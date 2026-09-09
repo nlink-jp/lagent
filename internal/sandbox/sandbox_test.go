@@ -1,0 +1,626 @@
+package sandbox
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestProfileContainsResolvedDirs(t *testing.T) {
+	p, err := Profile([]string{"/private/tmp/proj", "/private/tmp/scratch"}, []string{"/dev/null"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"(deny file-write*)",
+		`(subpath "/private/tmp/proj")`,
+		`(subpath "/private/tmp/scratch")`,
+	} {
+		if !strings.Contains(p, want) {
+			t.Errorf("profile missing %q:\n%s", want, p)
+		}
+	}
+}
+
+func TestProfileRejectsRelativeDir(t *testing.T) {
+	if _, err := Profile([]string{"relative/path"}, nil); err == nil {
+		t.Fatal("relative dir should be rejected")
+	}
+}
+
+func TestProfileRejectsEmpty(t *testing.T) {
+	if _, err := Profile(nil, nil); err == nil {
+		t.Fatal("empty write list should be rejected")
+	}
+}
+
+func TestSBPLStringEscaping(t *testing.T) {
+	got := sbplString(`/path/with"quote\back`)
+	want := `"/path/with\"quote\\back"`
+	if got != want {
+		t.Errorf("sbplString = %s, want %s", got, want)
+	}
+}
+
+// TestSandboxExecEnforcement runs real sandbox-exec (darwin only): a write
+// inside the allowed project dir must succeed, a write outside must fail.
+// This is the load-bearing test — the profile text being well-formed means
+// nothing unless Seatbelt actually enforces it.
+func TestSandboxExecEnforcement(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("sandbox-exec is macOS-only")
+	}
+	if err := Available(); err != nil {
+		t.Skipf("sandbox-exec cannot apply a profile here (nested sandbox?): %v", err)
+	}
+	inside, err := ResolveWriteDir(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	outside, err := ResolveWriteDir(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	profile, err := Profile([]string{inside}, ScratchFiles())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	run := func(command string) error {
+		argv := Wrap(profile, "/bin/bash", command)
+		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+		return cmd.Run()
+	}
+
+	if err := run("echo ok > " + filepath.Join(inside, "allowed.txt")); err != nil {
+		t.Errorf("write inside allowed dir should succeed: %v", err)
+	}
+	if err := run("echo bad > " + filepath.Join(outside, "denied.txt")); err == nil {
+		t.Error("write outside allowed dir should be denied by sandbox-exec")
+	}
+	// Reads outside the write allowlist must still work (allow default).
+	if err := run("ls / > " + filepath.Join(inside, "ls.txt")); err != nil {
+		t.Errorf("read outside + write inside should succeed: %v", err)
+	}
+}
+
+// ADR-0073: the lanes. The profile text is checked for the rules each
+// lane must carry; the live test below checks that Seatbelt enforces
+// them.
+func TestLaneProfiles(t *testing.T) {
+	spec := Spec{ProjectDir: "/private/tmp/proj", WorkDir: "/private/tmp/work", Home: "/Users/op", DenyExec: []string{"osascript"}, ReadScratch: "/private/tmp/work/scratch"}
+	read, err := LaneProfile(LaneRead, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"(deny network*)", "(deny mach-lookup)", "(deny appleevent-send)", "(deny ipc-posix*)", "(deny iokit-open)", "(deny user-preference-write)", "(deny lsopen)", "(deny signal)", "(deny process-exec", `/osascript"`, `(subpath "/Users/op/.ssh")`, `\.env`, "(allow file-write*\n    (subpath \"/private/tmp/work/scratch\")"} {
+		if !strings.Contains(read, want) {
+			t.Errorf("read lane lacks %q:\n%s", want, read)
+		}
+	}
+	if !strings.Contains(read, "(deny file-write*\n    (subpath \"/private/tmp/proj\")") {
+		t.Error("read lane must deny project writes by name (after the scratch allow)")
+	}
+	if strings.Contains(read, "(allow file-write*\n    (subpath \"/private/tmp/proj\")") {
+		t.Error("read lane must not allow project writes")
+	}
+	if strings.Contains(read, `(subpath "/private/tmp")`) || strings.Contains(read, "(deny sysctl-write)") {
+		t.Error("read lane must not allow the shared scratch roots, and must not deny sysctl-write (uname needs it)")
+	}
+	write, err := LaneProfile(LaneWrite, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`(subpath "/private/tmp/proj")`, `(subpath "/private/tmp/work")`, `AGENTS|AGENT|CLAUDE|GEMINI`, `\.git/(hooks|info)`, `(subpath "/Users/op/.ssh")`} {
+		if !strings.Contains(write, want) {
+			t.Errorf("write lane lacks %q:\n%s", want, write)
+		}
+	}
+	if strings.Contains(write, "(deny network*)") {
+		t.Error("write lane must not deny the network")
+	}
+	op, err := LaneProfile(LaneOperator, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(op, "AGENTS") || strings.Contains(op, ".ssh") {
+		t.Error("operator lane must allow persistent files and credential reads")
+	}
+	if _, err := ParseLane("root"); err == nil {
+		t.Error("unknown lane accepted")
+	}
+	if l, _ := ParseLane(""); l != LaneRead {
+		t.Error("empty access is not the read lane")
+	}
+}
+
+func TestPersistentAndCredentialRulesAgree(t *testing.T) {
+	for _, rel := range []string{"AGENTS.md", "sub/CLAUDE.md", ".git", "sub/.git", ".git/hooks/pre-commit", ".git/config", "vendor/x/.git/config.lock", ".claude/skills/a/SKILL.md", ".mcp.json", "docs/.lagent.toml"} {
+		if !PersistentFile(rel) {
+			t.Errorf("%q not persistent", rel)
+		}
+	}
+	for _, rel := range []string{"README.md", ".git/index", ".git/objects/ab/cd", "src/agents.go", "gitconfig", ".github/workflows/x.yml"} {
+		if PersistentFile(rel) {
+			t.Errorf("%q wrongly persistent", rel)
+		}
+	}
+	for _, p := range []string{"~/.ssh/id_rsa", ".env", ".env.local", "/x/credentials.json", "~/.aws/credentials", "sa-service-account.json", "~/.netrc", "~/.gemini/oauth_creds.json", "~/.claude/.credentials.json", "~/.claude.json", "~/Library/Keychains/login.keychain-db"} {
+		if !CredentialPath(p) {
+			t.Errorf("%q not credential", p)
+		}
+	}
+	for _, p := range []string{".env.example", "environment.go", "README.md", "src/main.go", ".envrc-notes.md", ".claude/skills/x/SKILL.md", "docs/.gemini/notes.md"} {
+		if CredentialPath(p) {
+			t.Errorf("%q wrongly credential", p)
+		}
+	}
+}
+
+// TestLaneEnforcement runs real sandbox-exec: the read lane denies a
+// project write, the network and a preference write; the write lane
+// allows the project write but denies AGENTS.md, .git/hooks and a
+// credential read through every spelling probed in ADR-0073; the
+// operator lane allows all of them.
+func TestLaneEnforcement(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("sandbox-exec is macOS-only")
+	}
+	if err := Available(); err != nil {
+		t.Skipf("sandbox-exec cannot apply a profile here (nested sandbox?): %v", err)
+	}
+	// The project must not sit under a scratch root, or the read
+	// lane's scratch allow would cover it: use the home directory.
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home directory")
+	}
+	proj, err := os.MkdirTemp(home, ".lagent-lane-test-")
+	if err != nil {
+		t.Skip("cannot create a directory under home")
+	}
+	defer func() { _ = os.RemoveAll(proj) }()
+	proj, _ = ResolveWriteDir(proj)
+	fakeHome := filepath.Join(proj, "home")
+	for _, d := range []string{".git/hooks", "home/.ssh"} {
+		if err := os.MkdirAll(filepath.Join(proj, d), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, d := range []string{"home/Library/Cookies", "home/Library/Caches", "home/.gemini"} {
+		if err := os.MkdirAll(filepath.Join(proj, d), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for name, body := range map[string]string{"AGENTS.md": "rules\n", ".git/config": "cfg\n", "home/.ssh/id_rsa": "secret\n", ".env": "K=v\n", ".env.example": "K=\n", "home/Library/Cookies/x": "c\n", "home/Library/Caches/x": "c\n", "home/.gemini/oauth_creds.json": "{}\n"} {
+		if err := os.WriteFile(filepath.Join(proj, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	scratch, _ := ResolveWriteDir(t.TempDir())
+	spec := Spec{ProjectDir: proj, Home: fakeHome, DenyExec: DefaultDenyExec, ReadScratch: scratch}
+	run := func(lane Lane, command string) error {
+		profile, err := LaneProfile(lane, spec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		argv := Wrap(profile, "/bin/bash", command)
+		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+		if lane == LaneRead {
+			cmd.Env = append(os.Environ(), "TMPDIR="+scratch)
+		}
+		return cmd.Run()
+	}
+	agents := filepath.Join(proj, "AGENTS.md")
+	cases := []struct {
+		lane    Lane
+		command string
+		allowed bool
+		what    string
+	}{
+		{LaneRead, "cat " + agents, true, "read lane reads the project"},
+		{LaneRead, "echo x > " + filepath.Join(proj, "new.txt"), false, "read lane denies a project write"},
+		{LaneRead, "echo x > /dev/null", true, "read lane allows the device sink"},
+		{LaneRead, `echo x > "$TMPDIR/probe" && rm "$TMPDIR/probe"`, true, "read lane allows its private scratch"},
+		{LaneRead, "echo x > /private/tmp/lagent-lane-probe-$$", false, "read lane denies the shared /private/tmp"},
+		{LaneRead, "cat " + filepath.Join(fakeHome, ".ssh/id_rsa"), false, "read lane denies a credential read"},
+		{LaneRead, "cat " + filepath.Join(proj, ".env"), false, "read lane denies .env"},
+		{LaneRead, "cat " + filepath.Join(proj, ".env.example"), true, "read lane allows the .env template"},
+		{LaneRead, "/usr/bin/osascript -e 'return 1'", false, "read lane denies osascript"},
+		{LaneRead, "sleep 5 & kill $!", true, "read lane lets a command signal its own child"},
+		{LaneWrite, "echo x > " + filepath.Join(proj, "new.txt"), true, "write lane allows a project write"},
+		{LaneWrite, "echo pwned > " + agents, false, "write lane denies a redirect onto AGENTS.md"},
+		{LaneWrite, "echo pwned > " + filepath.Join(proj, "t.txt") + " && mv " + filepath.Join(proj, "t.txt") + " " + agents, false, "write lane denies a rename onto AGENTS.md"},
+		{LaneWrite, "rm " + agents, false, "write lane denies removing AGENTS.md"},
+		{LaneWrite, "echo x > " + filepath.Join(proj, ".git/hooks/pre-commit"), false, "write lane denies a hook"},
+		{LaneWrite, "echo x > " + filepath.Join(proj, ".git/index"), true, "write lane allows ordinary .git writes"},
+		{LaneWrite, "cat " + filepath.Join(fakeHome, ".ssh/id_rsa"), false, "write lane denies a credential read"},
+		{LaneWrite, "cd " + shellQuote(proj) + " && git init -q .", false, "write lane denies git init (it writes .git/config and hooks) — agent-board review"},
+		{LaneWrite, "cd " + shellQuote(proj) + " && mv .git .git-old", false, "write lane denies renaming .git away (review F-02)"},
+		{LaneWrite, "cd " + shellQuote(proj) + " && mkdir -p sub " + shellQuote(filepath.Join(scratch, "evil/hooks")) + " && mv " + shellQuote(filepath.Join(scratch, "evil")) + " sub/.git", false, "write lane denies moving a prepared .git into the project (review F-02)"},
+		{LaneWrite, "cd " + shellQuote(proj) + " && rm -rf .git && echo 'gitdir: /tmp/evil' > .git", false, "write lane denies a gitdir pointer file (review F-02)"},
+		{LaneRead, "exec 3</dev/tty", false, "read lane denies opening the terminal (review F-01)"},
+		{LaneWrite, "exec 3</dev/tty", false, "write lane denies opening the terminal (review F-01)"},
+		{LaneOperator, "exec 3</dev/tty", false, "operator lane denies opening the terminal (review F-01)"},
+		{LaneRead, "cat <<'EOF'\nhere\nEOF", true, "read lane runs a here-document (review F-05)"},
+		{LaneRead, "echo x > /dev/fd/1", true, "read lane writes its own descriptors (review F-06)"},
+		{LaneRead, "cat " + shellQuote(filepath.Join(fakeHome, "Library/Cookies/x")), false, "read lane denies the user's Library (design review V2)"},
+		{LaneRead, "cat " + shellQuote(filepath.Join(fakeHome, "Library/Caches/x")), true, "read lane allows toolchain caches under Library"},
+		{LaneRead, "cat " + shellQuote(filepath.Join(fakeHome, ".gemini/oauth_creds.json")), false, "read lane denies agent token stores (review F-07)"},
+		{LaneOperator, "cd " + shellQuote(proj) + " && git init -q . && test -f .git/config", true, "operator lane allows git init"},
+		{LaneOperator, "cat " + filepath.Join(fakeHome, ".ssh/id_rsa"), true, "operator lane allows a credential read"},
+		{LaneOperator, "echo ok > " + agents, true, "operator lane allows AGENTS.md"},
+	}
+	for _, c := range cases {
+		err := run(c.lane, c.command)
+		if c.allowed && err != nil {
+			t.Errorf("%s: %q failed: %v", c.what, c.command, err)
+		}
+		if !c.allowed && err == nil {
+			t.Errorf("%s: %q succeeded", c.what, c.command)
+		}
+	}
+	if got, _ := os.ReadFile(agents); string(got) != "ok\n" {
+		t.Errorf("AGENTS.md = %q: the write lane changed it or the operator lane could not", got)
+	}
+	if st, err := os.Stat(filepath.Join(proj, ".git")); err != nil || !st.IsDir() {
+		t.Errorf(".git is no longer the repository directory: %v %v", st, err)
+	}
+	// A project under a scratch root (a checkout in /private/tmp) is
+	// still not writable in the read lane: the deny by name follows the
+	// scratch allow.
+	tmpProj, _ := ResolveWriteDir(t.TempDir())
+	if !strings.HasPrefix(tmpProj, "/private/") && !strings.HasPrefix(tmpProj, os.TempDir()) {
+		t.Skip("TempDir is not under a scratch root")
+	}
+	tmpSpec := Spec{ProjectDir: tmpProj, Home: fakeHome, ReadScratch: scratch}
+	profile, err := LaneProfile(LaneRead, tmpSpec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	argv := Wrap(profile, "/bin/bash", "echo x > "+filepath.Join(tmpProj, "new.txt"))
+	if err := exec.CommandContext(ctx, argv[0], argv[1:]...).Run(); err == nil {
+		t.Error("read lane wrote into a project that lives under a scratch root")
+	}
+}
+
+// TestReadLaneCorpus is the old shell corpus moved from the text tier
+// to the kernel (design review of ADR-0073): every spelling that once
+// needed a regex to catch — redirects, tee, sed -i, find -exec, xargs,
+// env, awk system(), command substitution, python, dd, install, mv,
+// truncate, chmod — is tried against the read lane, and the project
+// file must be untouched afterwards. The capability, not the command
+// name, is what the lane denies.
+func TestReadLaneCorpus(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("sandbox-exec is macOS-only")
+	}
+	if err := Available(); err != nil {
+		t.Skipf("sandbox-exec cannot apply a profile here: %v", err)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home directory")
+	}
+	proj, err := os.MkdirTemp(home, ".lagent-corpus-test-")
+	if err != nil {
+		t.Skip("cannot create a directory under home")
+	}
+	defer func() { _ = os.RemoveAll(proj) }()
+	proj, _ = ResolveWriteDir(proj)
+	target := filepath.Join(proj, "f.txt")
+	if err := os.WriteFile(target, []byte("keep\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scratch, _ := ResolveWriteDir(t.TempDir())
+	profile, err := LaneProfile(LaneRead, Spec{ProjectDir: proj, Home: filepath.Join(proj, "nohome"), ReadScratch: scratch})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	q := shellQuote(target)
+	corpus := []string{
+		"echo x > " + q,
+		"echo x >> " + q,
+		"echo x | tee " + q,
+		"sed -i '' s/keep/gone/ " + q,
+		"find " + shellQuote(proj) + " -name f.txt -exec rm {} \\;",
+		"find " + shellQuote(proj) + " -name f.txt -delete",
+		"echo " + q + " | xargs rm",
+		"env rm " + q,
+		"awk 'BEGIN{system(\"rm " + target + "\")}'",
+		"$(echo rm) " + q,
+		"python3 -c 'open(" + shellQuote(target) + ",\"w\").write(\"x\")'",
+		"perl -e 'open(F,\">\",\"" + target + "\"); print F 1'",
+		"dd if=/dev/zero of=" + q + " bs=1 count=1",
+		"install -m 600 /dev/null " + q,
+		"mv " + q + " " + shellQuote(target+".moved"),
+		"cp /etc/hosts " + q,
+		"truncate -s 0 " + q,
+		"chmod 000 " + q,
+		"ln -sf /etc/hosts " + q,
+		"touch " + shellQuote(filepath.Join(proj, "new.txt")),
+		"mkdir " + shellQuote(filepath.Join(proj, "newdir")),
+		"cd " + shellQuote(proj) + " && git init -q .",
+	}
+	for _, command := range corpus {
+		argv := Wrap(profile, "/bin/bash", command)
+		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+		cmd.Env = append(os.Environ(), "TMPDIR="+scratch)
+		_ = cmd.Run() // failing is the point; the assertion is on the file
+		got, err := os.ReadFile(target)
+		if err != nil || string(got) != "keep\n" {
+			t.Errorf("%q changed the project file: %q %v", command, got, err)
+			_ = os.WriteFile(target, []byte("keep\n"), 0o600)
+		}
+		if st, err := os.Stat(target); err == nil && st.Mode().Perm() != 0o600 {
+			t.Errorf("%q changed the mode: %v", command, st.Mode())
+			_ = os.Chmod(target, 0o600)
+		}
+	}
+	entries, _ := os.ReadDir(proj)
+	if len(entries) != 1 {
+		t.Errorf("the read lane created entries in the project: %v", entries)
+	}
+	// Other implementation paths for the network and preferences.
+	for _, command := range []string{
+		"exec 3<>/dev/tcp/127.0.0.1/9",
+		"python3 -c 'import socket; s=socket.socket(); s.settimeout(2); s.connect((\"127.0.0.1\",9))'",
+		"python3 -c 'import ctypes,ctypes.util; cf=ctypes.CDLL(ctypes.util.find_library(\"CoreFoundation\")); cf.CFStringCreateWithCString.restype=ctypes.c_void_p; s=lambda x: ctypes.c_void_p(cf.CFStringCreateWithCString(None,x.encode(),0x08000100)); cf.CFPreferencesSetAppValue(s(\"k\"),s(\"v\"),s(\"com.nlink.lagent.lanetest\")); import sys; sys.exit(0 if cf.CFPreferencesAppSynchronize(s(\"com.nlink.lagent.lanetest\")) else 1)'",
+		"kill -0 1",
+	} {
+		argv := Wrap(profile, "/bin/bash", command)
+		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+		cmd.Env = append(os.Environ(), "TMPDIR="+scratch)
+		if err := cmd.Run(); err == nil {
+			t.Errorf("%q succeeded in the read lane", command)
+		}
+	}
+}
+
+// TestVerifyReadLane: the real read profile passes; a profile that
+// allows everything is refused, so an environment where the kernel
+// does not deny what the lane claims never gets an unasked read lane.
+// The write lane is a verified claim too (ADR-0073 §7): the real profile
+// passes, an allow-everything profile — what a stubbed or foreign
+// sandbox-exec amounts to — fails, and nothing of the project is left
+// behind by the probes.
+func TestVerifyWriteLane(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("sandbox-exec is macOS-only")
+	}
+	if err := Available(); err != nil {
+		t.Skipf("sandbox-exec cannot apply a profile here: %v", err)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home directory")
+	}
+	proj, err := os.MkdirTemp(home, ".lagent-verify-write-test-")
+	if err != nil {
+		t.Skip("cannot create a directory under home")
+	}
+	defer func() { _ = os.RemoveAll(proj) }()
+	proj, _ = ResolveWriteDir(proj)
+	// Home is the real one here: the outside probe lives under it.
+	spec := Spec{ProjectDir: proj, Home: home}
+	profile, err := LaneProfile(LaneWrite, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyWriteLane(profile, spec); err != nil {
+		t.Errorf("the real write lane failed verification: %v", err)
+	}
+	if err := VerifyWriteLane("(version 1)(allow default)", spec); err == nil {
+		t.Error("an allow-everything profile passed verification")
+	}
+	if err := VerifyWriteLane("(version 1)(deny default)", spec); err == nil {
+		t.Error("a deny-everything profile passed verification")
+	}
+	entries, _ := os.ReadDir(proj)
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".lagent-lane-probe-") {
+			t.Errorf("probe left behind: %s", e.Name())
+		}
+	}
+}
+
+func TestVerifyReadLane(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("sandbox-exec is macOS-only")
+	}
+	if err := Available(); err != nil {
+		t.Skipf("sandbox-exec cannot apply a profile here: %v", err)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home directory")
+	}
+	proj, err := os.MkdirTemp(home, ".lagent-verify-test-")
+	if err != nil {
+		t.Skip("cannot create a directory under home")
+	}
+	defer func() { _ = os.RemoveAll(proj) }()
+	proj, _ = ResolveWriteDir(proj)
+	scratch, _ := ResolveWriteDir(t.TempDir())
+	spec := Spec{ProjectDir: proj, Home: filepath.Join(proj, "nohome"), DenyExec: DefaultDenyExec, ReadScratch: scratch}
+	profile, err := LaneProfile(LaneRead, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyReadLane(profile, spec); err != nil {
+		t.Errorf("the real read lane failed verification: %v", err)
+	}
+	if err := VerifyReadLane("(version 1)(allow default)", spec); err == nil {
+		t.Error("an allow-everything profile passed verification")
+	}
+	// Final review R1: a pre-existing file with the old fixed probe
+	// name — here a symlink to a project file — is neither written
+	// through nor removed.
+	target := filepath.Join(proj, "keep.txt")
+	if err := os.WriteFile(target, []byte("keep\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("keep.txt", filepath.Join(proj, ".lagent-lane-probe")); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyReadLane(profile, spec); err != nil {
+		t.Errorf("verification failed with a bystander link present: %v", err)
+	}
+	if got, _ := os.ReadFile(target); string(got) != "keep\n" {
+		t.Errorf("verification wrote through a pre-existing link: %q", got)
+	}
+	if _, err := os.Lstat(filepath.Join(proj, ".lagent-lane-probe")); err != nil {
+		t.Errorf("verification removed a file it did not create: %v", err)
+	}
+	if entries, _ := os.ReadDir(proj); len(entries) != 2 {
+		t.Errorf("verification left files in the project: %v", entries)
+	}
+}
+
+// Final review R3: a work directory placed under the shells' shared
+// here-document directory is still denied in the read lane, and its
+// scratch subdirectory is still allowed.
+func TestReadLaneDeniesAWorkDirUnderASharedRoot(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("sandbox-exec is macOS-only")
+	}
+	if err := Available(); err != nil {
+		t.Skipf("sandbox-exec cannot apply a profile here: %v", err)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home directory")
+	}
+	proj, err := os.MkdirTemp(home, ".lagent-r3-test-")
+	if err != nil {
+		t.Skip("cannot create a directory under home")
+	}
+	defer func() { _ = os.RemoveAll(proj) }()
+	proj, _ = ResolveWriteDir(proj)
+	work, err := os.MkdirTemp("/private/var/tmp", "lagent-r3-work-")
+	if err != nil {
+		t.Skip("cannot create a directory under /private/var/tmp")
+	}
+	defer func() { _ = os.RemoveAll(work) }()
+	work, _ = ResolveWriteDir(work)
+	scratch := filepath.Join(work, "scratch")
+	if err := os.MkdirAll(scratch, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(work, "result.txt"), []byte("keep\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	spec := Spec{ProjectDir: proj, WorkDir: work, Home: filepath.Join(proj, "nohome"), ReadScratch: scratch}
+	profile, err := LaneProfile(LaneRead, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	run := func(command string) error {
+		argv := Wrap(profile, "/bin/bash", command)
+		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+		cmd.Env = append(os.Environ(), "TMPDIR="+scratch)
+		return cmd.Run()
+	}
+	if err := run("echo pwned > " + shellQuote(filepath.Join(work, "result.txt"))); err == nil {
+		t.Error("read lane wrote a work-directory file under /private/var/tmp")
+	}
+	if got, _ := os.ReadFile(filepath.Join(work, "result.txt")); string(got) != "keep\n" {
+		t.Errorf("work file changed: %q", got)
+	}
+	if err := run(`echo x > "$TMPDIR/ok" && rm "$TMPDIR/ok"`); err != nil {
+		t.Errorf("read lane denied its own scratch under the work directory: %v", err)
+	}
+	if err := run("cat <<'EOF'\nhere\nEOF"); err != nil {
+		t.Errorf("here-document failed: %v", err)
+	}
+}
+
+// Review F-07 / F-10: the read lane's environment carries no exported
+// secrets, and the denial hint reads the tail of the output only.
+func TestScrubEnvAndHintTail(t *testing.T) {
+	env := ScrubEnv([]string{"PATH=/bin", "HOME=/Users/x", "GITHUB_TOKEN=abc", "AWS_SECRET_ACCESS_KEY=k", "LAGENT_SESSION_ID=s", "MY_API_KEY=z", "GOFLAGS=-mod=mod", "OPENAI_api_key=q"})
+	got := strings.Join(env, " ")
+	for _, gone := range []string{"GITHUB_TOKEN", "AWS_SECRET", "MY_API_KEY", "OPENAI_api_key"} {
+		if strings.Contains(got, gone) {
+			t.Errorf("%s survived the scrub: %v", gone, env)
+		}
+	}
+	for _, kept := range []string{"PATH=", "HOME=", "LAGENT_SESSION_ID", "GOFLAGS"} {
+		if !strings.Contains(got, kept) {
+			t.Errorf("%s was scrubbed: %v", kept, env)
+		}
+	}
+	if DeniedHint("grep: permission denied appears in this log line\n" + strings.Repeat("ok\n", 300) + "[exit status 1]") {
+		t.Error("a denial quoted early in a long output must not read as the lane's refusal")
+	}
+	if !DeniedHint(strings.Repeat("ok\n", 300) + "/bin/bash: x: Operation not permitted\n[exit status 1]") {
+		t.Error("a refusal at the tail must be recognised")
+	}
+}
+
+// ADR-0074 §2: the write lane denies renaming the parent directory of a
+// persistent file (the swap that replaced sub/CLAUDE.md under an
+// unchanged name), while ordinary writes inside it stay allowed.
+func TestWriteLaneDeniesPersistentParents(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("sandbox-exec is macOS-only")
+	}
+	if err := Available(); err != nil {
+		t.Skipf("sandbox-exec cannot apply a profile here: %v", err)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home directory")
+	}
+	proj, err := os.MkdirTemp(home, ".lagent-parents-test-")
+	if err != nil {
+		t.Skip("cannot create a directory under home")
+	}
+	defer func() { _ = os.RemoveAll(proj) }()
+	proj, _ = ResolveWriteDir(proj)
+	if err := os.MkdirAll(filepath.Join(proj, "sub/deep"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "sub/deep/CLAUDE.md"), []byte("rules\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	spec := Spec{ProjectDir: proj, Home: filepath.Join(proj, "nohome"),
+		PersistentParents: []string{filepath.Join(proj, "sub/deep"), filepath.Join(proj, "sub")}}
+	profile, err := LaneProfile(LaneWrite, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	run := func(command string) error {
+		argv := Wrap(profile, "/bin/bash", command)
+		return exec.CommandContext(ctx, argv[0], argv[1:]...).Run()
+	}
+	if err := run("mv " + shellQuote(filepath.Join(proj, "sub")) + " " + shellQuote(filepath.Join(proj, "sub.old"))); err == nil {
+		t.Error("the write lane renamed a persistent file's parent")
+	}
+	if err := run("mv " + shellQuote(filepath.Join(proj, "sub/deep")) + " " + shellQuote(filepath.Join(proj, "sub/deep.old"))); err == nil {
+		t.Error("the write lane renamed a persistent file's direct parent")
+	}
+	if err := run("echo ok > " + shellQuote(filepath.Join(proj, "sub/deep/other.txt")) + " && mkdir " + shellQuote(filepath.Join(proj, "sub/deep/more"))); err != nil {
+		t.Errorf("ordinary writes inside a protected parent failed: %v", err)
+	}
+	if got, _ := os.ReadFile(filepath.Join(proj, "sub/deep/CLAUDE.md")); string(got) != "rules\n" {
+		t.Errorf("CLAUDE.md changed: %q", got)
+	}
+}

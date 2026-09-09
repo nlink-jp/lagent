@@ -1,0 +1,461 @@
+package mcp
+
+import (
+	"bufio"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+// fakeServer speaks newline-delimited JSON-RPC over pipes, standing in
+// for a spawned MCP server process.
+type fakeServer struct {
+	mu       sync.Mutex
+	spawns   int
+	received []message
+	// handler returns raw lines to emit before the response, the result
+	// payload, and whether to respond at all.
+	handler func(f *fakeServer, method string, params json.RawMessage) (pre []string, result any, respond bool)
+}
+
+func (f *fakeServer) spawn() (io.WriteCloser, io.ReadCloser, func(), error) {
+	f.mu.Lock()
+	f.spawns++
+	f.mu.Unlock()
+
+	inR, inW := io.Pipe()   // client stdin -> server
+	outR, outW := io.Pipe() // server -> client stdout
+
+	go func() {
+		scanner := bufio.NewScanner(inR)
+		scanner.Buffer(make([]byte, 64*1024), scannerMax)
+		for scanner.Scan() {
+			var msg message
+			if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
+				continue
+			}
+			f.mu.Lock()
+			f.received = append(f.received, msg)
+			f.mu.Unlock()
+			if msg.ID == nil || msg.Method == "" {
+				continue // notification, or the client answering our request
+			}
+			pre, result, respond := f.handler(f, msg.Method, msg.Params)
+			for _, line := range pre {
+				fmt.Fprintln(outW, line)
+			}
+			if !respond {
+				continue
+			}
+			resp, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": *msg.ID, "result": result})
+			_, _ = outW.Write(append(resp, '\n'))
+		}
+	}()
+
+	kill := func() {
+		_ = inW.Close()
+		_ = outW.Close()
+		_ = inR.Close()
+		_ = outR.Close()
+	}
+	return inW, outR, kill, nil
+}
+
+func (f *fakeServer) spawnCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.spawns
+}
+
+func stdResult(method string) (any, bool) {
+	switch method {
+	case "initialize":
+		return map[string]any{
+			"protocolVersion": protocolVersion,
+			"capabilities":    map[string]any{},
+			"serverInfo":      map[string]any{"name": "fake", "version": "0"},
+		}, true
+	case "tools/list":
+		return map[string]any{"tools": []map[string]any{{
+			"name":        "check_ip",
+			"description": "Check an IP.",
+			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"ip": map[string]any{"type": "string"}}},
+		}}}, true
+	case "tools/call":
+		return map[string]any{"content": []map[string]any{{"type": "text", "text": "tool-result"}}}, true
+	}
+	return nil, false
+}
+
+func stdHandler(f *fakeServer, method string, params json.RawMessage) ([]string, any, bool) {
+	result, ok := stdResult(method)
+	return nil, result, ok
+}
+
+func newTestClient(f *fakeServer, timeout time.Duration) *Client {
+	return newClient("fake", f.spawn, timeout, "test")
+}
+
+func TestListAndCall(t *testing.T) {
+	f := &fakeServer{handler: stdHandler}
+	c := newTestClient(f, 2*time.Second)
+	defer c.Close()
+
+	tools, err := c.ListTools(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tools) != 1 || tools[0].Name != "check_ip" || tools[0].InputSchema["type"] != "object" {
+		t.Fatalf("tools = %+v", tools)
+	}
+
+	out, err := callText(t, c, "check_ip", map[string]any{"ip": "192.0.2.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != "tool-result" {
+		t.Errorf("out = %q", out)
+	}
+
+	// Handshake order: initialize request, then initialized notification.
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.received) < 2 || f.received[0].Method != "initialize" || f.received[1].Method != "notifications/initialized" {
+		t.Errorf("handshake frames wrong: %+v", f.received[:2])
+	}
+}
+
+func TestIsErrorPrefixed(t *testing.T) {
+	f := &fakeServer{}
+	f.handler = func(_ *fakeServer, method string, _ json.RawMessage) ([]string, any, bool) {
+		if method == "tools/call" {
+			return nil, map[string]any{
+				"content": []map[string]any{{"type": "text", "text": "lookup failed"}},
+				"isError": true,
+			}, true
+		}
+		r, ok := stdResult(method)
+		return nil, r, ok
+	}
+	c := newTestClient(f, 2*time.Second)
+	defer c.Close()
+
+	out, err := callText(t, c, "check_ip", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != "error: lookup failed" {
+		t.Errorf("out = %q", out)
+	}
+}
+
+func TestNotificationAndServerRequestInterleaved(t *testing.T) {
+	f := &fakeServer{}
+	f.handler = func(_ *fakeServer, method string, _ json.RawMessage) ([]string, any, bool) {
+		if method == "tools/call" {
+			pre := []string{
+				`{"jsonrpc":"2.0","method":"notifications/message","params":{"level":"info","data":"noise"}}`,
+				`{"jsonrpc":"2.0","id":999,"method":"sampling/createMessage","params":{}}`,
+			}
+			r, ok := stdResult(method)
+			return pre, r, ok
+		}
+		r, ok := stdResult(method)
+		return nil, r, ok
+	}
+	c := newTestClient(f, 2*time.Second)
+	defer c.Close()
+
+	out, err := callText(t, c, "check_ip", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != "tool-result" {
+		t.Errorf("out = %q (notification/server-request should be transparent)", out)
+	}
+
+	// The server-initiated request must receive a -32601 refusal — an
+	// unanswered request could hang a server that waits for it.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		f.mu.Lock()
+		for _, m := range f.received {
+			if m.ID != nil && m.Method == "" && m.Error != nil && m.Error.Code == -32601 {
+				f.mu.Unlock()
+				return
+			}
+		}
+		f.mu.Unlock()
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Error("server request never received the -32601 refusal")
+}
+
+func TestTimeoutKillsThenRespawns(t *testing.T) {
+	f := &fakeServer{}
+	f.handler = func(f *fakeServer, method string, _ json.RawMessage) ([]string, any, bool) {
+		if method == "tools/call" && f.spawnCount() == 1 {
+			return nil, nil, false // first incarnation hangs on calls
+		}
+		r, ok := stdResult(method)
+		return nil, r, ok
+	}
+	c := newTestClient(f, 300*time.Millisecond)
+	defer c.Close()
+
+	_, err := callText(t, c, "check_ip", nil)
+	if err == nil || !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("expected timeout error, got %v", err)
+	}
+	if f.spawnCount() != 1 {
+		t.Fatalf("spawns = %d before respawn", f.spawnCount())
+	}
+
+	out, err := callText(t, c, "check_ip", nil)
+	if err != nil {
+		t.Fatalf("call after respawn failed: %v", err)
+	}
+	if out != "tool-result" || f.spawnCount() != 2 {
+		t.Errorf("out = %q, spawns = %d (lazy respawn expected)", out, f.spawnCount())
+	}
+}
+
+func TestLargeToolOutput(t *testing.T) {
+	big := strings.Repeat("x", 200*1024) // beyond the scanner's initial buffer
+	f := &fakeServer{}
+	f.handler = func(_ *fakeServer, method string, _ json.RawMessage) ([]string, any, bool) {
+		if method == "tools/call" {
+			return nil, map[string]any{"content": []map[string]any{{"type": "text", "text": big}}}, true
+		}
+		r, ok := stdResult(method)
+		return nil, r, ok
+	}
+	c := newTestClient(f, 5*time.Second)
+	defer c.Close()
+
+	out, err := callText(t, c, "check_ip", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != big {
+		t.Errorf("large output corrupted: len=%d", len(out))
+	}
+}
+
+// callText drives CallTool and renders the blocks the way a caller
+// that only wants text would: the client no longer flattens for it.
+func callText(t *testing.T, c *Client, tool string, args map[string]any) (string, error) {
+	t.Helper()
+	blocks, isErr, err := c.CallTool(context.Background(), tool, args)
+	if err != nil {
+		return "", err
+	}
+	var parts []string
+	for _, b := range blocks {
+		if b.Type == "text" {
+			parts = append(parts, b.Text)
+			continue
+		}
+		parts = append(parts, "["+b.Type+" content: "+strconv.Itoa(len(b.Data))+" bytes "+b.MIME+"]")
+	}
+	out := strings.Join(parts, "\n")
+	if out == "" {
+		out = "(no content)"
+	}
+	if isErr {
+		out = "error: " + out
+	}
+	return out, nil
+}
+
+func TestToolListPagination(t *testing.T) {
+	f := &fakeServer{}
+	f.handler = func(_ *fakeServer, method string, params json.RawMessage) ([]string, any, bool) {
+		if method == "tools/list" {
+			var p struct {
+				Cursor string `json:"cursor"`
+			}
+			_ = json.Unmarshal(params, &p)
+			if p.Cursor == "" {
+				return nil, map[string]any{
+					"tools":      []map[string]any{{"name": "a", "inputSchema": map[string]any{"type": "object"}}},
+					"nextCursor": "page2",
+				}, true
+			}
+			return nil, map[string]any{
+				"tools": []map[string]any{{"name": "b", "inputSchema": map[string]any{"type": "object"}}},
+			}, true
+		}
+		r, ok := stdResult(method)
+		return nil, r, ok
+	}
+	c := newTestClient(f, 2*time.Second)
+	defer c.Close()
+
+	tools, err := c.ListTools(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tools) != 2 || tools[0].Name != "a" || tools[1].Name != "b" {
+		t.Errorf("paginated tools = %+v", tools)
+	}
+}
+
+// A server may answer with an image. The client used to flatten every
+// non-text block to "[non-text content: image]", so a screenshot from
+// chrome-pilot-mcp was invisible to the model (ADR-0058).
+func TestNonTextContentSurvives(t *testing.T) {
+	png := []byte("\x89PNG\r\n\x1a\nfake pixels")
+	f := &fakeServer{}
+	f.handler = func(_ *fakeServer, method string, _ json.RawMessage) ([]string, any, bool) {
+		if method == "tools/call" {
+			return nil, map[string]any{"content": []map[string]any{
+				{"type": "text", "text": "shot taken"},
+				{"type": "image", "data": base64.StdEncoding.EncodeToString(png), "mimeType": "image/png"},
+			}}, true
+		}
+		r, ok := stdResult(method)
+		return nil, r, ok
+	}
+	c := newTestClient(f, 2*time.Second)
+	defer c.Close()
+
+	blocks, isErr, err := c.CallTool(context.Background(), "take_screenshot", nil)
+	if err != nil || isErr {
+		t.Fatalf("call failed: %v isErr=%v", err, isErr)
+	}
+	if len(blocks) != 2 {
+		t.Fatalf("blocks = %d, want the text and the image", len(blocks))
+	}
+	if blocks[0].Type != "text" || blocks[0].Text != "shot taken" {
+		t.Errorf("text block = %+v", blocks[0])
+	}
+	img := blocks[1]
+	if img.Type != "image" || img.MIME != "image/png" {
+		t.Fatalf("image block = %+v", img)
+	}
+	if string(img.Data) != string(png) {
+		t.Errorf("image bytes = %q, want the decoded PNG", img.Data)
+	}
+}
+
+// Undecodable data is reported, never dropped: silently losing a
+// server's answer is the failure this change exists to stop.
+func TestUndecodableContentIsReportedNotDropped(t *testing.T) {
+	f := &fakeServer{}
+	f.handler = func(_ *fakeServer, method string, _ json.RawMessage) ([]string, any, bool) {
+		if method == "tools/call" {
+			return nil, map[string]any{"content": []map[string]any{
+				{"type": "image", "data": "!!! not base64 !!!", "mimeType": "image/png"},
+			}}, true
+		}
+		r, ok := stdResult(method)
+		return nil, r, ok
+	}
+	c := newTestClient(f, 2*time.Second)
+	defer c.Close()
+
+	blocks, _, err := c.CallTool(context.Background(), "take_screenshot", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blocks) != 1 || blocks[0].Type != "text" || !strings.Contains(blocks[0].Text, "could not be decoded") {
+		t.Errorf("blocks = %+v, want one text block saying so", blocks)
+	}
+}
+
+// ADR-0075 §1: a server's JSON-RPC error object is the server's words,
+// delivered as a rejection rather than a result. CallTool wraps it in a
+// CallError that the adapter unwraps by type — never by matching text —
+// and a transport cause travels in the same envelope.
+func TestRPCErrorIsTypedThroughCallError(t *testing.T) {
+	f := &fakeServer{}
+	f.handler = func(f *fakeServer, method string, params json.RawMessage) ([]string, any, bool) {
+		if method == "tools/call" {
+			f.mu.Lock()
+			id := f.received[len(f.received)-1].ID.String()
+			f.mu.Unlock()
+			return []string{fmt.Sprintf(`{"jsonrpc":"2.0","id":%s,"error":{"code":-32602,"message":"Invalid params"}}`, id)}, nil, false
+		}
+		r, ok := stdResult(method)
+		return nil, r, ok
+	}
+	c := newTestClient(f, 2*time.Second)
+	defer c.Close()
+
+	_, _, err := c.CallTool(context.Background(), "q", map[string]any{"x": 1})
+	var ce *CallError
+	var rpc *RPCError
+	if !errors.As(err, &ce) || !errors.As(err, &rpc) {
+		t.Fatalf("err = %v (%T) — want a CallError carrying the RPCError", err, err)
+	}
+	if ce.Server != "fake" || ce.Tool != "q" || !ce.Sent || rpc.Code != -32602 || rpc.Message != "Invalid params" || ce.Err != error(rpc) {
+		t.Errorf("CallError = %+v, RPCError = %+v — a rejection of a sent call", *ce, *rpc)
+	}
+	if err.Error() != "mcp fake: q: rpc error -32602: Invalid params" {
+		t.Errorf("Error() = %q — the text shape is unchanged", err.Error())
+	}
+}
+
+// ADR-0075 §1 (pre-release review A-1): a server that refuses to start —
+// its initialize answered with a JSON-RPC error — has not rejected the
+// call; the call was never sent. CallError says so, and the RPCError is
+// still reachable as the cause.
+func TestInitializeRefusalIsNotSent(t *testing.T) {
+	f := &fakeServer{}
+	f.handler = func(f *fakeServer, method string, params json.RawMessage) ([]string, any, bool) {
+		if method == "initialize" {
+			f.mu.Lock()
+			id := f.received[len(f.received)-1].ID.String()
+			f.mu.Unlock()
+			return []string{fmt.Sprintf(`{"jsonrpc":"2.0","id":%s,"error":{"code":-32600,"message":"unsupported protocol"}}`, id)}, nil, false
+		}
+		r, ok := stdResult(method)
+		return nil, r, ok
+	}
+	c := newTestClient(f, 2*time.Second)
+	defer c.Close()
+
+	_, _, err := c.CallTool(context.Background(), "q", map[string]any{"x": 1})
+	var ce *CallError
+	var rpc *RPCError
+	if !errors.As(err, &ce) || !errors.As(err, &rpc) {
+		t.Fatalf("err = %v (%T) — want a CallError carrying the initialize RPCError", err, err)
+	}
+	if ce.Sent {
+		t.Errorf("Sent = true for a call whose server never started: %+v", *ce)
+	}
+	if rpc.Code != -32600 || !strings.Contains(ce.Err.Error(), "initialize") {
+		t.Errorf("cause = %v — must name initialize and carry the server's code", ce.Err)
+	}
+	if strings.HasPrefix(ce.Err.Error(), "mcp fake:") {
+		t.Errorf("cause repeats the server name the adapter already shows: %q", ce.Err.Error())
+	}
+}
+
+// A result the server answered but the client could not decode was sent.
+func TestUndecodableResultIsSent(t *testing.T) {
+	f := &fakeServer{}
+	f.handler = func(f *fakeServer, method string, params json.RawMessage) ([]string, any, bool) {
+		if method == "tools/call" {
+			return nil, "not an object", true
+		}
+		r, ok := stdResult(method)
+		return nil, r, ok
+	}
+	c := newTestClient(f, 2*time.Second)
+	defer c.Close()
+	_, _, err := c.CallTool(context.Background(), "q", nil)
+	var ce *CallError
+	if !errors.As(err, &ce) || !ce.Sent || !strings.HasPrefix(ce.Err.Error(), "result:") {
+		t.Errorf("err = %v — want a sent CallError whose cause is the decode failure", err)
+	}
+}
