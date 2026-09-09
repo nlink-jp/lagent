@@ -629,7 +629,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// model away from the behavior its own prior already had.
 	var ag *agent.Agent
 	composeSystem := func() string {
-		return buildSystemPrompt(projectDir, workDir, projectContext)
+		return buildSystemPrompt(projectDir, projectContext)
 	}
 	// writes pairs the agent's before/after hooks around an
 	// operator-approved write (ADR-0074 §1).
@@ -759,6 +759,10 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	if len(restored) > 0 {
 		ag.SetHistory(restored)
 	}
+	// The per-session facts open the conversation (after SetHistory: the
+	// isolation tag is fresh, and the restored history's own opening
+	// message named the old one).
+	ag.AnnounceSession(sessionFacts(workDir))
 
 	// Exit summary (operator request): every interactive exit route —
 	// /quit, Ctrl+C, Ctrl+D — ends with the resume hint and the cost
@@ -995,9 +999,11 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 		// Every consumer of the work directory follows it: the file
 		// tools' second root, the sandbox profile, the MCP intake (it
-		// reads the registry), and the system prompt — a cleared
-		// conversation has no cached prefix to protect.
-		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap), func() { ag.SetSystem(composeSystem()) })...)
+		// reads the registry), and the model — told through a fresh
+		// runtime-facts message, never through the system prompt, which
+		// stays byte-identical so the server's prefix cache survives
+		// the clear.
+		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap), func() { ag.AnnounceSession(sessionFacts(workDir)) })...)
 		// The MCP servers — spawned at startup with the old id in their
 		// environment and arguments — are reconnected the way /mcp
 		// reload does, so a server keeping per-session state sees the
@@ -1998,9 +2004,10 @@ func (l liveLog) Log(kind string, data any) error {
 
 // rotateWorkDir points every consumer of the session work directory at
 // dir ("" for none): the file tools' second root, the sandbox profile,
-// and the system prompt. The MCP intake reads the registry, so it
-// follows on its own. Returns operator notes for what could not follow.
-func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool, projectDir, dir string, denyExec []string, readLanePrompts bool, persistentParents []string, setSystem func()) []string {
+// and the model (announce tells it, through the runtime-facts message).
+// The MCP intake reads the registry, so it follows on its own. Returns
+// operator notes for what could not follow.
+func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool, projectDir, dir string, denyExec []string, readLanePrompts bool, persistentParents []string, announce func()) []string {
 	var notes []string
 	if err := registry.UseWorkDir(dir); err != nil {
 		notes = append(notes, fmt.Sprintf("file tools keep the previous work directory: %v", err))
@@ -2015,8 +2022,8 @@ func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool
 		registry.SetLaneExec(shellExec.run, enf)
 		notes = append(notes, laneNotes...)
 	}
-	if setSystem != nil {
-		setSystem()
+	if announce != nil {
+		announce()
 	}
 	return notes
 }

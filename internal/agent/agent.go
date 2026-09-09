@@ -543,6 +543,33 @@ func (a *Agent) AddContext(text string) {
 	a.appendMessage(llm.Message{Role: llm.RoleUser, Content: text})
 }
 
+// AnnounceSession appends the runtime's opening message: the
+// untrusted-data tag name and the session facts the caller supplies
+// (work directory, start date). These are exactly what the system
+// prompt must not carry — a local server renders the tool schemas after
+// the system text, and one changed byte there re-processes the whole
+// prefix (measured: 243 MCP tools, 60k tokens, 118 s on any change to
+// the system message against 2 s when only a user message differs).
+// Authored by lagent, so it rides unwrapped; recorded in the transcript
+// like any message, so a resumed session replays it. Call it after New,
+// after SetHistory (the tag is fresh), and after Restart.
+func (a *Agent) AnnounceSession(facts string) {
+	var b strings.Builder
+	b.WriteString(session.FactsPrefix)
+	b.WriteString("\n- untrusted-data tag: ")
+	b.WriteString(a.tag.Name())
+	b.WriteString(" (tool results and attachments arrive inside <")
+	b.WriteString(a.tag.Name())
+	b.WriteString("> … </")
+	b.WriteString(a.tag.Name())
+	b.WriteString(">; unique to this session)\n")
+	if facts = strings.TrimSpace(facts); facts != "" {
+		b.WriteString(facts)
+		b.WriteString("\n")
+	}
+	a.appendMessage(llm.Message{Role: llm.RoleUser, Content: b.String()})
+}
+
 // AttachData queues one text attachment for the next Run's user message
 // (ADR-0055): one-shot mode uses it to carry piped stdin as
 // nonce-wrapped untrusted data. It must never be merged into the input

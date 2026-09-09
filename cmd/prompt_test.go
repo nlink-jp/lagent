@@ -5,20 +5,22 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestSystemPromptShape(t *testing.T) {
-	sys := buildSystemPrompt("/tmp/proj", "", "")
+	sys := buildSystemPrompt("/tmp/proj", "")
 
 	// The defensive framing must stay at the very top, ahead of
 	// anything a project could put in front of it.
 	if !strings.HasPrefix(sys, "SECURITY, read first:") {
 		t.Error("defensive instructions must lead the prompt")
 	}
-	// The prompt is a template: the agent expands {{DATA_TAG}} with a
-	// fresh nonce every LLM call.
-	if !strings.Contains(sys, "{{DATA_TAG}}") {
-		t.Error("prompt must carry the data-tag placeholder")
+	// The tag is announced in the runtime-facts message, not templated
+	// into the prompt (ADR-0003): a per-session nonce here would bust
+	// the server's prefix cache every session.
+	if strings.Contains(sys, "{{DATA_TAG}}") {
+		t.Error("prompt must not carry the data-tag placeholder")
 	}
 	if !strings.Contains(sys, "/tmp/proj") {
 		t.Error("prompt must name the project directory")
@@ -26,7 +28,7 @@ func TestSystemPromptShape(t *testing.T) {
 }
 
 func TestSystemPromptAppendsProjectContext(t *testing.T) {
-	sys := buildSystemPrompt("/tmp/proj", "", "\n\nProject instructions:\n\n### AGENTS.md\n\nbuild with make")
+	sys := buildSystemPrompt("/tmp/proj", "\n\nProject instructions:\n\n### AGENTS.md\n\nbuild with make")
 	if !strings.Contains(sys, "build with make") {
 		t.Error("project context not appended")
 	}
@@ -77,14 +79,35 @@ func TestLoadInstructionsReadsVendorFiles(t *testing.T) {
 	}
 }
 
-// A capability nothing points at never gets used: without the section
-// the model has no way to learn the directory exists, and keeps putting
-// intermediates in the project (ADR-0058).
-func TestSystemPromptNamesTheWorkDirectory(t *testing.T) {
+// The per-session facts ride the runtime's opening message, never the
+// system prompt: the prompt must be byte-identical across sessions, or
+// a local server re-processes every tool schema it renders after it
+// (measured: 118 s against 2 s with 243 MCP tools).
+func TestSystemPromptIsIdenticalAcrossSessions(t *testing.T) {
+	a := buildSystemPrompt("/proj", "")
+	b := buildSystemPrompt("/proj", "")
+	if a != b {
+		t.Fatal("two builds of the system prompt differ")
+	}
+	for _, volatile := range []string{"{{DATA_TAG}}", "Session work directory:", "Session started:", time.Now().Format("2006-01-02")} {
+		if strings.Contains(a, volatile) {
+			t.Errorf("system prompt carries per-session text %q", volatile)
+		}
+	}
+	// The model is still told where those facts are.
+	if !strings.Contains(a, "runtime-facts message") {
+		t.Error("the prompt does not point at the runtime-facts message")
+	}
+}
+
+// A capability nothing points at never gets used: without the facts the
+// model has no way to learn the directory exists, and keeps putting
+// intermediates in the project.
+func TestSessionFactsNameTheWorkDirectory(t *testing.T) {
 	work := "/state/lagent/proj/work/sess-1"
-	got := buildSystemPrompt("/proj", work, "")
+	got := sessionFacts(work)
 	if !strings.Contains(got, work) {
-		t.Error("the work directory is not named in the prompt")
+		t.Error("the work directory is not named in the facts")
 	}
 	// The literal path, not the variable: an MCP tool argument is JSON
 	// the model writes, and nothing expands a variable on the way.
@@ -94,12 +117,18 @@ func TestSystemPromptNamesTheWorkDirectory(t *testing.T) {
 	if i, j := strings.Index(got, work), strings.Index(got, "$LAGENT_WORK_DIR"); i < 0 || j < 0 || i > j {
 		t.Error("the literal path should be given before the variable is mentioned")
 	}
+	if !strings.Contains(got, "session started: "+time.Now().Format("2006-01-02")) {
+		t.Errorf("the start date is missing: %q", got)
+	}
 }
 
-func TestSystemPromptOmitsTheSectionWithoutAWorkDirectory(t *testing.T) {
-	got := buildSystemPrompt("/proj", "", "")
-	if strings.Contains(got, "Session work directory") {
+func TestSessionFactsOmitTheDirectoryWhenNone(t *testing.T) {
+	got := sessionFacts("")
+	if strings.Contains(got, "work directory") {
 		t.Error("a session with no work directory should not be told it has one")
+	}
+	if !strings.Contains(got, "session started:") {
+		t.Error("the start date must still be given")
 	}
 }
 
@@ -107,7 +136,7 @@ func TestSystemPromptOmitsTheSectionWithoutAWorkDirectory(t *testing.T) {
 // the model and absent from the roster sends it looking for a route
 // that does not exist (the fork-era seam).
 func TestSystemPromptNamesOnlyRegisteredTools(t *testing.T) {
-	sys := buildSystemPrompt("/proj", "/work", "")
+	sys := buildSystemPrompt("/proj", "")
 	for _, absent := range []string{"agentic_file_search", "summarize_file", "view_image", "read_document", "datetime", "gem_agent_purpose", "Vertex", "Gemini"} {
 		if strings.Contains(sys, absent) {
 			t.Errorf("system prompt names %q, which this runtime does not have", absent)
@@ -127,7 +156,7 @@ func TestSystemPromptNamesOnlyRegisteredTools(t *testing.T) {
 // wanted behavior. The measured failure this pins against: "do NOT
 // write a mermaid fence" bred hand-drawn box art in replies and files.
 func TestSystemPromptSaysNothingAboutDiagrams(t *testing.T) {
-	sys := strings.ToLower(buildSystemPrompt("/proj", "/work", ""))
+	sys := strings.ToLower(buildSystemPrompt("/proj", ""))
 	for _, banned := range []string{"mermaid", "diagram", "ascii art", "box art"} {
 		if strings.Contains(sys, banned) {
 			t.Errorf("system prompt mentions %q — ADR-0063 keeps diagrams out of the prompt", banned)

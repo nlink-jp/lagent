@@ -77,7 +77,15 @@ answer, a round limit, or a loop-guard stop. Every request replays the
 whole history behind a session-scoped isolation tag, so the request
 prefix stays byte-identical across rounds and the server's prefix
 cache can hit — on a local model that cache is the difference between
-a one-second turn and a thirty-second one.
+a two-second turn and a two-minute one.
+
+The system prompt is byte-identical across sessions too (ADR-0003):
+the isolation tag's name, the session work directory and the start
+date open the conversation as the runtime's own user-role message
+(`Agent.AnnounceSession`, `session.FactsPrefix`), because the server
+renders every tool schema after the system text and re-processes all
+of it when one byte there changes. The listing neither previews that
+message nor counts it as a conversation.
 
 ## The agent core knows nothing about the UI
 

@@ -90,6 +90,16 @@ type UsageRecord struct {
 // wrapper text as a session's preview reads like a bug.
 const ShellContextPrefix = "I ran this shell command myself:"
 
+// FactsPrefix opens the user-role message the agent writes at the start
+// of a session — the untrusted-data tag name, the work directory, the
+// start date: everything the system prompt must not carry, so that the
+// prompt (and the tool schemas the server renders after it) stays
+// byte-identical across sessions and the server's prefix cache holds.
+// It lives here for the same reason ShellContextPrefix does: the
+// listing must not preview it, and a transcript holding only it has no
+// conversation.
+const FactsPrefix = "Runtime facts for this session:"
+
 // Record is one JSONL line.
 type Record struct {
 	Time time.Time `json:"ts"`
@@ -735,14 +745,21 @@ func describe(path, id string) (Meta, error) {
 			_ = json.Unmarshal(rec.Data, &meta.Header)
 			meta.Started = rec.Time
 		case KindMessage, KindCompaction:
-			meta.HasConversation = true
 			if rec.Kind != KindMessage {
+				meta.HasConversation = true
 				break
 			}
 			var m llm.Message
 			if err := json.Unmarshal(rec.Data, &m); err != nil {
+				meta.HasConversation = true
 				break
 			}
+			// The runtime's own opening message is not a conversation:
+			// a session that recorded only it has nothing to resume.
+			if m.Role == llm.RoleUser && strings.HasPrefix(m.Content, FactsPrefix) {
+				break
+			}
+			meta.HasConversation = true
 			if m.Role != llm.RoleUser || strings.TrimSpace(m.Content) == "" {
 				break
 			}
@@ -770,6 +787,9 @@ const (
 // context message is shown as the command the operator ran, not as the
 // wrapper sentence the agent injected around it.
 func previewOf(content string) string {
+	if strings.HasPrefix(content, FactsPrefix) {
+		return ""
+	}
 	if !strings.HasPrefix(content, ShellContextPrefix) {
 		return firstLine(content, previewChars)
 	}

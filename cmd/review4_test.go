@@ -17,10 +17,10 @@ import (
 	"github.com/nlink-jp/lagent/internal/workdir"
 )
 
-// Review round 4: /clear rotates the work directory (ADR-0071 §2), and
-// every consumer must follow — the file tools' second root, the
-// sandbox profile (the shell could not write to the new directory), and
-// the system prompt. Real sandbox-exec, like root_workdir_test.go.
+// /clear rotates the work directory, and every consumer must follow —
+// the file tools' second root, the sandbox profile (the shell could not
+// write to the new directory), and the model, through the runtime-facts
+// message. Real sandbox-exec, like root_workdir_test.go.
 func TestRotateWorkDirMovesEveryConsumer(t *testing.T) {
 	if err := sandbox.Available(); err != nil {
 		t.Skipf("sandbox-exec cannot apply a profile here: %v", err)
@@ -50,13 +50,13 @@ func TestRotateWorkDirMovesEveryConsumer(t *testing.T) {
 	if err := registry.UseWorkDir(oldWork); err != nil {
 		t.Fatal(err)
 	}
-	systemRebuilt := false
-	notes := rotateWorkDir(registry, shellExec, true, project, newWork, nil, false, nil, func() { systemRebuilt = true })
+	announced := false
+	notes := rotateWorkDir(registry, shellExec, true, project, newWork, nil, false, nil, func() { announced = true })
 	if len(notes) != 0 {
 		t.Fatalf("rotation raised notes: %v", notes)
 	}
-	if !systemRebuilt {
-		t.Error("the system prompt was not rebuilt")
+	if !announced {
+		t.Error("the model was not told the new directory")
 	}
 	resolvedNew, _ := filepath.EvalSymlinks(newWork)
 	if registry.WorkDir() != resolvedNew {
@@ -194,6 +194,7 @@ func TestClearSequenceMatchesTheADR(t *testing.T) {
 		`reportPersistent("clear"`,
 		"ag.Restart(newLog)",
 		"rotateWorkDir(",
+		"ag.AnnounceSession(",
 		"reconnectMCP(false)",
 	}
 	last := -1

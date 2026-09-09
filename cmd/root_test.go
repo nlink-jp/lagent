@@ -53,13 +53,3 @@ func TestVersionFlagAndSubcommandAgree(t *testing.T) {
 		t.Fatalf("`version` printed %q, --version printed %q; they must be identical", sub, flag)
 	}
 }
-
-// Until Phase 1 lands the loop, running with no subcommand must fail
-// loudly rather than pretend to start a session.
-func TestRootWithoutLoopFails(t *testing.T) {
-	resetRoot(t, &bytes.Buffer{})
-	rootCmd.SetArgs([]string{})
-	if err := rootCmd.Execute(); err == nil {
-		t.Fatal("root command succeeded before the agent loop exists")
-	}
-}

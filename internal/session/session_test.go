@@ -507,3 +507,45 @@ func TestInUseTracksTheTranscriptLock(t *testing.T) {
 		t.Error("a malformed id must read as not in use, and must not be probed")
 	}
 }
+
+// The runtime's opening message is not the operator's: the listing
+// neither previews it nor counts it as a conversation, so a session
+// that recorded only it is skipped by --continue and gets no resume
+// hint.
+func TestFactsMessageIsNotAConversation(t *testing.T) {
+	dir := t.TempDir()
+	l, err := Open(dir, "/p")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Log(KindHeader, Header{Schema: SchemaVersion, Version: "v0", Model: "m", Project: "/p"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Log(KindMessage, llm.Message{Role: llm.RoleUser, Content: FactsPrefix + "\n- untrusted-data tag: x\n"}); err != nil {
+		t.Fatal(err)
+	}
+	_ = l.Close()
+	meta, err := describe(l.Path(), l.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta.HasConversation || meta.Preview != "" {
+		t.Fatalf("facts-only transcript: HasConversation=%v preview=%q", meta.HasConversation, meta.Preview)
+	}
+
+	l2, err := Reopen(dir, "/p", l.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := l2.Log(KindMessage, llm.Message{Role: llm.RoleUser, Content: "fix the build"}); err != nil {
+		t.Fatal(err)
+	}
+	_ = l2.Close()
+	meta, err = describe(l2.Path(), l2.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !meta.HasConversation || meta.Preview != "fix the build" {
+		t.Fatalf("after the operator's message: HasConversation=%v preview=%q", meta.HasConversation, meta.Preview)
+	}
+}

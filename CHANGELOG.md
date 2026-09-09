@@ -4,6 +4,14 @@
 
 ### Added
 
+- **The system prompt is byte-identical across sessions** (ADR-0003).
+  The isolation tag name, the session work directory and the start
+  date now open the conversation as the runtime's own message
+  (`Agent.AnnounceSession`) instead of living in the system prompt, so
+  the local server's prefix cache survives a new session and a
+  `/clear`. Measured with the operator's 243 MCP tools (60k tokens of
+  schemas): a new session started in 2 s instead of 118 s. The session
+  listing does not preview that message or count it as a conversation.
 - **Phase 1 core (RFP §4).** The agent loop, the eight built-in file and
   shell tools, the sandbox lanes, the approval gate with its rule-tier
   auto-approve ladder, the MCP client, the JSONL transcript with

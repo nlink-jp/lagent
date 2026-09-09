@@ -40,3 +40,8 @@ excepted).
 - [`ADR-0002`](adr/0002-features-not-reproduced.md) — the gem-agent
   features lagent does not reproduce, why each is bound to Vertex AI or
   Google Cloud, and what lagent does instead
+- [`ADR-0003`](adr/0003-session-facts-ride-the-conversation.md) — the
+  system prompt is byte-identical across sessions; the isolation tag,
+  the work directory and the start date ride the runtime's opening
+  message, so the server's prefix cache survives a new session and a
+  `/clear` (measured: 118 s against 2 s with 243 MCP tools)

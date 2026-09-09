@@ -586,3 +586,48 @@ func TestExecCallRefusesAfterCancel(t *testing.T) {
 		t.Errorf("gate prompted for a cancelled turn: %v", gate.asked)
 	}
 }
+
+// The runtime's opening message names the untrusted-data tag and the
+// session facts, unwrapped, as a user-role message the transcript keeps:
+// the system prompt must stay byte-identical across sessions, so
+// nothing per-session may live there.
+func TestAnnounceSessionOpensTheConversation(t *testing.T) {
+	mb := &mockBackend{responses: []*llm.Response{
+		{ToolCalls: []llm.ToolCall{{ID: "c1", Name: "read_file", Args: map[string]any{"path": "a.txt"}}}},
+		{Content: "done"},
+	}}
+	a, reg := newAgent(t, mb, &approveAll{}, 5)
+	if err := os.WriteFile(filepath.Join(reg.ProjectDir(), "a.txt"), []byte("body"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	log := &capturingLog{}
+	a.log = log
+	a.AnnounceSession("- session work directory: /state/work/s1\n- session started: 2026-09-10")
+	if a.HistoryLen() != 1 || a.history[0].Role != llm.RoleUser {
+		t.Fatalf("history = %+v, want one user message", a.history)
+	}
+	opening := a.history[0].Content
+	if !strings.HasPrefix(opening, session.FactsPrefix) {
+		t.Errorf("opening message lacks the facts prefix: %q", opening)
+	}
+	if !strings.Contains(opening, a.tag.Name()) || !strings.Contains(opening, "/state/work/s1") {
+		t.Errorf("opening message does not name the tag and the facts: %q", opening)
+	}
+	if len(log.kinds) != 1 || log.kinds[0] != session.KindMessage {
+		t.Errorf("transcript records = %v, want one message", log.kinds)
+	}
+	if _, err := a.Run(context.Background(), "read a.txt", nil); err != nil {
+		t.Fatal(err)
+	}
+	// On the wire the opening message rides as typed, and the tool
+	// result that follows is wrapped in exactly the tag it announced.
+	first := mb.calls[0][0]
+	if first.Role != llm.RoleUser || first.Content != opening {
+		t.Errorf("wire opening message = %+v", first)
+	}
+	last := mb.calls[1]
+	tool := last[len(last)-1]
+	if tool.Role != llm.RoleTool || !strings.Contains(tool.Content, "<"+a.tag.Name()+">") {
+		t.Errorf("tool result is not wrapped in the announced tag: %q", tool.Content)
+	}
+}

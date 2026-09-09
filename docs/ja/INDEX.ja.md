@@ -37,3 +37,8 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
 - [`ADR-0002`](adr/0002-features-not-reproduced.ja.md) — lagent が
   再現しない gem-agent の機能、それぞれが Vertex AI / Google Cloud に
   縛られている理由、代わりに lagent が行うこと
+- [`ADR-0003`](adr/0003-session-facts-ride-the-conversation.ja.md) —
+  system プロンプトはセッションをまたいでバイト同一。隔離タグ、作業
+  ディレクトリ、開始日はランタイムの冒頭メッセージに乗せ、サーバの接頭辞
+  キャッシュが新セッションと `/clear` を生き延びる（実測: MCP 243 ツールで
+  118 秒対 2 秒）

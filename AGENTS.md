@@ -98,6 +98,15 @@ is new; the others are ports minus the ADR-0002 features.
 - **`--version` must always answer** and `version` must print the same
   line (pinned by `cmd/root_test.go`) — a Homebrew formula's `brew test`
   runs it.
+- **The system prompt is byte-identical across sessions** (ADR-0003).
+  Anything per-session — the isolation tag name, the work directory,
+  the start date — goes through `Agent.AnnounceSession` as the
+  runtime's opening message, never into `buildSystemPrompt`; the server
+  renders every tool schema after the system text and re-processes all
+  of it when one byte there changes (measured: 118 s against 2 s with
+  243 MCP tools). `TestSystemPromptIsIdenticalAcrossSessions` pins it.
+  A second `system` message does not help: it is folded into the same
+  turn.
 - **Prompt processing on a local model is the cost to design around**:
   measured about 580 tokens/s on the reference machine, so a cache miss
   on a 20k-token prefix is 30+ seconds of silence before the first token,
