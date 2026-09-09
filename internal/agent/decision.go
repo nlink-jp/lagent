@@ -118,10 +118,10 @@ func (a *Agent) decide(tc llm.ToolCall) Decision {
 	if tc.Name == tools.ShellExecName && !a.registry.Confined() && v.Tier != risk.Block {
 		// Unconfined mode (--no-sandbox): the approval buys none of the
 		// lane's constraints, so it is not an ordinary write-lane call
-		// (ADR-0073 §5) — the operator alone approves, and neither the
-		// model tier, a session allowlist nor a policy lifts it.
+		// (ADR-0073 §5) — the operator alone approves, and neither a
+		// session allowlist nor a policy lifts it.
 		v = risk.Verdict{Tier: risk.Review, OperatorOnly: true,
-			Reason: "unconfined shell (the sandbox is off): no lane bounds this command — the operator decides, not the model tier"}
+			Reason: "unconfined shell (the sandbox is off): no lane bounds this command — the operator decides"}
 	}
 	d := Decision{Tool: tool, Mutating: mutating, Verdict: v}
 	ceiling := a.Ceiling()
