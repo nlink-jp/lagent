@@ -1485,13 +1485,18 @@ func (r *Registry) shellExec() *Tool {
 					// tool failure: silently dropping the status turns
 					// failed commands into false positives.
 					result += fmt.Sprintf("\n[exit status %d]", exitErr.ExitCode())
-					if r.Confined() && sandbox.DeniedHint(result) {
+					if r.Confined() {
 						// The read profile applies whether or not the lane
 						// was verified for unasked runs (review A-11).
-						switch lane {
-						case sandbox.LaneRead:
+						// A network client failing in the read lane is the
+						// lane's doing even when it printed nothing to
+						// say so (`curl -s`): the hint keys on the program
+						// as well as on the text, or the model retries
+						// the same lane until it gives up.
+						switch {
+						case lane == sandbox.LaneRead && (sandbox.DeniedHint(result) || needsNetwork(command)):
 							result += readLaneDeniedNote
-						case sandbox.LaneWrite:
+						case lane == sandbox.LaneWrite && sandbox.DeniedHint(result):
 							result += writeLaneDeniedNote
 						}
 					}

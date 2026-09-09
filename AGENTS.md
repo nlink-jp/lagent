@@ -106,6 +106,13 @@ is new; the others are ports minus the ADR-0002 features.
   so `AnnounceSession` runs after the MCP connect (startup, `/clear`,
   `/mcp reload`), never before. Anything that changes the connected set
   calls `adv.setInventory` then `ag.RefreshTools()`.
+- **A read-lane network failure is explained even when silent.** The
+  read lane has no network; `curl -s` prints nothing and exits 6, so the
+  text-keyed `sandbox.DeniedHint` never fired and the model retried the
+  same lane three times before giving up (measured 2026-09-10).
+  `internal/tools/netclient.go` keys the hint on a finite list of
+  network clients (and git's remote subcommands) as well — extend the
+  list, never turn it into a pattern over the command text.
 - **The system prompt is byte-identical across sessions** (ADR-0003).
   Anything per-session — the isolation tag name, the work directory,
   the start date — goes through `Agent.AnnounceSession` as the

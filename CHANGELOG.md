@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- A network client failing in the read lane is told which lane to ask
+  for even when it printed nothing: `curl -s` exits 6 without a word,
+  so the text-keyed hint never fired and the model retried the same
+  lane until it concluded the sandbox blocks the network. The hint now
+  also keys on a finite list of network programs (curl, wget, ssh, scp,
+  sftp, nc, ncat, telnet, dig, nslookup, host, ping, traceroute) and
+  git's remote subcommands.
+
 ### Added
 
 - **MCP tools are advertised on demand** (ADR-0004). Every server is
