@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"github.com/nlink-jp/lagent/internal/bounded"
+	"strings"
 
 	"bufio"
 	"context"
@@ -136,6 +137,24 @@ type Client struct {
 
 	pmu     sync.Mutex
 	pending map[int64]chan message
+
+	// instructions is what the server said about itself at initialize
+	// (the optional `instructions` field), clipped; the catalog the
+	// model reads before loading a server is built from it.
+	instructions string
+}
+
+// instructionsCap bounds what a server may say about itself, in runes:
+// a catalog line quotes the first sentence, and a server that publishes
+// a manual is still a server, not a prompt.
+const instructionsCap = 2000
+
+// Instructions returns the text the server published at initialize,
+// "" when it published none.
+func (c *Client) Instructions() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.instructions
 }
 
 // NewStdio creates a client that spawns command with args and extra env.
@@ -241,9 +260,22 @@ func (c *Client) ensureStarted(ctx context.Context) error {
 		"capabilities":    map[string]any{},
 		"clientInfo":      map[string]any{"name": "lagent", "version": c.version},
 	}
-	if _, err := c.rawCall(ctx, "initialize", initParams); err != nil {
+	initResult, err := c.rawCall(ctx, "initialize", initParams)
+	if err != nil {
 		c.shutdown()
 		return &startError{Server: c.name, Phase: "initialize", Err: err}
+	}
+	var init struct {
+		Instructions string `json:"instructions"`
+	}
+	if json.Unmarshal(initResult, &init) == nil {
+		text := strings.TrimSpace(init.Instructions)
+		if r := []rune(text); len(r) > instructionsCap {
+			text = string(r[:instructionsCap]) + "…"
+		}
+		c.mu.Lock()
+		c.instructions = text
+		c.mu.Unlock()
 	}
 	nctx, ncancel := context.WithTimeout(ctx, c.timeout)
 	defer ncancel()

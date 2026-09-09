@@ -169,19 +169,76 @@ type mcpInventory struct {
 	// also have caught a neighbour named "<server>__*", or missed a
 	// name truncated past it (pre-release review).
 	registered map[string][]string
+	// instructions is what each server said about itself at initialize:
+	// the catalog line the model reads before loading it (ADR-0004).
+	instructions map[string]string
 }
 
 // summaryLines is the /mcp listing, in server order: one line per
 // server that was started or deliberately not, none for one that failed.
 func (inv mcpInventory) summaryLines() []string {
+	return inv.summaryLinesWith(nil)
+}
+
+// summaryLinesWith is summaryLines with each connected server's
+// advertisement state (ADR-0004) — loaded says whether the model has the
+// server's tools; nil leaves the marker out.
+func (inv mcpInventory) summaryLinesWith(loaded func(server string) bool) []string {
 	var out []string
 	for _, name := range inv.Servers {
-		if line, ok := inv.summary[name]; ok {
-			out = append(out, line)
+		line, ok := inv.summary[name]
+		if !ok {
+			continue
 		}
+		if loaded != nil && len(inv.registered[name]) > 0 {
+			if loaded(name) {
+				line += " — loaded"
+			} else {
+				line += " — not loaded (mcp_load, or /mcp load " + name + ")"
+			}
+		}
+		out = append(out, line)
 	}
 	return out
 }
+
+// catalogLines renders the connected servers for the runtime-facts
+// message (ADR-0004): one line per server that registered tools — its
+// name, its tool names, and the first sentence of what it said about
+// itself — followed by the trigger. adv says which are already
+// advertised, so the line does not send the model to load a server
+// whose tools it can see.
+func (inv mcpInventory) catalogLines(adv *mcpAdvertiser) []string {
+	var out []string
+	for _, name := range inv.Servers {
+		names := inv.registered[name]
+		var fns []string
+		for _, n := range names {
+			if _, ok := strings.CutPrefix(n, mcpToolPrefix(name)); ok {
+				fns = append(fns, strings.TrimPrefix(n, mcpToolPrefix(name)))
+			}
+		}
+		if len(fns) == 0 {
+			continue
+		}
+		line := fmt.Sprintf("  - %s (%d tools: %s)", name, len(fns), strings.Join(fns, ", "))
+		if first := firstSentence(inv.instructions[name]); first != "" {
+			line += " — " + clipRunes(first, catalogSentenceCap)
+		}
+		if adv != nil && adv.Loaded(name) {
+			line += " [loaded: its tools are available now]"
+		}
+		out = append(out, line)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	header := "- MCP servers connected this session. Their tools are not in your tool list until you load the server: call mcp_load with the server name, and its tools appear for the rest of the session."
+	return append([]string{header}, out...)
+}
+
+// catalogSentenceCap bounds the quoted sentence, in runes.
+const catalogSentenceCap = 200
 
 // warnUnmatched names every exclude entry that did no work, with its own
 // remedy (ADR-0077 §2). Checked against the whole inventory because a
@@ -200,6 +257,7 @@ func (inv mcpInventory) warnUnmatched(filter mcpfilter.Filter, stderr io.Writer)
 type mcpServer interface {
 	mcpCaller
 	ListTools(ctx context.Context) ([]mcp.Tool, error)
+	Instructions() string
 	Close()
 }
 
@@ -228,6 +286,10 @@ func attachMCPServer(ctx context.Context, client mcpServer, registry *tools.Regi
 	scope := inv.Scopes[name]
 	delete(inv.summary, name)
 	delete(inv.Offered, name)
+	if inv.instructions == nil {
+		inv.instructions = map[string]string{}
+	}
+	inv.instructions[name] = client.Instructions()
 	lctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	toolList, err := client.ListTools(lctx)
 	cancel()

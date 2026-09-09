@@ -45,7 +45,7 @@ excepted).
   the work directory and the start date ride the runtime's opening
   message, so the server's prefix cache survives a new session and a
   `/clear` (measured: 118 s against 2 s with 243 MCP tools)
-- [`ADR-0004`](adr/0004-mcp-tools-load-on-demand.md) — *proposed:*
+- [`ADR-0004`](adr/0004-mcp-tools-load-on-demand.md) —
   MCP tools are advertised on demand — a catalog in the facts message,
   one `mcp_load` tool, native calls after a load; `[mcp].preload`,
   `[mcp].advertise = "all"` as the baseline

@@ -92,6 +92,17 @@ call_timeout_sec = 60
 # that this session does not have. An excluded server is never started.
 # A project's .lagent.toml may add exclusions, never remove them.
 #exclude = ["some-server", "obsidian/patch_vault_file"]
+# What the model is shown of the connected servers. "deferred" gives it
+# a catalog (one line per server in the runtime facts) and advertises a
+# server's tools once it loads the server with mcp_load; "all"
+# advertises every tool from the start — 243 tools came to 60k prompt
+# tokens, about two minutes of prompt processing on a cold cache, which
+# is why deferred is the default. --allow mcp__<server>__* preloads that
+# server for a one-shot run.
+advertise = "deferred"
+# Servers advertised from the start under "deferred": the lookups you
+# use every session. Their schemas then sit in the cached prefix.
+#preload = ["tor-exit-lookup", "whois-lookup"]
 
 [tui]
 # auto (detect the terminal background), dark, light, or plain (no

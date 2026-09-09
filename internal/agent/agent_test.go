@@ -631,3 +631,60 @@ func TestAnnounceSessionOpensTheConversation(t *testing.T) {
 		t.Errorf("tool result is not wrapped in the announced tag: %q", tool.Content)
 	}
 }
+
+// A registered tool the predicate hides is not declared, and a call to
+// it is refused before any gate with the route to it; once the
+// predicate admits it and the declarations are refreshed, it runs.
+func TestAdvertiseHidesRegisteredToolsUntilRefreshed(t *testing.T) {
+	mb := &mockBackend{responses: []*llm.Response{
+		{ToolCalls: []llm.ToolCall{{ID: "c1", Name: "mcp__srv__lookup", Args: map[string]any{}}}},
+		{Content: "first"},
+		{ToolCalls: []llm.ToolCall{{ID: "c2", Name: "mcp__srv__lookup", Args: map[string]any{}}}},
+		{Content: "second"},
+	}}
+	reg, err := tools.New(t.TempDir(), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ran := 0
+	if err := reg.Register(&tools.Tool{Name: "mcp__srv__lookup", Description: "d", Mutating: false,
+		Parameters: map[string]any{"type": "object"},
+		Run:        func(context.Context, map[string]any) (string, error) { ran++; return "RESULT", nil }}); err != nil {
+		t.Fatal(err)
+	}
+	shown := false
+	gate := &denyAll{}
+	a := New(Options{Backend: mb, Registry: reg, Gate: gate, System: "s", MaxTurns: 5,
+		Advertise: func(name string) bool { return shown || !strings.HasPrefix(name, "mcp__") }})
+	for _, d := range mb.toolDefs {
+		_ = d
+	}
+	if _, err := a.Run(context.Background(), "go", nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range mb.toolDefs[0] {
+		if d.Name == "mcp__srv__lookup" {
+			t.Fatal("a hidden tool was declared to the model")
+		}
+	}
+	if ran != 0 || len(gate.asked) != 0 {
+		t.Fatalf("hidden tool ran (%d) or reached the gate (%v)", ran, gate.asked)
+	}
+	if res := a.history[2].Content; !strings.Contains(res, "not in your tool list") || !strings.Contains(res, "mcp_load") {
+		t.Errorf("refusal does not name the route: %q", res)
+	}
+	shown = true
+	a.RefreshTools()
+	if _, err := a.Run(context.Background(), "again", nil); err != nil {
+		t.Fatal(err)
+	}
+	declared := false
+	for _, d := range mb.toolDefs[2] {
+		if d.Name == "mcp__srv__lookup" {
+			declared = true
+		}
+	}
+	if !declared || ran != 1 {
+		t.Errorf("after refresh: declared=%v ran=%d", declared, ran)
+	}
+}

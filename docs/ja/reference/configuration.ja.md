@@ -32,6 +32,8 @@
 | `[mcp].enabled` | `true` | `false` で global とプロジェクトの全 MCP サーバを無効化。`--mcp on|off` で実行ごとに上書き |
 | `[mcp].call_timeout_sec` | `60` | MCP ツール呼び出しごとのタイムアウト |
 | `[mcp].exclude` | （未設定） | このセッションに無いサーバ、またはその一機能。プロジェクトの `.lagent.toml` は追加のみ可、削除は不可 |
+| `[mcp].advertise` | `deferred` | 接続したサーバのうちモデルに見せる範囲: `deferred` はランタイム事実に目録を出し、モデルがサーバ名で `mcp_load` を呼んだ時点でそのサーバのツールを広告する。`all` は最初から全ツールを広告（計測のベースライン） |
+| `[mcp].preload` | （未設定） | `deferred` でも最初から広告するサーバ。`--allow mcp__<server>__*` の許可はその実行でそのサーバをプリロードする |
 | `[tui].theme` | `auto` | `auto`、`dark`、`light`、`plain` |
 | `[tui].language` | `auto` | `auto`（`LC_ALL` / `LC_MESSAGES` / `LANG` から）、`ja`、`en` |
 | `[tui].show_thoughts` | `true` | サーバが送る推論差分をライブ領域に表示。表示専用 |
@@ -63,6 +65,7 @@
 | `lagent "<first message>"` | 引数を第 1 ターンとして送ってから対話へ |
 | `lagent sessions` | このプロジェクトのセッション一覧（id、日時、プレビュー） |
 | `lagent trust` | プロジェクトの信頼とピンを表示・変更 |
+| `/mcp`、`/mcp load <server>`、`/mcp reload`（セッション内） | サーバ一覧をロード状態付きで表示。1 サーバのツールを手で広告。再接続 |
 | `lagent workdirs` | 過去セッションの作業ディレクトリ一覧。`workdirs clean` で削除 |
 | `lagent version` | 版数を表示 — `--version` と同じ行 |
 

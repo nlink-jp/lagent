@@ -321,3 +321,23 @@ func TestLoadProjectRefusesOversizeFile(t *testing.T) {
 		t.Fatalf("oversize project config accepted: %v", err)
 	}
 }
+
+// [mcp].advertise is deferred by default, all is the baseline, anything
+// else is refused; preload is a plain list.
+func TestMCPAdvertiseAndPreload(t *testing.T) {
+	clearEnv(t)
+	cfg, err := Load(writeConfig(t, "[llm]\nmodel = \"m\"\n"))
+	if err != nil || cfg.MCP.Advertise != "deferred" || len(cfg.MCP.Preload) != 0 {
+		t.Fatalf("defaults: %+v err=%v", cfg.MCP, err)
+	}
+	cfg, err = Load(writeConfig(t, "[llm]\nmodel = \"m\"\n[mcp]\nadvertise = \"all\"\npreload = [\"tor-exit-lookup\", \"whois-lookup\"]\n"))
+	if err != nil || cfg.MCP.Advertise != "all" || len(cfg.MCP.Preload) != 2 {
+		t.Fatalf("explicit: %+v err=%v", cfg.MCP, err)
+	}
+	if cfg.Source("mcp.advertise") != FromFile || cfg.Source("mcp.preload") != FromFile {
+		t.Errorf("provenance: %q %q", cfg.Source("mcp.advertise"), cfg.Source("mcp.preload"))
+	}
+	if _, err := Load(writeConfig(t, "[llm]\nmodel = \"m\"\n[mcp]\nadvertise = \"lazy\"\n")); err == nil || !strings.Contains(err.Error(), "[mcp].advertise") {
+		t.Errorf("unknown advertise accepted: %v", err)
+	}
+}

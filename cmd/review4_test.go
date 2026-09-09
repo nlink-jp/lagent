@@ -18,9 +18,10 @@ import (
 )
 
 // /clear rotates the work directory, and every consumer must follow —
-// the file tools' second root, the sandbox profile (the shell could not
-// write to the new directory), and the model, through the runtime-facts
-// message. Real sandbox-exec, like root_workdir_test.go.
+// the file tools' second root and the sandbox profile (the shell could
+// not write to the new directory); the model is told by onClear through
+// the runtime-facts message, pinned by TestClearSequenceMatchesTheADR.
+// Real sandbox-exec, like root_workdir_test.go.
 func TestRotateWorkDirMovesEveryConsumer(t *testing.T) {
 	if err := sandbox.Available(); err != nil {
 		t.Skipf("sandbox-exec cannot apply a profile here: %v", err)
@@ -50,13 +51,9 @@ func TestRotateWorkDirMovesEveryConsumer(t *testing.T) {
 	if err := registry.UseWorkDir(oldWork); err != nil {
 		t.Fatal(err)
 	}
-	announced := false
-	notes := rotateWorkDir(registry, shellExec, true, project, newWork, nil, false, nil, func() { announced = true })
+	notes := rotateWorkDir(registry, shellExec, true, project, newWork, nil, false, nil)
 	if len(notes) != 0 {
 		t.Fatalf("rotation raised notes: %v", notes)
-	}
-	if !announced {
-		t.Error("the model was not told the new directory")
 	}
 	resolvedNew, _ := filepath.EvalSymlinks(newWork)
 	if registry.WorkDir() != resolvedNew {
@@ -73,7 +70,7 @@ func TestRotateWorkDirMovesEveryConsumer(t *testing.T) {
 		t.Error("sandbox still allows the old work directory")
 	}
 	// No work directory at all: the second root is removed, not kept.
-	if notes := rotateWorkDir(registry, shellExec, true, project, "", nil, false, nil, nil); len(notes) != 0 {
+	if notes := rotateWorkDir(registry, shellExec, true, project, "", nil, false, nil); len(notes) != 0 {
 		t.Fatalf("rotation to none raised notes: %v", notes)
 	}
 	if registry.WorkDir() != "" {
@@ -194,8 +191,9 @@ func TestClearSequenceMatchesTheADR(t *testing.T) {
 		`reportPersistent("clear"`,
 		"ag.Restart(newLog)",
 		"rotateWorkDir(",
-		"ag.AnnounceSession(",
+		"adv.Reset()",
 		"reconnectMCP(false)",
+		"ag.AnnounceSession(",
 	}
 	last := -1
 	for _, s := range steps {

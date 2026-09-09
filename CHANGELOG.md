@@ -4,6 +4,18 @@
 
 ### Added
 
+- **MCP tools are advertised on demand** (ADR-0004). Every server is
+  connected and every tool registered as before, but the model is shown
+  a catalog in the runtime facts — one line per server with its tool
+  names and what it said about itself — and a built-in `mcp_load` that
+  advertises one server's tools for the rest of the session. A call to
+  a tool the model was not shown is refused with the route.
+  `[mcp].advertise = "deferred"` (default) or `"all"` (the baseline);
+  `[mcp].preload` and a `--allow mcp__<server>__*` grant advertise from
+  the start; `/mcp` shows the loaded state and `/mcp load <server>`
+  loads by hand; a resumed session replays its loads. With the
+  operator's 243 tools the cold prefix drops from about 63k tokens to
+  about 4k.
 - **The system prompt is byte-identical across sessions** (ADR-0003).
   The isolation tag name, the session work directory and the start
   date now open the conversation as the runtime's own message

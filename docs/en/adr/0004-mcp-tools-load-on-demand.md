@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Proposed |
+| Status | **Accepted** |
 | Date | 2026-09-10 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |

@@ -61,7 +61,10 @@ lagent
 
 - **ツール:** `list_files`、`list_tree`、`search_files`、`read_file`、
   `file_info`、`write_file`、`edit_file`、`shell_exec`、`ask_user`、および
-  `.mcp.json` の MCP サーバが提供する全ツール。
+  `.mcp.json` の MCP サーバが提供する全ツール — モデルには目録として見せ、
+  サーバごとに `mcp_load` を呼んだ時点で広告する（ローカルモデルは毎ターン
+  243 スキーマを読む余裕がない。`[mcp].preload` と `[mcp].advertise = "all"`
+  が操作者の調整点）。
 - **封じ込め:** ファイルツールはプロジェクト（とセッション作業ディレクトリ）
   の内側に留まる。`shell_exec` は宣言したレーンで `sandbox-exec` 下で走る —
   read は尋ねずに、write と operator は尋ねてから。

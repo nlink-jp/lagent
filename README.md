@@ -63,7 +63,10 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
 
 - **Tools:** `list_files`, `list_tree`, `search_files`, `read_file`,
   `file_info`, `write_file`, `edit_file`, `shell_exec`, `ask_user`, and
-  every tool of the MCP servers in `.mcp.json`.
+  every tool of the MCP servers in `.mcp.json` — shown to the model as a
+  catalog, and advertised per server once it calls `mcp_load` (a local
+  model cannot afford 243 schemas on every turn; `[mcp].preload` and
+  `[mcp].advertise = "all"` are the operator's levers).
 - **Confinement:** file tools stay inside the project (and the session
   work directory); `shell_exec` runs under `sandbox-exec` in the lane it
   declares — read runs unasked, write and operator ask.

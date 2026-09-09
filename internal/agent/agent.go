@@ -168,6 +168,11 @@ type Agent struct {
 	// zero value leaves every tool at the default behaviour.
 	policy policy.Policy
 
+	// advertise says which registered tools the model is shown; nil
+	// shows every one. A registered tool it hides is refused when
+	// called, before any gate: the model was never given its schema.
+	advertise func(name string) bool
+
 	// msgs is the operator's language for the notices this package
 	// writes mid-turn (ADR-0029). Never nil: New falls back to English,
 	// so a caller that does not care — every test — needs no wiring.
@@ -251,6 +256,12 @@ type Options struct {
 	OnNotice func(msg string)
 	// Policy is the per-tool approval policy (ADR-0008).
 	Policy policy.Policy
+	// Advertise, when set, decides which registered tools are declared
+	// to the model; the others stay registered — gated, recorded,
+	// excluded exactly as before — but are not in the tool list until
+	// the predicate says so and RefreshTools runs. A call to a hidden
+	// tool is refused with the route to it.
+	Advertise func(name string) bool
 	// ClipboardImage captures the clipboard image as PNG bytes for the
 	// @clipboard reference (ADR-0012). nil reports it unavailable.
 	ClipboardImage func() ([]byte, error)
@@ -280,7 +291,7 @@ type Options struct {
 
 // New creates an agent.
 func New(opts Options) *Agent {
-	defs, purposeTools := toolDefs(opts.Registry)
+	defs, purposeTools := toolDefs(opts.Registry, opts.Advertise)
 	if opts.Msgs == nil {
 		// English, so a caller that never asked for a language still
 		// gets sentences rather than empty format strings.
@@ -307,7 +318,8 @@ func New(opts Options) *Agent {
 
 		purposeTools: purposeTools,
 
-		policy: opts.Policy,
+		policy:    opts.Policy,
+		advertise: opts.Advertise,
 
 		msgs:         opts.Msgs,
 		clipboard:    opts.ClipboardImage,
@@ -586,7 +598,7 @@ func (a *Agent) AttachData(ref, kind, content string) {
 // a turn is in flight — so it shares AddContext's single-writer
 // discipline.
 func (a *Agent) RefreshTools() {
-	a.toolDefs, a.purposeTools = toolDefs(a.registry)
+	a.toolDefs, a.purposeTools = toolDefs(a.registry, a.advertise)
 }
 
 // SetSystem replaces the system prompt (ADR-0039: a skills reload
@@ -1001,6 +1013,13 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 			a.logRecord("tool_excluded", map[string]any{"name": tc.Name})
 		}
 		return fmt.Sprintf("error: unknown tool %q", tc.Name), false, floorRan, nil
+	}
+	// Registered but not advertised: the model was never given this
+	// tool's schema, so the call is a guess, and a guessed call must
+	// not reach a server. Refused before any gate, with the route.
+	if a.advertise != nil && !a.advertise(tc.Name) {
+		a.logRecord("tool_not_advertised", map[string]any{"name": tc.Name})
+		return fmt.Sprintf("error: tool %q is not in your tool list yet — its MCP server is not loaded; call mcp_load with the server name (the runtime facts list the servers), then call the tool", tc.Name), false, floorRan, nil
 	}
 	d := a.decide(tc)
 	operatorWrite := false // approved by the operator's own answer to an OperatorOnly call

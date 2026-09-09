@@ -105,7 +105,7 @@ func TestSystemPromptIsIdenticalAcrossSessions(t *testing.T) {
 // intermediates in the project.
 func TestSessionFactsNameTheWorkDirectory(t *testing.T) {
 	work := "/state/lagent/proj/work/sess-1"
-	got := sessionFacts(work)
+	got := sessionFacts(work, nil)
 	if !strings.Contains(got, work) {
 		t.Error("the work directory is not named in the facts")
 	}
@@ -123,7 +123,7 @@ func TestSessionFactsNameTheWorkDirectory(t *testing.T) {
 }
 
 func TestSessionFactsOmitTheDirectoryWhenNone(t *testing.T) {
-	got := sessionFacts("")
+	got := sessionFacts("", nil)
 	if strings.Contains(got, "work directory") {
 		t.Error("a session with no work directory should not be told it has one")
 	}
@@ -161,5 +161,14 @@ func TestSystemPromptSaysNothingAboutDiagrams(t *testing.T) {
 		if strings.Contains(sys, banned) {
 			t.Errorf("system prompt mentions %q — ADR-0063 keeps diagrams out of the prompt", banned)
 		}
+	}
+}
+
+// The MCP catalog rides the facts message after the work directory and
+// the date, line by line as the inventory rendered it.
+func TestSessionFactsCarryTheCatalog(t *testing.T) {
+	got := sessionFacts("", []string{"- MCP servers connected this session.", "  - tor-exit (2 tools: check_ip, update_list)"})
+	if !strings.Contains(got, "tor-exit (2 tools") || strings.Index(got, "session started:") > strings.Index(got, "MCP servers") {
+		t.Errorf("catalog missing or out of order:\n%s", got)
 	}
 }

@@ -19,10 +19,13 @@ import (
 // server toggled off must be closed.
 type stubServer struct {
 	stubCaller
-	tools  []string
-	lists  int
-	closed int
+	tools        []string
+	instructions string
+	lists        int
+	closed       int
 }
+
+func (s *stubServer) Instructions() string { return s.instructions }
 
 func (s *stubServer) ListTools(context.Context) ([]mcp.Tool, error) {
 	s.lists++

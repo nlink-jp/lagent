@@ -67,6 +67,22 @@ Studio answers on its native `/api/v0/models/<id>`, Ollama on
 `/api/show`, and a plain OpenAI-compatible server has no such endpoint,
 so `[model].context_window` is required there.
 
+## MCP servers
+
+`.mcp.json` is read in Claude Code's format; every server is connected
+and every tool registered as `mcp__<server>__<tool>`, filtered by
+`[mcp].exclude`. What the model is shown is decided separately
+(ADR-0004, `cmd/mcpload.go`): under `[mcp].advertise = "deferred"` the
+runtime-facts message carries a catalog — one line per server with its
+tool names and the first sentence of the `instructions` it published at
+initialize — and the built-in `mcp_load` advertises a server's tools
+for the rest of the session. A call to a registered tool the model was
+not shown is refused before any gate, with the route. `[mcp].preload`
+and a `--allow mcp__<server>__*` grant advertise from the start;
+`"all"` is the baseline that advertises everything. A resumed session
+replays its `mcp_load` calls; `/clear` starts unloaded with a fresh
+catalog; `/mcp` shows each server's loaded state.
+
 ## One turn
 
 `Agent.Run` takes the operator's text, expands `@`-references into
@@ -108,6 +124,8 @@ callbacks and the agent never imports a UI package:
 - `OnRoundLimit` — the checkpoint dialog; nil means unattended, and the
   checkpoint stops.
 - `ClipboardImage` — the `@clipboard` capture; nil reports it unavailable.
+- `Advertise` — which registered tools are declared to the model
+  (ADR-0004); a call to a hidden one is refused before any gate.
 
 ## Approval
 

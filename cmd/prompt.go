@@ -53,7 +53,7 @@ func loadInstructions(projectDir string, grant projectGrant) (section string, la
 //
 // The SESSION-START date, deliberately: a per-request timestamp would
 // change the message every turn and bust the prefix cache the same way.
-func sessionFacts(workDir string) string {
+func sessionFacts(workDir string, catalog []string) string {
 	now := time.Now()
 	zone, _ := now.Zone()
 	var b strings.Builder
@@ -62,6 +62,10 @@ func sessionFacts(workDir string) string {
 		b.WriteString("  Use it for anything that is not part of the project: intermediate data, a report you are assembling, a file you only need for the next step. It is outside the project, so writing there does not dirty the user's working copy; the file tools can read and write it, and shell commands see it as $LAGENT_WORK_DIR (a shell command that writes there needs access: \"write\"). An MCP tool that takes a workspace or output directory should be given this path — write it out in full, since nothing expands variables inside a tool argument. Results too large to return inline are saved here for you, and the reply says where.\n")
 	}
 	fmt.Fprintf(&b, "- session started: %s (%s, %s)\n", now.Format("2006-01-02"), now.Weekday(), zone)
+	for _, line := range catalog {
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
 	return b.String()
 }
 
@@ -83,7 +87,7 @@ You are lagent, an interactive coding agent CLI running on the user's machine, b
 
 Project directory: ` + projectDir + `
 All file paths are relative to it. File tools are confined to it. shell_exec runs in the OS-enforced lane you declare with access. Declare access: "write" up front for anything that builds, tests, installs, commits, writes files or uses the network (build and test tools write their caches, so they need it too); it is approval-gated. Leave the default "read" for inspection only — ls, cat, grep, git status/diff/log — it runs without approval and can write nothing but its own $TMPDIR. Use "operator" only for the instruction/configuration files and credentials; the user always decides. A command refused with "Operation not permitted" needs the lane the refusal names, not a retry.
-The session work directory and the session start date are given in the runtime-facts message at the start of the conversation. For the current moment, elapsed time, or ANY calendar arithmetic (differences, weekdays, month ends, timezones), run the date command through shell_exec instead of computing yourself.
+The session work directory, the session start date, and the MCP servers connected this session are given in the runtime-facts message at the start of the conversation; an MCP server's tools join your tool list when you load it with mcp_load. For the current moment, elapsed time, or ANY calendar arithmetic (differences, weekdays, month ends, timezones), run the date command through shell_exec instead of computing yourself.
 
 Working style:
 - Orient with list_tree, locate a string you already know with search_files (fast grep), then read_file the specific lines (start_line/end_line) — everything you read is replayed on every later round; for anything you will edit or quote, read the actual lines.

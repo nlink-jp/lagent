@@ -517,6 +517,14 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			c.Close()
 		}
 	}()
+	// What the model is shown of them (ADR-0004): every server's tools
+	// are registered; only a loaded server's are advertised. A --allow
+	// grant naming a server is a preload — the operator's declaration
+	// that this run needs it.
+	adv := newMCPAdvertiser(cfg.MCP.Advertise == "all", cfg.MCP.Preload, flagAllow)
+	adv.setInventory(mcpInv)
+	mcpStatus := func() []string { return mcpInv.summaryLinesWith(adv.Loaded) }
+	_ = mcpSummary
 
 	// --- LLM backend ---
 	backend, err := llm.NewOpenAI(cfg.LLM.BaseURL, cfg.LLM.Model, cfg.LLM.APIKey, cfg.LLM.Provider)
@@ -593,6 +601,13 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	if err := registerAskTool(registry, askOperator); err != nil {
 		return err
 	}
+	// mcp_load (ADR-0004): registered before agent.New, which caches the
+	// declarations; the refresh closure reads `ag` lazily — the tool can
+	// only run inside ag.Run, so the pointer is set by then.
+	var ag *agent.Agent
+	if err := registerMCPLoadTool(registry, adv, func() { ag.RefreshTools() }); err != nil {
+		return err
+	}
 
 	// --- round-limit intervention dialog ---
 	// nil in one-shot mode: nobody to ask, and no model review to
@@ -627,7 +642,6 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// view-layer concern the model is never told about, and both a
 	// prohibition and a format instruction were measured steering the
 	// model away from the behavior its own prior already had.
-	var ag *agent.Agent
 	composeSystem := func() string {
 		return buildSystemPrompt(projectDir, projectContext)
 	}
@@ -657,6 +671,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		System:         composeSystem(),
 		MaxTurns:       cfg.Agent.MaxTurns,
 		Policy:         approvalPolicy,
+		Advertise:      adv.Advertise,
 		ClipboardImage: clipboardImage,
 		BeforeOperatorWrite: func(tc llm.ToolCall) {
 			if name := pinNameForWrite(projectDir, tc); name != "" {
@@ -758,11 +773,16 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	})
 	if len(restored) > 0 {
 		ag.SetHistory(restored)
+		// The servers the earlier session loaded are loaded again, so
+		// it sees what it saw (ADR-0004).
+		if replayLoads(restored, adv, registry) > 0 {
+			ag.RefreshTools()
+		}
 	}
 	// The per-session facts open the conversation (after SetHistory: the
 	// isolation tag is fresh, and the restored history's own opening
-	// message named the old one).
-	ag.AnnounceSession(sessionFacts(workDir))
+	// message named the old one). The MCP catalog rides with them.
+	ag.AnnounceSession(sessionFacts(workDir, mcpInv.catalogLines(adv)))
 
 	// Exit summary (operator request): every interactive exit route —
 	// /quit, Ctrl+C, Ctrl+D — ends with the resume hint and the cost
@@ -814,6 +834,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			}
 		}
 		mcpClients, mcpSummary, mcpInv = connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, &warn, grant, mcpFilter)
+		adv.setInventory(mcpInv)
 		ag.RefreshTools()
 		mcpTools := 0
 		for _, t := range registry.List() {
@@ -840,7 +861,22 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 		return b.String()
 	}
-	reloadMCP := func() string { return reconnectMCP(true) }
+	reloadMCP := func() string {
+		out := reconnectMCP(true)
+		// The catalog changed with the server set: the model is told
+		// through a fresh facts message (ADR-0003's lane), never through
+		// the system prompt.
+		ag.AnnounceSession(sessionFacts(workDir, mcpInv.catalogLines(adv)))
+		return out
+	}
+	loadMCP := func(server string) (string, bool) {
+		out, err := adv.Load(server, registry)
+		if err != nil {
+			return err.Error() + "\n", true
+		}
+		ag.RefreshTools()
+		return out, false
+	}
 	// The panel writes an exclusion for one server and then asks for
 	// this: the filter is re-derived from the files it just changed, and
 	// that one server is reconnected under it (ADR-0039 + ADR-0077 §3).
@@ -889,6 +925,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 		mcpClients = others
 		mcpSummary = mcpInv.summaryLines()
+		adv.setInventory(mcpInv)
 		ag.RefreshTools()
 		settings.inv = mcpInv
 		mcpTools := mcpToolCount(registry)
@@ -1003,14 +1040,19 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// runtime-facts message, never through the system prompt, which
 		// stays byte-identical so the server's prefix cache survives
 		// the clear.
-		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap), func() { ag.AnnounceSession(sessionFacts(workDir)) })...)
+		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap))...)
 		// The MCP servers — spawned at startup with the old id in their
 		// environment and arguments — are reconnected the way /mcp
 		// reload does, so a server keeping per-session state sees the
-		// session the environment reports.
+		// session the environment reports. A cleared session starts
+		// unloaded, preloads aside (ADR-0004).
+		adv.Reset()
 		if cfg.MCP.Enabled {
 			extra.WriteString(reconnectMCP(false))
 		}
+		// Told last, once everything it names is in place: the work
+		// directory and the catalog ride one fresh facts message.
+		ag.AnnounceSession(sessionFacts(workDir, mcpInv.catalogLines(adv)))
 		return render()
 	}
 
@@ -1165,8 +1207,8 @@ func runREPL(cmd *cobra.Command, args []string) error {
 				}()
 			},
 			Slash: func(in string) (string, bool, bool) {
-				return slashOutput(in, ag, registry, mcpSummary,
-					slashReloads{mcp: reloadMCP},
+				return slashOutput(in, ag, registry, mcpStatus(),
+					slashReloads{mcp: reloadMCP, load: loadMCP},
 					func() string { return usageReport(ag, cfg.LLM.Model) },
 					appVersion, msgs, onClear)
 			},
@@ -1231,8 +1273,8 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			continue
 		}
 		if strings.HasPrefix(input, "/") {
-			out, _, quit := slashOutput(input, ag, registry, mcpSummary,
-				slashReloads{mcp: reloadMCP},
+			out, _, quit := slashOutput(input, ag, registry, mcpStatus(),
+				slashReloads{mcp: reloadMCP, load: loadMCP},
 				func() string { return usageReport(ag, cfg.LLM.Model) },
 				appVersion, msgs, onClear)
 			fmt.Fprint(stderr, out)
@@ -1808,17 +1850,28 @@ func resolveTheme(configured string) string {
 // either may be nil (tests), which reads as "not available here".
 type slashReloads struct {
 	mcp func() string
+	// load advertises one server's tools by hand (/mcp load <server>,
+	// ADR-0004); returns the text and whether it is an error.
+	load func(server string) (string, bool)
 }
 
 func slashOutput(input string, ag *agent.Agent, registry *tools.Registry, mcpSummary []string, reload slashReloads, usage func() string, version string, msgs *uitext.Messages, onClear func() string) (output string, isErr bool, quit bool) {
 	var b strings.Builder
 	fields := strings.Fields(input)
-	// The one supported subcommand shape: "/mcp reload". Anything else
-	// after the command is a typo and says so, instead of silently
-	// showing the listing.
+	// The supported subcommand shapes: "/mcp reload" and "/mcp load
+	// <server>". Anything else after the command is a typo and says so,
+	// instead of silently showing the listing.
 	sub := ""
 	if len(fields) > 1 {
 		sub = fields[1]
+	}
+	if fields[0] == "/mcp" && sub == "load" && reload.load != nil {
+		if len(fields) != 3 {
+			fmt.Fprintf(&b, msgs.UnknownCommandFmt, input)
+			return b.String(), true, false
+		}
+		out, isErr := reload.load(fields[2])
+		return out, isErr, false
 	}
 	if fields[0] == "/mcp" && sub != "" {
 		var fn func() string
@@ -2003,11 +2056,12 @@ func (l liveLog) Log(kind string, data any) error {
 }
 
 // rotateWorkDir points every consumer of the session work directory at
-// dir ("" for none): the file tools' second root, the sandbox profile,
-// and the model (announce tells it, through the runtime-facts message).
-// The MCP intake reads the registry, so it follows on its own. Returns
-// operator notes for what could not follow.
-func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool, projectDir, dir string, denyExec []string, readLanePrompts bool, persistentParents []string, announce func()) []string {
+// dir ("" for none): the file tools' second root and the sandbox
+// profile. The MCP intake reads the registry, so it follows on its own;
+// the model is told by the caller, through the runtime-facts message,
+// once everything that message names is in place. Returns operator
+// notes for what could not follow.
+func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool, projectDir, dir string, denyExec []string, readLanePrompts bool, persistentParents []string) []string {
 	var notes []string
 	if err := registry.UseWorkDir(dir); err != nil {
 		notes = append(notes, fmt.Sprintf("file tools keep the previous work directory: %v", err))
@@ -2021,9 +2075,6 @@ func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool
 		}
 		registry.SetLaneExec(shellExec.run, enf)
 		notes = append(notes, laneNotes...)
-	}
-	if announce != nil {
-		announce()
 	}
 	return notes
 }

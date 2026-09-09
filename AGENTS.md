@@ -38,7 +38,8 @@ lagent.example.project.toml  shipped <project>/.lagent.toml template
 mcp.example.json     shipped MCP server template (pinned by a loader test)
 main.go            entry point (package main, calls cmd.Execute(version))
 cmd/               cobra root command, REPL loop, wiring, system prompt; `version`,
-                   `sessions`, `trust`, `workdirs` subcommands; ask_user, MCP intake
+                   `sessions`, `trust`, `workdirs` subcommands; ask_user, MCP intake,
+                   the MCP advertiser and mcp_load (cmd/mcpload.go, ADR-0004)
 internal/config/   strict-decode TOML + env/flag precedence ([llm], [model], [sandbox],
                    [agent], [mcp], [tui], [approval]); the policy file
 internal/llm/      Backend interface + the OpenAI-compatible client (stdlib net/http,
@@ -98,6 +99,13 @@ is new; the others are ports minus the ADR-0002 features.
 - **`--version` must always answer** and `version` must print the same
   line (pinned by `cmd/root_test.go`) — a Homebrew formula's `brew test`
   runs it.
+- **MCP tools are registered always, advertised on load** (ADR-0004).
+  `mcpAdvertiser` owns which servers the model can see; `agent.Options.
+  Advertise` filters the declarations and refuses a call to a hidden
+  registered tool before any gate. The catalog rides the facts message,
+  so `AnnounceSession` runs after the MCP connect (startup, `/clear`,
+  `/mcp reload`), never before. Anything that changes the connected set
+  calls `adv.setInventory` then `ag.RefreshTools()`.
 - **The system prompt is byte-identical across sessions** (ADR-0003).
   Anything per-session — the isolation tag name, the work directory,
   the start date — goes through `Agent.AnnounceSession` as the

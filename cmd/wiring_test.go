@@ -4,6 +4,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -62,5 +64,18 @@ func TestTUIOptionsWiring(t *testing.T) {
 		if !set {
 			t.Errorf("tui.Options in root.go does not set %s — the TUI silently loses that wiring", field)
 		}
+	}
+}
+
+// ADR-0004's predicate must reach agent.New, or every MCP tool is
+// advertised and the catalog is decoration. Pinned on the source: the
+// wiring is a closure over the session.
+func TestAdvertiseIsWiredIntoTheAgent(t *testing.T) {
+	src, err := os.ReadFile("root.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(src), "Advertise:      adv.Advertise,") && !strings.Contains(string(src), "Advertise: adv.Advertise,") {
+		t.Fatal("agent.New is not given adv.Advertise")
 	}
 }

@@ -194,11 +194,19 @@ type MCPConfig struct {
 	Enabled        bool `toml:"enabled"`
 	CallTimeoutSec int  `toml:"call_timeout_sec"`
 	// Exclude names MCP servers, or single functions of them
-	// ("obsidian/patch_vault_file"), that this session does not have
-	// (ADR-0077). An excluded server is never started. Everything not
-	// named here is declared, so an operator who sets nothing sees
-	// today's behaviour and .mcp.json keeps the meaning it has.
+	// ("obsidian/patch_vault_file"), that this session does not have.
+	// An excluded server is never started. Everything not named here is
+	// connected, so an operator who sets nothing sees every server and
+	// .mcp.json keeps the meaning it has.
 	Exclude []string `toml:"exclude"`
+	// Advertise decides what the model is shown of the connected
+	// servers: "deferred" (default) shows a catalog and advertises a
+	// server's tools when the model loads it; "all" advertises every
+	// tool from the start — the measurement baseline.
+	Advertise string `toml:"advertise"`
+	// Preload names servers advertised from the start under "deferred":
+	// the lookups an operator uses every session.
+	Preload []string `toml:"preload"`
 }
 
 // LLMConfig names the local server and the model. Every conversation
@@ -264,7 +272,7 @@ func defaults() Config {
 		Sandbox:  SandboxConfig{Enabled: true},
 		Approval: ApprovalConfig{PinTrustedFiles: true},
 		Agent:    AgentConfig{MaxTurns: 50, ShellTimeoutSec: 120},
-		MCP:      MCPConfig{Enabled: true, CallTimeoutSec: 60},
+		MCP:      MCPConfig{Enabled: true, CallTimeoutSec: 60, Advertise: "deferred"},
 		TUI:      TUIConfig{Theme: "auto", Language: "auto", ShowThoughts: true},
 	}
 }
@@ -386,7 +394,7 @@ var trackedKeys = []string{
 	"approval.pin_trusted_files",
 	"agent.max_turns", "agent.shell_timeout_sec", "agent.auto_approve",
 	"agent.read_only",
-	"mcp.enabled", "mcp.call_timeout_sec",
+	"mcp.enabled", "mcp.call_timeout_sec", "mcp.advertise", "mcp.preload",
 	"tui.theme", "tui.language", "tui.show_thoughts",
 }
 
@@ -417,6 +425,11 @@ func (c *Config) validate() error {
 	}
 	if c.MCP.CallTimeoutSec <= 0 {
 		return fmt.Errorf("[mcp].call_timeout_sec must be positive")
+	}
+	switch c.MCP.Advertise {
+	case "deferred", "all":
+	default:
+		return fmt.Errorf("[mcp].advertise must be deferred or all (got %q)", c.MCP.Advertise)
 	}
 	switch c.TUI.Theme {
 	case "auto", "dark", "light", "plain":
