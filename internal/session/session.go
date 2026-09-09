@@ -186,7 +186,7 @@ func DefaultDir() (string, error) {
 }
 
 // projectSubdir is where projectDir's sessions live (gem-agent ADR-0022): the
-// same escaped-path + .project-marker convention as memory. Legacy
+// statedir escaped-path + .project-marker convention. Legacy
 // flat files directly under dir stay readable in place.
 func projectSubdir(dir, projectDir string) string {
 	return filepath.Join(dir, "projects", statedir.EscapeProject(projectDir))

@@ -165,8 +165,8 @@ type Options struct {
 	Banner []string
 	// InitialInput is submitted as the first message once the banner
 	// has printed (gem-agent ADR-0064), through the exact path a typed message
-	// takes — !shell, slash commands, /skill expansion, @ mentions —
-	// and echoed as "> line". argv is operator input, the same trust
+	// takes — !shell, slash commands, @ mentions — and echoed as
+	// "> line". argv is operator input, the same trust
 	// as the keyboard. Empty starts the session idle.
 	InitialInput string
 	// AutoMode is the initial auto-approve state; ToggleAuto flips it
@@ -325,7 +325,6 @@ type Model struct {
 	promptTokens  int // last round's prompt alone (cache-share denominator)
 	cachedTokens  int // last round's cached prompt tokens (gem-agent ADR-0018)
 	window        int // model input token limit, 0 = unknown
-	windowAssumed bool
 }
 
 // New creates the model.
@@ -582,7 +581,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ContextWindow:
 		m.window = msg.Tokens
-		m.windowAssumed = msg.Assumed
 		return m, nil
 
 	case ToolCall:
@@ -653,9 +651,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case initialSubmit:
 		// The argv first message enters the same submit() the Enter
-		// key uses (gem-agent ADR-0064): !shell, slash commands, /skill
-		// expansion, @ mentions and the "> line" echo all behave as
-		// if the operator had typed it.
+		// key uses (gem-agent ADR-0064): !shell, slash commands,
+		// @ mentions and the "> line" echo all behave as if the
+		// operator had typed it.
 		//
 		// A type-ahead line can have taken the turn already — the
 		// input reader subscribes before the first resize delivers
@@ -686,9 +684,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return nm, cmd
 		}
 		return next, cmd
-
-	case Output:
-		return m, m.emitJoined(msg.Lines...)
 
 	case Attached:
 		var parts []string
@@ -1817,10 +1812,10 @@ func (m Model) completeMention() (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// completeSlash completes a /command (and, through the injected
-// completer, a /skill name) the same way @-references complete: to the
-// unique match, else to the longest common prefix, listing the
-// candidates when Tab cannot advance.
+// completeSlash completes a /command (the injected completer supplies
+// the list) the same way @-references complete: to the unique match,
+// else to the longest common prefix, listing the candidates when Tab
+// cannot advance.
 func (m Model) completeSlash() (tea.Model, tea.Cmd) {
 	if m.completeSlashFn == nil {
 		return m, nil
@@ -2104,9 +2099,6 @@ func (m Model) footer() string {
 	window := "–"
 	if m.window > 0 {
 		window = humanTokens(m.window)
-		if m.windowAssumed {
-			window = "~" + window
-		}
 	}
 	occupancy := "ctx " + ctx + "/" + window
 	if m.ctxTokens > 0 && m.window > 0 {

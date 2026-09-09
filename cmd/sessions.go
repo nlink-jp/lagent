@@ -92,9 +92,10 @@ func writeSessions(out io.Writer, metas []session.Meta, showProject bool) {
 // it, refusing rather than warning when it does not belong here.
 //
 // Both refusals are deliberate (gem-agent ADR-0005): a transcript replayed in the
-// wrong tree describes files that are not there, and thought signatures
-// are model-bound opaque tokens with no basis for cross-model replay.
-// Each message names what to do instead.
+// wrong tree describes files that are not there, and a conversation
+// recorded under one model is not silently continued under another —
+// the operator says so with --model. Each message names what to do
+// instead.
 func resolveResume(dir, projectDir, model, id string) (session.Meta, error) {
 	var meta session.Meta
 	if id == "" {

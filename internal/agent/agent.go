@@ -25,8 +25,9 @@ import (
 )
 
 // UsageStats is the session's per-category token accounting (gem-agent ADR-0019).
-// Main-loop numbers feed the footer; risk and compaction are side-calls
-// that must NOT touch the footer's context gauge — a risk check stomping
+// Main-loop numbers feed the footer; a side-call (gem-agent's risk
+// review and compaction; none here yet, the fields stay for the
+// record shape) must NOT touch the footer's context gauge — a risk check stomping
 // "ctx" with its own prompt size was the bug that shaped this split.
 type UsageStats struct {
 	Rounds                           int
@@ -192,8 +193,8 @@ type Agent struct {
 	// implicit caching can hit; regenerated on Reset and SetHistory.
 	// Session scope is sound because guard.Wrap refuses content that
 	// contains the tag name — knowing the tag is useless for escaping
-	// it. Side-calls (risk eval, compaction, summaries) keep per-call
-	// tags: one-shot calls have no prefix to reuse.
+	// it. A side-call, should one be added, keeps a per-call tag:
+	// one-shot calls have no prefix to reuse.
 	tag guard.Tag
 
 	history  []llm.Message
@@ -223,9 +224,9 @@ type Options struct {
 	Ceiling sandbox.Ceiling
 	// Model names the model these calls bill against. Record-keeping
 	// only (gem-agent ADR-0057): it goes into the usage records so a transcript
-	// can be priced without joining the header, and into an
-	// auto_decision the model tier answered, so a verdict can be read
-	// back against the model that gave it. The backend picks the model.
+	// can be priced without joining the header, and into each
+	// auto_decision record, so a verdict can be read back against the
+	// model that was running. The backend picks the model.
 	Model string
 	// OnUsage, when set, receives per-round token usage (prompt tokens
 	// approximate the current context size; output tokens the round's
@@ -248,8 +249,8 @@ type Options struct {
 	// OnAttach, when set, reports what an @-reference pulled in (and
 	// what it could not) so the operator sees it landed.
 	OnAttach func(atts []mention.Attachment, problems []mention.Problem)
-	// OnNotice, when set, receives in-turn notices (a retry after a
-	// content-filter block, a compaction) so the operator sees what
+	// OnNotice, when set, receives in-turn notices (a truncated answer,
+	// a late-returning abandoned call) so the operator sees what
 	// happened.
 	OnNotice func(msg string)
 	// Policy is the per-tool approval policy (gem-agent ADR-0008).
@@ -386,10 +387,9 @@ func (a *Agent) SetHistory(history []llm.Message) {
 	a.tag = guard.NewTagWithPrefix("tool_output")
 }
 
-// SetContextWindow records the model's input token limit, which
-// auto-compaction measures against. It arrives asynchronously (the
-// lookup that feeds the footer), so it is guarded — 0 means "unknown",
-// and auto-compaction stays off until it is known.
+// SetContextWindow records the model's input token limit for the usage
+// snapshot. It arrives asynchronously (the lookup that feeds the
+// footer), so it is guarded — 0 means "unknown".
 func (a *Agent) SetContextWindow(tokens int) {
 	a.mu.Lock()
 	a.window = tokens
@@ -1219,9 +1219,7 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 				source = "allowlist"
 			}
 			operatorWrite = ok && d.Verdict.OperatorOnly && !fromAllowlist
-			// The transcript record (gem-agent ADR-0045 §7) survives /learn's
-			// withdrawal (gem-agent ADR-0049 §2): telemetry is opt-in and
-			// off-machine, and any future learning design needs a local
+			// The transcript record (gem-agent ADR-0045 §7) is a local
 			// record of the operator's own decisions — inferring them
 			// from what ran cannot tell a typed 'y' from a policy that
 			// was in force at the time.
@@ -1240,8 +1238,8 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 				"lane": a.laneOf(tc),
 			}
 			// The operator's own words about their own decision — the
-			// strongest evidence gem-agent ADR-0045 stores. Local record only:
-			// free text stays out of the telemetry export (gem-agent ADR-0060 §4).
+			// strongest evidence gem-agent ADR-0045 stores. Local record
+			// only; nothing here exports it.
 			if denyReason != "" {
 				record["deny_reason"] = denyReason
 			}
@@ -1498,9 +1496,9 @@ func (a *Agent) notify(msg string) {
 }
 
 // logUsage writes one accounting record per model call (gem-agent ADR-0057).
-// EVERY call goes through here — main loop, risk evaluation, progress
-// review, compaction — because a tally that lives only in memory is
-// gone when the process exits, and the API never reports cost.
+// EVERY call goes through here — the main loop today, any side-call
+// added later — because a tally that lives only in memory is gone when
+// the process exits, and the API never reports cost.
 func (a *Agent) logUsage(source string, u llm.Usage) {
 	if u.Empty() {
 		return

@@ -26,13 +26,15 @@ type mcpCaller interface {
 }
 
 const (
-	// Gemini function names allow [a-zA-Z0-9_.-], max 64 chars.
+	// Function names are kept to [a-zA-Z0-9_.-], max 64 chars — the
+	// strictest rule among the chat APIs, so a name is valid wherever
+	// the transcript is replayed.
 	maxToolNameLen = 64
 	maxToolDescLen = 2000
 )
 
 // mcpToolName builds the registry name for an MCP tool, Claude Code
-// style: mcp__<server>__<tool>, sanitized to Gemini's charset. An
+// style: mcp__<server>__<tool>, sanitized to that charset. An
 // over-long name is truncated with a deterministic hash suffix: a bare
 // cut collided two long remote names into one registry entry, silently
 // dropping the second tool (gem-agent ADR-0021). The hash is stable across runs,

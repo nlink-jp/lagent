@@ -58,7 +58,7 @@ type Verdict struct {
 	// (gem-agent ADR-0072 §4): the write lands in what later sessions trust —
 	// instruction files, the runtime's own configuration — so the
 	// party that proposed it cannot also be its judge (gem-agent ADR-0020 §4,
-	// applied beyond memory). The ladder hands such calls straight to
+	// stated there for its memory file). The ladder hands such calls straight to
 	// the operator. A shell command in the operator lane (gem-agent ADR-0073) is
 	// the same verdict: the lane can write those files.
 	OperatorOnly bool
@@ -260,7 +260,7 @@ func projectRelative(p, projectDir string) string {
 // lane's profile also denies (gem-agent ADR-0073 §3) — are Review that only the
 // operator may answer: the edit persists into what every later session
 // trusts, so the evaluator-is-the-proposer objection of gem-agent ADR-0020 §4
-// applies to it exactly as to memory.
+// applies to it exactly as it did to gem-agent's memory file.
 func persistentTarget(rel string) (Verdict, bool) {
 	if rel == "" {
 		return Verdict{}, false

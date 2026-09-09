@@ -94,22 +94,12 @@ type Usage struct {
 	Cached int
 }
 
-// ContextWindow reports the model's input token limit once known.
-// Assumed marks a family-default guess (Vertex publisher metadata omits
-// inputTokenLimit) — the footer renders it with a "~" so an estimate
-// never masquerades as a measured value.
+// ContextWindow reports the model's input token limit once known: the
+// provider probe's answer or the configured `[model].context_window`,
+// a measured value either way.
 type ContextWindow struct {
-	Tokens  int
-	Assumed bool
+	Tokens int
 }
-
-// Output carries plain lines to the scrollback from work running
-// outside the event loop — /riskbook learn's progress and draft, for
-// one (gem-agent ADR-0050). Attached exists for two other things and neither
-// fits: its Lines are attachments (📎) and its Notes warnings (⚠);
-// a draft rendered as a column of warnings reads as a column of
-// problems.
-type Output struct{ Lines []string }
 
 // ApprovalAnswer is the UI's reply to one ApprovalRequest. Key is the
 // dialog answer byte ('y', 'n', 'a' — 'p' resolves to 'y' before it is
