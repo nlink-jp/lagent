@@ -1,16 +1,71 @@
-// Package cmd holds the cobra command tree. main.go injects the version
-// (from `git describe` via -X main.version) through Execute.
 package cmd
 
 import (
-	"fmt"
-	"os"
+	"github.com/nlink-jp/lagent/internal/trustpin"
+	"runtime"
+	"syscall"
 
+	"github.com/nlink-jp/lagent/internal/bounded"
+
+	"bufio"
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+	"unicode/utf8"
+
+	"github.com/nlink-jp/lagent/internal/agent"
+	"github.com/nlink-jp/lagent/internal/approve"
+	"github.com/nlink-jp/lagent/internal/banner"
+	"github.com/nlink-jp/lagent/internal/config"
+	"github.com/nlink-jp/lagent/internal/llm"
+	"github.com/nlink-jp/lagent/internal/mcp"
+	"github.com/nlink-jp/lagent/internal/mcpfilter"
+	"github.com/nlink-jp/lagent/internal/mention"
+	"github.com/nlink-jp/lagent/internal/policy"
+	"github.com/nlink-jp/lagent/internal/repl"
+	"github.com/nlink-jp/lagent/internal/sandbox"
+	"github.com/nlink-jp/lagent/internal/session"
+	"github.com/nlink-jp/lagent/internal/tools"
+	"github.com/nlink-jp/lagent/internal/tui"
+	"github.com/nlink-jp/lagent/internal/uitext"
+	"github.com/nlink-jp/lagent/internal/workdir"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
-// Execute runs the root command with the injected version string.
+var (
+	flagConfig    string
+	flagModel     string
+	flagMCP       string
+	flagNoSandbox bool
+	flagPrompt    string
+	flagContinue  bool
+	flagResume    string
+	flagAuto      bool
+	flagWritable  bool
+	flagReadOnly  bool
+	flagAllow     []string
+)
+
+// appVersion mirrors rootCmd.Version for use inside rootCmd's own run
+// closures — reading rootCmd there is an initialization cycle.
+var appVersion = "dev"
+
+// Execute runs the root command.
 func Execute(version string) {
+	appVersion = version
 	rootCmd.Version = version
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -20,32 +75,1978 @@ func Execute(version string) {
 var rootCmd = &cobra.Command{
 	Use:   "lagent [first message]",
 	Short: "Sandboxed CLI agent runtime on a local LLM (OpenAI-compatible API)",
-	Long: `lagent is a sandboxed CLI agent runtime backed by a local LLM served
+	Long: `lagent is a sandboxed CLI agent backed by a local language model served
 over an OpenAI-compatible API (LM Studio, Ollama): file read/write,
-sandboxed shell commands and MCP servers, with mutating calls gated by
-the operator. It is a separate product line from gem-agent, built on the
-same design; see docs/en/lagent-rfp.md.`,
-	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Phase 1 (Core) lands the agent loop here. The scaffold only
-		// answers --version and version, which the scaffold checklist
-		// requires to be identical and pinned by a test.
-		return fmt.Errorf("lagent: the agent loop is not implemented yet (Phase 1)")
-	},
-}
+sandboxed shell commands and MCP servers, with mutating calls asking for
+your approval. It reads a project's AGENTS.md / CLAUDE.md and Claude
+Code-format .mcp.json as they are — no lagent-specific setup.
 
-// versionCmd mirrors --version so `lagent version` and `lagent --version`
-// print the same line (CONVENTIONS.md §Scaffold checklist).
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print the version",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		_, err := fmt.Fprintf(cmd.OutOrStdout(), "%s version %s\n", rootCmd.Name(), rootCmd.Version)
-		return err
-	},
+The current working directory is the project: file tools stay inside it,
+and sandboxed shell commands cannot write outside it.
+
+macOS only. Documentation: README.md.`,
+	// One optional positional argument: the first interactive turn
+	// (ADR-0064). It runs through the same path a typed message takes,
+	// then the session is ordinary interactive lagent.
+	Args:         cobra.MaximumNArgs(1),
+	SilenceUsage: true,
+	RunE:         runREPL,
 }
 
 func init() {
-	rootCmd.SetVersionTemplate("{{.Name}} version {{.Version}}\n")
-	rootCmd.AddCommand(versionCmd)
+	rootCmd.Flags().StringVar(&flagConfig, "config", "", "config file path (default ~/.config/lagent/config.toml)")
+	rootCmd.Flags().StringVar(&flagModel, "model", "", "override the configured model name")
+	rootCmd.Flags().StringVar(&flagMCP, "mcp", "", "override [mcp].enabled for this run: on|off (off skips every MCP server spawn — useful for -p pipelines)")
+	rootCmd.Flags().BoolVar(&flagNoSandbox, "no-sandbox", false, "disable the sandbox-exec wrapper for shell_exec (debugging only, unsafe)")
+	rootCmd.Flags().StringVarP(&flagPrompt, "prompt", "p", "", "one-shot: run this prompt and exit; mutating tools are denied unless listed in --allow or --auto is set")
+	rootCmd.Flags().BoolVar(&flagAuto, "auto", false, "start in auto-approve mode (required for auto-approve in -p, where [agent].auto_approve is ignored)")
+	rootCmd.Flags().StringSliceVar(&flagAllow, "allow", nil, `tools that never ask this run: tool names or mcp__server__* prefixes (repeatable or comma-separated); blocked commands still ask`)
+	rootCmd.Flags().BoolVar(&flagWritable, "writable", false, "no lane ceiling — the default, stated; use it to step out of a configured [agent].read_only")
+	rootCmd.Flags().BoolVar(&flagReadOnly, "read-only", false, "cap the session at the read lane: nothing outside the session scratch may change")
+	rootCmd.Flags().BoolVarP(&flagContinue, "continue", "c", false, "resume this project's most recent session")
+	rootCmd.Flags().StringVar(&flagResume, "resume", "", "resume a specific session id (see: lagent sessions)")
+}
+
+const shell = "/bin/bash"
+
+// reloadWarnings keeps a reload report's warnings and drops its
+// per-server inventory. `/mcp reload` is a command that asked for the
+// inventory; a toggle in the settings panel is not.
+func reloadWarnings(report string) string {
+	var keep []string
+	for _, l := range strings.Split(report, "\n") {
+		t := strings.TrimSpace(l)
+		if strings.HasPrefix(t, "warning:") || strings.HasPrefix(t, "note:") {
+			keep = append(keep, t)
+		}
+	}
+	return strings.Join(keep, "; ")
+}
+
+// workDirNoteFloor is the size a session's leftovers reach before the
+// startup note is worth an operator's attention (ADR-0078 §4). Below it
+// the directories exist but nothing has accumulated.
+const workDirNoteFloor = 10 << 20 // 10 MiB
+
+func runREPL(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// Startup warnings are teed: they hit stderr immediately (plain
+	// REPL, one-shot, early failures), but the TUI's first ClearScreen
+	// wipes that copy — a broken skill or unreadable memory flashed for
+	// milliseconds and vanished (ADR-0021) — so the recorded lines ride
+	// the banner too.
+	notes := &startupNotes{w: cmd.ErrOrStderr()}
+	var stderr io.Writer = notes
+
+	// --- config ---
+	cfgPath := flagConfig
+	if cfgPath == "" {
+		p, err := config.DefaultPath()
+		if err != nil {
+			return err
+		}
+		cfgPath = p
+	}
+	oneShot := flagPrompt != ""
+	roFlag, err := readOnlyOverride(flagWritable, flagReadOnly)
+	if err != nil {
+		return err
+	}
+	cfg, err := config.LoadWithOverrides(cfgPath, config.Overrides{
+		Model: flagModel, MCP: flagMCP, Auto: flagAuto, ReadOnly: roFlag})
+	if err != nil {
+		return err
+	}
+	// The first interactive turn, from the positional argument
+	// (ADR-0064). Never combined with -p: the two select different
+	// session shapes, and ambiguity is refused, not resolved.
+	initialInput, err := firstMessage(args, oneShot)
+	if err != nil {
+		return err
+	}
+	// Everything downstream reads this one effective value, never the
+	// raw config field.
+	autoOn := effectiveAuto(cfg.Agent.AutoApprove, oneShot, flagAuto)
+	// The ceiling this run starts with, resolved once for the same
+	// reason (ADR-0080 §1).
+	ceiling := effectiveCeiling(cfg.Agent)
+	// UI language, resolved once (ADR-0029): the chrome that follows —
+	// prompts, TUI, slash output — is built with it.
+	uiLang := uitext.Resolve(cfg.TUI.Language, os.Getenv)
+	msgs := uitext.For(uiLang)
+	// The escape ladder for turns outside the TUI (ADR-0065 §3): the
+	// TUI has its own three-press exit; the plain REPL and one-shot
+	// mode get the same one here. The quit skips the deferred flushes
+	// on purpose — the transcript is per event, and the warning that
+	// preceded it says so.
+	ladder := &interruptLadder{
+		Interrupting: func() { fmt.Fprintln(cmd.ErrOrStderr(), msgs.StatusInterrupting) },
+		Warn:         func() { fmt.Fprintln(cmd.ErrOrStderr(), msgs.InterruptStuckWarn) },
+		Quit: func() {
+			fmt.Fprintln(cmd.ErrOrStderr(), msgs.Bye)
+			os.Exit(130)
+		},
+	}
+
+	// --- project directory ---
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	projectDir, err := sandbox.ResolveWriteDir(cwd)
+	if err != nil {
+		return err
+	}
+
+	// --- startup safety (ADR-0023) ---
+	// Both gates read one unbuffered line from stdin before the REPL/TUI
+	// takes over. One-shot mode counts as non-interactive even on a TTY:
+	// a scripted -p must behave deterministically.
+	interactive := !oneShot && term.IsTerminal(int(os.Stdin.Fd()))
+	home, _ := os.UserHomeDir()
+	if reason := broadRoot(projectDir, home); reason != "" {
+		if err := confirmBroadRoot(reason, projectDir, interactive, os.Stdin, cmd.ErrOrStderr(), msgs); err != nil {
+			return err
+		}
+	}
+
+	policyPath := config.PolicyPath(cfgPath)
+	policyFile, err := config.LoadPolicyFile(policyPath)
+	if err != nil {
+		return err
+	}
+
+	// --- first-run project trust (ADR-0023): does this project's own
+	// instruction files / .mcp.json / skills get loaded at all? ---
+	projectTrusted, trustNote := resolveProjectTrust(
+		cfg, policyFile, policyPath, projectDir, interactive, os.Stdin, cmd.ErrOrStderr(), msgs)
+	if trustNote != "" {
+		fmt.Fprintf(stderr, "%s\n", trustNote)
+	}
+	// Content pins (ADR-0074): trust was given to a directory; what is
+	// loaded is content, and content that changed since asks again.
+	// Decided before anything of the project is read — .lagent.toml
+	// below included.
+	grant := projectGrant{trusted: projectTrusted}
+	var pinNotes []string
+	grant.excluded, pinNotes = checkPins(cfg, policyFile, policyPath, projectDir, projectTrusted, interactive, os.Stdin, cmd.ErrOrStderr(), msgs)
+	for _, n := range pinNotes {
+		fmt.Fprintf(stderr, "%s\n", n)
+	}
+
+	// --- per-tool approval policy (ADR-0008) ---
+	// The project half may tighten freely and may only loosen where the
+	// operator trusted this directory and its content is what they
+	// trusted: a checked-out repository must not be able to switch the
+	// gate off.
+	projectCfg, projectMayLoosen, err := loadProjectConfig(cfg, projectDir, grant)
+	if err != nil {
+		return err
+	}
+	// The MCP tool filter (ADR-0077): what this session does not have.
+	// Built once — the reload re-derives what it removes, but the files
+	// it is built from are config, and config changes need a restart
+	// like every other key. A malformed entry refuses to start: an
+	// exclusion that does not do what it says is worse than none, and
+	// falling back to "exclude nothing" would silently hand back the
+	// write functions the operator took away.
+	mcpFilter, err := mcpfilter.Build(cfg.MCP.Exclude, policyScope(policyFile), projectCfg.MCP.Exclude)
+	if err != nil {
+		return err
+	}
+	mergedTools := map[string]string{}
+	for k, v := range cfg.Approval.Tools {
+		mergedTools[k] = v
+	}
+	// The machine-owned file wins: a change made through /settings must
+	// not be silently overridden by the hand-written config (ADR-0009).
+	for k, v := range policyFile.ForProject(projectDir) {
+		mergedTools[k] = v
+	}
+	// --allow entries sit above both files (flags > machine-owned >
+	// hand-written, the order the config system already declares) and
+	// compile into the same policy build — so the project tighten, the
+	// Block floor, hooks, and the bare-"*" ban all hold without knowing
+	// the flag exists (ADR-0053 §2).
+	if err := applyAllowFlag(mergedTools, flagAllow); err != nil {
+		return err
+	}
+	// Learned command rules are parsed but NOT applied (ADR-0049 §3):
+	// /learn is withdrawn, nothing displays or manages those entries, and
+	// invisible standing permissions are the state the withdrawal exists
+	// to end. Ignoring them only ever tightens. The note tells the
+	// operator where the entries live.
+	approvalPolicy, policyNotes, err := policy.Build(
+		mergedTools, projectCfg.Approval.Tools, nil, projectMayLoosen)
+	if err != nil {
+		return err
+	}
+	if n := len(policyFile.CommandsFor(projectDir)); n > 0 {
+		fmt.Fprintf(stderr, "note: %s has %d obsolete [projects.<dir>.commands] entries — ignored; delete them to silence this note\n", policyPath, n)
+	}
+
+	// The persistent-file snapshot (ADR-0074 §3/§4): what this session
+	// starts from, compared with what the previous session left, and
+	// compared again at the end so what the session added or changed
+	// is said — the parent directories it names are denied by name in
+	// the write lane.
+	persistentSnap, persistentCut := trustpin.Snapshot(projectDir)
+	if persistentCut {
+		fmt.Fprintf(stderr, "note: change detection covers the first %d files under the project only\n", trustpin.WalkEntries)
+	}
+	persistentPath, persistentPathErr := persistentStateFile(projectDir)
+	if persistentPathErr == nil {
+		if prev := loadPersistentSnapshot(persistentPath); prev != nil {
+			if a, c, r := trustpin.SnapshotDiff(prev, persistentSnap); len(a)+len(c)+len(r) > 0 {
+				fmt.Fprintf(stderr, msgs.PersistentSinceLastFmt+"\n", describeSnapshotDiff(a, c, r))
+			}
+		}
+		_ = savePersistentSnapshot(persistentPath, persistentSnap)
+	}
+	reportPersistent := func(reason string, log func(kind string, data any) error) {
+		now, _ := trustpin.Snapshot(projectDir)
+		a, c, r := trustpin.SnapshotDiff(persistentSnap, now)
+		if len(a)+len(c)+len(r) > 0 {
+			fmt.Fprintf(stderr, msgs.PersistentSessionFmt+"\n", describeSnapshotDiff(a, c, r))
+			if log != nil {
+				_ = log("persistent_changes", map[string]any{"reason": reason, "added": a, "changed": c, "removed": r})
+			}
+		}
+		persistentSnap = now
+		if persistentPathErr == nil {
+			_ = savePersistentSnapshot(persistentPath, now)
+		}
+	}
+	afterDirectShell = func() string {
+		return pinChangesNote(cfg, policyFile, projectDir, projectTrusted, msgs)
+	}
+	defer func() { afterDirectShell = nil }()
+
+	// --- session transcript: the log, and the resume source (ADR-0005) ---
+	if flagContinue && flagResume != "" {
+		return fmt.Errorf("--continue and --resume name different sessions; use one")
+	}
+	sessionDir, sessionDirErr := session.DefaultDir()
+
+	var restored []llm.Message
+	resumedID := ""
+	if flagContinue || flagResume != "" {
+		if sessionDirErr != nil {
+			return fmt.Errorf("cannot resume: %w", sessionDirErr)
+		}
+		meta, err := resolveResume(sessionDir, projectDir, cfg.LLM.Model, flagResume)
+		if err != nil {
+			return err
+		}
+		resumedID = meta.ID
+		// restored is loaded below, AFTER Reopen holds the flock.
+	}
+
+	// A broken log warns; a session that cannot be recorded is still a
+	// session, and degrading beats refusing to start. A broken *resume*
+	// is fatal, though — the operator asked for that history, and
+	// continuing without it silently would be worse than stopping.
+	var sessionLog agent.SessionLog
+	sessionPath := "(disabled)"
+	sessionID := ""
+	// curLog is the transcript in use; /clear replaces it (ADR-0071 §2),
+	// so the exit-time close reads the variable, not a snapshot.
+	var curLog *session.Logger
+	defer func() {
+		if curLog != nil {
+			_ = curLog.Close()
+		}
+	}()
+	if sessionDirErr != nil {
+		fmt.Fprintf(stderr, "warning: session log disabled: %v\n", sessionDirErr)
+	} else {
+		lg, err := openSessionLog(sessionDir, resumedID, projectDir, cfg.LLM.Model, cmd.Root().Version)
+		switch {
+		case err != nil && resumedID != "":
+			return fmt.Errorf("cannot append to session %s: %w", resumedID, err)
+		case err != nil:
+			fmt.Fprintf(stderr, "warning: session log disabled: %v\n", err)
+		default:
+			curLog = lg
+			sessionLog = lg
+			sessionPath = lg.Path()
+			sessionID = lg.ID()
+			// Exported before any MCP server starts, so a registration
+			// line can hand the session to a server that keeps
+			// per-session state (ADR-0069 addendum 2).
+			if err := session.Export(sessionID); err != nil {
+				fmt.Fprintf(stderr, "warning: cannot set %s: %v\n", session.EnvVar, err)
+			}
+			if resumedID != "" {
+				// Under the flock (Reopen holds it): the file we read
+				// is exactly the file we will append to, with no
+				// window for another process's tail (review round 2).
+				history, resumeNotes, err := loadResumedHistory(lg, resumedID)
+				if err != nil {
+					return err
+				}
+				for _, n := range resumeNotes {
+					fmt.Fprintf(stderr, "warning: %s\n", n)
+				}
+				restored = history
+			}
+		}
+	}
+
+	// --- session work directory (ADR-0058) ---
+	// Everything the session produces outside the project lands here: an
+	// MCP result too large to hold in context, binary a server returned,
+	// scratch a shell command wrote. It has to exist BEFORE the sandbox
+	// profile is built (it is a writable root) and before the MCP
+	// servers start, because ${LAGENT_WORK_DIR} in an mcp.json args
+	// entry is expanded at load time from the process environment.
+	//
+	// That ordering is why the session block above was moved ahead of
+	// this one: the directory is keyed by session id, so a resume lands
+	// back in the directory its earlier self used.
+	// The project directory is the third fact a child sees (ADR-0071
+	// §3), beside the session id and the work directory.
+	if err := os.Setenv(workdir.ProjectEnvVar, projectDir); err != nil {
+		fmt.Fprintf(stderr, "warning: cannot set %s: %v\n", workdir.ProjectEnvVar, err)
+	}
+	workDir := ""
+	defer removeFallbackScratch()
+	defer func() {
+		if workDir != "" {
+			workdir.RemoveIfEmpty(workDir)
+		}
+	}()
+	if sessionID != "" {
+		if dir, err := workdir.Ensure(projectDir, sessionID); err != nil {
+			// A missing work directory degrades the session (oversized
+			// MCP results get truncated with a note); it does not stop
+			// the session from starting.
+			fmt.Fprintf(stderr, "warning: session work directory unavailable: %v\n", err)
+			// An inherited value (a nested launch) must not stand in.
+			_ = os.Unsetenv(workdir.EnvVar)
+		} else {
+			workDir = dir
+			// Exported, not passed: this is what puts the path in front
+			// of shell_exec's child, every MCP server (internal/mcp
+			// inherits os.Environ), and every hook, without any of them
+			// needing to know lagent's layout.
+			if err := exportWorkDir(workDir); err != nil {
+				fmt.Fprintf(stderr, "warning: cannot set %s: %v\n", workdir.EnvVar, err)
+			}
+			// Gated on bytes, not on the count (ADR-0078 §4): two empty
+			// leftovers are not an accumulation, and a line reading "0B"
+			// asks the operator to look at nothing.
+			// `more` means the scan was cut, so bytes is a lower bound:
+			// a truncated sweep whose partial sum is under the floor
+			// would suppress the note the floor exists to make
+			// meaningful (pre-release review).
+			if dirs, bytes, more, err := workdir.Sweep(projectDir, sessionID); err == nil &&
+				(bytes >= workDirNoteFloor || (more && bytes > 0)) {
+				plus := ""
+				if more {
+					plus = "+" // the startup scan was cut: a lower bound
+				}
+				fmt.Fprintf(stderr, "note: %d%s earlier session work dir(s) hold %s%s — delete them with 'lagent workdirs clean'\n",
+					dirs, plus, humanBytes(bytes), plus)
+			}
+		}
+	}
+
+	// --- shell execution strategy (ADR-0001 defense-in-depth) ---
+	sandboxOn := cfg.Sandbox.Enabled && !flagNoSandbox
+	if sandboxOn {
+		// Fail closed (ADR-0073 §5): a sandbox that cannot apply here
+		// (a nested Seatbelt) must not degrade silently into unconfined
+		// execution — the operator says --no-sandbox, or nothing runs.
+		if err := sandbox.Available(); err != nil {
+			return fmt.Errorf("the sandbox cannot be applied here (%v); every shell command would run unconfined — pass --no-sandbox to accept that explicitly", err)
+		}
+	}
+	execFn, enforcement, laneNotes, err := buildExecFn(sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, trustpin.Parents(projectDir, persistentSnap))
+	if err != nil {
+		return err
+	}
+	if cfg.Sandbox.ReadLanePrompts {
+		// The operator's opt-out (ADR-0073 §5): read-lane commands keep
+		// their cage and their prompt.
+		enforcement.ReadLane = false
+	}
+	for _, n := range laneNotes {
+		fmt.Fprintf(stderr, "warning: %s\n", n)
+	}
+	// The strategy is swapped when /clear rotates the work directory
+	// (ADR-0071 §2): the sandbox profile names the directory, so a
+	// profile built at startup denied every write to the new one.
+	shellExec := &liveExec{fn: execFn}
+
+	registry, err := tools.New(projectDir, nil, time.Duration(cfg.Agent.ShellTimeoutSec)*time.Second)
+	if err != nil {
+		return err
+	}
+	// The lanes (ADR-0073): a read-lane command runs without approval
+	// only where the read lane's denials were verified on this machine;
+	// with the sandbox off every shell call is the operator's alone.
+	registry.SetLaneExec(shellExec.run, enforcement)
+	if workDir != "" {
+		// The file tools get the work directory as a second root, so a
+		// result the intake saved is one read_file can read back. Without
+		// it the model sees paths it cannot open and routes around the
+		// built-ins with shell redirection, which is less reviewable.
+		if err := registry.UseWorkDir(workDir); err != nil {
+			fmt.Fprintf(stderr, "warning: session work directory not readable by the file tools: %v\n", err)
+		}
+	}
+
+	// --- project instruction files (drop-in: AGENTS.md and friends,
+	// including ancestor directories, exactly as other agents read them)
+	// Read here, with the skills, before any process the project names
+	// (an MCP server) starts: the pins were digested moments ago, and
+	// the gap between digest and read is kept to this (ADR-0074).
+	projectContext, contextLabels, contextNotes := loadInstructions(projectDir, grant)
+	for _, n := range contextNotes {
+		fmt.Fprintf(stderr, "warning: instruction file %s\n", n)
+	}
+
+	// --- MCP servers from the project's .mcp.json (drop-in) ---
+	mcpClients, mcpSummary, mcpInv := connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, stderr, grant, mcpFilter)
+	defer func() {
+		for _, c := range mcpClients {
+			c.Close()
+		}
+	}()
+
+	// --- LLM backend ---
+	backend, err := llm.NewOpenAI(cfg.LLM.BaseURL, cfg.LLM.Model, cfg.LLM.APIKey, cfg.LLM.Provider)
+	if err != nil {
+		return err
+	}
+
+	// The TUI needs a real terminal on both ends (ADR-0002); piped use
+	// falls back to the plain line REPL so scripts and smoke pipelines
+	// keep working.
+	useTUI := !oneShot &&
+		term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
+
+	// One shared buffered reader for the plain REPL and its approval
+	// gate: bufio.NewReader returns an existing *bufio.Reader unchanged,
+	// so both components drain the same buffer and no typed-ahead input
+	// is stranded in a second one. (The TUI reads the terminal itself.)
+	stdin := bufio.NewReader(cmd.InOrStdin())
+	var gate agent.Approver
+	var tuiGate *tui.Gate
+	switch {
+	case oneShot:
+		// One-shot runs non-interactively (stdin may be a pipe): a
+		// blocking approval prompt would hang, so mutating tools are
+		// denied outright. Read-only pipelines still work.
+		gate = denyGate{out: stderr}
+	case useTUI:
+		tuiGate = tui.NewGate()
+		gate = tuiGate
+	default:
+		gate = approve.New(stdin, stderr)
+	}
+	reader := repl.NewReader(stdin, stderr)
+
+	// prog is assigned before the TUI runs; the agent only executes
+	// inside prog.Run, so the callbacks below never see it half-set.
+	var prog *tea.Program
+	// Turn observability (ADR-0033): stream heartbeat, retries, and
+	// thought summaries reach the TUI when one is running; the plain
+	// REPL and one-shot mode stay quiet — their output goes to pipes.
+	backend.SetObserver(func(ev llm.StreamEvent) {
+		if ev.Kind == "thought" && !cfg.TUI.ShowThoughts {
+			return
+		}
+		if prog != nil {
+			prog.Send(tui.StreamUpdate{Kind: ev.Kind, Thought: ev.Thought,
+				Attempt: ev.Attempt, Max: ev.Max, Cause: ev.Cause, DelayMS: ev.DelayMS})
+		}
+	})
+
+	// --- ask_user: a structured mid-turn choice (ADR-0036) ---
+	// Registered before agent.New (declarations are cached there). The
+	// asker picks its mode at call time: one-shot has nobody to ask,
+	// the TUI shows a dialog, the plain REPL reads a number. The same
+	// asker carries the round-limit dialog (ADR-0040).
+	// The plain-REPL asker reads the SHARED stdin reader: a second
+	// bufio.Reader over the same fd strands typed-ahead input in one
+	// buffer while the other blocks (AGENTS.md gotcha; review round 3).
+	askOperator := func(askCtx context.Context, question string, options []string) (int, error) {
+		if flagPrompt != "" {
+			return oneShotAsk(askCtx, question, options)
+		}
+		if prog != nil {
+			resp := make(chan int, 1)
+			prog.Send(tui.AskRequest{Question: question, Options: options, Resp: resp})
+			idx := <-resp
+			if idx < 0 {
+				return 0, errAskDeclined
+			}
+			return idx, nil
+		}
+		return plainAsk(stdin, cmd.ErrOrStderr())(askCtx, question, options)
+	}
+	if err := registerAskTool(registry, askOperator); err != nil {
+		return err
+	}
+
+	// --- round-limit intervention dialog ---
+	// nil in one-shot mode: nobody to ask, and no model review to
+	// decide in their place, so the checkpoint stops there (fail-closed
+	// inside the agent). The dialog shows the turn's recent calls: the
+	// evidence a reviewer would have read, for the operator to read.
+	var onRoundLimit func(ctx context.Context, info agent.RoundLimitInfo) bool
+	if !oneShot {
+		onRoundLimit = func(rctx context.Context, info agent.RoundLimitInfo) bool {
+			recent := info.RecentCalls
+			if len(recent) > 8 {
+				recent = recent[len(recent)-8:]
+			}
+			evidence := ""
+			if len(recent) > 0 {
+				evidence = fmt.Sprintf(msgs.RoundRecentCallsFmt, clipRunes(strings.Join(recent, "\n  "), 600))
+			}
+			var q string
+			if info.Trigger == "loop" {
+				q = fmt.Sprintf(msgs.RoundLoopAskFmt, clipRunes(info.Detail, 80), evidence)
+			} else {
+				q = fmt.Sprintf(msgs.RoundLimitAskFmt, info.Rounds, info.Cap, evidence)
+			}
+			idx, err := askOperator(rctx, q, []string{msgs.RoundContinue, msgs.RoundStop})
+			return err == nil && idx == 0
+		}
+	}
+
+	// The system prompt is composed in ONE place so a skills reload
+	// rebuilds exactly what startup built (ADR-0039). It says nothing
+	// about diagrams on any surface (ADR-0063): fence rendering is a
+	// view-layer concern the model is never told about, and both a
+	// prohibition and a format instruction were measured steering the
+	// model away from the behavior its own prior already had.
+	var ag *agent.Agent
+	composeSystem := func() string {
+		return buildSystemPrompt(projectDir, workDir, projectContext)
+	}
+	// writes pairs the agent's before/after hooks around an
+	// operator-approved write (ADR-0074 §1).
+	writes := &writeGuard{}
+	// notice puts a one-line warning in front of the operator wherever
+	// they are: the TUI's note strip when it runs, stderr otherwise.
+	notice := func(msg string) {
+		if prog != nil {
+			prog.Send(tui.Attached{Notes: []string{msg}})
+			return
+		}
+		fmt.Fprintf(stderr, "[⚠ %s]\n", msg)
+	}
+	ag = agent.New(agent.Options{
+		// The operator's language for the notices the agent writes
+		// mid-turn (ADR-0029 §3: they are chrome, not error chains).
+		Msgs: msgs,
+		// Accounting only (ADR-0057): the model name that goes into
+		// this session's usage records.
+		Model:          cfg.LLM.Model,
+		Backend:        backend,
+		Registry:       registry,
+		Gate:           gate,
+		Log:            sessionLog,
+		System:         composeSystem(),
+		MaxTurns:       cfg.Agent.MaxTurns,
+		Policy:         approvalPolicy,
+		ClipboardImage: clipboardImage,
+		BeforeOperatorWrite: func(tc llm.ToolCall) {
+			if name := pinNameForWrite(projectDir, tc); name != "" {
+				writes.begin(tc, name, pinIsCurrent(policyFile, projectDir, name))
+			}
+		},
+		OnOperatorWrite: func(tc llm.ToolCall) {
+			// The operator approved a write into the files later
+			// sessions trust: that content — the one file they saw
+			// written — is now what they trust (ADR-0074 §1), provided
+			// the file was still what its pin records when the write
+			// began; a file that had drifted before is left for the
+			// next start to ask about. An operator-lane command shows
+			// its text, not its effect on those files, so it re-pins
+			// nothing; what now differs is named and the next start
+			// asks.
+			if name := pinNameForWrite(projectDir, tc); name != "" {
+				if !writes.end(tc, name) {
+					notice(fmt.Sprintf(msgs.PinStaleWriteFmt, name))
+					return
+				}
+				if err := repinName(policyPath, projectDir, name, policyFile, grant.excluded); err != nil {
+					notice(fmt.Sprintf("could not refresh the trust pin of %s: %v", name, err))
+				}
+				return
+			}
+			if n := pinChangesNote(cfg, policyFile, projectDir, projectTrusted, msgs); n != "" {
+				notice(n)
+			}
+		},
+		OnToolCall: func(tc llm.ToolCall) {
+			// Describe, not CallDetail+CallPurpose: only the agent knows
+			// which tools it added the purpose field to, and a tool that
+			// publishes an argument of that name must keep it visible
+			// among the arguments (ADR-0047 §2).
+			detail, purpose := ag.Describe(tc)
+			if prog != nil {
+				prog.Send(tui.ToolCall{Name: tc.Name, Detail: detail, Purpose: purpose})
+				return
+			}
+			fmt.Fprintf(stderr, "\n[tool] %s %s\n", tc.Name, detail)
+			// Headless runs (-p, piped stdin) get the declared purpose
+			// on its own line too (ADR-0047 §5): the transcript of a
+			// scripted run is the only record it leaves behind.
+			if purpose != "" {
+				fmt.Fprintf(stderr, "[tool] ↪ %s\n", purpose)
+			}
+		},
+		// The tool-finished signal (review round 3): the TUI's stall
+		// detector re-arms on this, never on stream chunks — a risk or
+		// progress review's side-stream used to look like "the tool
+		// returned" and produced false stall warnings.
+		OnToolDone: func(tc llm.ToolCall) {
+			if prog != nil {
+				prog.Send(tui.ToolDone{Name: tc.Name})
+			}
+		},
+		OnAttach: func(atts []mention.Attachment, problems []mention.Problem) {
+			lines := make([]string, 0, len(atts))
+			for _, a := range atts {
+				lines = append(lines, fmt.Sprintf("attached %s: %s (%d bytes)", a.Kind, a.Ref, a.Bytes))
+			}
+			notes := make([]string, 0, len(problems))
+			for _, p := range problems {
+				notes = append(notes, fmt.Sprintf("@%s: %s", p.Ref, p.Reason))
+			}
+			if prog != nil {
+				prog.Send(tui.Attached{Lines: lines, Notes: notes})
+				return
+			}
+			for _, l := range lines {
+				fmt.Fprintln(stderr, "[📎 "+l+"]")
+			}
+			for _, n := range notes {
+				fmt.Fprintln(stderr, "[⚠ "+n+"]")
+			}
+		},
+		OnNotice: notice,
+		OnUsage: func(u llm.Usage) {
+			if prog != nil {
+				prog.Send(tui.Usage{Prompt: u.Prompt, Output: u.Output, Cached: u.Cached})
+			}
+		},
+		// The round limit is an intervention ladder on the main loop.
+		RoundReview:  true,
+		OnRoundLimit: onRoundLimit,
+		AutoApprove:  autoOn,
+		Ceiling:      ceiling,
+		OnAutoDecision: func(tc llm.ToolCall, d agent.AutoDecision) {
+			if !d.Approved {
+				return // the escalation shows up in the approval prompt
+			}
+			if prog != nil {
+				prog.Send(tui.AutoApproved{Tool: tc.Name, Reason: d.Reason, Tier: d.Tier.String()})
+				return
+			}
+			fmt.Fprintf(stderr, "[%s]\n", fmt.Sprintf(strings.TrimSpace(msgs.AutoApprovedFmt), d.Tier, tc.Name+": "+d.Reason))
+		},
+	})
+	if len(restored) > 0 {
+		ag.SetHistory(restored)
+	}
+
+	// Exit summary (operator request): every interactive exit route —
+	// /quit, Ctrl+C, Ctrl+D — ends with the resume hint and the cost
+	// line as the last thing in the scrollback. Deferred so no route
+	// can forget it; one-shot mode stays clean for pipelines.
+	if !oneShot {
+		out := cmd.ErrOrStderr()
+		defer func() {
+			for _, l := range exitSummary(ag.Usage(), sessionID, msgs) {
+				fmt.Fprintln(out, l)
+			}
+		}()
+	}
+
+	settings := &settingsStore{
+		cfg: cfg, projectCfg: projectCfg, policyFile: policyFile,
+		policyPath: policyPath, projectDir: projectDir,
+		registry: registry, ag: ag, current: approvalPolicy,
+		filter: mcpFilter, inv: mcpInv,
+	}
+	settingsData := settings.data()
+
+	// --- in-session integration reload (ADR-0039) ---
+	// Both closures reuse the startup code paths and the startup trust
+	// verdict — a reload can never widen what the trust gate allowed.
+	// They run only between turns (slash commands cannot be queued), so
+	// reassigning the captured variables is single-writer safe.
+	// reconnectMCP is /mcp reload; /clear calls it after its own pin
+	// check, so recheck is false there and the note is not printed twice.
+	reconnectMCP := func(recheck bool) string {
+		if !cfg.MCP.Enabled {
+			return msgs.MCPDisabled
+		}
+		registry.RemoveByPrefix("mcp__")
+		for _, c := range mcpClients {
+			c.Close()
+		}
+		// Warnings go into the command output: under the TUI a stderr
+		// write would corrupt the display.
+		var warn bytes.Buffer
+		// A changed .mcp.json is re-checked against its pin first
+		// (ADR-0074); mid-session there is nobody at a prompt, so a
+		// change is left out and named.
+		if recheck {
+			var pinNotes []string
+			grant.excluded, pinNotes = checkPins(cfg, policyFile, policyPath, projectDir, projectTrusted, false, nil, &warn, msgs)
+			for _, n := range pinNotes {
+				fmt.Fprintf(&warn, "%s\n", n)
+			}
+		}
+		mcpClients, mcpSummary, mcpInv = connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, &warn, grant, mcpFilter)
+		ag.RefreshTools()
+		mcpTools := 0
+		for _, t := range registry.List() {
+			if strings.HasPrefix(t.Name, "mcp__") {
+				mcpTools++
+			}
+		}
+		// The panel reads this snapshot; only a panel-driven reload used
+		// to refresh it, so a server added to .mcp.json and picked up by
+		// `/mcp reload` had no row and could not be excluded until some
+		// other toggle healed it (pre-release review).
+		settings.inv = mcpInv
+		if sessionLog != nil {
+			_ = sessionLog.Log("mcp_reload", map[string]any{
+				"servers": len(mcpClients), "tools": mcpTools})
+		}
+		var b strings.Builder
+		fmt.Fprintf(&b, msgs.MCPReloadedFmt, len(mcpClients), mcpTools)
+		for _, s := range mcpSummary {
+			b.WriteString("  " + s + "\n")
+		}
+		if warn.Len() > 0 {
+			b.WriteString(warn.String())
+		}
+		return b.String()
+	}
+	reloadMCP := func() string { return reconnectMCP(true) }
+	// The panel writes an exclusion for one server and then asks for
+	// this: the filter is re-derived from the files it just changed, and
+	// that one server is reconnected under it (ADR-0039 + ADR-0077 §3).
+	// Rebuilt rather than patched so the panel and the runtime read the
+	// same three files in the same order the next start will. One
+	// server, not the set: the edit names one, and reconnecting all of
+	// them killed and respawned every process on an arrow key, inside
+	// the TUI's event loop, so the keys typed meanwhile queued behind it
+	// (post-release field report).
+	settings.reloadMCP = func(server string) (mcpfilter.Filter, mcpInventory, string) {
+		f, err := mcpfilter.Build(cfg.MCP.Exclude, policyScope(policyFile), projectCfg.MCP.Exclude)
+		if err != nil {
+			// Saved but unusable: keep the running set and say so
+			// rather than dropping every exclusion on the floor.
+			return mcpFilter, mcpInv, "not applied: " + err.Error()
+		}
+		mcpFilter = f
+		var running *mcp.Client
+		others := make([]*mcp.Client, 0, len(mcpClients))
+		for _, c := range mcpClients {
+			if c.Name() == server {
+				running = c
+				continue
+			}
+			others = append(others, c)
+		}
+		// Only what went wrong goes back to the panel: an arrow key is
+		// not a command that asked for an inventory, and the warnings
+		// are still the operator's answer to "why did nothing appear"
+		// (pre-release review).
+		var warn bytes.Buffer
+		timeout := time.Duration(cfg.MCP.CallTimeoutSec) * time.Second
+		start := func() mcpServer {
+			return mcp.NewStdio(server, mcpInv.configs[server], timeout, cmd.Root().Version)
+		}
+		// The interface hides the type; a nil *mcp.Client inside it
+		// would not compare equal to nil, so the running client is
+		// passed only when there is one.
+		var runningServer mcpServer
+		if running != nil {
+			runningServer = running
+		}
+		kept := reconnectMCPServer(ctx, server, runningServer, start, registry, &warn, mcpFilter, &mcpInv)
+		if kept != nil {
+			others = append(others, kept.(*mcp.Client))
+		}
+		mcpClients = others
+		mcpSummary = mcpInv.summaryLines()
+		ag.RefreshTools()
+		settings.inv = mcpInv
+		mcpTools := mcpToolCount(registry)
+		if sessionLog != nil {
+			_ = sessionLog.Log("mcp_reload", map[string]any{
+				"servers": len(mcpClients), "tools": mcpTools, "server": server})
+		}
+		return mcpFilter, mcpInv, reloadWarnings(warn.String())
+	}
+	// resolveWindow settles the model's context window and hands it to
+	// everyone who needs it: the footer displays it. It runs in the
+	// background — the provider lookup must never delay the first
+	// prompt. A provider that does not answer leaves the window unknown
+	// and says so once; [model].context_window is the remedy.
+	resolveWindow := func() {
+		tokens := cfg.Model.ContextWindow
+		if tokens <= 0 {
+			mctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+			defer cancel()
+			w, err := backend.ContextWindow(mctx)
+			if err != nil {
+				notice(fmt.Sprintf(msgs.ContextWindowUnknownFmt, err))
+			}
+			tokens = w
+		}
+		ag.SetContextWindow(tokens)
+		if prog != nil {
+			prog.Send(tui.ContextWindow{Tokens: tokens})
+		}
+	}
+
+	defer reportPersistent("exit", func(kind string, data any) error {
+		if sessionLog == nil {
+			return nil
+		}
+		return sessionLog.Log(kind, data)
+	})
+
+	// /clear starts a new session: the old transcript is closed where
+	// the conversation ended and stays resumable by its id; a new id,
+	// transcript and work directory take over, exported to children
+	// like the first. If a new transcript cannot be opened the
+	// conversation is cleared in place, as before, and the operator is
+	// told.
+	onClear := func() string {
+		var notes []string
+		note := func(format string, a ...any) { notes = append(notes, fmt.Sprintf(format, a...)) }
+		// The output is the slash command's: warnings first, then the
+		// MCP reconnection report (the same text /mcp reload prints).
+		var extra strings.Builder
+		render := func() string {
+			var b strings.Builder
+			for _, n := range notes {
+				fmt.Fprintf(&b, "[⚠ %s]\n", n)
+			}
+			b.WriteString(extra.String())
+			return b.String()
+		}
+		// The new transcript is opened before anything ends, so a
+		// failure leaves the session it found: cleared in place, the
+		// operator told. An unresolved state root must not be handed
+		// to Open.
+		if sessionDirErr != nil {
+			ag.Reset()
+			note("history cleared; a new session could not be started (%v) — the conversation continues in this session", sessionDirErr)
+			return render()
+		}
+		newLog, err := openSessionLog(sessionDir, "", projectDir, cfg.LLM.Model, cmd.Root().Version)
+		if err != nil {
+			ag.Reset()
+			note("history cleared; a new session could not be started (%v) — the conversation continues in this session", err)
+			return render()
+		}
+		reportPersistent("clear", func(kind string, data any) error { return curLog.Log(kind, data) })
+		ag.Restart(newLog)
+		// The new session re-checks the pins: a file that changed during
+		// the old one is left out, and the system prompt is composed
+		// from what the grant allows.
+		var pinNotes []string
+		grant.excluded, pinNotes = checkPins(cfg, policyFile, policyPath, projectDir, projectTrusted, false, nil, io.Discard, msgs)
+		notes = append(notes, pinNotes...)
+		projectContext, contextLabels, contextNotes = loadInstructions(projectDir, grant)
+		_ = contextLabels
+		notes = append(notes, contextNotes...)
+		if curLog != nil {
+			_ = curLog.Close()
+		}
+		curLog = newLog
+		sessionLog = newLog
+		sessionPath, sessionID = newLog.Path(), newLog.ID()
+		_ = sessionPath
+		if err := session.Export(sessionID); err != nil {
+			note("cannot set %s: %v", session.EnvVar, err)
+		}
+		if workDir != "" {
+			workdir.RemoveIfEmpty(workDir)
+		}
+		workDir = ""
+		if dir, err := workdir.Ensure(projectDir, sessionID); err != nil {
+			note("session work directory unavailable: %v", err)
+		} else {
+			workDir = dir
+		}
+		// Exported or UNSET: the MCP servers reconnected below inherit
+		// the environment, and the old directory must not survive in it.
+		if err := exportWorkDir(workDir); err != nil {
+			note("cannot set %s: %v", workdir.EnvVar, err)
+		}
+		// Every consumer of the work directory follows it: the file
+		// tools' second root, the sandbox profile, the MCP intake (it
+		// reads the registry), and the system prompt — a cleared
+		// conversation has no cached prefix to protect.
+		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap), func() { ag.SetSystem(composeSystem()) })...)
+		// The MCP servers — spawned at startup with the old id in their
+		// environment and arguments — are reconnected the way /mcp
+		// reload does, so a server keeping per-session state sees the
+		// session the environment reports.
+		if cfg.MCP.Enabled {
+			extra.WriteString(reconnectMCP(false))
+		}
+		return render()
+	}
+
+	// --- one-shot mode: single turn, quiet stderr, exit ---
+	if oneShot {
+		for _, n := range policyNotes {
+			fmt.Fprintf(stderr, "warning: %s\n", n)
+		}
+		go resolveWindow()
+		// The measured state, all four branches: passing constants meant
+		// one-shot printed nothing when the read lane was unverified —
+		// and every shell_exec then needs an approval nobody is there to
+		// give (pre-release review).
+		if line := banner.SandboxLine(registry.Confined(), registry.ReadLane(), cfg.Sandbox.ReadLanePrompts); line != "" {
+			fmt.Fprintln(stderr, line)
+		}
+		// One-shot returns before the banner is built, so the fact that
+		// this run approves its own mutating tools had no surface at all
+		// — in the mode where it matters most, since the ladder answers
+		// and nobody is at a prompt (pre-release review).
+		if ag.AutoApprove() {
+			fmt.Fprintln(stderr, banner.AutoApproveOneShotLine())
+		}
+		// Same argument for the ceiling: one-shot has no footer to carry
+		// it and no /readonly to type, so the only place this fact can
+		// appear is here (ADR-0080 §1, ADR-0078's test for a line).
+		if ag.CeilingState().ReadOnly {
+			fmt.Fprintln(stderr, banner.ReadOnlyOneShotLine(registry.Confined()))
+		}
+		// Piped stdin becomes a nonce-wrapped data attachment
+		// (ADR-0055) — never prompt text: the -p string alone is the
+		// instruction the risk evaluator sees (ADR-0038/0054). A
+		// terminal stdin is never read, so an interactive `-p` cannot
+		// hang waiting for input. A non-terminal stdin that never
+		// closes (an idle pipe inherited from a scheduler or harness)
+		// is read to EOF like any other, but the wait is announced
+		// after a short grace so it cannot pass for a hang (ADR-0067).
+		if f, ok := cmd.InOrStdin().(*os.File); !ok || !term.IsTerminal(int(f.Fd())) {
+			waited := false
+			content, warning := readPipedStdinNoticing(cmd.InOrStdin(), stdinWaitNotice, func() {
+				waited = true
+				fmt.Fprintln(stderr, stdinWaitMessage)
+			})
+			if warning != "" {
+				fmt.Fprintf(stderr, "warning: %s\n", warning)
+			}
+			if content != "" {
+				ag.AttachData("-", "stdin", content)
+			}
+			if line := stdinOutcomeLine(content, warning, waited); line != "" {
+				fmt.Fprintln(stderr, line)
+			}
+		}
+		wrote := false
+		runErr := runTurnWith(ctx, ladder, func(turnCtx context.Context) error {
+			_, err := ag.Run(turnCtx, flagPrompt, func(s string) {
+				wrote = wrote || s != ""
+				fmt.Fprint(cmd.OutOrStdout(), s)
+			})
+			return err
+		})
+		// stdout is model text only: a turn that produced none (blocked
+		// prompt, interrupt, backend error) leaves it empty rather than
+		// a bare newline (review round 4).
+		if wrote {
+			fmt.Fprintln(cmd.OutOrStdout())
+		}
+		if errors.Is(runErr, errInterrupted) {
+			return fmt.Errorf("interrupted")
+		}
+		return runErr
+	}
+
+	// --- banner (ADR-0078) ---
+	// The rule, and the composition, live in internal/banner: a line
+	// earns a place here only if nothing else will say it, and that
+	// rule needs somewhere to be stated, tested and rendered for the
+	// operator-text read-through.
+	warnLines := make([]string, 0, len(policyNotes))
+	for _, n := range policyNotes {
+		warnLines = append(warnLines, string(n))
+	}
+	bannerLines := banner.Lines(banner.Facts{
+		Version: cmd.Root().Version, Model: cfg.LLM.Model,
+		Instructions: contextLabels,
+		Servers:      len(mcpClients), Tools: mcpToolCount(registry),
+		ResumedID: resumedID, Restored: len(restored),
+		// The measurement, not the intent: --no-sandbox is folded into
+		// sandboxOn already, but a failed write-lane probe zeroes the
+		// enforcement and left the banner saying "enabled" while
+		// /settings said "DISABLED" — in the one case the row exists for.
+		SandboxOn: registry.Confined(), ReadLane: registry.ReadLane(),
+		ReadLanePrompts: cfg.Sandbox.ReadLanePrompts,
+		AutoApprove:     ag.AutoApprove(),
+		ReadOnly:        ag.CeilingState(),
+		Notes:           warnLines,
+	})
+
+	// --- interactive TUI (ADR-0002/0003) ---
+	if useTUI {
+		// The banner goes through the TUI (not stderr): bottom pinning
+		// counts every printed line, and the startup clear would wipe a
+		// pre-printed banner anyway. Startup warnings join it for the
+		// same reason (ADR-0021).
+		bannerLines = append(bannerLines, notes.lines...)
+		// Nothing reads the tee after the banner; without this the
+		// stderr stream accumulated every line for the whole session
+		// (review round 3).
+		notes.freeze()
+		model := tui.New(tui.Options{
+			BaseCtx: ctx,
+			// Msgs is the wiring ADR-0029 shipped without: the catalog
+			// was resolved here but never handed to the TUI, so the
+			// whole chrome fell back to English (review round 2).
+			Msgs:          msgs,
+			Theme:         resolveTheme(cfg.TUI.Theme),
+			ModelName:     cfg.LLM.Model,
+			ProjectDir:    abbreviateHome(projectDir),
+			Banner:        bannerLines,
+			InitialInput:  initialInput,
+			AutoMode:      ag.AutoApprove(),
+			AutoState:     ag.AutoApprove,
+			ReadOnlyState: ag.CeilingState,
+			ToggleAuto: func() bool {
+				ag.SetAutoApprove(!ag.AutoApprove())
+				return ag.AutoApprove()
+			},
+			CompletePath: func(prefix string) []string {
+				return mention.Complete(projectDir, prefix, 24)
+			},
+			CompleteSlash:   slashCompletions(),
+			Settings:        &settingsData,
+			ApplySetting:    settings.Apply,
+			RefreshSettings: settings.data,
+			Shell: func(shellCtx context.Context, command string) {
+				go func() {
+					out := runDirectShell(shellCtx, registry, ag, command)
+					// Interrupted runs hand a queued message back instead
+					// of auto-sending it (ADR-0007 via ADR-0021).
+					prog.Send(tui.ShellDone{Output: out, Interrupted: shellCtx.Err() != nil})
+				}()
+			},
+			StartTurn: func(turnCtx context.Context, input string) {
+				go func() {
+					_, err := ag.Run(turnCtx, input, func(s string) { prog.Send(tui.TextDelta(s)) })
+					if err != nil && turnCtx.Err() != nil {
+						// Mirror runTurn's mapping: a cancellation-caused
+						// failure is an interrupt, not a backend error.
+						err = context.Canceled
+					}
+					prog.Send(tui.TurnDone{Err: err})
+				}()
+			},
+			Slash: func(in string) (string, bool, bool) {
+				return slashOutput(in, ag, registry, mcpSummary,
+					slashReloads{mcp: reloadMCP},
+					func() string { return usageReport(ag, cfg.LLM.Model) },
+					appVersion, msgs, onClear)
+			},
+		})
+		prog = tea.NewProgram(model)
+		tuiGate.SetProgram(prog)
+		go resolveWindow()
+		_, err := prog.Run()
+		return err
+	}
+	go resolveWindow()
+
+	// Plain REPL / one-shot: the banner is printed, the tee is done.
+	notes.freeze()
+	for _, line := range bannerLines {
+		fmt.Fprintln(stderr, line)
+	}
+	fmt.Fprintf(stderr, "/help for commands, Ctrl+D to quit\n")
+
+	// --- plain REPL loop (non-TTY fallback) ---
+	// The argv first message (ADR-0064) runs before the first read,
+	// through the same handling a read line gets; the echoed "> line"
+	// keeps the terminal record showing what ran. Piped stdin lines
+	// follow as they always have (ADR-0055's boundary is untouched).
+	pending := initialInput
+	for {
+		var input string
+		if pending != "" {
+			input, pending = pending, ""
+			fmt.Fprintf(stderr, "\n> %s\n", input)
+		} else {
+			line, err := reader.Read("\n> ")
+			if errors.Is(err, io.EOF) {
+				fmt.Fprintln(stderr, msgs.Bye)
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			input = line
+		}
+		input = strings.TrimSpace(input)
+		if input == "" {
+			continue
+		}
+		if strings.HasPrefix(input, "!") {
+			command := strings.TrimSpace(strings.TrimPrefix(input, "!"))
+			if command == "" {
+				continue
+			}
+			// runTurn's signal handling: Ctrl+C interrupts the command,
+			// not the process (ADR-0021 — outside it, the default action
+			// killed the whole session).
+			_ = runTurnWith(ctx, ladder, func(shellCtx context.Context) error {
+				fmt.Fprintln(cmd.OutOrStdout(), runDirectShell(shellCtx, registry, ag, command))
+				return nil
+			})
+			continue
+		}
+		if input == "/settings" {
+			writeSettingsTable(stderr, settings.data())
+			continue
+		}
+		if strings.HasPrefix(input, "/") {
+			out, _, quit := slashOutput(input, ag, registry, mcpSummary,
+				slashReloads{mcp: reloadMCP},
+				func() string { return usageReport(ag, cfg.LLM.Model) },
+				appVersion, msgs, onClear)
+			fmt.Fprint(stderr, out)
+			if quit {
+				return nil
+			}
+			continue
+		}
+
+		// SIGINT cancels the in-flight turn, not the process.
+		runErr := runTurnWith(ctx, ladder, func(turnCtx context.Context) error {
+			_, err := ag.Run(turnCtx, input, func(s string) { fmt.Fprint(cmd.OutOrStdout(), s) })
+			return err
+		})
+		fmt.Fprintln(cmd.OutOrStdout())
+		if runErr != nil {
+			if errors.Is(runErr, errInterrupted) {
+				fmt.Fprintln(stderr, msgs.Interrupted)
+				continue
+			}
+			fmt.Fprintf(stderr, "%s%v\n", msgs.ErrorPrefix, runErr)
+		}
+	}
+}
+
+var errInterrupted = errors.New("interrupted")
+
+// startupNotes tees startup-time stderr lines so the TUI can replay
+// them in the banner after its first ClearScreen (ADR-0021).
+type startupNotes struct {
+	w      io.Writer
+	lines  []string
+	frozen bool
+}
+
+// freeze stops recording: the banner has been built, and a session-long
+// tee would only grow.
+func (s *startupNotes) freeze() { s.frozen = true; s.lines = nil }
+
+func (s *startupNotes) Write(p []byte) (int, error) {
+	if !s.frozen {
+		for _, line := range strings.Split(strings.TrimRight(string(p), "\n"), "\n") {
+			if strings.TrimSpace(line) != "" {
+				s.lines = append(s.lines, line)
+			}
+		}
+	}
+	return s.w.Write(p)
+}
+
+// stdinCap bounds a piped stdin read (ADR-0055 §2): history is resent
+// every round, so an unbounded pipe would burn the context window
+// before the first response. The clip is disclosed inside the
+// attachment so a part cannot masquerade as the whole (ADR-0014).
+const stdinCap = 256 * 1024
+
+// readPipedStdin reads bounded piped stdin for one-shot mode
+// (ADR-0055). It returns the attachment content ("" when stdin is
+// empty) and a warning ("" when none): binary input is skipped with the
+// warning naming why.
+func readPipedStdin(r io.Reader) (content, warning string) {
+	buf, clipped, err := bounded.ReadAll(r, stdinCap)
+	if err != nil {
+		return "", "stdin read failed, nothing attached: " + err.Error()
+	}
+	if len(buf) == 0 {
+		return "", ""
+	}
+	if clipped {
+		// The cap may have split a multi-byte rune; dropping at most
+		// three tail bytes repairs that without masking real garbage.
+		for i := 0; i < 3 && len(buf) > 0 && !utf8.Valid(buf); i++ {
+			buf = buf[:len(buf)-1]
+		}
+	}
+	if bytes.IndexByte(buf, 0) >= 0 || !utf8.Valid(buf) {
+		return "", "piped stdin is not UTF-8 text, nothing attached — pass binary files by path (@ reference) instead"
+	}
+	s := string(buf)
+	if clipped {
+		s += "\n[stdin clipped at 256 KiB — the rest of the pipe was not read]"
+	}
+	return s, ""
+}
+
+// stdinWaitNotice is the grace before a still-open piped stdin is
+// announced (ADR-0067 §1): long enough that `< /dev/null`, here-strings
+// and `echo … |` stay silent, short enough that an idle inherited pipe
+// is named before anyone reads the silence as a hang. The TUI
+// heartbeat (ADR-0033 §1) never runs in -p, so this is the only wait
+// notice in play here.
+const stdinWaitNotice = 2 * time.Second
+
+// stdinOutcomeLine is the stderr line that closes a piped-stdin read
+// (ADR-0067 §2): the byte count when content was attached; the "ended
+// empty" line only when the wait was announced and no warning already
+// said nothing was attached; nothing otherwise, so the silent fast
+// path stays silent.
+func stdinOutcomeLine(content, warning string, waited bool) string {
+	switch {
+	case content != "":
+		return fmt.Sprintf("[stdin: %d bytes attached as data]", len(content))
+	case waited && warning == "":
+		return "[stdin: ended empty — nothing attached]"
+	}
+	return ""
+}
+
+// stdinWaitMessage names both remedies, because the operator reading
+// it cannot tell a slow producer from an idle pipe.
+const stdinWaitMessage = "[stdin: waiting for piped input to end (no EOF after 2s) — close the pipe, or run with < /dev/null if nothing should be attached]"
+
+// readPipedStdinNoticing is readPipedStdin with the wait announced:
+// if the read has not finished within `after`, notify is called once,
+// then the read continues to EOF unchanged (ADR-0067). The reader is
+// never abandoned — a slow producer must not be cut off — so a truly
+// endless pipe still blocks, but no longer silently.
+func readPipedStdinNoticing(r io.Reader, after time.Duration, notify func()) (content, warning string) {
+	type result struct{ content, warning string }
+	done := make(chan result, 1)
+	go func() {
+		c, w := readPipedStdin(r)
+		done <- result{c, w}
+	}()
+	select {
+	case res := <-done:
+		return res.content, res.warning
+	case <-time.After(after):
+		if notify != nil {
+			notify()
+		}
+		res := <-done
+		return res.content, res.warning
+	}
+}
+
+// applyAllowFlag merges --allow entries into the global policy scope as
+// "never" values (ADR-0053 §2). It carries the [approval.tools]
+// vocabulary and validation exactly; entries are trimmed because the
+// comma-separated form invites "a, b".
+func applyAllowFlag(merged map[string]string, entries []string) error {
+	for _, pattern := range entries {
+		pattern = strings.TrimSpace(pattern)
+		if err := policy.ValidateEntry("--allow", pattern); err != nil {
+			return err
+		}
+		merged[pattern] = "never"
+	}
+	return nil
+}
+
+// firstMessage resolves the positional argument into the first
+// interactive turn (ADR-0064). Whitespace-only counts as absent. -p
+// beside it is an error, because the two select different session
+// shapes — one answers and exits, the other starts and stays — and
+// ambiguity is refused, not resolved by precedence.
+func firstMessage(args []string, oneShot bool) (string, error) {
+	if len(args) == 0 {
+		return "", nil
+	}
+	msg := strings.TrimSpace(args[0])
+	if msg == "" {
+		return "", nil
+	}
+	if oneShot {
+		return "", fmt.Errorf("cannot combine -p (one turn, then exit) with a first message (interactive session) — pass one or the other")
+	}
+	return msg, nil
+}
+
+// effectiveAuto derives the session's auto-approve state (ADR-0053):
+// the config key arms interactive sessions only — an unattended run's
+// grant must be visible on the invocation itself — and --auto arms any
+// mode.
+func effectiveAuto(cfgAuto, oneShot, flagAuto bool) bool {
+	return flagAuto || (cfgAuto && !oneShot)
+}
+
+// readOnlyOverride resolves the two ceiling flags to one state, or ""
+// when neither was given. They are the two ends of one setting, so
+// passing both is a contradiction rather than a precedence puzzle.
+func readOnlyOverride(writable, readOnly bool) (string, error) {
+	if writable && readOnly {
+		return "", errors.New("--writable and --read-only are the two ends of one setting; pass at most one")
+	}
+	switch {
+	case readOnly:
+		return "on", nil
+	case writable:
+		return "off", nil
+	}
+	return "", nil
+}
+
+// effectiveCeiling is the ceiling the run actually starts with. It
+// takes the whole [agent] section so a call site cannot pass the wrong
+// bool.
+func effectiveCeiling(a config.AgentConfig) sandbox.Ceiling {
+	return sandbox.Ceiling{ReadOnly: a.ReadOnly}
+}
+
+// ApproveOnce refuses like Approve: the answer set differs, the
+// absence of a human does not.
+func (d denyGate) ApproveOnce(toolName, detail, _, reason string) (bool, string) {
+	fmt.Fprintf(d.out, "[denied: %s %s — %s]\n", toolName, detail, reason)
+	return false, ""
+}
+
+// ApproveLift refuses in one-shot: there is nobody to ask, so the
+// ceiling holds and the reason goes to stderr like every other denial
+// here (ADR-0080 §4). --read-only is how a run says it meant this.
+func (d denyGate) ApproveLift(toolName, detail, _, reason string) (bool, string) {
+	fmt.Fprintf(d.out, "[denied: %s %s — %s]\n", toolName, detail, reason)
+	return false, ""
+}
+
+// denyGate is the one-shot approver: it denies every mutating call with
+// a visible reason instead of blocking on an approval prompt that
+// nothing will answer.
+type denyGate struct{ out io.Writer }
+
+func (d denyGate) Approve(toolName, detail, purpose, reason string, mustPrompt bool) (bool, bool, string) {
+	why := "mutating tools are disabled in one-shot mode; approve interactively, grant with --allow, or arm the risk ladder with --auto"
+	if reason != "" {
+		// The ladder or the rule tier said why this call needs a human;
+		// with no human here, that reason is the denial's story
+		// (ADR-0053 §3).
+		why = reason + " — nobody to ask in one-shot mode"
+	}
+	fmt.Fprintf(d.out, "[denied: %s %s — %s]\n", toolName, detail, why)
+	// What it wanted, on the record: a one-shot run that ends in denials
+	// is exactly the case where the operator has to reconstruct the
+	// agent's plan afterwards (ADR-0047 §5).
+	if purpose != "" {
+		fmt.Fprintf(d.out, "[denied: ↪ %s]\n", purpose)
+	}
+	// No operator, no typed reason (ADR-0060 §1): the model keeps the
+	// standing "ask the user" denial text.
+	return false, false, ""
+}
+
+// interruptLadder is the plain REPL / one-shot counterpart of the
+// TUI's three-press exit (ADR-0034 §3, extended by ADR-0065 §3). The
+// first Ctrl+C of a turn cancels it; the second calls Warn; the third
+// calls Quit. Before ADR-0065, signal.NotifyContext swallowed every
+// SIGINT after the first, so a wedged turn outside the TUI could only
+// be killed from another terminal. Armed is a test hook: it fires once
+// the signal handler is registered, so a test can raise SIGINT
+// without racing the registration.
+type interruptLadder struct {
+	// Interrupting fires on the first press, so the operator sees the
+	// press land before the turn returns (the TUI shows "interrupting…"
+	// for the same reason).
+	Interrupting func()
+	Warn         func()
+	Quit         func()
+	Armed        func()
+}
+
+// ladderStep names what the n-th SIGINT of one turn does. Pure, so the
+// ladder's shape is pinned without raising signals.
+func ladderStep(n int) string {
+	switch {
+	case n <= 1:
+		return "cancel"
+	case n == 2:
+		return "warn"
+	default:
+		return "quit"
+	}
+}
+
+// runTurn runs fn under a SIGINT-cancellable context with no ladder:
+// extra presses do nothing, which is the pre-ADR-0065 behaviour the
+// tests pin.
+func runTurn(parent context.Context, fn func(ctx context.Context) error) error {
+	return runTurnWith(parent, nil, fn)
+}
+
+// runTurnWith runs fn under a SIGINT-cancellable context, climbing the
+// ladder on repeated presses, and maps a cancellation-caused failure
+// to errInterrupted. The context error MUST be captured before the
+// deferred cancel — consulting it afterwards would misreport every
+// error (404s included) as a user interrupt (regression test in
+// turn_test.go).
+func runTurnWith(parent context.Context, ladder *interruptLadder, fn func(ctx context.Context) error) error {
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
+	// Buffered generously: signal.Notify drops a signal the channel
+	// cannot take, and a press arriving while the ladder goroutine is
+	// writing the previous warning must still count (review finding).
+	sigs := make(chan os.Signal, 8)
+	signal.Notify(sigs, os.Interrupt)
+	defer signal.Stop(sigs)
+	finished := make(chan struct{})
+	go func() {
+		presses := 0
+		for {
+			select {
+			case <-finished:
+				return
+			case <-sigs:
+				presses++
+				switch ladderStep(presses) {
+				case "cancel":
+					cancel()
+					if ladder != nil && ladder.Interrupting != nil {
+						ladder.Interrupting()
+					}
+				case "warn":
+					if ladder != nil && ladder.Warn != nil {
+						ladder.Warn()
+					}
+				default:
+					if ladder != nil && ladder.Quit != nil {
+						ladder.Quit()
+					}
+				}
+			}
+		}
+	}()
+	if ladder != nil && ladder.Armed != nil {
+		ladder.Armed()
+	}
+	err := fn(ctx)
+	canceled := ctx.Err() != nil
+	close(finished)
+	if err != nil && canceled {
+		return errInterrupted
+	}
+	return err
+}
+
+// buildExecFn returns the shell execution strategy and what could be
+// established about it (ADR-0073 §5): with the sandbox on, one profile
+// per lane and a read lane enabled only when VerifyReadLane passed on
+// this machine (notes say why when it did not); with the sandbox off,
+// direct bash and Confined=false — the unconfined mode the agent gates
+// as the operator's alone.
+func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, persistentParents []string) (tools.LaneExecFunc, sandbox.Enforcement, []string, error) {
+	if !sandboxOn {
+		return func(ctx context.Context, command string, _ sandbox.Lane) *exec.Cmd {
+			return exec.CommandContext(ctx, shell, "-c", command)
+		}, sandbox.Enforcement{}, nil, nil
+	}
+	if _, err := os.Stat(sandbox.Executable); err != nil {
+		return nil, sandbox.Enforcement{}, nil, fmt.Errorf("%s not found (lagent is macOS-only); use --no-sandbox to bypass at your own risk", sandbox.Executable)
+	}
+	// The profile's anchors must be the path the kernel reports —
+	// symlinks resolved (/var → /private/var): a regex anchored on the
+	// unresolved spelling protects nothing, which the verification below
+	// would then report as an unconfined write lane.
+	if real, err := sandbox.ResolveWriteDir(projectDir); err == nil {
+		projectDir = real
+	}
+	spec := sandbox.Spec{ProjectDir: projectDir, DenyExec: append(append([]string{}, sandbox.DefaultDenyExec...), denyExec...), PersistentParents: persistentParents}
+	if workDir != "" {
+		// The session work directory (ADR-0058). A shell command told to
+		// put its output in $LAGENT_WORK_DIR has to be able to.
+		if resolved, err := sandbox.ResolveWriteDir(workDir); err == nil {
+			spec.WorkDir = resolved
+		}
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		spec.Home = home
+	}
+	var notes []string
+	// The read lane's private scratch: under the work directory when
+	// there is one, a fresh temporary directory otherwise. TMPDIR points
+	// there for read-lane commands, so what such a command may change
+	// is exactly this directory and the device sinks.
+	if scratch, err := readScratchDir(spec.WorkDir); err != nil {
+		notes = append(notes, fmt.Sprintf("read lane disabled: no private scratch directory (%v); every shell_exec asks", err))
+	} else {
+		spec.ReadScratch = scratch
+	}
+	profiles := map[sandbox.Lane]string{}
+	for _, lane := range []sandbox.Lane{sandbox.LaneRead, sandbox.LaneWrite, sandbox.LaneOperator} {
+		p, err := sandbox.LaneProfile(lane, spec)
+		if err != nil {
+			return nil, sandbox.Enforcement{}, nil, err
+		}
+		profiles[lane] = p
+	}
+	enf := sandbox.Enforcement{Confined: true, ReadLane: spec.ReadScratch != ""}
+	if enf.ReadLane {
+		// The claim is checked, not assumed: a read-lane call runs
+		// unasked only where the kernel demonstrably denies what the
+		// lane says it denies.
+		if err := sandbox.VerifyReadLane(profiles[sandbox.LaneRead], spec); err != nil {
+			enf.ReadLane = false
+			notes = append(notes, fmt.Sprintf("read lane disabled: %v; every shell_exec asks", err))
+		}
+	}
+	// Confinement itself is measured, not assumed (ADR-0073 §7): where
+	// the write lane's denials cannot be confirmed — a sandbox-exec that
+	// applies no cage, a build that stubbed it — the session runs as
+	// unconfined, and every shell command is the operator's to answer.
+	// The commands stay wrapped: a cage that half-works is still in
+	// the way.
+	if err := sandbox.VerifyWriteLane(profiles[sandbox.LaneWrite], spec); err != nil {
+		enf = sandbox.Enforcement{}
+		notes = append(notes, fmt.Sprintf("sandbox unverified: %v — shell commands run as unconfined: every one asks you", err))
+	}
+	scratch := spec.ReadScratch
+	return func(ctx context.Context, command string, lane sandbox.Lane) *exec.Cmd {
+		argv := sandbox.Wrap(profiles[lane], shell, command)
+		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+		if lane == sandbox.LaneRead {
+			// The read lane runs unasked: it does not get the operator's
+			// exported secrets to print (review F-07), and its
+			// temporary directory is the private scratch.
+			env := sandbox.ScrubEnv(os.Environ())
+			if scratch != "" {
+				env = append(env, "TMPDIR="+scratch, "TMP="+scratch, "TEMP="+scratch)
+			}
+			cmd.Env = env
+		}
+		return cmd
+	}, enf, notes, nil
+}
+
+// readScratchDir creates the read lane's private scratch directory:
+// <workDir>/scratch, or a fresh temporary directory when the session
+// has no work directory.
+func readScratchDir(workDir string) (string, error) {
+	if workDir != "" {
+		dir := filepath.Join(workDir, "scratch")
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return "", err
+		}
+		return sandbox.ResolveWriteDir(dir)
+	}
+	// One fallback per process, reused across /clear and removed at
+	// exit (review F-08/A-12: a new one per rotation leaked).
+	fallbackScratchMu.Lock()
+	defer fallbackScratchMu.Unlock()
+	if fallbackScratch != "" {
+		return fallbackScratch, nil
+	}
+	dir, err := os.MkdirTemp("", "lagent-read-scratch-")
+	if err != nil {
+		return "", err
+	}
+	resolved, err := sandbox.ResolveWriteDir(dir)
+	if err != nil {
+		return "", err
+	}
+	fallbackScratch = resolved
+	return resolved, nil
+}
+
+var (
+	fallbackScratchMu sync.Mutex
+	fallbackScratch   string
+)
+
+// removeFallbackScratch deletes the process's fallback scratch
+// directory, if one was created — a directory this process made under
+// its own temporary root, named by its full path.
+func removeFallbackScratch() {
+	fallbackScratchMu.Lock()
+	defer fallbackScratchMu.Unlock()
+	if fallbackScratch != "" && strings.Contains(filepath.Base(fallbackScratch), "lagent-read-scratch-") {
+		_ = os.RemoveAll(fallbackScratch)
+		fallbackScratch = ""
+	}
+}
+
+// runDirectShell executes a !-prefixed command through the same
+// sandboxed shell_exec tool the agent uses (same timeout, output cap,
+// exit-status surfacing — no approval prompt: the user typed it), and
+// feeds command + output into the agent history so the next turn can
+// refer to what happened.
+// afterDirectShell, when set by the running session, runs after a `!`
+// command and returns a note for the output: the operator's own shell
+// may have changed the files later sessions trust, and the command
+// line does not show that — the difference is named, the pins are not
+// moved (ADR-0074 §1).
+var afterDirectShell func() string
+
+func runDirectShell(ctx context.Context, registry *tools.Registry, ag *agent.Agent, command string) string {
+	tool, ok := registry.Get("shell_exec")
+	if !ok {
+		return "error: shell_exec is unavailable"
+	}
+	// The operator typed it: the operator lane (ADR-0073), as the
+	// operator's own shell would be.
+	out, err := tool.Run(ctx, map[string]any{"command": command, "access": sandbox.LaneOperator.String()})
+	if err != nil {
+		out = "error: " + err.Error()
+	}
+	if strings.TrimSpace(out) == "" {
+		out = "(no output)"
+	}
+	if afterDirectShell != nil {
+		if n := afterDirectShell(); n != "" {
+			out += "\n[⚠ " + n + "]"
+		}
+	}
+	// The prefix is a shared constant: the session listing uses it to
+	// tell an injected message from one the operator typed.
+	ag.AddContext(session.ShellContextPrefix + "\n$ " + command + "\n\nOutput:\n" + out)
+	return out
+}
+
+// slashCompletions completes the slash commands this runtime has.
+func slashCompletions() func(string) []string {
+	commands := []string{
+		"/auto", "/clear", "/exit", "/help", "/mcp",
+		"/quit", "/readonly", "/settings",
+		"/tools", "/usage", "/version",
+	}
+	return func(prefix string) []string {
+		var out []string
+		for _, c := range commands {
+			if strings.HasPrefix(c, prefix) {
+				out = append(out, c)
+			}
+		}
+		return out
+	}
+}
+
+// mcpToolCount counts the MCP tools this session actually declares.
+func mcpToolCount(registry *tools.Registry) int {
+	n := 0
+	for _, t := range registry.List() {
+		if strings.HasPrefix(t.Name, "mcp__") {
+			n++
+		}
+	}
+	return n
+}
+
+// abbreviateHome shortens the home-directory prefix to "~" for display.
+func abbreviateHome(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return path
+	}
+	if path == home {
+		return "~"
+	}
+	if strings.HasPrefix(path, home+string(os.PathSeparator)) {
+		return "~" + path[len(home):]
+	}
+	return path
+}
+
+// resolveTheme maps [tui].theme to the TUI's theme value. "auto" runs
+// background detection, which sends an OSC query and reads the reply —
+// it must happen HERE, before Bubble Tea puts the terminal in raw mode,
+// or the reply leaks into the input box as phantom keys.
+func resolveTheme(configured string) string {
+	switch configured {
+	case "dark", "light":
+		return configured
+	case "plain":
+		return "notty"
+	default: // "auto"
+		if lipgloss.HasDarkBackground() {
+			return "dark"
+		}
+		return "light"
+	}
+}
+
+// slashOutput executes a /command and returns its output text — shared
+// by the TUI (which prints it into scrollback, errors highlighted) and
+// the plain REPL (which writes it to stderr).
+// slashReloads carries the ADR-0039 reload closures into slashOutput;
+// either may be nil (tests), which reads as "not available here".
+type slashReloads struct {
+	mcp func() string
+}
+
+func slashOutput(input string, ag *agent.Agent, registry *tools.Registry, mcpSummary []string, reload slashReloads, usage func() string, version string, msgs *uitext.Messages, onClear func() string) (output string, isErr bool, quit bool) {
+	var b strings.Builder
+	fields := strings.Fields(input)
+	// The one supported subcommand shape: "/mcp reload". Anything else
+	// after the command is a typo and says so, instead of silently
+	// showing the listing.
+	sub := ""
+	if len(fields) > 1 {
+		sub = fields[1]
+	}
+	if fields[0] == "/mcp" && sub != "" {
+		var fn func() string
+		if sub == "reload" {
+			fn = reload.mcp
+		}
+		if fn == nil {
+			fmt.Fprintf(&b, msgs.UnknownCommandFmt, input)
+			return b.String(), true, false
+		}
+		return fn(), false, false
+	}
+	switch fields[0] {
+	case "/help":
+		// The text lives in uitext (ADR-0029) — both languages in full,
+		// pinned to the command set by TestHelpListsEveryCommand.
+		b.WriteString(msgs.Help)
+	case "/tools":
+		// The LIVE policy: a /settings edit or a 'p' answer mid-session
+		// must show here, or the display the operator audits gating with
+		// no longer reflects the gate (ADR-0021).
+		pol := ag.Policy()
+		for _, t := range registry.List() {
+			marker := "read-only"
+			if t.Mutating {
+				marker = "requires approval"
+			}
+			// The effective policy, not the default, is what the
+			// operator needs to see here.
+			switch pol.For(t.Name) {
+			case policy.AlwaysAsk:
+				marker = "always asks (policy)"
+			case policy.NeverAsk:
+				marker = "never asks (policy)"
+				if t.Mutating {
+					marker = "never asks (policy; blocked commands still ask)"
+				}
+			}
+			fmt.Fprintf(&b, "  %-12s %s (%s)\n", t.Name, firstSentence(t.Description), marker)
+		}
+	case "/auto":
+		// on|off as well as toggling, the same grammar /readonly uses.
+		// The argument used to be ignored, so `/auto on` toggled — and
+		// could turn auto OFF while the line it printed said ON
+		// (operator report). In the TUI this case is unreachable: the
+		// model intercepts /auto so the footer cannot go stale.
+		switch sub {
+		case "":
+			ag.SetAutoApprove(!ag.AutoApprove())
+		case "on":
+			ag.SetAutoApprove(true)
+		case "off":
+			ag.SetAutoApprove(false)
+		default:
+			b.WriteString(msgs.AutoUsage)
+			return b.String(), true, false
+		}
+		if ag.AutoApprove() {
+			b.WriteString(msgs.AutoOn)
+		} else {
+			b.WriteString(msgs.AutoOff)
+		}
+	case "/readonly":
+		// The ceiling in force: `on`/`off` move it, nothing in the
+		// runtime lowers it, this is where the operator does. A typo is
+		// an error here exactly as it is for /auto, which shares this
+		// grammar.
+		bad := false
+		switch {
+		case len(fields) > 2:
+			b.WriteString(msgs.ReadOnlyUsage)
+			bad = true
+		case sub == "":
+		case sub == "on" || sub == "off":
+			ag.SetReadOnly(sub == "on", "operator")
+		default:
+			b.WriteString(msgs.ReadOnlyUsage)
+			bad = true
+		}
+		if bad {
+			return b.String(), true, false
+		}
+		if b.Len() == 0 {
+			c := ag.CeilingState()
+			// Same reservation the banner makes: with the lanes off the
+			// ceiling reaches less, and the state line must not promise
+			// what only the lanes give (independent review). A nil
+			// registry is the tests' agent-only fixture.
+			confined := registry == nil || registry.Confined()
+			switch {
+			case c.ReadOnly && !confined:
+				b.WriteString(msgs.ReadOnlyOnUnconfined)
+			case c.ReadOnly:
+				b.WriteString(msgs.ReadOnlyOn)
+			default:
+				b.WriteString(msgs.ReadOnlyOff)
+			}
+		}
+	case "/usage":
+		b.WriteString(usage())
+	case "/version":
+		b.WriteString(versionLine(version))
+	case "/clear":
+		// A cleared conversation is a new session (ADR-0071 §2): onClear
+		// closes the old transcript where the conversation ended — no
+		// clear record, so it stays resumable — and starts the next.
+		// Without it (tests), the history is cleared in place.
+		if onClear != nil {
+			b.WriteString(onClear())
+		} else {
+			ag.Reset()
+		}
+		b.WriteString(msgs.HistoryCleared)
+	case "/quit", "/exit":
+		return "bye\n", false, true
+	case "/mcp":
+		if len(mcpSummary) == 0 {
+			b.WriteString(msgs.MCPNone)
+		} else {
+			for _, s := range mcpSummary {
+				b.WriteString("  " + s + "\n")
+			}
+		}
+	default:
+		fmt.Fprintf(&b, msgs.UnknownCommandFmt, input)
+		return b.String(), true, false
+	}
+	return b.String(), false, false
+}
+
+func firstSentence(s string) string {
+	if i := strings.Index(s, ". "); i > 0 {
+		return s[:i+1]
+	}
+	return s
+}
+
+// exportWorkDir publishes the session work directory to children, or
+// removes the variable when the session has none — a stale value
+// would be inherited by every process spawned afterwards.
+func exportWorkDir(dir string) error {
+	if dir == "" {
+		return os.Unsetenv(workdir.EnvVar)
+	}
+	return os.Setenv(workdir.EnvVar, dir)
+}
+
+// liveExec is the shell strategy the registry calls through, so /clear
+// can swap the sandbox profile for the new work directory (ADR-0071
+// §2) without rebuilding the registry. Guarded: an abandoned shell call
+// (ADR-0065) may still hold the old strategy while the next turn
+// starts on the new one.
+type liveExec struct {
+	mu sync.RWMutex
+	fn tools.LaneExecFunc
+}
+
+func (e *liveExec) run(ctx context.Context, command string, lane sandbox.Lane) *exec.Cmd {
+	e.mu.RLock()
+	fn := e.fn
+	e.mu.RUnlock()
+	return fn(ctx, command, lane)
+}
+
+func (e *liveExec) set(fn tools.LaneExecFunc) {
+	e.mu.Lock()
+	e.fn = fn
+	e.mu.Unlock()
+}
+
+// liveLog is a SessionLog that forwards to whichever transcript is in
+// use — the value /clear reassigns (ADR-0071 §2) — for the side-call
+// tools registered at startup. nil (session log disabled) fails the
+// write, which every side call already treats as best-effort.
+type liveLog struct{ get func() agent.SessionLog }
+
+func (l liveLog) Log(kind string, data any) error {
+	if lg := l.get(); lg != nil {
+		return lg.Log(kind, data)
+	}
+	return errors.New("session log disabled")
+}
+
+// rotateWorkDir points every consumer of the session work directory at
+// dir ("" for none): the file tools' second root, the sandbox profile,
+// and the system prompt. The MCP intake reads the registry, so it
+// follows on its own. Returns operator notes for what could not follow.
+func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool, projectDir, dir string, denyExec []string, readLanePrompts bool, persistentParents []string, setSystem func()) []string {
+	var notes []string
+	if err := registry.UseWorkDir(dir); err != nil {
+		notes = append(notes, fmt.Sprintf("file tools keep the previous work directory: %v", err))
+	}
+	if fn, enf, laneNotes, err := buildExecFn(sandboxOn, projectDir, dir, denyExec, persistentParents); err != nil {
+		notes = append(notes, fmt.Sprintf("shell commands keep the previous sandbox profile: %v", err))
+	} else {
+		shellExec.set(fn)
+		if readLanePrompts {
+			enf.ReadLane = false
+		}
+		registry.SetLaneExec(shellExec.run, enf)
+		notes = append(notes, laneNotes...)
+	}
+	if setSystem != nil {
+		setSystem()
+	}
+	return notes
+}
+
+// versionLine is the /version answer: the runtime, its version, and
+// the platform. Version strings and platform triples are
+// locale-neutral, so the line is not in the uitext catalog (same
+// footing as the banner).
+func versionLine(version string) string {
+	osName := runtime.GOOS
+	if v := macOSVersion(); v != "" {
+		osName = "macOS " + v
+	}
+	return fmt.Sprintf("lagent %s on %s (%s/%s)\n", version, osName, runtime.GOOS, runtime.GOARCH)
+}
+
+// macOSVersion reads the product version, "" on failure.
+func macOSVersion() string {
+	v, err := syscall.Sysctl("kern.osproductversion")
+	if err != nil {
+		return ""
+	}
+	return v
+}
+
+// clipRunes bounds a string by rune count — a byte-based clip could
+// split a multi-byte rune mid-sequence.
+func clipRunes(s string, limit int) string {
+	if r := []rune(s); len(r) > limit {
+		return string(r[:limit]) + "…"
+	}
+	return s
 }

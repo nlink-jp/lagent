@@ -1,0 +1,311 @@
+package cmd
+
+import (
+	"context"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/nlink-jp/lagent/internal/agent"
+	"github.com/nlink-jp/lagent/internal/config"
+	"github.com/nlink-jp/lagent/internal/policy"
+	"github.com/nlink-jp/lagent/internal/tools"
+	"github.com/nlink-jp/lagent/internal/tui"
+)
+
+func newStore(t *testing.T) *settingsStore {
+	t.Helper()
+	projectDir := t.TempDir()
+	reg, err := tools.New(projectDir,
+		func(ctx context.Context, command string) *exec.Cmd {
+			return exec.CommandContext(ctx, "/bin/bash", "-c", command)
+		}, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := &config.Config{}
+	cfg.Approval.Tools = map[string]string{}
+	ag := agent.New(agent.Options{Registry: reg, MaxTurns: 1})
+	s := &settingsStore{
+		cfg: cfg, projectCfg: &config.ProjectConfig{},
+		policyFile: &config.PolicyFile{Tools: map[string]string{}, Projects: map[string]config.ProjectPolicy{}},
+		policyPath: filepath.Join(t.TempDir(), config.PolicyFileName),
+		projectDir: projectDir, registry: reg, ag: ag,
+	}
+	if _, err := s.Rebuild(); err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func rowFor(d tui.SettingsData, label string) (tui.SettingRow, bool) {
+	for _, r := range d.Rows {
+		if r.Label == label {
+			return r, true
+		}
+	}
+	return tui.SettingRow{}, false
+}
+
+// The panel exists because four precedence layers were invisible.
+func TestSettingsRowsCarryProvenance(t *testing.T) {
+	s := newStore(t)
+	s.cfg.Sources = map[string]string{"llm.model": config.FromFlag}
+	d := s.data()
+
+	row, ok := rowFor(d, "llm.model")
+	if !ok || row.Source != config.FromFlag {
+		t.Errorf("llm.model row = %+v", row)
+	}
+	if len(row.Values) != 0 {
+		t.Error("llm.model must be read-only: changing it needs a new backend client")
+	}
+	if row.Detail == "" {
+		t.Error("a read-only row must say why, or pressing Enter looks broken")
+	}
+	if sandbox, _ := rowFor(d, "sandbox.enabled"); len(sandbox.Values) != 0 {
+		t.Error("the sandbox switch must not be a menu item")
+	}
+	// Review round 2: the theme row was editable but applied NOTHING
+	// (styles are built once at startup) — read-only with a restart
+	// note is the honest shape, like tui.language.
+	if theme, _ := rowFor(d, "tui.theme"); len(theme.Values) != 0 {
+		t.Error("tui.theme must be read-only — the panel cannot restyle a running session")
+	} else if theme.Detail == "" {
+		t.Error("the read-only theme row must say when it applies")
+	}
+}
+
+// Editing a policy writes the machine-owned file and takes effect at
+// once — the panel and the running agent must not disagree.
+func TestSettingsPolicyEditPersistsAndApplies(t *testing.T) {
+	s := newStore(t)
+	d, line := s.Apply(tui.SettingChange{Tool: "write_file", Value: "never", Scope: tui.ScopeGlobal})
+	if !strings.Contains(line, "never") || !strings.Contains(line, config.PolicyFileName) {
+		t.Errorf("line = %q, want it to name the value and the file", line)
+	}
+	if row, _ := rowFor(d, "write_file"); row.Value != "never" || row.Source != config.PolicyFileName {
+		t.Errorf("row = %+v", row)
+	}
+
+	back, err := config.LoadPolicyFile(s.policyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back.Tools["write_file"] != "never" {
+		t.Errorf("policy file = %+v", back)
+	}
+	if s.current.For("write_file") != policy.NeverAsk {
+		t.Error("the edit did not reach the resolved policy")
+	}
+}
+
+// Project scope is expressed inside the machine-owned file, so nothing
+// is written into the operator's repository (ADR-0009 §4).
+func TestSettingsProjectScopeStaysOutOfTheRepository(t *testing.T) {
+	s := newStore(t)
+	if _, line := s.Apply(tui.SettingChange{Tool: "edit_file", Value: "never", Scope: tui.ScopeProject}); !strings.Contains(line, "in ") {
+		t.Errorf("line = %q, want it to name the project scope", line)
+	}
+	back, err := config.LoadPolicyFile(s.policyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back.Projects[s.projectDir].Tools["edit_file"] != "never" {
+		t.Errorf("project policy = %+v", back.Projects)
+	}
+	if len(back.Tools) != 0 {
+		t.Errorf("a project-scoped edit leaked into the global table: %v", back.Tools)
+	}
+	// And nothing was written into the project itself.
+	if _, err := config.LoadProject(s.projectDir); err != nil {
+		t.Fatal(err)
+	}
+	if pc, _ := config.LoadProject(s.projectDir); len(pc.Approval.Tools) != 0 {
+		t.Errorf("the settings panel wrote into the repository: %v", pc.Approval.Tools)
+	}
+}
+
+// "default" removes the entry rather than recording a third state.
+func TestSettingsDefaultRemovesTheEntry(t *testing.T) {
+	s := newStore(t)
+	s.Apply(tui.SettingChange{Tool: "write_file", Value: "never", Scope: tui.ScopeGlobal})
+	d, line := s.Apply(tui.SettingChange{Tool: "write_file", Value: "default", Scope: tui.ScopeGlobal})
+	if !strings.Contains(line, "default") {
+		t.Errorf("line = %q", line)
+	}
+	back, _ := config.LoadPolicyFile(s.policyPath)
+	if len(back.Tools) != 0 {
+		t.Errorf("the entry survived: %v", back.Tools)
+	}
+	if row, _ := rowFor(d, "write_file"); row.Value != "default" {
+		t.Errorf("row = %+v", row)
+	}
+}
+
+// A hand-written entry that the UI overrode must be visible as such,
+// not mysterious.
+func TestSettingsShowsWhichFileDecided(t *testing.T) {
+	s := newStore(t)
+	s.cfg.Approval.Tools["shell_exec"] = "always"
+	if _, err := s.Rebuild(); err != nil {
+		t.Fatal(err)
+	}
+	if row, _ := rowFor(s.data(), "shell_exec"); row.Source != config.FromFile || row.Value != "always" {
+		t.Errorf("row = %+v, want it attributed to config.toml", row)
+	}
+	s.Apply(tui.SettingChange{Tool: "shell_exec", Value: "never", Scope: tui.ScopeGlobal})
+	row, _ := rowFor(s.data(), "shell_exec")
+	if row.Value != "never" || row.Source != config.PolicyFileName {
+		t.Errorf("row = %+v, want the UI edit to win and say so", row)
+	}
+}
+
+func TestSettingsSessionTogglesTakeEffectImmediately(t *testing.T) {
+	s := newStore(t)
+	if s.ag.AutoApprove() {
+		t.Fatal("precondition")
+	}
+	if _, line := s.Apply(tui.SettingChange{Label: "agent.auto_approve", Value: "true"}); !strings.Contains(line, "this session") {
+		t.Errorf("line = %q, want it to say the change is not persisted", line)
+	}
+	if !s.ag.AutoApprove() {
+		t.Error("the toggle did not reach the agent")
+	}
+	s.Apply(tui.SettingChange{Label: "agent.read_only", Value: "true"})
+	if !s.ag.CeilingState().ReadOnly {
+		t.Error("read-only toggle did not reach the agent")
+	}
+}
+
+func TestWriteSettingsTableGroupsBySection(t *testing.T) {
+	s := newStore(t)
+	var b strings.Builder
+	writeSettingsTable(&b, s.data())
+	out := b.String()
+	for _, want := range []string{"[backend]", "[approval policy]", "llm.model", "write_file", "editable in the TUI"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("table is missing %q:\n%s", want, out)
+		}
+	}
+}
+
+// An untrusted project's "never" is dropped (ADR-0008). Crediting it as
+// the deciding source would tell the operator the opposite of the truth.
+func TestSettingsMarksAnIgnoredProjectEntry(t *testing.T) {
+	s := newStore(t)
+	s.projectCfg.Approval.Tools = map[string]string{"read_file": "never"}
+	if _, err := s.Rebuild(); err != nil {
+		t.Fatal(err)
+	}
+	row, _ := rowFor(s.data(), "read_file")
+	if row.Value != "default" {
+		t.Fatalf("an untrusted project loosened a gate: %+v", row)
+	}
+	if !strings.Contains(row.Source, "ignored") {
+		t.Errorf("source = %q, want it to say the entry was ignored", row.Source)
+	}
+
+	// Trusted, the same entry decides — and is credited.
+	s.cfg.Approval.TrustedProjects = []string{s.projectDir}
+	if _, err := s.Rebuild(); err != nil {
+		t.Fatal(err)
+	}
+	row, _ = rowFor(s.data(), "read_file")
+	if row.Value != "never" || row.Source != config.ProjectFileName {
+		t.Errorf("trusted row = %+v", row)
+	}
+}
+
+// The ceiling and its watcher are rows the panel can move, and the ADR
+// promised their provenance would be visible there. Nothing covered
+// either half (independent review, pass 2).
+func TestSettingsCeilingRowsMoveAndReportSession(t *testing.T) {
+	s := newStore(t)
+	s.cfg.Sources = map[string]string{"agent.read_only": config.FromFile}
+	d := s.data() // the startup build: the baseline for "has it moved?"
+
+	row, ok := rowFor(d, "agent.read_only")
+	if !ok {
+		t.Fatal("agent.read_only has no row")
+	}
+	if row.Value != "false" || row.Source != config.FromFile {
+		t.Errorf("agent.read_only at startup = %+v", row)
+	}
+
+	d, line := s.Apply(tui.SettingChange{Label: "agent.read_only", Value: "true"})
+	if !s.ag.CeilingState().ReadOnly {
+		t.Error("the row did not reach the agent")
+	}
+	if !strings.Contains(line, "read-only: true") {
+		t.Errorf("scrollback line = %q", line)
+	}
+	row, _ = rowFor(d, "agent.read_only")
+	if row.Value != "true" || row.Source != "session" {
+		t.Errorf("after the edit = %+v, want true/session", row)
+	}
+}
+
+// Provenance follows the value, not the panel. /readonly, shift+tab, the
+// lift dialog and the watcher all move these settings without the panel
+// hearing about it, and the row then showed a live value credited to the
+// config file that says the opposite (independent review, pass 2).
+func TestSettingsLiveRowsCreditTheSessionForChangesMadeElsewhere(t *testing.T) {
+	s := newStore(t)
+	s.cfg.Sources = map[string]string{
+		"agent.read_only": config.FromFile, "agent.auto_approve": config.FromFile,
+	}
+	s.data() // startup baseline
+
+	// Moved behind the panel's back, the way every other surface does it.
+	s.ag.SetReadOnly(true, "auto")
+	s.ag.SetAutoApprove(true)
+
+	d := s.data()
+	for _, label := range []string{"agent.read_only", "agent.auto_approve"} {
+		row, _ := rowFor(d, label)
+		if row.Value != "true" {
+			t.Errorf("%s row does not show the live value: %+v", label, row)
+		}
+		if row.Source != "session" {
+			t.Errorf("%s credits %q for a value this session set", label, row.Source)
+		}
+	}
+
+	// And back again: a value returned to where it started is the
+	// startup layer's again, not the session's.
+	s.ag.SetReadOnly(false, "operator")
+	if row, _ := rowFor(s.data(), "agent.read_only"); row.Source != config.FromFile {
+		t.Errorf("restored value still credited to the session: %+v", row)
+	}
+}
+
+// One rule per row: a setting returned to its startup value reads as the
+// startup layer's again, whichever surface moved it. The panel's own
+// edit history must not outvote the value, or the same net change reads
+// differently depending on where the operator typed it (second
+// independent review).
+func TestSettingsProvenanceAgreesAcrossSurfaces(t *testing.T) {
+	viaPanel := newStore(t)
+	viaPanel.cfg.Sources = map[string]string{"agent.read_only": config.FromFile}
+	viaPanel.data()
+	viaPanel.Apply(tui.SettingChange{Label: "agent.read_only", Value: "true"})
+	d, _ := viaPanel.Apply(tui.SettingChange{Label: "agent.read_only", Value: "false"})
+	panelRow, _ := rowFor(d, "agent.read_only")
+
+	viaSlash := newStore(t)
+	viaSlash.cfg.Sources = map[string]string{"agent.read_only": config.FromFile}
+	viaSlash.data()
+	viaSlash.ag.SetReadOnly(true, "operator")
+	viaSlash.ag.SetReadOnly(false, "operator")
+	slashRow, _ := rowFor(viaSlash.data(), "agent.read_only")
+
+	if panelRow.Value != slashRow.Value || panelRow.Source != slashRow.Source {
+		t.Errorf("same net change reads differently: panel %+v vs /readonly %+v", panelRow, slashRow)
+	}
+	if panelRow.Source != config.FromFile {
+		t.Errorf("a value back at its startup value is still credited to the session: %+v", panelRow)
+	}
+}

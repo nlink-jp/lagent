@@ -1,0 +1,259 @@
+// Package tui implements the interactive terminal UI (ADR-0002):
+// Bubble Tea in inline mode — completed conversation flushes to the
+// terminal's native scrollback, only the live region (streaming text,
+// status, input box) is managed. The agent core stays UI-agnostic; the
+// agent goroutine talks to the UI exclusively through Program.Send.
+//
+// Ported from gem-agent internal/tui at be7609980022e38314268c58ca94a6517e6f5d28 (v0.74.0), ADR-0001.
+package tui
+
+import (
+	"sync"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+// TextDelta carries one streamed chunk of model text.
+type TextDelta string
+
+// AskRequest is the ask_user tool's dialog (ADR-0036): the model's
+// question with 2-8 options. Resp receives the chosen index, or -1
+// when the operator declines (Esc).
+type AskRequest struct {
+	Question string
+	Options  []string
+	Resp     chan int
+}
+
+// StreamUpdate is turn observability from the backend (ADR-0033):
+// Kind "chunk" (heartbeat), "thought" (a live thought-summary delta),
+// or "retry" (a scheduled backoff retry).
+type StreamUpdate struct {
+	Kind    string
+	Thought string
+	Attempt int
+	Max     int
+	Cause   string
+	DelayMS int
+}
+
+// ToolCall announces a tool invocation (shown as an event line).
+// Purpose is the model's declaration of why it wants the call
+// (ADR-0047); empty for read-only tools, which are not gated and carry
+// no such field.
+type ToolCall struct {
+	Name    string
+	Detail  string
+	Purpose string
+}
+
+// ToolDone signals that a tool call finished (executed, denied, or
+// skipped) — the stall detector re-arms on this, never on stream
+// chunks, which a side-call (risk/progress review) also produces.
+type ToolDone struct {
+	Name string
+}
+
+// TurnDone signals the end of an agent turn.
+type TurnDone struct {
+	Err error
+}
+
+// AutoApproved reports a tool call that auto mode let through, with the
+// reason — the operator must be able to see what ran unattended.
+type AutoApproved struct {
+	Tool   string
+	Reason string
+	Tier   string
+}
+
+// Attached reports what @-references pulled in, and what they could not
+// — a silently dropped reference would look like the file was read.
+type Attached struct {
+	Lines []string
+	Notes []string
+}
+
+// ShellDone signals completion of a direct (!-prefixed) shell command.
+// Interrupted marks a Ctrl+C'd run: a message queued during it is
+// handed back rather than auto-sent (ADR-0007's rule, which the shell
+// path previously ignored — ADR-0021).
+type ShellDone struct {
+	Output      string
+	Interrupted bool
+}
+
+// Usage carries one LLM round's token counts. Prompt tokens approximate
+// the current context size; output tokens are the round's generation.
+type Usage struct {
+	Prompt int
+	Output int
+	// Cached is the share of Prompt served from the implicit cache
+	// (ADR-0018) — the footer shows it so "is caching firing" is a
+	// glance, not an investigation.
+	Cached int
+}
+
+// ContextWindow reports the model's input token limit once known.
+// Assumed marks a family-default guess (Vertex publisher metadata omits
+// inputTokenLimit) — the footer renders it with a "~" so an estimate
+// never masquerades as a measured value.
+type ContextWindow struct {
+	Tokens  int
+	Assumed bool
+}
+
+// Output carries plain lines to the scrollback from work running
+// outside the event loop — /riskbook learn's progress and draft, for
+// one (ADR-0050). Attached exists for two other things and neither
+// fits: its Lines are attachments (📎) and its Notes warnings (⚠);
+// a draft rendered as a column of warnings reads as a column of
+// problems.
+type Output struct{ Lines []string }
+
+// ApprovalAnswer is the UI's reply to one ApprovalRequest. Key is the
+// dialog answer byte ('y', 'n', 'a' — 'p' resolves to 'y' before it is
+// sent, and a reasoned denial arrives as 'n'); Reason is the operator's
+// typed denial reason (ADR-0060), empty for every other answer.
+type ApprovalAnswer struct {
+	Key    byte
+	Reason string
+}
+
+// ApprovalRequest asks the operator to approve a mutating tool call.
+// The gate goroutine blocks on Resp until the UI answers.
+type ApprovalRequest struct {
+	Tool   string
+	Detail string
+	// Purpose is the model's own one-sentence declaration of why it
+	// wants this call (ADR-0047). The arguments say what will run and
+	// Reason says why the operator is being asked; without this the
+	// third question — why the agent wants it — had no answer anywhere
+	// on screen. Empty when the model declared nothing, which is shown
+	// as such rather than hidden.
+	Purpose string
+	// Reason is non-empty when auto-approve escalated this call instead
+	// of running it — the operator needs to know why they are being
+	// asked, and which tier objected.
+	Reason string
+	// ModeChange marks the read-only lift question (ADR-0080 §4). It is
+	// not a tool approval: the dialog says what changes, and offers
+	// y/n/N only — "allow for this session" and "always allow" are
+	// answers about a tool, and an 'a' here would register the tool in
+	// the allowlist, granting exactly what the ceiling withholds.
+	ModeChange bool
+	// NoStanding marks an ordinary tool approval that no standing
+	// answer may settle — an MCP call while the ceiling is in force
+	// (ADR-0080 §5). The question is the usual one, so the title and
+	// the consequence stay as they are; what goes is 'a' and 'p', which
+	// the ceiling refuses to honour anyway and which would therefore
+	// take effect only later, invisibly.
+	NoStanding bool
+	Resp       chan ApprovalAnswer
+}
+
+// sender is the slice of *tea.Program the gate needs (testable).
+type sender interface {
+	Send(tea.Msg)
+}
+
+// Gate is the TUI-backed approval gate. The session allowlist lives
+// here, not in the UI — the UI only ever answers one question.
+type Gate struct {
+	mu     sync.Mutex
+	prog   sender
+	always map[string]bool
+}
+
+// NewGate creates a gate; SetProgram must be called before the first
+// turn runs (the REPL only starts turns from inside the running program,
+// so this ordering is structural).
+func NewGate() *Gate {
+	return &Gate{always: map[string]bool{}}
+}
+
+// SetProgram binds the running Bubble Tea program.
+func (g *Gate) SetProgram(p sender) {
+	g.mu.Lock()
+	g.prog = p
+	g.mu.Unlock()
+}
+
+// ApproveLift asks the mode question. No allowlist is consulted and
+// none is registered, whatever the operator presses: the dialog does
+// not offer that answer, and this method could not honour it.
+func (g *Gate) ApproveLift(toolName, detail, purpose, reason string) (bool, string) {
+	g.mu.Lock()
+	prog := g.prog
+	g.mu.Unlock()
+	if prog == nil {
+		return false, ""
+	}
+	resp := make(chan ApprovalAnswer, 1)
+	prog.Send(ApprovalRequest{Tool: toolName, Detail: detail, Purpose: purpose,
+		Reason: reason, ModeChange: true, Resp: resp})
+	answer := <-resp
+	if answer.Key == 'y' {
+		return true, ""
+	}
+	return false, answer.Reason
+}
+
+// ApproveOnce asks the ordinary approval question with the standing
+// answers removed. The dialog does not offer 'a' or 'p', and this
+// method could not honour them: while the ceiling is up the allowlist
+// may not answer, so the keystroke's only effect would be one the
+// operator cannot see until they lift the mode (ADR-0080 §5).
+func (g *Gate) ApproveOnce(toolName, detail, purpose, reason string) (bool, string) {
+	g.mu.Lock()
+	prog := g.prog
+	g.mu.Unlock()
+	if prog == nil {
+		return false, ""
+	}
+	resp := make(chan ApprovalAnswer, 1)
+	prog.Send(ApprovalRequest{Tool: toolName, Detail: detail, Purpose: purpose,
+		Reason: reason, NoStanding: true, Resp: resp})
+	answer := <-resp
+	if answer.Key == 'y' {
+		return true, ""
+	}
+	return false, answer.Reason
+}
+
+// Approve implements agent.Approver. Fails closed when no program is
+// bound. mustPrompt says the session allowlist may not answer this call
+// (Block-tier, or an "always" policy — ADR-0021 §5); an 'a' answered on
+// such a prompt still registers, for future non-Block calls. A denial
+// may carry the operator's typed reason (ADR-0060), which rides back
+// to the agent verbatim.
+func (g *Gate) Approve(toolName, detail, purpose, reason string, mustPrompt bool) (approved, fromAllowlist bool, denyReason string) {
+	g.mu.Lock()
+	if !mustPrompt && g.always[toolName] {
+		g.mu.Unlock()
+		// One keystroke standing in for this call: the learner must not
+		// read it as a decision made here (ADR-0048 §1).
+		return true, true, ""
+	}
+	prog := g.prog
+	g.mu.Unlock()
+	if prog == nil {
+		return false, false, ""
+	}
+	resp := make(chan ApprovalAnswer, 1)
+	prog.Send(ApprovalRequest{Tool: toolName, Detail: detail, Purpose: purpose, Reason: reason, Resp: resp})
+	answer := <-resp
+	switch answer.Key {
+	case 'y':
+		return true, false, ""
+	case 'a':
+		g.mu.Lock()
+		g.always[toolName] = true
+		g.mu.Unlock()
+		// The keystroke that registers the allowlist is itself an
+		// operator decision about this call.
+		return true, false, ""
+	default:
+		return false, false, answer.Reason
+	}
+}
