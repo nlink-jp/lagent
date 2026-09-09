@@ -50,7 +50,8 @@ tools パッケージはプロジェクトディレクトリだけを要する 9
 `internal/llm` は全ての会話を 1 つのエンドポイント、`[llm].base_url` の
 OpenAI 互換 `chat/completions` に、stdlib の `net/http` と手書きの SSE
 リーダで送る。履歴は呼び出しごとに 1 回ワイヤ形式へ変換される: system
-プロンプトは system メッセージ、ユーザ文（`@` 参照の画像は image part）、
+プロンプトは system メッセージ、ユーザ文（`@` 参照およびそのままドロップ
+された画像は image part、ADR-0005。`view_image` の結果も同じ形で画像を運ぶ）、
 tool call 付きの assistant ターン、id で呼び出しに対応付けた tool 結果 —
 id はサーバが送ったもの、transcript に無ければ合成したもの。ストリーミング
 はテキスト差分を到着順に呼び出し元へ流し、tool call はインデックス付き
@@ -143,15 +144,18 @@ transcript は状態ルート下のセッションごとの JSONL ファイル�
 `--continue` と `--resume` がそれを再生する。usage レコードはモデル呼び出し
 ごとに、gem-usage-lens が両ランタイムに対して読む形（`prompt` / `output` /
 `thoughts` / `cached` / `tool_prompt` / `total`、`tool_prompt` はここでは
-常に 0）で書かれる。セッション作業ディレクトリは transcript の隣にあり、
-子プロセスへ `LAGENT_WORK_DIR` として export される。
+常に 0）で書かれる。セッション作業ディレクトリは同じ状態ルート下の
+プロジェクト別ディレクトリにあり（ルートは `LAGENT_STATE_DIR` で上書き）、
+子プロセスへ `LAGENT_WORK_DIR` として、`LAGENT_SESSION_ID` と
+`LAGENT_PROJECT_DIR` と並んで export される。
 
 ## 設定と drop-in の挙動
 
 `~/.config/lagent/config.toml` は strict decode で読まれる。優先順位は
 フラグ > `LAGENT_*` > ファイル > 既定。プロジェクトの `AGENTS.md` /
-`CLAUDE.md` / `AGENT.md` / `GEMINI.md` は、プロジェクトが信頼されピンが
-一致した後に、祖先ディレクトリまで遡ってそのまま読まれる。`.mcp.json` は
+`CLAUDE.md` / `AGENT.md` / `GEMINI.md` は祖先ディレクトリまで遡り、
+`~/.config/lagent` からもそのまま読まれる（プロジェクト自身のものは
+信頼されピンが一致した後）。`.mcp.json` は
 Claude Code の形式で読む。`.lagent.toml` はプロジェクトの承認ポリシーと
 MCP の除外だけを持ち、他は何も持たない。
 

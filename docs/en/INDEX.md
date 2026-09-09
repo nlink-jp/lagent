@@ -12,7 +12,8 @@ both, and the identifiers of each pair agree. Prose parity is the author's job.
 
 - [`lagent-rfp.md`](lagent-rfp.md) — the canonical spec: problem
   statement, functional surface, scope boundaries, phase plan. Features
-  outside it need an ADR.
+  outside it need an ADR; where an ADR or the build amended a section,
+  a note stands in place and the reference documents are current.
 
 ## Reference
 

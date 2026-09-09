@@ -98,7 +98,7 @@ call_timeout_sec = 60
 # advertises every tool from the start — 243 tools came to 60k prompt
 # tokens, about two minutes of prompt processing on a cold cache, which
 # is why deferred is the default. --allow mcp__<server>__* preloads that
-# server for a one-shot run.
+# server for the run, in every mode.
 advertise = "deferred"
 # Servers advertised from the start under "deferred": the lookups you
 # use every session. Their schemas then sit in the cached prefix.
@@ -141,8 +141,9 @@ show_thoughts = true
 
 # Project directories you trust completely. This is NOT approval-only:
 # a listed project's .lagent.toml may REMOVE approvals, AND its
-# .mcp.json servers are spawned and its instruction files are read. It
-# is the same decision as answering yes to the startup trust prompt.
+# .mcp.json servers are spawned and its instruction files are read.
+# Answering yes to the startup trust prompt does the last two only;
+# nothing but this list lets a project's .lagent.toml loosen the gate.
 # Everywhere else a project file may only ADD approvals: a checked-out
 # repository is not necessarily something you wrote, and it must not be
 # able to switch the gate off. Ignored entries are reported at startup.

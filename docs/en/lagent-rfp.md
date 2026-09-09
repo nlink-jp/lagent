@@ -38,9 +38,15 @@ gem-agent's surface, narrowed to what the experiment needs.
 | `--auto` | auto-approve calls the rule tier classifies as Safe |
 | `--version` | version (from `git describe`) |
 
+As built, Phase 1 also has `--resume`, `--allow`, `--read-only` /
+`--writable`, `--model`, `--mcp`, `--config`, `--no-sandbox` and the
+`sessions` / `trust` / `workdirs` / `version` subcommands;
+`reference/configuration.md` is the current table.
+
 Phase 1 built-in tools: read_file / write_file / edit_file / list_files /
 list_tree / search_files / file_info / shell_exec / ask_user. MCP server
-tools are added by connecting from `.mcp.json`.
+tools are added by connecting from `.mcp.json`. Amended by ADR-0005:
+`view_image` joins the list, and ADR-0004 adds `mcp_load`.
 
 ### Input / Output
 
@@ -51,7 +57,9 @@ tools are added by connecting from `.mcp.json`.
   `--continue` reads them.
 - Usage records are written in the format gem-usage-lens reads (the four
   buckets `prompt` / `output` / `tool_prompt` / `total`; locally
-  `tool_prompt` is always 0). Cost is zero, so the comparison axes are
+  `tool_prompt` is always 0). As built, the record carries the lens's
+  six fields — `thoughts` and `cached` beside those four — as
+  `reference/architecture.md` lists. Cost is zero, so the comparison axes are
   tokens, wall-clock time, turns, and cache hits (inferred from time to
   first token).
 
@@ -74,13 +82,17 @@ context_window = 0           # 0 = detect from the provider
 `provider` only selects where the context length is detected (LM Studio:
 `/api/v0/models`; Ollama: `/api/show`). Every conversation goes through the
 OpenAI-compatible `chat/completions`. An explicit `context_window` removes
-the provider dependency.
+the provider dependency. As built, the file also carries `[sandbox]`,
+`[agent]`, `[mcp]`, `[tui]` and `[approval]`; `reference/configuration.md`
+lists every key.
 
 ### External Dependencies
 
 - A local LLM server (LM Studio or Ollama). No credentials.
 - macOS `sandbox-exec` (the same confinement as gem-agent).
 - Go dependencies: stdlib + cobra + BurntSushi/toml + nlk. No OpenAI SDK.
+  As built, the inline TUI ported under ADR-0001 brought Bubble Tea,
+  bubbles, lipgloss and glamour with it.
 
 ## 3. Design Decisions
 
@@ -110,6 +122,11 @@ reference docs describing gem-agent's behaviour as current. lagent never
 carries code or documents for features it does not ship.
 
 ### Prompt
+
+Amended by ADR-0003, ADR-0004 and ADR-0005: the prompt now differs from
+gem-agent's in the points those records list (the per-session facts
+moved to the runtime's opening message, the MCP catalog sentence,
+`view_image`); the measurement below predates them.
 
 gem-agent's system prompt goes in unchanged as the first measurement
 point. Measured: gem-agent's own prompt (about 1.2k tokens) + a 56KB

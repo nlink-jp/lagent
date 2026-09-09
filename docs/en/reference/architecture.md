@@ -54,7 +54,9 @@ takes the grant).
 OpenAI-compatible `chat/completions` at `[llm].base_url`, with stdlib
 `net/http` and a hand-written SSE reader. The history is converted to
 the wire shape once per call: the system prompt as the system message,
-user text (with `@`-referenced images as image parts), assistant turns
+user text (with `@`-referenced and bare-dropped images as image parts,
+ADR-0005; a `view_image` result carries its image the same way),
+assistant turns
 with their tool calls, tool results paired to their calls by id — ids
 the server sent, or synthetic ones when a transcript carries none.
 Streaming folds text deltas to the caller as they arrive and assembles
@@ -156,15 +158,17 @@ The transcript is a JSONL file per session under the state root;
 model call in the shape gem-usage-lens reads for both runtimes
 (`prompt` / `output` / `thoughts` / `cached` / `tool_prompt` / `total`,
 with `tool_prompt` always zero here). The per-session work directory
-sits beside the transcript and is exported to children as
-`LAGENT_WORK_DIR`.
+lives under the same state root in a per-project directory of its own
+(`LAGENT_STATE_DIR` overrides the root) and is exported to children as
+`LAGENT_WORK_DIR`, beside `LAGENT_SESSION_ID` and `LAGENT_PROJECT_DIR`.
 
 ## Configuration and drop-in behaviour
 
 `~/.config/lagent/config.toml` is strict-decoded; precedence is flags >
 `LAGENT_*` > file > defaults. The project's `AGENTS.md` / `CLAUDE.md` /
-`AGENT.md` / `GEMINI.md` are read as they are, up the ancestor chain,
-after the project is trusted and its pins agree; `.mcp.json` is read in
+`AGENT.md` / `GEMINI.md` are read as they are, up the ancestor chain
+and from `~/.config/lagent`, the project's own after it is trusted and
+its pins agree; `.mcp.json` is read in
 Claude Code's format. `.lagent.toml` carries the project's approval
 policy and MCP exclusions, nothing else.
 

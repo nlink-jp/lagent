@@ -14,7 +14,8 @@ Every request advertises every tool of every connected MCP server as a
 function schema. With the operator's global `mcp.json` (23 servers)
 that is 243 schemas and 60,097 tokens before a word of conversation;
 three servers (slack-extender, github, obsidian) are half of it. The
-built-in tools are eight schemas, about 2,500 tokens.
+built-in tools (eight file and shell tools and `ask_user`) are nine
+schemas, about 2,500 tokens.
 
 ADR-0003 made that block cacheable across sessions. It did not make it
 small: the server's cache is per process and holds what fits, the
@@ -71,7 +72,7 @@ Operator controls:
 - `[mcp].preload = ["tor-exit-lookup", …]` advertises named servers
   from the start, for the lookups an operator uses every session; the
   cache then holds them like the built-ins.
-- `--allow mcp__<server>__*` in one-shot preloads that server: the
+- `--allow mcp__<server>__*` preloads that server, in every mode: the
   grant is the operator's declaration that the run needs it, and a
   pipeline must not depend on the model remembering to load.
 - `[mcp].advertise = "all"` restores today's behaviour — the
@@ -91,8 +92,8 @@ gem-usage-lens.
 
 ## Consequences
 
-- The cold prefix drops from about 63k tokens (8 built-ins + 243 MCP
-  schemas) to about 4k (8 built-ins, `mcp_load`, and a catalog line
+- The cold prefix drops from about 63k tokens (the built-ins + 243 MCP
+  schemas) to about 4k (the built-ins, `mcp_load`, and a catalog line
   per server) for the operator's configuration — the two-minute first
   session becomes about ten seconds, and the cache is a bonus rather
   than a rescue.

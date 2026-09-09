@@ -3,6 +3,8 @@
 // lexical path, unbounded I/O, permission decided in several places)
 // are closed by construction here, not by review. A violation is a
 // failing test naming the file, line and enclosing function.
+//
+// Ported from gem-agent internal/archtest at be7609980022e38314268c58ca94a6517e6f5d28 (v0.74.0), ADR-0001.
 package archtest
 
 import (

@@ -6,8 +6,7 @@ updated in place as keys and commands are added.
 ## Install
 
 Build from source (`make build` → `dist/lagent`) and put the binary on
-your PATH. Release archives and a Homebrew formula come with the first
-release (RFP Phase 3).
+your PATH. Release archives come with the first release (RFP Phase 3).
 
 ## Config file
 
@@ -20,7 +19,7 @@ Unknown keys are errors (strict decode).
 |---|---|---|
 | `[llm].provider` | `lmstudio` | which local server answers: `lmstudio`, `ollama` or `openai`. Selects only where the context length is detected from; every conversation goes through the OpenAI-compatible `chat/completions` endpoint |
 | `[llm].base_url` | `http://localhost:1234/v1` | base URL of the OpenAI-compatible API |
-| `[llm].model` | `google/gemma-4-26b-a4b-qat` | model id as the server lists it |
+| `[llm].model` | (required) | model id as the server lists it; there is no default — startup fails without it (or `LAGENT_MODEL` / `--model`) |
 | `[llm].api_key` | (unset) | bearer token for a server that requires one; local servers need none |
 | `[model].context_window` | `0` | context window in tokens; `0` detects it from the provider at startup (LM Studio `/api/v0/models`, Ollama `/api/show`; `openai` needs an explicit value) |
 | `[sandbox].enabled` | `true` | wrap `shell_exec` in sandbox-exec; the lane the model declares is enforced by the kernel. Off, every shell call is yours to approve |
@@ -40,7 +39,7 @@ Unknown keys are errors (strict decode).
 | `[tui].show_thoughts` | `true` | show the server's reasoning deltas in the live area; display-only |
 | `[approval].pin_trusted_files` | `true` | trust is given to content: a trusted project's agent-facing files are pinned by digest and a changed one asks again |
 | `[approval].tools` | (unset) | per-tool policy: `"always"` (always ask; a floor auto-approve cannot lift) or `"never"` (never ask; blocked shell patterns still ask). `--allow` does the same for one run |
-| `[approval].trusted_projects` | (unset) | projects whose own `.lagent.toml` may remove approvals; the same decision as the startup trust prompt |
+| `[approval].trusted_projects` | (unset) | projects whose own `.lagent.toml` may remove approvals (`"never"` entries). The startup trust prompt only loads a project's files; nothing but this list lets a project loosen the gate |
 
 The two session modes are independent axes: `auto_approve` decides who
 answers the gate, `read_only` decides what the session may reach at
@@ -59,17 +58,41 @@ flags > `LAGENT_*` environment > config file > built-in defaults.
 | `LAGENT_MODEL` | `[llm].model` |
 | `LAGENT_API_KEY` | `[llm].api_key` |
 
+Other environment variables the runtime reads or sets:
+
+| Environment variable | Direction | Meaning |
+|---|---|---|
+| `LAGENT_STATE_DIR` | read | the state root (sessions, work directories, pins) instead of the default under `~/.local/state` |
+| `LAGENT_MCP_STDERR` | read | `1` passes MCP servers' stderr through to the terminal (debugging; it is discarded otherwise) |
+| `LAGENT_SESSION_ID` | exported | the session id, for `shell_exec` children and `${LAGENT_SESSION_ID}` in `.mcp.json` |
+| `LAGENT_WORK_DIR` | exported | the per-session work directory, likewise expandable in `.mcp.json` |
+| `LAGENT_PROJECT_DIR` | exported | the project directory, for children that need to know it |
+
 ## Commands
 
 | Command | Meaning |
 |---|---|
 | `lagent` | start the interactive session in the current directory (the TUI on a terminal, a plain REPL on pipes) |
 | `lagent "<first message>"` | send the argument as the first turn, then converse |
-| `lagent sessions` | list this project's sessions (id, when, preview) |
-| `lagent trust` | show or change the project's trust and its pins |
-| `/mcp`, `/mcp load <server>`, `/mcp reload` (in a session) | list the servers with their loaded state; advertise one server's tools by hand; reconnect |
-| `lagent workdirs` | list earlier sessions' work directories; `workdirs clean` removes them |
+| `lagent sessions [--all]` | list this project's sessions (id, when, preview); `--all` lists every project's |
+| `lagent trust [--accept]` | show or change the project's trust and its pins; `--accept` records the files' current content as trusted |
+| `lagent workdirs` | list earlier sessions' work directories; `workdirs clean [--yes]` removes them (`--yes` skips the confirmation, for scripts) |
 | `lagent version` | print the version — the same line as `--version` |
+
+In a session:
+
+| Command | Meaning |
+|---|---|
+| `/help` | list these commands |
+| `/tools` | list the tools and each one's current approval gate |
+| `/mcp`, `/mcp load <server>`, `/mcp reload` | list the servers with their loaded state; advertise one server's tools by hand; reconnect |
+| `/auto on|off` | switch auto-approve for the session (shift+tab does the same) |
+| `/readonly on|off` | switch the lane ceiling for the session |
+| `/settings` | view and edit settings, with provenance |
+| `/usage` | token statement for this session |
+| `/version` | the version line |
+| `/clear` | start a new conversation in the same session |
+| `/quit` | leave (`/exit` is the same) |
 
 | Flag | Meaning |
 |---|---|

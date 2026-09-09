@@ -4,8 +4,8 @@ Sandboxed CLI agent runtime on a local LLM served over an
 OpenAI-compatible API (LM Studio, Ollama). A separate product line from
 gem-agent built on the same design; gem-agent is the porting source
 (ADR-0001), and the features it has that lagent does not reproduce are
-listed in ADR-0002. Experimental, lab-series, unreleased. The scaffold
-answers `--version` and `version`; the agent loop is RFP Phase 1.
+listed in ADR-0002. Experimental, lab-series, unreleased; RFP Phase 1
+(the core loop, tools, sandbox, MCP, sessions, TUI) is in.
 
 - **Module:** `github.com/nlink-jp/lagent`
 - **Series:** lab-series (target; developed in `_wip/lagent` until integration)
@@ -22,7 +22,7 @@ answers `--version` and `version`; the agent loop is RFP Phase 1.
 | Vet + lint + test + docs mirror + release gate + build | `make check` |
 | Docs mirror only | `make docs-check` |
 | Release gate's own test | `make gate-check` |
-| Release binary | `make build-all` (darwin/arm64 only; signed by `make package`) |
+| Release binary | `make build-all` (darwin/arm64 only; signs the binary) |
 | Release archive | `make package` → `dist/lagent-vX.Y.Z-darwin-arm64.zip`, notarized |
 | Release gate | `make verify-release` — refuses a zip with no notarisation marker, one rebuilt after its marker, one that does not unpack, or one whose binary does not run or reports another tag's version |
 
@@ -32,8 +32,8 @@ Version is injected via `-X main.version` from `git describe` — never edit the
 ## Structure
 
 ```
-config.example.toml  shipped config template ([llm] provider/base_url/model/api_key, [model] context_window;
-                     pinned by a loader test)
+config.example.toml  shipped config template (every section: [llm], [model], [sandbox], [agent],
+                     [mcp], [tui], [approval]; pinned by a loader test)
 lagent.example.project.toml  shipped <project>/.lagent.toml template
 mcp.example.json     shipped MCP server template (pinned by a loader test)
 main.go            entry point (package main, calls cmd.Execute(version))
@@ -46,7 +46,9 @@ internal/llm/      Backend interface + the OpenAI-compatible client (stdlib net/
                    hand-written SSE, tool-call assembly, retry, per-provider context probe)
 internal/agent/    tool-calling loop, approval dispatch, nonce wrapping, history,
                    the rule-tier auto-approve ladder, the round ladder
-internal/tools/    built-in tools, path confinement, lane-aware exec injection, Register
+internal/tools/    the nine built-in tools (list_files, list_tree, search_files, read_file,
+                   file_info, view_image, write_file, edit_file, shell_exec), path
+                   confinement, lane-aware exec injection, Register
 internal/bounded/  the one place a read, listing or process output is capped —
                    every primitive returns the `more` fact
 internal/archtest/ AST tests pinning confined opens, bounded reads and the
@@ -63,7 +65,8 @@ internal/uitext/   ja/en UI string catalogs: completeness enforced by test —
                    new operator-facing strings go in BOTH catalogs or make check fails
 internal/banner/   the lines printed before the operator has typed: a line earns a
                    place only if nothing else will say it; Sample() is the read-through
-internal/statedir/ shared per-project state convention: root+env override, escape, .project marker
+internal/statedir/ shared per-project state convention: root (LAGENT_STATE_DIR overrides it),
+                   escape, .project marker
 internal/workdir/  per-session work directory: layout under the state root, sweep
                    report, empty-dir removal; LAGENT_WORK_DIR is exported at startup
 internal/mention/  @-reference parsing (files, directories, images), project-confined
@@ -86,7 +89,8 @@ docs/en/, docs/ja/ INDEX + reference/ + adr/ + the RFP (en: no suffix; ja: .ja.m
 
 Every package under internal/ that came from gem-agent says so in its
 package doc comment, with the source commit (ADR-0001). `internal/llm`
-is new; the others are ports minus the ADR-0002 features.
+is written new (its type shapes follow gem-agent's, as its doc comment
+says); the others are ports minus the ADR-0002 features.
 
 ## Gotchas
 
@@ -106,7 +110,7 @@ is new; the others are ports minus the ADR-0002 features.
 - **No string for a feature this runtime does not have.** The catalog,
   `/help`, tool descriptions, notes and error text name only what is
   here; a leftover from the porting source (`/readonly auto`, `/skill`,
-  `view_image`, "the model tier") is a seam ADR-0001 forbids. Before a
+  "the model tier") is a seam ADR-0001 forbids. Before a
   release, grep every string literal in cmd/ and internal/ for the
   ADR-0002 and Phase 2 feature names, and grep the `uitext.Messages`
   fields for ones no code reads — the completeness test only checks
@@ -162,5 +166,6 @@ is new; the others are ports minus the ADR-0002 features.
   the shipped template against the built-in defaults.
 - **Docs are checked mechanically** — `make docs-check` fails on a missing
   en/ja mirror, an ADR absent from either INDEX, an INDEX link that does
-  not resolve, or a backticked identifier (tool name, flag, config key)
-  present in one language only.
+  not resolve, a backticked identifier (tool name, flag, config key)
+  present in one language only, an en/ja mermaid pair whose shape
+  differs, or this file losing one of its sections.

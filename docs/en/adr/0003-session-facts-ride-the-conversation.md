@@ -62,7 +62,8 @@ per-session rides the conversation as the runtime's opening message:
   precedent): a transcript that recorded only it is skipped by
   `--continue` and gets no resume hint.
 - `cmd.TestSystemPromptIsIdenticalAcrossSessions` pins the invariant;
-  `rotateWorkDir` takes an `announce` callback where it took `setSystem`.
+  `rotateWorkDir` no longer takes the `setSystem` callback — the caller
+  announces the new facts afterwards.
 
 The consecutive user messages this produces (the facts, then the
 operator's first message) were measured accepted by the LM Studio
@@ -80,8 +81,8 @@ template, with the model reading the work directory from the facts.
 - The date is the session start, as before; a long session's "today"
   drifts exactly as it did.
 - The prefix now depends only on the system prompt and the tool set, so
-  the remaining lever is the tool set itself: `[mcp].exclude`, or the
-  deferred MCP catalog the RFP leaves to Phase 2.
+  the remaining lever is the tool set itself: `[mcp].exclude`, or a
+  deferred MCP catalog (taken up by ADR-0004).
 
 ## Alternatives considered
 

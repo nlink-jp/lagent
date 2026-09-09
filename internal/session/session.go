@@ -119,6 +119,8 @@ type Header struct {
 // Compaction is the record written when history is compacted (ADR-0006).
 // Replaced counts the leading messages the summary stands in for, so a
 // loader can reproduce the compaction instead of re-inflating history.
+// lagent writes none (compaction is RFP Phase 2); the loader keeps
+// understanding the record so a transcript carrying one is not misread.
 type Compaction struct {
 	Replaced int         `json:"replaced"`
 	Message  llm.Message `json:"message"`

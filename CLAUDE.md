@@ -39,9 +39,11 @@ Project-specific rules for AI agents. Org rules: nlink-jp/.github CONVENTIONS.md
 - Untrusted data (tool output, file contents) is wrapped with nlk/guard
   nonce-tagged XML before entering the prompt; defensive instructions sit at
   the top of the system prompt.
-- The system prompt is gem-agent's, unchanged, until Phase 1 measurements
-  justify a local-model rewrite (RFP §3). Prompts tuned for cloud models are
-  not assumed to work here — measure first.
+- The system prompt started as gem-agent's (RFP §3) and changes only by
+  ADR — so far ADR-0003 (per-session facts leave it), ADR-0004 (the MCP
+  catalog sentence) and ADR-0005 (`view_image`). It is byte-identical
+  across sessions and names only what this runtime has. Prompts tuned for
+  cloud models are not assumed to work here — measure first.
 - No secrets or environment-specific values in code, docs, or tests —
   placeholders only.
 - Consult `nlink-jp/knowledge` docs (llm-integration, security,

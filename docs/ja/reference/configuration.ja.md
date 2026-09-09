@@ -6,7 +6,7 @@
 ## インストール
 
 ソースからビルドし（`make build` → `dist/lagent`）、バイナリを PATH に置く。
-リリースアーカイブと Homebrew formula は初回リリース（RFP Phase 3）から。
+リリースアーカイブは初回リリース（RFP Phase 3）から。
 
 ## 設定ファイル
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | `[llm].provider` | `lmstudio` | 応答するローカルサーバ: `lmstudio`、`ollama`、`openai`。コンテキスト長の検出先を選ぶだけで、会話は全て OpenAI 互換の `chat/completions` エンドポイントを通る |
 | `[llm].base_url` | `http://localhost:1234/v1` | OpenAI 互換 API のベース URL |
-| `[llm].model` | `google/gemma-4-26b-a4b-qat` | サーバが一覧に出すモデル ID |
+| `[llm].model` | （必須） | サーバが一覧に出すモデル ID。既定は無く、無ければ起動に失敗する（`LAGENT_MODEL` / `--model` でも可） |
 | `[llm].api_key` | （未設定） | bearer トークンを要求するサーバ向け。ローカルサーバには不要 |
 | `[model].context_window` | `0` | コンテキスト窓（トークン）。`0` は起動時に provider から検出（LM Studio は `/api/v0/models`、Ollama は `/api/show`。`openai` は明示が必要） |
 | `[sandbox].enabled` | `true` | `shell_exec` を sandbox-exec で包む。モデルが宣言したレーンをカーネルが強制。off だと全シェル呼び出しが操作者の承認待ち |
@@ -39,7 +39,7 @@
 | `[tui].show_thoughts` | `true` | サーバが送る推論差分をライブ領域に表示。表示専用 |
 | `[approval].pin_trusted_files` | `true` | 信頼は内容に与える: 信頼済みプロジェクトのエージェント向けファイルはダイジェストで固定され、変わると再度尋ねる |
 | `[approval].tools` | （未設定） | ツールごとのポリシー: `"always"`（常に尋ねる。自動承認でも外せない床）または `"never"`（尋ねない。ブロック対象のシェルパターンは尋ねる）。`--allow` は 1 実行分の同等物 |
-| `[approval].trusted_projects` | （未設定） | 自身の `.lagent.toml` で承認を削除できるプロジェクト。起動時の信頼プロンプトと同じ判断 |
+| `[approval].trusted_projects` | （未設定） | 自身の `.lagent.toml` で承認を削除（`"never"` 項目）できるプロジェクト。起動時の信頼プロンプトはプロジェクトのファイルを読み込むだけで、ゲートを緩められるのはこの一覧に載ったプロジェクトだけ |
 
 2 つのセッションモードは独立した軸: `auto_approve` はゲートに誰が答えるかを、
 `read_only` はセッションが何に到達できるかを決める。両方 on も成立する。
@@ -57,17 +57,41 @@
 | `LAGENT_MODEL` | `[llm].model` |
 | `LAGENT_API_KEY` | `[llm].api_key` |
 
+ランタイムが読む・設定するその他の環境変数:
+
+| 環境変数 | 向き | 意味 |
+|---|---|---|
+| `LAGENT_STATE_DIR` | 読む | 状態ルート（セッション、作業ディレクトリ、ピン）。既定は `~/.local/state` 下 |
+| `LAGENT_MCP_STDERR` | 読む | `1` で MCP サーバの stderr を端末に通す（デバッグ用。通常は捨てる） |
+| `LAGENT_SESSION_ID` | export | セッション id。`shell_exec` の子プロセスと `.mcp.json` の `${LAGENT_SESSION_ID}` 向け |
+| `LAGENT_WORK_DIR` | export | セッション作業ディレクトリ。同じく `.mcp.json` で展開できる |
+| `LAGENT_PROJECT_DIR` | export | プロジェクトディレクトリ。それを知る必要がある子プロセス向け |
+
 ## コマンド
 
 | コマンド | 意味 |
 |---|---|
 | `lagent` | カレントディレクトリで対話セッションを開始（端末なら TUI、パイプなら plain REPL） |
 | `lagent "<first message>"` | 引数を第 1 ターンとして送ってから対話へ |
-| `lagent sessions` | このプロジェクトのセッション一覧（id、日時、プレビュー） |
-| `lagent trust` | プロジェクトの信頼とピンを表示・変更 |
-| `/mcp`、`/mcp load <server>`、`/mcp reload`（セッション内） | サーバ一覧をロード状態付きで表示。1 サーバのツールを手で広告。再接続 |
-| `lagent workdirs` | 過去セッションの作業ディレクトリ一覧。`workdirs clean` で削除 |
+| `lagent sessions [--all]` | このプロジェクトのセッション一覧（id、日時、プレビュー）。`--all` で全プロジェクト |
+| `lagent trust [--accept]` | プロジェクトの信頼とピンを表示・変更。`--accept` はファイルの現在の内容を信頼済みとして記録 |
+| `lagent workdirs` | 過去セッションの作業ディレクトリ一覧。`workdirs clean [--yes]` で削除（`--yes` は確認を省く。スクリプト向け） |
 | `lagent version` | 版数を表示 — `--version` と同じ行 |
+
+セッション内:
+
+| コマンド | 意味 |
+|---|---|
+| `/help` | これらのコマンドを一覧 |
+| `/tools` | ツール一覧と各ツールの現在の承認ゲート |
+| `/mcp`、`/mcp load <server>`、`/mcp reload` | サーバ一覧をロード状態付きで表示。1 サーバのツールを手で広告。再接続 |
+| `/auto on|off` | セッションの自動承認を切り替え（shift+tab も同じ） |
+| `/readonly on|off` | セッションのレーン天井を切り替え |
+| `/settings` | 設定の表示と編集（出所つき） |
+| `/usage` | このセッションのトークン明細 |
+| `/version` | 版数の行 |
+| `/clear` | 同じセッションで新しい会話を始める |
+| `/quit` | 終了（`/exit` も同じ） |
 
 | フラグ | 意味 |
 |---|---|

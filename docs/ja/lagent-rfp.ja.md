@@ -37,9 +37,15 @@ gem-agent の表面を基準に、実験目的に必要なものへ絞る。
 | `--auto` | 規則層で Safe と判定した呼び出しを自動承認 |
 | `--version` | 版数（`git describe` 由来） |
 
+実装された Phase 1 にはこのほか `--resume`、`--allow`、`--read-only` /
+`--writable`、`--model`、`--mcp`、`--config`、`--no-sandbox` と、
+`sessions` / `trust` / `workdirs` / `version` サブコマンドがある。現行の表は
+`reference/configuration.md`。
+
 Phase 1 の組込ツール: read_file / write_file / edit_file / list_files / list_tree /
 search_files / file_info / shell_exec / ask_user。MCP サーバのツールは
-`.mcp.json` から接続して追加する。
+`.mcp.json` から接続して追加する。ADR-0005 により修正: `view_image` が一覧に
+加わり、ADR-0004 が `mcp_load` を加える。
 
 ### Input / Output
 
@@ -49,6 +55,8 @@ search_files / file_info / shell_exec / ask_user。MCP サーバのツールは
   `--continue` はこれを読む。
 - usage レコードは gem-usage-lens が読める形式で書く（`prompt` / `output` /
   `tool_prompt` / `total` の 4 項。ローカルでは `tool_prompt` は常に 0）。
+  実装ではレコードは lens の 6 項 — この 4 項に `thoughts` と `cached` を
+  加えたもの — を運ぶ（`reference/architecture.md` に列挙）。
   費用はゼロなので、比較軸はトークン数・壁時計時間・ターン数・
   キャッシュヒット（初回応答時間から推定）。
 
@@ -70,13 +78,17 @@ context_window = 0           # 0 = provider から自動検出
 
 `provider` はコンテキスト長の自動検出先を選ぶだけ（LM Studio は `/api/v0/models`、
 Ollama は `/api/show`）。会話は全て OpenAI 互換の `chat/completions`。
-`context_window` を明示すれば provider に依存しない。
+`context_window` を明示すれば provider に依存しない。実装ではファイルは
+`[sandbox]`、`[agent]`、`[mcp]`、`[tui]`、`[approval]` も持つ。全キーは
+`reference/configuration.md` に列挙。
 
 ### External Dependencies
 
 - ローカル LLM サーバ（LM Studio または Ollama）。資格情報なし。
 - macOS の `sandbox-exec`（gem-agent と同じ封じ込め）。
 - Go 依存: stdlib + cobra + BurntSushi/toml + nlk。OpenAI SDK は使わない。
+  実装では ADR-0001 で移植したインライン TUI が Bubble Tea、bubbles、
+  lipgloss、glamour を伴った。
 
 ## 3. Design Decisions
 
@@ -102,6 +114,10 @@ llm-cli と同じ REST 直叩き（stdlib `net/http`、SSE 手書き）。組織
 lagent では持ち込まない機能のコードと文書を最初から持たない。
 
 ### プロンプト
+
+ADR-0003、ADR-0004、ADR-0005 により修正: プロンプトは現在、それらの記録が
+挙げる点（セッション単位の事実をランタイムの冒頭メッセージへ移動、MCP 目録の
+一文、`view_image`）で gem-agent のものと異なる。以下の計測はそれ以前のもの。
 
 gem-agent のシステムプロンプトをそのまま入れて第 1 計測点とする。実測では
 gem-agent 自身のプロンプト（約 1.2k トークン）+ 56KB の AGENTS.md + 組込ツール 15 個で

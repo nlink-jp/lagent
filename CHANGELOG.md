@@ -12,30 +12,6 @@
   beside the operator's warning. Measured cause: a pasted screenshot
   path attached nothing, and the model described an image it never
   had.
-
-### Fixed
-
-- `/readonly` and `/help` described commands this runtime does not
-  have: the usage line offered `auto on|off` (gem-agent's watcher, not
-  ported), and `/help` listed `/compact`, `/riskbook`, `/memory`,
-  `/skills` and `/skill`. The UI catalog drops those strings and the
-  34 others no code reads; `/help` describes `/mcp load <server>`.
-  The same sweep over every string in the runtime: the MCP intake no
-  longer points at `view_image`, the round-limit notice no longer
-  credits a progress review, the rule tier's reasons no longer name a
-  model tier, the memory-write rule and ceiling kind are gone with the
-  memory tools, `/usage` no longer has empty review and compaction
-  lines, and the TUI's skill-expansion hook is gone.
-- A network client failing in the read lane is told which lane to ask
-  for even when it printed nothing: `curl -s` exits 6 without a word,
-  so the text-keyed hint never fired and the model retried the same
-  lane until it concluded the sandbox blocks the network. The hint now
-  also keys on a finite list of network programs (curl, wget, ssh, scp,
-  sftp, nc, ncat, telnet, dig, nslookup, host, ping, traceroute) and
-  git's remote subcommands.
-
-### Added
-
 - **MCP tools are advertised on demand** (ADR-0004). Every server is
   connected and every tool registered as before, but the model is shown
   a catalog in the runtime facts — one line per server with its tool
@@ -56,7 +32,7 @@
   `/clear`. Measured with the operator's 243 MCP tools (60k tokens of
   schemas): a new session started in 2 s instead of 118 s. The session
   listing does not preview that message or count it as a conversation.
-- **Phase 1 core (RFP §4).** The agent loop, the eight built-in file and
+- **Phase 1 core (RFP §4).** The agent loop, the built-in file and
   shell tools, the sandbox lanes, the approval gate with its rule-tier
   auto-approve ladder, the MCP client, the JSONL transcript with
   `--continue` / `--resume`, one-shot `-p`, the inline TUI and the plain
@@ -79,3 +55,32 @@
   build / sign / notarize / release-gate targets, docs mirror check,
   RFP, ADR-0001 (porting sources pinned), ADR-0002 (features not
   reproduced from gem-agent).
+
+### Fixed
+
+- `/readonly` and `/help` described commands this runtime does not
+  have: the usage line offered `auto on|off` (gem-agent's watcher, not
+  ported), and `/help` listed `/compact`, `/riskbook`, `/memory`,
+  `/skills` and `/skill`. The UI catalog drops those strings and the
+  ones no code reads; `/help` describes `/mcp load <server>`. The same
+  sweep over every string in the runtime: the round-limit notice no
+  longer credits a progress review, the approval reasons no longer name
+  a model tier, the memory-write rule and ceiling kind are gone with
+  the memory tools, `/usage` no longer has empty review and compaction
+  lines, and the TUI's skill-expansion hook is gone.
+- A network client failing in the read lane is told which lane to ask
+  for even when it printed nothing: `curl -s` exits 6 without a word,
+  so the text-keyed hint never fired and the model retried the same
+  lane until it concluded the sandbox blocks the network. The hint now
+  also keys on a finite list of network programs (curl, wget, ssh, scp,
+  sftp, nc, ncat, telnet, dig, nslookup, host, ping, traceroute) and
+  git's remote subcommands.
+- The documentation was audited against the code before release: the
+  configuration reference no longer shows a default for `[llm].model`
+  (there is none; startup fails without it), lists `LAGENT_STATE_DIR`,
+  the exported `LAGENT_SESSION_ID` / `LAGENT_WORK_DIR` /
+  `LAGENT_PROJECT_DIR` and the `LAGENT_MCP_STDERR` debug switch, and
+  covers every subcommand flag and slash command; the RFP carries
+  in-place notes where ADR-0003/0004/0005 and the build amended it; the
+  shipped `.lagent.toml` template and the ported code cite gem-agent's
+  ADRs as gem-agent's, not as records this repository has.

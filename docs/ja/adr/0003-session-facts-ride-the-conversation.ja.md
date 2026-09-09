@@ -55,7 +55,8 @@ system プロンプトはセッションをまたいでバイト同一とする�
   （`session.FactsPrefix`、ShellContextPrefix の先例）: それだけを記録した
   transcript は `--continue` に飛ばされ、再開ヒントも出ない。
 - `cmd.TestSystemPromptIsIdenticalAcrossSessions` が不変条件を固定する。
-  `rotateWorkDir` は `setSystem` の代わりに `announce` コールバックを取る。
+  `rotateWorkDir` は `setSystem` コールバックを取らなくなり、呼び出し側が
+  後から新しい事実を告知する。
 
 これが生む連続した user メッセージ（事実、次に操作者の初手）は LM Studio の
 テンプレートに受理され、モデルは事実から作業ディレクトリを読み取ることを
@@ -71,8 +72,8 @@ system プロンプトはセッションをまたいでバイト同一とする�
 - 日付は従来どおりセッション開始時。長いセッションの「今日」は従来どおり
   ずれる。
 - 接頭辞は system プロンプトとツール一式だけに依存するようになったので、
-  残る手段はツール一式そのもの: `[mcp].exclude`、または RFP が Phase 2 に
-  残した MCP の遅延目録。
+  残る手段はツール一式そのもの: `[mcp].exclude`、または MCP の遅延目録
+  （ADR-0004 が取り上げた）。
 
 ## Alternatives considered
 

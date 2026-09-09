@@ -61,9 +61,9 @@ attach is reported to the operator but not to the model.
 - The dropped screenshot is in the first request, as one attachment,
   with no tool call, no copy and no delete of the operator's file —
   on either runtime, once the source adopts the first point.
-- The Phase 1 tool roster is nine built-ins. The RFP's list of eight
-  is amended by this record; ADR-0002 is unaffected (view_image is not
-  a provider feature).
+- The Phase 1 roster of file and shell built-ins is nine. The RFP's
+  list (eight of them, plus `ask_user`) is amended by this record;
+  ADR-0002 is unaffected (view_image is not a provider feature).
 - A model that is told a file is absent can say so. Whether Gemma 4
   does is the next measurement; the runtime's part is to make the
   absence a fact in the conversation rather than a silence.

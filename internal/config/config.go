@@ -1,6 +1,5 @@
-// Package config loads lagent configuration following the org-standard
-// Vertex AI schema: ~/.config/lagent/config.toml with env precedence
-// LAGENT_* > GOOGLE_CLOUD_* > config file > built-in defaults.
+// Package config loads lagent configuration: ~/.config/lagent/config.toml
+// with env precedence LAGENT_* > config file > built-in defaults.
 //
 // Ported from gem-agent internal/config at be7609980022e38314268c58ca94a6517e6f5d28 (v0.74.0), ADR-0001.
 package config
@@ -28,7 +27,7 @@ type Config struct {
 	Approval ApprovalConfig `toml:"approval"`
 
 	// Sources records where each setting's effective value came from,
-	// keyed by its TOML path ("model.name"). Four precedence layers with
+	// keyed by its TOML path ("llm.model"). Three precedence layers with
 	// nothing on screen is a design that assumes the operator remembers
 	// them; /settings shows this instead (ADR-0009).
 	Sources map[string]string `toml:"-"`
