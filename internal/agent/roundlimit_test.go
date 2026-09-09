@@ -153,7 +153,7 @@ func TestRoundLimitAutoStillAsks(t *testing.T) {
 	if !called {
 		t.Error("auto mode skipped the checkpoint dialog with nothing to vouch for progress")
 	}
-	if len(notices) == 0 || !strings.Contains(notices[0], "continued the turn") {
+	if len(notices) == 0 || !strings.Contains(notices[0], "continued at your request") {
 		t.Errorf("continue notice missing: %v", notices)
 	}
 }

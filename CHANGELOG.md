@@ -9,6 +9,12 @@
   ported), and `/help` listed `/compact`, `/riskbook`, `/memory`,
   `/skills` and `/skill`. The UI catalog drops those strings and the
   34 others no code reads; `/help` describes `/mcp load <server>`.
+  The same sweep over every string in the runtime: the MCP intake no
+  longer points at `view_image`, the round-limit notice no longer
+  credits a progress review, the rule tier's reasons no longer name a
+  model tier, the memory-write rule and ceiling kind are gone with the
+  memory tools, `/usage` no longer has empty review and compaction
+  lines, and the TUI's skill-expansion hook is gone.
 - A network client failing in the read lane is told which lane to ask
   for even when it printed nothing: `curl -s` exits 6 without a word,
   so the text-keyed hint never fired and the model retried the same

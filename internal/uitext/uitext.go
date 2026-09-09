@@ -212,7 +212,6 @@ type Messages struct {
 	// bound is asked about anyway, every time.
 	CeilingUnboundedReason string
 	CeilingStateFmt        string
-	CeilingMemoryFmt       string
 	ReadOnlyOn             string
 	// ReadOnlyOnUnconfined is the same state under --no-sandbox, where
 	// the refusal still reaches the file tools and a write- or
@@ -408,7 +407,6 @@ keys:
 	CeilingShellFmt:        "this session is capped at the %s lane, and the command declared %s",
 	CeilingUnboundedReason: "read-only is on, and this tool runs on another server the ceiling cannot bound — so no standing answer applies to it, and none is created here",
 	CeilingStateFmt:        "this session is capped at the %s lane, and this tool changes state outside it",
-	CeilingMemoryFmt:       "this session is capped at the %s lane, and a memory write changes what every later session trusts",
 	ReadOnlyOn:             "read-only mode: ON — nothing outside the session scratch changes; /readonly off lifts it\n",
 	ReadOnlyOnUnconfined:   "read-only mode: ON — but the sandbox is off, so a shell command declaring the read lane is bounded by nothing; /readonly off lifts the rest\n",
 	ReadOnlyOff:            "read-only mode: OFF\n",
@@ -419,8 +417,8 @@ keys:
 	TranscriptFailedFmt:    "session transcript write failed (%s) — recording stopped, so this session can no longer be resumed in full; restart lagent to record again",
 	TruncatedFmt:           "the response was cut off mid-generation (%s) — ask for the rest, or narrow the request",
 	RemoteFaultFmt:         "MCP server %q: %s failed %d times in a row with the same error — /mcp reload, or fix the server",
-	RoundLimitContinuedFmt: "round limit reached at %d rounds — the progress review continued the turn",
-	RoundLoopContinuedFmt:  "the same call repeated (%s) — the progress review continued the turn",
+	RoundLimitContinuedFmt: "round limit reached at %d rounds — continued at your request",
+	RoundLoopContinuedFmt:  "the same call repeated (%s) — continued at your request",
 	UnknownCommandFmt:      "unknown command %q — /help lists commands\n",
 	MCPNone:                "no MCP servers connected — define them in ~/.config/lagent/mcp.json (global) or the project's .mcp.json (project; wins name collisions)\n",
 	MCPDisabled:            "MCP is disabled for this session ([mcp].enabled=false or --mcp off) — restart to enable it\n",
@@ -557,7 +555,6 @@ var ja = Messages{
 	CeilingShellFmt:        "このセッションは %s レーンに抑えられていますが、このコマンドは %s を宣言しています",
 	CeilingUnboundedReason: "read-only が ON ですが、このツールは上限が縛れない別サーバーで動きます。そのため継続的な許可は効かず、ここでの回答も残りません",
 	CeilingStateFmt:        "このセッションは %s レーンに抑えられていますが、このツールはスクラッチの外の状態を変更します",
-	CeilingMemoryFmt:       "このセッションは %s レーンに抑えられていますが、メモリ書込は後続の全セッションが信頼するものを変えます",
 	ReadOnlyOn:             "読み取り専用モード: ON — スクラッチの外は変更しません。解除は /readonly off\n",
 	ReadOnlyOnUnconfined:   "読み取り専用モード: ON — ただし sandbox が off のため、read レーンを宣言したシェルコマンドは何にも縛られません。残りの解除は /readonly off\n",
 	ReadOnlyOff:            "読み取り専用モード: OFF\n",
@@ -568,8 +565,8 @@ var ja = Messages{
 	TranscriptFailedFmt:    "セッション記録の書き込みに失敗しました（%s）。記録が停止したため、このセッションは完全な形では再開できません。記録を再開するには lagent を起動し直してください",
 	TruncatedFmt:           "応答が生成途中で打ち切られました（%s）— 続きを求めるか、要求を絞ってください",
 	RemoteFaultFmt:         "MCP サーバー %q: %s が同じエラーで %d 回連続して失敗しました — /mcp reload、またはサーバー側を修正してください",
-	RoundLimitContinuedFmt: "ラウンド上限 %d に達しました — 進捗レビューがターンを継続しました",
-	RoundLoopContinuedFmt:  "同じ呼び出しが繰り返されました（%s）— 進捗レビューがターンを継続しました",
+	RoundLimitContinuedFmt: "ラウンド上限 %d に達しました — あなたの指示で継続しました",
+	RoundLoopContinuedFmt:  "同じ呼び出しが繰り返されました（%s）— あなたの指示で継続しました",
 	UnknownCommandFmt:      "未知のコマンド %q — /help に一覧があります\n",
 	MCPNone:                "MCP サーバー未接続 — ~/.config/lagent/mcp.json（グローバル）またはプロジェクトの .mcp.json（プロジェクト側が名前衝突で優先）で定義します\n",
 	MCPDisabled:            "MCP はこのセッションでは無効です（[mcp].enabled=false または --mcp off）— 有効化するには再起動してください\n",

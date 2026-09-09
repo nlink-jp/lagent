@@ -64,12 +64,6 @@ func TestCeilingRefusesWhatNeedsAHigherLane(t *testing.T) {
 	mcp := &tools.Tool{Name: "mcp__srv__patch", Description: "Patch a remote note.", Mutating: true,
 		Parameters: map[string]any{"type": "object"},
 		Run:        func(context.Context, map[string]any) (string, error) { return "", nil }}
-	// save_memory is registered by the command layer, not by the tool
-	// registry, so the agent-level test stands one in.
-	mem := &tools.Tool{Name: "save_memory", Description: "Remember a fact.", Mutating: true,
-		Parameters: map[string]any{"type": "object"},
-		Run:        func(context.Context, map[string]any) (string, error) { return "", nil }}
-
 	cases := []struct {
 		name    string
 		call    llm.ToolCall
@@ -82,31 +76,24 @@ func TestCeilingRefusesWhatNeedsAHigherLane(t *testing.T) {
 		{"write_file", writeCall("f.txt"), true},
 		{"edit_file", llm.ToolCall{ID: "c", Name: "edit_file",
 			Args: map[string]any{"path": "f.txt", "old_string": "x", "new_string": "y"}}, true},
-		{"save_memory", llm.ToolCall{ID: "c", Name: "save_memory",
-			Args: map[string]any{"scope": "project", "name": "n", "content": "c"}}, true},
 		{"read_file", llm.ToolCall{ID: "c", Name: "read_file", Args: map[string]any{"path": "f.txt"}}, false},
 		{"list_files", llm.ToolCall{ID: "c", Name: "list_files", Args: map[string]any{}}, false},
 		// The rule tier cannot read another server's effects, so the
-		// ceiling does not pretend to bound them (ADR-0077). ADR-0080 §5
-		// states the ceiling to the model tier instead.
+		// ceiling does not pretend to bound them; the operator is
+		// asked instead.
 		{"an MCP tool that writes", llm.ToolCall{ID: "c", Name: "mcp__srv__patch", Args: map[string]any{}}, false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			a := ceilingAgent(t, "on", mcp, mem)
+			a := ceilingAgent(t, "on", mcp)
 			if got := a.decide(tc.call).OverCeiling; got != tc.refused {
 				t.Errorf("read-only: OverCeiling = %v, want %v", got, tc.refused)
 			}
 			// With no ceiling nothing is over it, whatever the call.
-			off := ceilingAgent(t, "off", mcp, mem)
+			off := ceilingAgent(t, "off", mcp)
 			if off.decide(tc.call).OverCeiling {
 				t.Errorf("ceiling off: %s was refused anyway", tc.name)
-			}
-			// The auto state has not tightened yet, so it is off too.
-			auto := ceilingAgent(t, "auto", mcp, mem)
-			if auto.decide(tc.call).OverCeiling {
-				t.Errorf("auto (untightened): %s was refused anyway", tc.name)
 			}
 		})
 	}

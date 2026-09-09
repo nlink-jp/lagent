@@ -71,17 +71,14 @@ const (
 	ceilingShell
 	// ceilingState covers every other mutating built-in. It says
 	// "changes state outside the session scratch" rather than naming
-	// files, because the set is not only the file tools: web_search and
-	// web_fetch are mutating for their egress, and telling the operator
-	// a search "changes files" is a sentence that is simply untrue
-	// (independent review, 2026-09-09). A truthful generic beats a
-	// per-tool list nobody keeps in sync.
+	// files, because the set is not only the file tools: a tool that
+	// is mutating for its egress changes no file, and telling the
+	// operator it "changes files" is a sentence that is simply untrue.
+	// A truthful generic beats a per-tool list nobody keeps in sync.
 	ceilingState
-	ceilingMemory
 )
 
-// Floor reports a verdict no policy, allowlist answer or model tier
-// may lift: Block, or a Review only the operator may answer.
+// Floor reports a verdict no policy or allowlist answer may lift: Block, or a Review only the operator may answer.
 func (d Decision) Floor() bool {
 	return d.Verdict.Tier == risk.Block || d.Verdict.OperatorOnly
 }
@@ -191,8 +188,6 @@ func (a *Agent) ceilingPrompt(d Decision, tc llm.ToolCall) string {
 	switch d.CeilingKind {
 	case ceilingShell:
 		return fmt.Sprintf(a.msgs.CeilingShellFmt, ceiling, laneOrDefault(tc))
-	case ceilingMemory:
-		return fmt.Sprintf(a.msgs.CeilingMemoryFmt, ceiling)
 	default:
 		return fmt.Sprintf(a.msgs.CeilingStateFmt, ceiling)
 	}

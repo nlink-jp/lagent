@@ -190,7 +190,7 @@ type Options struct {
 	// prefix (Tab completion in the input box).
 	CompletePath func(prefix string) []string
 	// CompleteSlash returns candidate completions for an input that
-	// starts with "/" — command names, and skill names after "/skill ".
+	// starts with "/" — the command names.
 	CompleteSlash func(prefix string) []string
 	// Settings supplies the panel's initial content, and ApplySetting
 	// stores one edit and returns the refreshed content (ADR-0009).
@@ -203,12 +203,6 @@ type Options struct {
 	// with ADR-0077 that row is the only place the state is visible at
 	// all (pre-release review).
 	RefreshSettings func() SettingsData
-	// ExpandInput rewrites an input line into the text of a turn before
-	// it is sent — the /skill route (ADR-0010): the operator's line is
-	// echoed, the expanded text is what actually runs. handled=false
-	// leaves the input to the normal paths; a non-empty errMsg means
-	// handled but nothing to run.
-	ExpandInput func(input string) (turn string, handled bool, errMsg string)
 	// Printer overrides tea.Println for tests.
 	Printer func(...any) tea.Cmd
 	// RenderFactory overrides the Markdown renderer factory for tests.
@@ -270,7 +264,6 @@ type Model struct {
 	// name): the panel's two levels (ADR-0077 §3). Groups open closed.
 	settingsCollapsed map[string]bool
 	applySetting      SettingsApplier
-	expandInput       func(input string) (string, bool, string)
 	// choice indexes approvalOptions. Selection + Enter exists because
 	// typing y/n/a is impossible with a Japanese IME switched on — the
 	// letters are swallowed by composition — while arrows, Tab, and
@@ -373,7 +366,6 @@ func New(opts Options) Model {
 		settingsData:    opts.Settings,
 		refreshSettings: opts.RefreshSettings,
 		applySetting:    opts.ApplySetting,
-		expandInput:     opts.ExpandInput,
 		baseCtx:         opts.BaseCtx,
 		println:         opts.Printer,
 		mkRender:        opts.RenderFactory,
@@ -1492,33 +1484,6 @@ func (m Model) submit() (tea.Model, tea.Cmd) {
 	// so the two defences are independent.
 	if strings.Fields(input)[0] == "/auto" && m.toggleAuto != nil {
 		return m.setAutoMode(input, m.echoLine(">", input))
-	}
-
-	// /skill expands into a turn (ADR-0010): echo what the operator
-	// typed, run the expanded text. Checked before the slash handler so
-	// a synchronous handler never sees it.
-	if m.expandInput != nil {
-		if turn, handled, errMsg := m.expandInput(input); handled {
-			if errMsg != "" {
-				// Echoed like the answer it is: this branch was missed
-				// when the others were routed through echoLine, leaving
-				// `/skill` with no name typed printing its usage line
-				// flush against the previous output while `/nope` on
-				// the slash branch printed a captioned one (pre-release
-				// review).
-				return m, m.emitJoined(m.echoLine(">", input), m.st.errS.Render("✗ "+errMsg))
-			}
-			m.phase = phaseRunning
-			m.status = m.msgs.StatusThinking
-			m.beginTurnStats()
-			m.live.Reset()
-			ctx, cancel := context.WithCancel(m.baseCtx)
-			m.cancelTurn = cancel
-			if m.startTurn != nil {
-				m.startTurn(ctx, turn)
-			}
-			return m, tea.Batch(m.emit(m.echoLine(">", input)), m.spin.Tick)
-		}
 	}
 
 	if strings.HasPrefix(input, "/") {

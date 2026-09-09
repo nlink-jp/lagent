@@ -99,6 +99,14 @@ is new; the others are ports minus the ADR-0002 features.
 - **`--version` must always answer** and `version` must print the same
   line (pinned by `cmd/root_test.go`) — a Homebrew formula's `brew test`
   runs it.
+- **No string for a feature this runtime does not have.** The catalog,
+  `/help`, tool descriptions, notes and error text name only what is
+  here; a leftover from the porting source (`/readonly auto`, `/skill`,
+  `view_image`, "the model tier") is a seam ADR-0001 forbids. Before a
+  release, grep every string literal in cmd/ and internal/ for the
+  ADR-0002 and Phase 2 feature names, and grep the `uitext.Messages`
+  fields for ones no code reads — the completeness test only checks
+  that both languages agree.
 - **MCP tools are registered always, advertised on load** (ADR-0004).
   `mcpAdvertiser` owns which servers the model can see; `agent.Options.
   Advertise` filters the declarations and refuses a call to a hidden

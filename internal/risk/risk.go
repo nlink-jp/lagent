@@ -140,11 +140,6 @@ func Classify(toolName string, mutating bool, args map[string]any, projectDir, w
 		}
 		return Verdict{Tier: Safe, Reason: "edits a file inside the project"}
 
-	case "save_memory", "delete_memory":
-		// Never Safe: a persisted memory reappears in every later
-		// session's prompt, so memory is a persistence vector for
-		// injected instructions (ADR-0020 §4).
-		return Verdict{Tier: Review, Reason: "changes what the agent remembers across sessions"}
 	}
 
 	if strings.HasPrefix(toolName, "mcp__") {
@@ -175,7 +170,7 @@ func classifyShell(args map[string]any, mutating bool) Verdict {
 	switch {
 	case lane == sandbox.LaneOperator:
 		return Verdict{Tier: Review, OperatorOnly: true,
-			Reason: "operator access: the command may write the instruction and configuration files later sessions trust, and read credentials — the operator decides, not the model tier"}
+			Reason: "operator access: the command may write the instruction and configuration files later sessions trust, and read credentials — the operator decides"}
 	case lane == sandbox.LaneRead && !mutating:
 		return Verdict{Tier: Safe, Reason: "read lane: the sandbox denies writes outside scratch, the network, preference writes, signals to other processes and IPC-capable programs"}
 	case lane == sandbox.LaneRead:
@@ -184,9 +179,9 @@ func classifyShell(args map[string]any, mutating bool) Verdict {
 		// operator asked for read-lane prompts. The command still runs
 		// under the read profile where there is one; the ladder or the
 		// operator decides (review V7: the reason once said "off").
-		return Verdict{Tier: Review, Reason: "read lane declared, but read-lane commands ask in this session — the model tier weighs it"}
+		return Verdict{Tier: Review, Reason: "read lane declared, but read-lane commands ask in this session — the operator is asked"}
 	}
-	return Verdict{Tier: Review, Reason: "write lane: writes the project and the work directory, reaches the network — the model tier weighs it"}
+	return Verdict{Tier: Review, Reason: "write lane: writes the project and the work directory, reaches the network — the operator is asked"}
 }
 
 // blockFloor is the text part of the shell verdict that survives
@@ -280,7 +275,7 @@ func persistentTarget(rel string) (Verdict, bool) {
 	}
 	if sandbox.PersistentFile(c) {
 		return Verdict{Tier: Review, OperatorOnly: true,
-			Reason: "changes the instructions or configuration later sessions trust — the operator decides, not the model tier"}, true
+			Reason: "changes the instructions or configuration later sessions trust — the operator decides"}, true
 	}
 	return Verdict{}, false
 }

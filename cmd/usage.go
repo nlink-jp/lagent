@@ -54,15 +54,6 @@ func usageReport(ag *agent.Agent, mainModel string) string {
 		}
 		fmt.Fprintf(&b, "  context now %s of %s\n", humanTok(s.LastPrompt), window)
 	}
-	if s.RiskCalls > 0 {
-		fmt.Fprintf(&b, "risk & progress reviews (%s): %d calls · prompt %s · output %s\n",
-			mainModel, s.RiskCalls, humanTok(s.RiskPrompt), humanTok(s.RiskOutput))
-	}
-	if s.CompactCalls > 0 {
-		fmt.Fprintf(&b, "compaction (%s): %d calls · prompt %s · output %s\n",
-			mainModel, s.CompactCalls, humanTok(s.CompactPrompt), humanTok(s.CompactOutput))
-	}
-
 	return b.String()
 }
 

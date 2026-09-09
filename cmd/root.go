@@ -1497,7 +1497,7 @@ func (d denyGate) ApproveLift(toolName, detail, _, reason string) (bool, string)
 type denyGate struct{ out io.Writer }
 
 func (d denyGate) Approve(toolName, detail, purpose, reason string, mustPrompt bool) (bool, bool, string) {
-	why := "mutating tools are disabled in one-shot mode; approve interactively, grant with --allow, or arm the risk ladder with --auto"
+	why := "mutating tools are disabled in one-shot mode; approve interactively, grant with --allow, or pass --auto so rule-tier Safe calls run"
 	if reason != "" {
 		// The ladder or the rule tier said why this call needs a human;
 		// with no human here, that reason is the denial's story
