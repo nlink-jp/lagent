@@ -18,10 +18,13 @@ lagent の保守者向けドキュメントの入口。利用者向けは
 現在の挙動。コードの変更に合わせてその場で更新する。
 
 - [`reference/configuration.ja.md`](reference/configuration.ja.md) —
-  インストール、設定ファイル、優先順位、コマンド表
+  インストール、設定ファイル、優先順位、コマンド表とフラグ表
+- [`reference/architecture.ja.md`](reference/architecture.ja.md) —
+  パッケージ配置、バックエンド、ターンループ、承認、ラウンド階梯、
+  永続化、ここに無いもの
 
-機能リファレンス（interface、tools、approval、sessions、integration、
-architecture）は Phase 1 のパッケージが入るのに合わせて書く。
+機能リファレンス（interface、tools、approval、sessions、integration）は
+Phase 1 の計測で表面が落ち着くのに合わせて書く。
 
 ## ADR
 

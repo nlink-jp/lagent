@@ -32,15 +32,60 @@ Version is injected via `-X main.version` from `git describe` — never edit the
 ## Structure
 
 ```
-config.example.toml  shipped config template ([llm] provider/base_url/model/api_key, [model] context_window)
+config.example.toml  shipped config template ([llm] provider/base_url/model/api_key, [model] context_window;
+                     pinned by a loader test)
+lagent.example.project.toml  shipped <project>/.lagent.toml template
+mcp.example.json     shipped MCP server template (pinned by a loader test)
 main.go            entry point (package main, calls cmd.Execute(version))
-cmd/               cobra root command; `version` subcommand mirrors --version
-internal/          (empty at scaffold) Phase 1 lands the packages here, each
-                   ported one names its gem-agent source commit in its doc comment
+cmd/               cobra root command, REPL loop, wiring, system prompt; `version`,
+                   `sessions`, `trust`, `workdirs` subcommands; ask_user, MCP intake
+internal/config/   strict-decode TOML + env/flag precedence ([llm], [model], [sandbox],
+                   [agent], [mcp], [tui], [approval]); the policy file
+internal/llm/      Backend interface + the OpenAI-compatible client (stdlib net/http,
+                   hand-written SSE, tool-call assembly, retry, per-provider context probe)
+internal/agent/    tool-calling loop, approval dispatch, nonce wrapping, history,
+                   the rule-tier auto-approve ladder, the round ladder
+internal/tools/    built-in tools, path confinement, lane-aware exec injection, Register
+internal/bounded/  the one place a read, listing or process output is capped —
+                   every primitive returns the `more` fact
+internal/archtest/ AST tests pinning confined opens, bounded reads and the
+                   single decision point
+internal/mcp/      .mcp.json parsing + stdio JSON-RPC client (kill-and-respawn)
+internal/mcpfilter/ the one predicate behind `[mcp] exclude`
+internal/ignore/   ignore-aware enumeration: builtin dir list + full gitignore matcher
+internal/risk/     rule tier of the auto-approve ladder (pure, no model); exact for
+                   file-tool paths (persistent files OperatorOnly), a Block floor only
+                   for shell text — the lane decides the rest; the shared lists come
+                   from internal/sandbox
+internal/policy/   per-tool approval policy, pure resolver
+internal/uitext/   ja/en UI string catalogs: completeness enforced by test —
+                   new operator-facing strings go in BOTH catalogs or make check fails
+internal/banner/   the lines printed before the operator has typed: a line earns a
+                   place only if nothing else will say it; Sample() is the read-through
+internal/statedir/ shared per-project state convention: root+env override, escape, .project marker
+internal/workdir/  per-session work directory: layout under the state root, sweep
+                   report, empty-dir removal; LAGENT_WORK_DIR is exported at startup
+internal/mention/  @-reference parsing (files, directories, images), project-confined
+                   resolution, completion
+internal/instructions/ AGENTS.md / AGENT.md / CLAUDE.md / GEMINI.md discovery
+                   (ancestor walk, stops at $HOME)
+internal/trustpin/ content pins for the agent-facing files and the persistent-file
+                   snapshot; cmd/pins.go applies them to the grant
+internal/sandbox/  SBPL profile generation per lane (read/write/operator), the shared
+                   scratch / persistent-file / credential lists, sandbox-exec wrapping
+internal/approve/  MITL gate (y/n/N/a + session allowlist; N = deny with a typed reason)
+internal/session/  JSONL transcript: logger + resume loader; usage records in the
+                   gem-usage-lens shape; LAGENT_SESSION_ID is exported at startup
+internal/repl/     paste-safe input reader (plain REPL, non-TTY fallback)
+internal/tui/      Bubble Tea inline TUI: model, approval gate, settings panel
 scripts/           codesign-darwin.sh / notarize-darwin.sh (org templates, verbatim),
                    docs-mirror-check.sh, verify-release-selftest.sh (make check)
 docs/en/, docs/ja/ INDEX + reference/ + adr/ + the RFP (en: no suffix; ja: .ja.md)
 ```
+
+Every package under internal/ that came from gem-agent says so in its
+package doc comment, with the source commit (ADR-0001). `internal/llm`
+is new; the others are ports minus the ADR-0002 features.
 
 ## Gotchas
 
@@ -62,7 +107,20 @@ docs/en/, docs/ja/ INDEX + reference/ + adr/ + the RFP (en: no suffix; ja: .ja.m
   liveness signal while a large `write_file` argument is generated. Do
   not add a stall timeout on that path.
 - **`finish_reason=length` is a partial result** — surface it, never
-  drop the turn (a fork-era defect).
+  drop the turn (a fork-era defect). The agent notifies and keeps the
+  text; `emptyResponseError` names the reason when nothing arrived.
+- **Skills are pinned, not loaded.** The trust probe and `internal/trustpin`
+  still digest `.claude/skills` for change detection (the sibling runtime
+  reads them, and a changed one is a fact worth a line), but nothing here
+  loads a skill: skills are RFP Phase 2. The trust prompt says so.
+- **There is no model tier.** `agent.AutoDecision.ModelConsulted` is
+  always false and stays for record-shape parity; the round checkpoint
+  asks the operator or stops. Adding a model review is a Phase 2 ADR,
+  not a flag.
+- **The OpenAI client reads are bounded by hand** — `io.LimitReader` on
+  error bodies and the probe, a 16 MiB scanner buffer on the stream —
+  and `internal/archtest` allowlists them by name with the reason.
+  A new read there needs the same.
 - **A new config key means updating `config.example.toml`** — strict
   decode makes a stale template a startup error, so the loader tests parse
   the shipped template against the built-in defaults.

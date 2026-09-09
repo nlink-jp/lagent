@@ -19,10 +19,13 @@ both, and the identifiers of each pair agree. Prose parity is the author's job.
 Current behaviour, updated in place as the code changes.
 
 - [`reference/configuration.md`](reference/configuration.md) — install,
-  the config file, precedence, the command table
+  the config file, precedence, the command and flag tables
+- [`reference/architecture.md`](reference/architecture.md) — package
+  layout, the backend, the turn loop, approval, the round ladder,
+  persistence, and what is not here
 
-Feature references (interface, tools, approval, sessions, integration,
-architecture) are written as the Phase 1 packages land.
+Feature references (interface, tools, approval, sessions, integration)
+follow as the Phase 1 measurements settle the surface.
 
 ## ADRs
 

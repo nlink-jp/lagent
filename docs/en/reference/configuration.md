@@ -30,17 +30,32 @@ flags > `LAGENT_*` environment > config file > built-in defaults.
 
 | Environment variable | Key |
 |---|---|
-| `LAGENT_MODEL` | `[llm].model` |
+| `LAGENT_PROVIDER` | `[llm].provider` |
 | `LAGENT_BASE_URL` | `[llm].base_url` |
+| `LAGENT_MODEL` | `[llm].model` |
 | `LAGENT_API_KEY` | `[llm].api_key` |
 
 ## Commands
 
 | Command | Meaning |
 |---|---|
-| `lagent` | start the interactive session (RFP Phase 1; the scaffold exits with an error until the loop lands) |
+| `lagent` | start the interactive session in the current directory (the TUI on a terminal, a plain REPL on pipes) |
+| `lagent "<first message>"` | send the argument as the first turn, then converse |
+| `lagent sessions` | list this project's sessions (id, when, preview) |
+| `lagent trust` | show or change the project's trust and its pins |
+| `lagent workdirs` | list earlier sessions' work directories; `workdirs clean` removes them |
 | `lagent version` | print the version — the same line as `--version` |
 
 | Flag | Meaning |
 |---|---|
 | `--version` | print the version and exit |
+| `-p`, `--prompt` | one-shot: run this prompt and exit; mutating tools are denied unless listed in `--allow` or `--auto` is set |
+| `--auto` | start in auto-approve mode: rule-tier Safe calls run unasked |
+| `--allow` | tools that never ask this run: names or `mcp__server__*` prefixes |
+| `--read-only` / `--writable` | cap the session at the read lane, or state that it is not capped |
+| `-c`, `--continue` | resume this project's most recent session |
+| `--resume` | resume a specific session id |
+| `--model` | override `[llm].model` for this run |
+| `--mcp on|off` | override `[mcp].enabled` for this run |
+| `--no-sandbox` | disable the sandbox-exec wrapper (debugging only, unsafe) |
+| `--config` | config file path |

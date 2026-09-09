@@ -12,9 +12,9 @@ shell / MCP / 承認）、対象プロジェクトの AGENTS.md / CLAUDE.md / .m
 ランタイムをどこまで担えるかを、コスト（トークン数・壁時計時間・ターン数）と
 実効性の両面で、gem-agent と同じ物差しで測るために存在する。
 
-> **状態: 実験中（lab-series）。** 未リリース。scaffold は `--version` に
-> 答えるだけで、エージェントループは [RFP](docs/ja/lagent-rfp.ja.md) の
-> 開発 Phase 1。
+> **状態: 実験中（lab-series）。** 未リリース。[RFP](docs/ja/lagent-rfp.ja.md)
+> の Phase 1 コア — ループ、ツール、sandbox レーン、承認、MCP、セッション、
+> TUI — が入った。次は gem-agent との比較計測。
 
 English: [README.md](README.md)
 
@@ -41,6 +41,37 @@ model    = "google/gemma-4-26b-a4b-qat"
 [model]
 context_window = 0           # 0 = provider から自動検出
 ```
+
+## クイックスタート
+
+LM Studio を起動してモデルをロードし、プロジェクトディレクトリで lagent を
+実行する。
+
+```bash
+cd ~/work/my-project
+lagent
+```
+
+初回起動でプロジェクト自身の AGENTS.md / CLAUDE.md / .mcp.json を信頼する
+かを尋ねる。変更を伴うツールは実行前に尋ねる。`--auto` で規則層が Safe と
+判定した呼び出しは尋ねずに走る。`-p "…"` はプロンプト 1 つを実行して終了。
+`/help` でスラッシュコマンド一覧。
+
+## できること
+
+- **ツール:** `list_files`、`list_tree`、`search_files`、`read_file`、
+  `file_info`、`write_file`、`edit_file`、`shell_exec`、`ask_user`、および
+  `.mcp.json` の MCP サーバが提供する全ツール。
+- **封じ込め:** ファイルツールはプロジェクト（とセッション作業ディレクトリ）
+  の内側に留まる。`shell_exec` は宣言したレーンで `sandbox-exec` 下で走る —
+  read は尋ねずに、write と operator は尋ねてから。
+- **セッション:** セッションごとの JSONL transcript。`--continue` と
+  `--resume`。usage レコードは
+  [gem-usage-lens](https://github.com/nlink-jp/gem-usage-lens) が両ランタイム
+  に対して読む形。
+- **無いもの:** web 検索と取得、メディアアップロード、監査ログ出力、
+  履歴圧縮、skills、agent memory、hooks — RFP と
+  [ADR-0002](docs/ja/adr/0002-features-not-reproduced.ja.md) を参照。
 
 ## ビルド
 

@@ -1,0 +1,151 @@
+# Architecture
+
+Current behaviour of lagent, written to be readable cold. Why a given
+decision was made lives in the [ADRs](../INDEX.md#adrs); this document
+describes what the code does today. gem-agent's architecture is the
+porting source (ADR-0001); where this runtime differs, the difference is
+what ADR-0002 leaves out and what the RFP defers to Phase 2.
+
+## Shape
+
+One binary, one process, one conversation. `main.go` hands off to
+`cmd.Execute`, which builds five things and wires them together:
+
+```
+cmd/            flags, config load, project resolution, wiring, REPL/TUI
+  |-- internal/config      strict-decode TOML + env/flag precedence
+  |-- internal/llm         Backend interface + the OpenAI-compatible client (stream observer)
+  |-- internal/tools       the eight file/shell built-ins + Register
+  |-- internal/agent       the turn loop, approval dispatch, the round ladder
+  `-- internal/tui         Bubble Tea inline UI (or internal/repl, non-TTY)
+```
+
+The tools package holds the eight built-ins that need only the project
+directory: `list_files`, `list_tree`, `search_files`, `read_file`,
+`file_info`, `write_file`, `edit_file`, `shell_exec`. `cmd/` registers
+`ask_user` through the same `Register`, plus every MCP tool.
+
+Supporting packages: `internal/sandbox` (Seatbelt profile generation
+per lane, the persistent-file and credential lists), `internal/approve`
+(plain-REPL gate), `internal/risk` (auto-approve rule tier),
+`internal/policy` (per-tool approval policy), `internal/mcp` (stdio
+JSON-RPC client), `internal/mcpfilter` (the one predicate behind
+`[mcp] exclude`), `internal/banner` (the lines printed before the
+operator has typed anything, and the rule that decides which ones),
+`internal/mention` (`@`-references: files, directories, images),
+`internal/instructions` (`AGENTS.md` discovery), `internal/ignore`
+(ignore-aware enumeration: builtin dir list + gitignore matcher),
+`internal/session` (transcript: logger + resume loader, usage records),
+`internal/statedir` (per-project state layout), `internal/workdir` (the
+per-session work directory under the state root), `internal/trustpin`
+(content pins of the agent-facing files and the persistent-file
+snapshot), `internal/uitext` (ja/en UI string catalogs),
+`internal/bounded` (the capped read/list/capture primitives every other
+package uses), `internal/archtest` (AST tests that pin the structural
+rules: path packages open through `os.Root`, reads are bounded, the
+rule tier is consulted in one function, every loader of project content
+takes the grant).
+
+## The backend
+
+`internal/llm` sends every conversation to one endpoint, the
+OpenAI-compatible `chat/completions` at `[llm].base_url`, with stdlib
+`net/http` and a hand-written SSE reader. The history is converted to
+the wire shape once per call: the system prompt as the system message,
+user text (with `@`-referenced images as image parts), assistant turns
+with their tool calls, tool results paired to their calls by id — ids
+the server sent, or synthetic ones when a transcript carries none.
+Streaming folds text deltas to the caller as they arrive and assembles
+tool calls from their indexed deltas; the final usage chunk fills the
+four accounting buckets. A transient failure (429, 5xx, a dropped
+connection) retries with backoff only while nothing has been consumed.
+A `finish_reason` of `length` is returned as a partial result with the
+text that arrived, never discarded.
+
+`[llm].provider` selects one thing: where `ContextWindow` asks. LM
+Studio answers on its native `/api/v0/models/<id>`, Ollama on
+`/api/show`, and a plain OpenAI-compatible server has no such endpoint,
+so `[model].context_window` is required there.
+
+## One turn
+
+`Agent.Run` takes the operator's text, expands `@`-references into
+attachments beside it, and loops: send the history (tool results
+nonce-wrapped at send time), stream the answer, and for each tool call
+decide, gate, execute, and append the result. The loop ends on a text
+answer, a round limit, or a loop-guard stop. Every request replays the
+whole history behind a session-scoped isolation tag, so the request
+prefix stays byte-identical across rounds and the server's prefix
+cache can hit — on a local model that cache is the difference between
+a one-second turn and a thirty-second one.
+
+## The agent core knows nothing about the UI
+
+`agent.Options` is the whole contract between the loop and whatever
+runs it; every surface (TUI, plain REPL, one-shot) wires the same
+callbacks and the agent never imports a UI package:
+
+- `OnToolCall` / `OnToolDone` — a call is about to be gated and
+  executed; a call has produced its result (the TUI's activity line and
+  its stall detector re-arm on the second, never on stream chunks).
+- `OnUsage` — one round's token spend, for the footer gauge.
+- `OnAutoDecision` — each auto-mode verdict, so the UI can show what ran
+  without asking, and why.
+- `BeforeOperatorWrite` / `OnOperatorWrite` — an operator-approved write
+  into the files later sessions trust is about to run; it ran (the pins
+  compare the file before and after).
+- `OnAttach` — what an `@`-reference pulled in, and what it could not.
+- `OnNotice` — an in-turn notice (a truncated answer, a late-returning
+  abandoned call) for the operator to see.
+- `OnRoundLimit` — the checkpoint dialog; nil means unattended, and the
+  checkpoint stops.
+- `ClipboardImage` — the `@clipboard` capture; nil reports it unavailable.
+
+## Approval
+
+The rule tier (`internal/risk`) classifies every call: Safe runs under
+`--auto` without asking, Block always asks, Review asks the operator.
+There is no model tier here: gem-agent's second model call judging the
+proposed call is a Phase 2 measurement. The session ceiling
+(`--read-only`) caps the lane a call may reach; lifting it is the
+operator's act. Operator-only files — the instruction files, `.mcp.json`,
+`.lagent.toml`, and the sibling runtime's `.gem-agent.toml` — are never
+answered by a standing approval.
+
+## The round ladder
+
+Three consecutive identical calls escalate immediately; the round limit
+is a checkpoint. Interactively both ask the operator, with the turn's
+recent calls as evidence; unattended (`-p`), both stop the turn,
+fail-closed, because there is no model review to vouch for progress in
+the operator's place. An absolute cap of three times `[agent].max_turns`
+bounds the spend nothing can lift.
+
+## Persistence
+
+The transcript is a JSONL file per session under the state root;
+`--continue` and `--resume` replay it. Usage records are written per
+model call in the shape gem-usage-lens reads for both runtimes
+(`prompt` / `output` / `thoughts` / `cached` / `tool_prompt` / `total`,
+with `tool_prompt` always zero here). The per-session work directory
+sits beside the transcript and is exported to children as
+`LAGENT_WORK_DIR`.
+
+## Configuration and drop-in behaviour
+
+`~/.config/lagent/config.toml` is strict-decoded; precedence is flags >
+`LAGENT_*` > file > defaults. The project's `AGENTS.md` / `CLAUDE.md` /
+`AGENT.md` / `GEMINI.md` are read as they are, up the ancestor chain,
+after the project is trusted and its pins agree; `.mcp.json` is read in
+Claude Code's format. `.lagent.toml` carries the project's approval
+policy and MCP exclusions, nothing else.
+
+## Not here
+
+`web_search`, `web_fetch`, media uploads, Cloud Logging, thought
+signatures, safety settings, the summary model and the delegated file
+search are gem-agent features bound to Vertex AI (ADR-0002). History
+compaction, the model tier of auto-approval, skills, agent memory and
+operator hooks are Phase 2 (RFP §4): the trust probe still pins
+`.claude/skills` for change detection, but this runtime does not load
+skills.

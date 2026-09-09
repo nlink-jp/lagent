@@ -29,17 +29,32 @@
 
 | 環境変数 | キー |
 |---|---|
-| `LAGENT_MODEL` | `[llm].model` |
+| `LAGENT_PROVIDER` | `[llm].provider` |
 | `LAGENT_BASE_URL` | `[llm].base_url` |
+| `LAGENT_MODEL` | `[llm].model` |
 | `LAGENT_API_KEY` | `[llm].api_key` |
 
 ## コマンド
 
 | コマンド | 意味 |
 |---|---|
-| `lagent` | 対話セッションを開始（RFP Phase 1。ループが入るまで scaffold はエラー終了する） |
+| `lagent` | カレントディレクトリで対話セッションを開始（端末なら TUI、パイプなら plain REPL） |
+| `lagent "<first message>"` | 引数を第 1 ターンとして送ってから対話へ |
+| `lagent sessions` | このプロジェクトのセッション一覧（id、日時、プレビュー） |
+| `lagent trust` | プロジェクトの信頼とピンを表示・変更 |
+| `lagent workdirs` | 過去セッションの作業ディレクトリ一覧。`workdirs clean` で削除 |
 | `lagent version` | 版数を表示 — `--version` と同じ行 |
 
 | フラグ | 意味 |
 |---|---|
 | `--version` | 版数を表示して終了 |
+| `-p`, `--prompt` | 単発: このプロンプトを実行して終了。変更を伴うツールは `--allow` に列挙するか `--auto` を付けない限り拒否 |
+| `--auto` | 自動承認モードで開始: 規則層で Safe の呼び出しは尋ねずに走る |
+| `--allow` | この実行で尋ねないツール: 名前または `mcp__server__*` 接頭辞 |
+| `--read-only` / `--writable` | セッションを read レーンに上限で抑える / 上限が無いことを明示 |
+| `-c`, `--continue` | このプロジェクトの直近セッションを再開 |
+| `--resume` | 特定のセッション id を再開 |
+| `--model` | この実行の `[llm].model` を上書き |
+| `--mcp on|off` | この実行の `[mcp].enabled` を上書き |
+| `--no-sandbox` | sandbox-exec ラッパを無効化（デバッグ専用、危険） |
+| `--config` | 設定ファイルのパス |
