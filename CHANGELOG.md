@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- `/readonly` and `/help` described commands this runtime does not
+  have: the usage line offered `auto on|off` (gem-agent's watcher, not
+  ported), and `/help` listed `/compact`, `/riskbook`, `/memory`,
+  `/skills` and `/skill`. The UI catalog drops those strings and the
+  34 others no code reads; `/help` describes `/mcp load <server>`.
 - A network client failing in the read lane is told which lane to ask
   for even when it printed nothing: `curl -s` exits 6 without a word,
   so the text-keyed hint never fired and the model retried the same

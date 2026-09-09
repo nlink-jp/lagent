@@ -135,7 +135,6 @@ type Messages struct {
 
 	// --- running-status chrome (TUI, ADR-0033) ---
 	StatusThinking     string
-	StatusCompacting   string
 	StatusInterrupting string
 	StatusToolWait     string
 	StatusRunningFmt   string // %s = tool name
@@ -171,51 +170,6 @@ type Messages struct {
 	RoundContinue           string
 	RoundStop               string
 
-	// --- /riskbook (ADR-0050) ---
-	// RiskbookStatusLearning is the running-status line while the
-	// summary model drafts.
-	RiskbookStatusLearning string
-	// RiskbookNoDataFmt: %d sessions scanned, no gate decisions found.
-	// Saying how much was read distinguishes "nothing yet" from
-	// "nothing looked at".
-	RiskbookNoDataFmt string
-	// RiskbookScannedFmt: %d sessions, %d gate decisions — drafting.
-	RiskbookScannedFmt string
-	// RiskbookUnreadableFmt: %d transcripts skipped as unreadable.
-	RiskbookUnreadableFmt string
-	// RiskbookPartialFmt: the session listing was cut at %d files.
-	RiskbookPartialFmt string
-	// RiskbookDraftHeader precedes the full draft — everything below it
-	// is byte-for-byte what would be stored.
-	RiskbookDraftHeader string
-	// RiskbookAskSave is the review question; Accept/Discard the answers.
-	RiskbookAskSave string
-	RiskbookAccept  string
-	RiskbookDiscard string
-	// RiskbookSavedFmt: %s = the project layer's path.
-	RiskbookSavedFmt  string
-	RiskbookDiscarded string
-	// RiskbookStopped: interrupted or declined; nothing was stored.
-	RiskbookStopped string
-	// RiskbookProvenanceFmt heads a stored draft: date, sessions,
-	// decisions — the document says what it was built from.
-	RiskbookProvenanceFmt string
-	// RiskbookShowBaseFmt / RiskbookShowProjectFmt head the layers in
-	// /riskbook show: %s = path — the path IS the provenance; labels
-	// restating what the operator already knows are noise (the
-	// status-output-is-not-documentation rule). ShowNoneFmt names where
-	// the base would be read from: an empty state is the one place
-	// teaching belongs, because it is where the operator actually asks
-	// "so what do I do?".
-	RiskbookShowBaseFmt    string
-	RiskbookShowProjectFmt string
-	RiskbookShowNoneFmt    string
-	RiskbookReloaded       string
-	// RiskbookClearedFmt: %s = the removed project layer's path.
-	RiskbookClearedFmt string
-	RiskbookClearNone  string
-	RiskbookUsage      string
-
 	// --- exit summary (cmd) ---
 	// Printed once, on the way out — the last thing in the scrollback
 	// answers "how do I get back to this?". Skipped when there was no
@@ -228,9 +182,6 @@ type Messages struct {
 	// that are still running at exit — their effect may land after
 	// the process is gone, so the operator hears it.
 	ExitAbandonedFmt string
-	// ExitFlushing precedes the bounded audit-event flush on the way
-	// out (ADR-0065 §4): a silent wait reads as a hang.
-	ExitFlushing string
 
 	// --- slash command feedback (cmd) ---
 	Help    string // the full /help text
@@ -240,14 +191,12 @@ type Messages struct {
 	// grammar /readonly uses. An ignored argument is how `/auto on`
 	// came to toggle instead.
 	AutoUsage string
-	// ReadOnlyOn/Off is the ceiling and ReadOnlyAuto is the watcher —
-	// two independent settings, so /readonly prints one line each and
-	// the watcher line only when it is armed (ADR-0080 §1).
-	// They describe the state, not a transition, and
+	// ReadOnlyOn/Off is the ceiling. They describe the state, not a
+	// transition, and
 	// only the states that constrain explain themselves: OFF is the
 	// default, so "this session may change things" said something
 	// obvious in a way that read as a puzzle (operator report).
-	// ReadOnlyOn/Off/Auto describe the state, not a transition:
+	// ReadOnlyOn/Off describe the state, not a transition:
 	// /readonly shows the current state as well as setting one, so a
 	// transition verb ("…に戻りました") is a lie on the showing path.
 	// Operator report, 2026-09-09.
@@ -272,15 +221,7 @@ type Messages struct {
 	// only the lanes can give (independent review).
 	ReadOnlyOnUnconfined string
 	ReadOnlyOff          string
-	ReadOnlyAuto         string
 	ReadOnlyUsage        string
-	// ReadOnlyAutoOnFmt: %s = the operator's own words that decided it.
-	// This one IS a transition, unlike the state lines above, so it
-	// reads as one. Cause, change, way back — and nothing else: saying
-	// what read-only then prevents repeated what the mode's own name
-	// already says (operator report).
-	ReadOnlyAutoOnFmt   string
-	ReadOnlyAutoOnPlain string
 	// CeilingRefusedAgainFmt: %s = the tool. The lift dialog is asked
 	// once a turn — a model that keeps trying is not worth re-asking
 	// about. But the refusals kept happening with nothing on screen, so
@@ -290,30 +231,10 @@ type Messages struct {
 	// them.
 	CeilingRefusedAgainFmt string
 	HistoryCleared         string
-	NothingToCompact       string
-	// CompactedFmt reports a /compact: messages summarised, kept.
-	CompactedFmt string
 
-	// The notices the agent writes mid-turn. They were English-only
-	// until v0.72.0 — the same compaction printed Japanese when the
-	// operator asked for it and English when the runtime decided — and
-	// they belong here by §3's own reading: a sentence carrying the
-	// operator's next command is chrome, whatever wrote it.
-	//
-	// AutoCompactedFmt: window %, messages summarised, kept verbatim.
-	AutoCompactedFmt string
-	// CompactNothingFmt: window %, with nothing safe to summarise.
-	CompactNothingFmt string
-	// CompactFailedFmt: the cause.
-	CompactFailedFmt string
-	// CompactOffSuffix is appended to CompactFailedFmt once automatic
-	// compaction gives up for the session.
-	CompactOffSuffix string
 	// TranscriptFailedFmt: the cause. What reached the disk still
 	// resumes; what follows the failure does not.
 	TranscriptFailedFmt string
-	// FilterRetryFmt: the provider's block reason; one retry follows.
-	FilterRetryFmt string
 	// TruncatedFmt: why generation stopped early.
 	TruncatedFmt string
 	// RemoteFaultFmt: server, tool, identical failures in a row.
@@ -328,17 +249,12 @@ type Messages struct {
 	// check was at 30.
 	RoundLimitContinuedFmt string // %d = the limit that fired
 	RoundLoopContinuedFmt  string // %s = the repeated call
-	// PromptHookAttachedFmt: bytes a prompt hook attached as data. It
-	// reaches the operator through onNotice rather than notify, which
-	// is how a sweep that grepped for notify missed it.
-	PromptHookAttachedFmt string
 	// UnknownCommandFmt: %s = the input that matched no command.
 	UnknownCommandFmt string
 	MCPNone           string // /mcp with nothing connected
 	// Integration reload results (ADR-0039).
-	MCPDisabled       string // /mcp reload while [mcp].enabled=false / --mcp off
-	MCPReloadedFmt    string // fmt: servers (int), tools (int)
-	SkillsReloadedFmt string // fmt: skill count (int)
+	MCPDisabled    string // /mcp reload while [mcp].enabled=false / --mcp off
+	MCPReloadedFmt string // fmt: servers (int), tools (int)
 
 	// --- startup safety (ADR-0023, cmd) ---
 	// TrustHeaderFmt opens the first-run prompt: project dir.
@@ -434,7 +350,6 @@ var en = Messages{
 	NoOutput:                "(no output)",
 
 	StatusThinking:          "thinking…",
-	StatusCompacting:        "compacting the conversation…",
 	StatusInterrupting:      "interrupting…",
 	StatusToolWait:          "waiting for the tool…",
 	StatusRunningFmt:        "running %s",
@@ -454,44 +369,18 @@ var en = Messages{
 	RoundContinue:           "continue",
 	RoundStop:               "stop here",
 
-	RiskbookStatusLearning: "drafting project risk rules from your decision record…",
-	RiskbookNoDataFmt:      "read %d sessions — no gate decisions recorded yet. The rulebook learns from your own answers at the approval gate; you can also write ~/.config/lagent/risk-rules.md by hand.",
-	RiskbookScannedFmt:     "read %d sessions / %d gate decisions — drafting…",
-	RiskbookUnreadableFmt:  "%d sessions could not be read and were skipped",
-	RiskbookPartialFmt:     "more than %d sessions — only the first were scanned",
-	RiskbookDraftHeader:    "proposed project risk rules — review every line; this exact text is what would be stored:",
-	RiskbookAskSave:        "Save these project risk rules? They will inform every auto-approve risk review in this project.",
-	RiskbookAccept:         "save",
-	RiskbookDiscard:        "discard",
-	RiskbookSavedFmt:       "saved to %s — in force now",
-	RiskbookDiscarded:      "discarded — nothing was stored",
-	RiskbookStopped:        "stopped — nothing was stored",
-	RiskbookProvenanceFmt:  "(learned %s from %d sessions / %d gate decisions — operator-reviewed)",
-	RiskbookShowBaseFmt:    "base rules — %s:",
-	RiskbookShowProjectFmt: "project rules — %s:",
-	RiskbookShowNoneFmt:    "no risk rules in force. Write %s by hand, or run /riskbook learn to draft project rules from your decision record.",
-	RiskbookReloaded:       "risk rules reloaded from disk",
-	RiskbookClearedFmt:     "project risk rules removed (%s)",
-	RiskbookClearNone:      "no project risk rules to remove",
-	RiskbookUsage:          "usage: /riskbook [show|learn|reload|clear]",
-	ExitSessionFmt:         "session %s — resume: lagent -c (or --resume %s)",
-	ExitUsageFmt:           "%d rounds · prompt %s · output %s",
-	ExitAbandonedFmt:       "%d abandoned tool call(s) still running — an effect may still land after this exit",
-	ExitFlushing:           "sending audit events… (up to 3s)",
+	ExitSessionFmt:   "session %s — resume: lagent -c (or --resume %s)",
+	ExitUsageFmt:     "%d rounds · prompt %s · output %s",
+	ExitAbandonedFmt: "%d abandoned tool call(s) still running — an effect may still land after this exit",
 
 	Help: `commands:
   /help      show this help
   /tools     list tools and each one's current approval gate
-  /mcp       list connected MCP servers (/mcp reload reconnects)
+  /mcp       list connected MCP servers with their loaded state (/mcp load <server> advertises one, /mcp reload reconnects)
   /auto      auto-approve: on|off, or bare to toggle (shift+tab too)
-  /readonly  read-only: on|off · auto on|off arms the watcher · bare shows both
-  /compact   summarise the older half of the conversation
+  /readonly  read-only: on|off · bare shows the state
   /settings  view and edit settings, with provenance
-  /riskbook  view the risk rules; /riskbook learn drafts them from your answers
   /usage     token statement for this session
-  /memory    list persisted memories
-  /skills    list installed skills (/skills reload re-discovers)
-  /skill <name> [args]   invoke a skill directly
   /version   version and platform
   /clear     reset the conversation
   /quit      exit (/exit and Ctrl+D too)
@@ -523,31 +412,19 @@ keys:
 	ReadOnlyOn:             "read-only mode: ON — nothing outside the session scratch changes; /readonly off lifts it\n",
 	ReadOnlyOnUnconfined:   "read-only mode: ON — but the sandbox is off, so a shell command declaring the read lane is bounded by nothing; /readonly off lifts the rest\n",
 	ReadOnlyOff:            "read-only mode: OFF\n",
-	ReadOnlyAuto:           "auto read-only: ON — it turns read-only on by itself when you ask for a read-only session\n",
-	ReadOnlyUsage:          "usage: /readonly on|off (the ceiling) · /readonly auto on|off (the watcher) · no argument shows both\n",
-	ReadOnlyAutoOnFmt:      "You asked for %q, so this session is now read-only. /readonly off lifts it",
-	ReadOnlyAutoOnPlain:    "This reads as a read-only session, so it is now read-only. /readonly off lifts it",
+	ReadOnlyUsage:          "usage: /readonly on|off · no argument shows the state\n",
 	CeilingRefusedAgainFmt: "%s refused: read-only is still on. You declined to lift it this turn, so this one was not asked",
 	HistoryCleared:         "history cleared — the next message starts a fresh conversation\n",
-	NothingToCompact:       "nothing to compact yet — the conversation is still short",
-	CompactedFmt:           "compacted %d earlier messages into a summary; %d kept verbatim. Detail from the summarised part is now second-hand",
 
-	AutoCompactedFmt:       "context reached %d%% of the window — compacted %d earlier messages into a summary; %d kept verbatim. Detail from the summarised part is now second-hand",
-	CompactNothingFmt:      "context is at %d%% of the window and nothing can be summarised yet — /clear starts a fresh conversation",
-	CompactFailedFmt:       "context compaction failed: %s",
-	CompactOffSuffix:       " — automatic compaction is off for this session; /compact retries by hand",
 	TranscriptFailedFmt:    "session transcript write failed (%s) — recording stopped, so this session can no longer be resumed in full; restart lagent to record again",
-	FilterRetryFmt:         "the provider's content filter blocked the response (%s) — retrying once",
 	TruncatedFmt:           "the response was cut off mid-generation (%s) — ask for the rest, or narrow the request",
 	RemoteFaultFmt:         "MCP server %q: %s failed %d times in a row with the same error — /mcp reload, or fix the server",
 	RoundLimitContinuedFmt: "round limit reached at %d rounds — the progress review continued the turn",
 	RoundLoopContinuedFmt:  "the same call repeated (%s) — the progress review continued the turn",
-	PromptHookAttachedFmt:  "user_prompt_submit hook attached %d bytes of context as data",
 	UnknownCommandFmt:      "unknown command %q — /help lists commands\n",
 	MCPNone:                "no MCP servers connected — define them in ~/.config/lagent/mcp.json (global) or the project's .mcp.json (project; wins name collisions)\n",
 	MCPDisabled:            "MCP is disabled for this session ([mcp].enabled=false or --mcp off) — restart to enable it\n",
 	MCPReloadedFmt:         "mcp reloaded: %d server(s), %d tool(s)\n",
-	SkillsReloadedFmt:      "skills reloaded: %d found\n",
 
 	TrustHeaderFmt:           "\nnew project: %s\nthis project provides:\n",
 	TrustItemInstructionsFmt: "%s (loaded as your instructions)",
@@ -622,7 +499,6 @@ var ja = Messages{
 	NoOutput:                "(出力なし)",
 
 	StatusThinking:          "思考中…",
-	StatusCompacting:        "会話を圧縮中…",
 	StatusInterrupting:      "中断中…",
 	StatusToolWait:          "ツールの完了待ち…",
 	StatusRunningFmt:        "実行中 %s",
@@ -642,44 +518,18 @@ var ja = Messages{
 	RoundContinue:           "続行",
 	RoundStop:               "ここで停止",
 
-	RiskbookStatusLearning: "判断記録からプロジェクトのリスクルールを起草しています…",
-	RiskbookNoDataFmt:      "%d セッションを読みました — 記録されたゲート判断はまだありません。ルールブックは承認ゲートでのあなた自身の回答から学びます。~/.config/lagent/risk-rules.md を手で書くこともできます。",
-	RiskbookScannedFmt:     "%d セッション / %d 件のゲート判断を読みました — 起草中…",
-	RiskbookUnreadableFmt:  "%d 件のセッションは読めなかったため飛ばしました",
-	RiskbookPartialFmt:     "セッションが %d 件を超えるため、先頭分だけを走査しました",
-	RiskbookDraftHeader:    "プロジェクトリスクルールの提案 — 全行を確認してください。保存されるのはこのテキストそのものです:",
-	RiskbookAskSave:        "このプロジェクトリスクルールを保存しますか？ このプロジェクトの auto-approve の全リスク評価が参照するようになります。",
-	RiskbookAccept:         "保存",
-	RiskbookDiscard:        "破棄",
-	RiskbookSavedFmt:       "%s に保存しました — いま有効です",
-	RiskbookDiscarded:      "破棄しました — 何も保存されていません",
-	RiskbookStopped:        "中止しました — 何も保存されていません",
-	RiskbookProvenanceFmt:  "（%s に %d セッション / %d 件のゲート判断から学習 — オペレータレビュー済み）",
-	RiskbookShowBaseFmt:    "ベースルール — %s:",
-	RiskbookShowProjectFmt: "プロジェクトルール — %s:",
-	RiskbookShowNoneFmt:    "有効なリスクルールはありません。%s を手で書くか、/riskbook learn で判断記録から起草できます。",
-	RiskbookReloaded:       "リスクルールをディスクから読み直しました",
-	RiskbookClearedFmt:     "プロジェクトリスクルールを削除しました（%s）",
-	RiskbookClearNone:      "削除するプロジェクトリスクルールはありません",
-	RiskbookUsage:          "使い方: /riskbook [show|learn|reload|clear]",
-	ExitSessionFmt:         "セッション %s — 再開: lagent -c（または --resume %s）",
-	ExitUsageFmt:           "%d ラウンド · prompt %s · output %s",
-	ExitAbandonedFmt:       "放棄したツール呼び出し %d 件がまだ実行中 — 終了後に効果が及ぶことがあります",
-	ExitFlushing:           "監査イベントを送信中…（最大 3 秒）",
+	ExitSessionFmt:   "セッション %s — 再開: lagent -c（または --resume %s）",
+	ExitUsageFmt:     "%d ラウンド · prompt %s · output %s",
+	ExitAbandonedFmt: "放棄したツール呼び出し %d 件がまだ実行中 — 終了後に効果が及ぶことがあります",
 
 	Help: `コマンド:
   /help      このヘルプ
   /tools     ツール一覧と各ツールの現在の承認ゲート
-  /mcp       接続中の MCP サーバー一覧（/mcp reload で再接続）
+  /mcp       接続中の MCP サーバー一覧とロード状態（/mcp load <server> で 1 台を広告、/mcp reload で再接続）
   /auto      auto-approve: on|off、引数なしで切替（shift+tab でも可）
-  /readonly  読み取り専用: on|off・auto on|off で自動切り替え・引数なしで両方表示
-  /compact   会話の古い半分を要約
+  /readonly  読み取り専用: on|off・引数なしで状態を表示
   /settings  設定の表示と編集（出所つき）
-  /riskbook  リスクルールの表示。/riskbook learn は回答記録から起草
   /usage     このセッションのトークン明細
-  /memory    永続メモリの一覧
-  /skills    インストール済みスキル一覧（/skills reload で再探索）
-  /skill <name> [args]   スキルを直接起動
   /version   バージョンとプラットフォーム
   /clear     会話履歴をリセット
   /quit      終了（/exit・Ctrl+D でも可）
@@ -711,31 +561,19 @@ var ja = Messages{
 	ReadOnlyOn:             "読み取り専用モード: ON — スクラッチの外は変更しません。解除は /readonly off\n",
 	ReadOnlyOnUnconfined:   "読み取り専用モード: ON — ただし sandbox が off のため、read レーンを宣言したシェルコマンドは何にも縛られません。残りの解除は /readonly off\n",
 	ReadOnlyOff:            "読み取り専用モード: OFF\n",
-	ReadOnlyAuto:           "自動切り替え: ON — 読み取り専用の依頼を打つと自動で ON になります\n",
-	ReadOnlyUsage:          "使い方: /readonly on|off（上限）・/readonly auto on|off（自動切り替え）・引数なしで両方表示\n",
-	ReadOnlyAutoOnFmt:      "%q という依頼のため、読み取り専用モードに切り替えました。解除は /readonly off",
-	ReadOnlyAutoOnPlain:    "読み取り専用の依頼と判断し、読み取り専用モードに切り替えました。解除は /readonly off",
+	ReadOnlyUsage:          "使い方: /readonly on|off・引数なしで状態を表示\n",
 	CeilingRefusedAgainFmt: "%s を拒否: 読み取り専用モードのままです。このターンで解除しないと答えたため、確認は出していません",
 	HistoryCleared:         "履歴をクリアしました — 次のメッセージから新しい会話が始まります\n",
-	NothingToCompact:       "まだ /compact の対象がありません — 会話がまだ短いためです",
-	CompactedFmt:           "古いメッセージ %d 件を要約に畳みました; %d 件はそのまま保持。要約された部分の詳細は伝聞になります",
 
-	AutoCompactedFmt:       "コンテキストがウィンドウの %d%% に達しました。古いメッセージ %d 件を要約にまとめ、%d 件はそのまま保持しています。要約された部分の詳細は伝聞になります",
-	CompactNothingFmt:      "コンテキストはウィンドウの %d%% ですが、まだ要約できるものがありません — /clear で新しい会話を始められます",
-	CompactFailedFmt:       "コンテキストの要約に失敗しました: %s",
-	CompactOffSuffix:       " — このセッションの自動要約は停止しています。/compact で手動で再試行できます",
 	TranscriptFailedFmt:    "セッション記録の書き込みに失敗しました（%s）。記録が停止したため、このセッションは完全な形では再開できません。記録を再開するには lagent を起動し直してください",
-	FilterRetryFmt:         "プロバイダのコンテンツフィルタが応答を遮断しました（%s）— 1 回だけ再試行します",
 	TruncatedFmt:           "応答が生成途中で打ち切られました（%s）— 続きを求めるか、要求を絞ってください",
 	RemoteFaultFmt:         "MCP サーバー %q: %s が同じエラーで %d 回連続して失敗しました — /mcp reload、またはサーバー側を修正してください",
 	RoundLimitContinuedFmt: "ラウンド上限 %d に達しました — 進捗レビューがターンを継続しました",
 	RoundLoopContinuedFmt:  "同じ呼び出しが繰り返されました（%s）— 進捗レビューがターンを継続しました",
-	PromptHookAttachedFmt:  "user_prompt_submit フックが %d バイトのコンテキストをデータとして添付しました",
 	UnknownCommandFmt:      "未知のコマンド %q — /help に一覧があります\n",
 	MCPNone:                "MCP サーバー未接続 — ~/.config/lagent/mcp.json（グローバル）またはプロジェクトの .mcp.json（プロジェクト側が名前衝突で優先）で定義します\n",
 	MCPDisabled:            "MCP はこのセッションでは無効です（[mcp].enabled=false または --mcp off）— 有効化するには再起動してください\n",
 	MCPReloadedFmt:         "MCP を再接続しました: %d サーバー・%d ツール\n",
-	SkillsReloadedFmt:      "skill を再読込しました: %d 件\n",
 
 	TrustHeaderFmt:           "\n新しいプロジェクト: %s\nこのプロジェクトの提供物:\n",
 	TrustItemInstructionsFmt: "%s（あなたへの指示として読み込まれます）",
