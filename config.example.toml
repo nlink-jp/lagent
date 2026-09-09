@@ -3,7 +3,9 @@
 #
 # Precedence: command-line flags > LAGENT_* > this file > built-in
 # defaults. Unknown keys are rejected, so a typo fails loudly at startup
-# instead of being silently ignored.
+# instead of being silently ignored. Every key below is shown at its
+# built-in default unless the comment says otherwise; a commented-out
+# key is optional.
 
 [llm]
 # Which local server answers. Only selects where the context length is
@@ -12,12 +14,14 @@
 #   lmstudio — LM Studio (context length from /api/v0/models)
 #   ollama   — Ollama (context length from /api/show)
 #   openai   — any other OpenAI-compatible server (set [model].context_window)
+# Also settable via LAGENT_PROVIDER.
 provider = "lmstudio"
 
-# Base URL of the OpenAI-compatible API.
+# Base URL of the OpenAI-compatible API. Also settable via LAGENT_BASE_URL.
 base_url = "http://localhost:1234/v1"
 
-# Model id as the server lists it.
+# Model id as the server lists it. Required, and deliberately without a
+# built-in default. Also settable via LAGENT_MODEL or --model.
 model = "google/gemma-4-26b-a4b-qat"
 
 # Optional. Local servers need none; set it for a server that requires a
@@ -25,5 +29,110 @@ model = "google/gemma-4-26b-a4b-qat"
 #api_key = ""
 
 [model]
-# Context window in tokens. 0 = detect from the provider at startup.
+# Context window in tokens, shown in the status line. 0 asks the
+# provider at startup (LM Studio and Ollama answer; the openai provider
+# cannot, so set it there).
 context_window = 0
+
+[sandbox]
+# Wrap shell_exec in macOS sandbox-exec: the lane the model declares —
+# read, write or operator — is enforced by the kernel. Leave enabled
+# unless you are debugging the sandbox itself; with it off every
+# shell_exec is yours to approve — no policy or auto mode lifts that.
+enabled = true
+# Programs the read lane may not launch, added to the built-in list
+# (osascript, open, launchctl, defaults, security, pbcopy, shortcuts,
+# automator, scutil, networksetup, systemsetup). Names or absolute paths.
+#read_lane_deny_exec = ["docker", "/usr/local/bin/terraform"]
+# Keep the approval prompt for read-lane commands too (the kernel cage
+# still applies; only "runs unasked" is given up).
+#read_lane_prompts = false
+
+[agent]
+# Round budget for one turn. Reaching it is a checkpoint, not a
+# guillotine: interactively you are asked whether to continue (the
+# turn's recent calls are shown as evidence), and extensions are
+# granted up to a hard cap of 3x this value that nothing can lift. In
+# one-shot -p there is nobody to ask and no model review to answer in
+# your place, so the checkpoint stops the turn. A loop detector
+# escalates three identical consecutive calls immediately, without
+# waiting for the limit.
+max_turns = 50
+
+# Per-command timeout for shell_exec, in seconds.
+shell_timeout_sec = 120
+
+# Start sessions with auto-approve on. Off by default: weakening the
+# approval gate should be a deliberate choice. Auto-approve is the rule
+# tier alone here — a call it classifies Safe runs unasked, Review asks
+# you, Block always asks; there is no model tier judging the rest.
+# Toggle at runtime with shift+tab or /auto on|off. In one-shot -p this
+# key is IGNORED: only the --auto flag arms it there, so an unattended
+# run that approves its own writes says so on its command line.
+auto_approve = false
+
+# The session's lane ceiling, an axis of its own: auto_approve decides
+# who answers the gate, this decides what the session may reach at all.
+# true caps the session at the read lane — nothing outside the session
+# scratch may change; a call that needs more asks you to lift it.
+# Override per run with --read-only / --writable (the file value applies
+# in one-shot -p too; --writable is the way out), or change it
+# mid-session with /readonly on|off. Lifting it is always your act:
+# nothing in the runtime lowers the ceiling.
+read_only = false
+
+[mcp]
+# false disables ALL MCP servers, global and project; --mcp on|off
+# overrides it per run (off is the one-shot pipeline case: no server
+# child is spawned).
+enabled = true
+# Per-call timeout for an MCP tool, in seconds.
+call_timeout_sec = 60
+# Servers, or single functions of them ("obsidian/patch_vault_file"),
+# that this session does not have. An excluded server is never started.
+# A project's .lagent.toml may add exclusions, never remove them.
+#exclude = ["some-server", "obsidian/patch_vault_file"]
+
+[tui]
+# auto (detect the terminal background), dark, light, or plain (no
+# colors — the escape hatch for terminal themes that fight styling).
+theme = "auto"
+# auto (LC_ALL / LC_MESSAGES / LANG), ja, or en — the language of the
+# interactive chrome. Resolved once at startup.
+language = "auto"
+# Show the model's reasoning deltas in the live area when the server
+# sends them. Display-only — never stored or replayed.
+show_thoughts = true
+
+[approval]
+# Trust is given to content: a trusted project's agent-facing files
+# (AGENTS.md and friends, .mcp.json) are pinned by digest, and a changed
+# one asks again before it is loaded. false restores directory-only
+# trust.
+#pin_trusted_files = true
+# Per-tool approval policy. Two values:
+#   "always" — always ask, in every mode (an operator-set floor that
+#              auto-approve cannot lift)
+#   "never"  — never ask, in every mode. For a tool whose effect varies
+#              per call (shell_exec), the rule tier's blocked patterns
+#              (rm -rf, sudo, curl|sh, credential paths, out-of-project
+#              writes) still ask — "never" is not "run anything".
+# Unset means today's behaviour: mutating tools ask; auto-approve runs
+# them through the rule tier.
+#
+# The main use: every MCP tool asks on every call, because lagent cannot
+# know what a server's tool does. You do. A trailing "*" matches a whole
+# server, which is usually what you want for a read-only lookup.
+# --allow does the same for one run.
+#[approval.tools]
+#"mcp__tor-exit-lookup__*" = "never"
+#"shell_exec"              = "always"
+
+# Project directories you trust completely. This is NOT approval-only:
+# a listed project's .lagent.toml may REMOVE approvals, AND its
+# .mcp.json servers are spawned and its instruction files are read. It
+# is the same decision as answering yes to the startup trust prompt.
+# Everywhere else a project file may only ADD approvals: a checked-out
+# repository is not necessarily something you wrote, and it must not be
+# able to switch the gate off. Ignored entries are reported at startup.
+#trusted_projects = ["/Users/you/works/your-repo"]

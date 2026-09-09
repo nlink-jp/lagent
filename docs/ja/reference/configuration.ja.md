@@ -22,6 +22,27 @@
 | `[llm].model` | `google/gemma-4-26b-a4b-qat` | サーバが一覧に出すモデル ID |
 | `[llm].api_key` | （未設定） | bearer トークンを要求するサーバ向け。ローカルサーバには不要 |
 | `[model].context_window` | `0` | コンテキスト窓（トークン）。`0` は起動時に provider から検出（LM Studio は `/api/v0/models`、Ollama は `/api/show`。`openai` は明示が必要） |
+| `[sandbox].enabled` | `true` | `shell_exec` を sandbox-exec で包む。モデルが宣言したレーンをカーネルが強制。off だと全シェル呼び出しが操作者の承認待ち |
+| `[sandbox].read_lane_deny_exec` | （未設定） | read レーンが起動してはならないプログラム。組込一覧に追加 |
+| `[sandbox].read_lane_prompts` | `false` | read レーンのコマンドにも承認プロンプトを残す |
+| `[agent].max_turns` | `50` | 1 ターンのラウンド予算。対話中はチェックポイント、`-p` では停止。絶対上限は 3 倍 |
+| `[agent].shell_timeout_sec` | `120` | `shell_exec` のコマンドごとのタイムアウト |
+| `[agent].auto_approve` | `false` | 自動承認で開始: 規則層で Safe の呼び出しは尋ねずに走り、Review と Block は尋ねる。**`-p` では無視** — そこでは `--auto` だけが有効。`/auto on|off` と shift+tab でセッション中に変更 |
+| `[agent].read_only` | `false` | レーン天井を有効にして開始: セッションのスクラッチの外は何も変えない。`-p` でも効く。`--read-only` / `--writable` で実行ごとに、`/readonly on|off` でセッション中に上書き。ランタイムが下げることはない |
+| `[mcp].enabled` | `true` | `false` で global とプロジェクトの全 MCP サーバを無効化。`--mcp on|off` で実行ごとに上書き |
+| `[mcp].call_timeout_sec` | `60` | MCP ツール呼び出しごとのタイムアウト |
+| `[mcp].exclude` | （未設定） | このセッションに無いサーバ、またはその一機能。プロジェクトの `.lagent.toml` は追加のみ可、削除は不可 |
+| `[tui].theme` | `auto` | `auto`、`dark`、`light`、`plain` |
+| `[tui].language` | `auto` | `auto`（`LC_ALL` / `LC_MESSAGES` / `LANG` から）、`ja`、`en` |
+| `[tui].show_thoughts` | `true` | サーバが送る推論差分をライブ領域に表示。表示専用 |
+| `[approval].pin_trusted_files` | `true` | 信頼は内容に与える: 信頼済みプロジェクトのエージェント向けファイルはダイジェストで固定され、変わると再度尋ねる |
+| `[approval].tools` | （未設定） | ツールごとのポリシー: `"always"`（常に尋ねる。自動承認でも外せない床）または `"never"`（尋ねない。ブロック対象のシェルパターンは尋ねる）。`--allow` は 1 実行分の同等物 |
+| `[approval].trusted_projects` | （未設定） | 自身の `.lagent.toml` で承認を削除できるプロジェクト。起動時の信頼プロンプトと同じ判断 |
+
+2 つのセッションモードは独立した軸: `auto_approve` はゲートに誰が答えるかを、
+`read_only` はセッションが何に到達できるかを決める。両方 on も成立する。
+プロジェクトの `.lagent.toml` はどちらも持たず、`[approval.tools]` と
+`[mcp].exclude` だけを持つので、クローンしたリポジトリはゲートを外せない。
 
 ## 優先順位
 
