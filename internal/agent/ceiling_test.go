@@ -1,0 +1,652 @@
+package agent
+
+// The session's lane ceiling refuses a call whose effect needs a lane
+// above it, before any gate (ADR-0080 §2-3). One setting bounds every
+// tool: what is pinned here is which calls it reaches and which it
+// deliberately does not.
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/nlink-jp/lagent/internal/llm"
+	"github.com/nlink-jp/lagent/internal/policy"
+	"github.com/nlink-jp/lagent/internal/risk"
+	"github.com/nlink-jp/lagent/internal/sandbox"
+	"github.com/nlink-jp/lagent/internal/tools"
+)
+
+// ceilingFor keeps the tests reading in the operator's three words
+// while the runtime holds the two independent bits behind them.
+func ceilingFor(state string) sandbox.Ceiling {
+	switch state {
+	case "on":
+		return sandbox.Ceiling{ReadOnly: true}
+	}
+	return sandbox.Ceiling{}
+}
+
+func ceilingAgent(t *testing.T, state string, extra ...*tools.Tool) *Agent {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reg, err := tools.New(dir,
+		func(ctx context.Context, c string) *exec.Cmd { return exec.CommandContext(ctx, "/bin/bash", "-c", c) },
+		5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tl := range extra {
+		if err := reg.Register(tl); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return New(Options{Backend: &mockBackend{}, Registry: reg, Gate: &recordingGate{},
+		System: "s", MaxTurns: 5, Ceiling: ceilingFor(state)})
+}
+
+func shellLane(command, access string) llm.ToolCall {
+	args := map[string]any{"command": command}
+	if access != "" {
+		args["access"] = access
+	}
+	return llm.ToolCall{ID: "c", Name: "shell_exec", Args: args}
+}
+
+func TestCeilingRefusesWhatNeedsAHigherLane(t *testing.T) {
+	mcp := &tools.Tool{Name: "mcp__srv__patch", Description: "Patch a remote note.", Mutating: true,
+		Parameters: map[string]any{"type": "object"},
+		Run:        func(context.Context, map[string]any) (string, error) { return "", nil }}
+	// save_memory is registered by the command layer, not by the tool
+	// registry, so the agent-level test stands one in.
+	mem := &tools.Tool{Name: "save_memory", Description: "Remember a fact.", Mutating: true,
+		Parameters: map[string]any{"type": "object"},
+		Run:        func(context.Context, map[string]any) (string, error) { return "", nil }}
+
+	cases := []struct {
+		name    string
+		call    llm.ToolCall
+		refused bool
+	}{
+		{"write-lane shell", shellLane("touch x", "write"), true},
+		{"operator-lane shell", shellLane("git config a b", "operator"), true},
+		{"read-lane shell", shellLane("ls", "read"), false},
+		{"shell with no declared lane", shellLane("ls", ""), false},
+		{"write_file", writeCall("f.txt"), true},
+		{"edit_file", llm.ToolCall{ID: "c", Name: "edit_file",
+			Args: map[string]any{"path": "f.txt", "old_string": "x", "new_string": "y"}}, true},
+		{"save_memory", llm.ToolCall{ID: "c", Name: "save_memory",
+			Args: map[string]any{"scope": "project", "name": "n", "content": "c"}}, true},
+		{"read_file", llm.ToolCall{ID: "c", Name: "read_file", Args: map[string]any{"path": "f.txt"}}, false},
+		{"list_files", llm.ToolCall{ID: "c", Name: "list_files", Args: map[string]any{}}, false},
+		// The rule tier cannot read another server's effects, so the
+		// ceiling does not pretend to bound them (ADR-0077). ADR-0080 §5
+		// states the ceiling to the model tier instead.
+		{"an MCP tool that writes", llm.ToolCall{ID: "c", Name: "mcp__srv__patch", Args: map[string]any{}}, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := ceilingAgent(t, "on", mcp, mem)
+			if got := a.decide(tc.call).OverCeiling; got != tc.refused {
+				t.Errorf("read-only: OverCeiling = %v, want %v", got, tc.refused)
+			}
+			// With no ceiling nothing is over it, whatever the call.
+			off := ceilingAgent(t, "off", mcp, mem)
+			if off.decide(tc.call).OverCeiling {
+				t.Errorf("ceiling off: %s was refused anyway", tc.name)
+			}
+			// The auto state has not tightened yet, so it is off too.
+			auto := ceilingAgent(t, "auto", mcp, mem)
+			if auto.decide(tc.call).OverCeiling {
+				t.Errorf("auto (untightened): %s was refused anyway", tc.name)
+			}
+		})
+	}
+}
+
+// liftGate answers the ceiling's lift question and records how it was
+// asked. A mode is not a call, so the question must be must-prompt.
+// onceGate records which of the two questions each call arrived as.
+type onceGate struct {
+	answer bool
+	asked  []string // the ordinary dialog
+	once   []string // the no-standing dialog
+}
+
+func (g *onceGate) Approve(name, detail, purpose, reason string, mustPrompt bool) (bool, bool, string) {
+	g.asked = append(g.asked, name+"|"+reason)
+	return g.answer, false, ""
+}
+
+func (g *onceGate) ApproveOnce(name, detail, purpose, reason string) (bool, string) {
+	g.once = append(g.once, name+"|"+reason)
+	return g.answer, ""
+}
+
+func (g *onceGate) ApproveLift(name, detail, purpose, reason string) (bool, string) {
+	return false, ""
+}
+
+type liftGate struct {
+	answer      bool
+	asked       []string
+	mustPrompts []bool
+	lifts       []bool // whether each question was the mode change
+}
+
+func (g *liftGate) Approve(name, detail, purpose, reason string, mustPrompt bool) (bool, bool, string) {
+	g.asked = append(g.asked, name+"|"+reason)
+	g.mustPrompts = append(g.mustPrompts, mustPrompt)
+	g.lifts = append(g.lifts, false)
+	return g.answer, false, ""
+}
+
+// The mode question arrives here, and it has no allowlist answer to
+// give: a mode is not a call.
+func (g *liftGate) ApproveLift(name, detail, purpose, reason string) (bool, string) {
+	g.asked = append(g.asked, name+"|"+reason)
+	g.mustPrompts = append(g.mustPrompts, true)
+	g.lifts = append(g.lifts, true)
+	return g.answer, ""
+}
+
+// Declining leaves the ceiling in place, and the rest of the turn is not
+// asked again: a model pushed by a poisoned tool result must not be able
+// to raise one prompt per proposed write (ADR-0080 §4).
+func TestCeilingLiftDeclinedIsNotAskedTwiceInATurn(t *testing.T) {
+	a := ceilingAgent(t, "on")
+	gate := &liftGate{answer: false}
+	a.gate = gate
+
+	out, denied, _, err := a.execCallInner(context.Background(), shellLane("touch x", "write"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(gate.asked) != 1 {
+		t.Fatalf("asked %d times, want 1: %v", len(gate.asked), gate.asked)
+	}
+	// It arrives as the mode question, not as a tool approval. That is
+	// the whole point: the tool-approval dialog's 'a' registers the tool
+	// in the session allowlist even when the allowlist may not answer,
+	// which would grant exactly what the ceiling withholds.
+	if !gate.lifts[0] {
+		t.Error("the ceiling asked through the ordinary tool-approval path")
+	}
+	if !strings.Contains(gate.asked[0], "capped at the read lane") {
+		t.Errorf("the question does not name the ceiling: %q", gate.asked[0])
+	}
+	if !strings.Contains(out, "capped at the read lane") || !strings.Contains(out, "/readonly off") {
+		t.Errorf("result = %q", out)
+	}
+	// Not an operator's denial of the tool: the learner reads that from
+	// the exact deniedResult text (ADR-0045).
+	if denied || out == deniedResult {
+		t.Error("a ceiling refusal was reported as an operator denial")
+	}
+	if !a.CeilingState().ReadOnly {
+		t.Errorf("the ceiling moved on a declined lift: %+v", a.CeilingState())
+	}
+
+	if _, _, _, err := a.execCallInner(context.Background(), shellLane("touch y", "write")); err != nil {
+		t.Fatal(err)
+	}
+	if len(gate.asked) != 1 {
+		t.Errorf("asked again after a decline: %v", gate.asked)
+	}
+}
+
+// The dialog is asked once a turn; the denials are not once a turn.
+// Without a line for the suppressed ones, one-shot printed only the
+// first refusal of a run — the mode question is the only thing denyGate
+// prints — and the TUI showed the operator nothing while the model
+// retried (independent review).
+func TestCeilingSuppressedRefusalStillSpeaks(t *testing.T) {
+	a := ceilingAgent(t, "on")
+	a.gate = &liftGate{answer: false}
+	var notices []string
+	a.onNotice = func(msg string) { notices = append(notices, msg) }
+
+	for _, cmd := range []string{"touch x", "touch y", "touch z"} {
+		if _, _, _, err := a.execCallInner(context.Background(), shellLane(cmd, "write")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The first refusal spoke through the dialog, so it owes no notice;
+	// the two the dialog never saw do.
+	if len(notices) != 2 {
+		t.Fatalf("notices = %d, want 2 (one per suppressed refusal): %q", len(notices), notices)
+	}
+	for _, n := range notices {
+		if !strings.Contains(n, "shell_exec") {
+			t.Errorf("the notice does not name the call: %q", n)
+		}
+	}
+}
+
+// The suppression is per turn, so a new turn asks again: an operator
+// who declined a lift while asking one thing has not answered for the
+// next thing they ask. Nothing covered the reset (independent review).
+func TestCeilingLiftDeclineDoesNotOutlastTheTurn(t *testing.T) {
+	a := ceilingAgent(t, "on")
+	gate := &liftGate{answer: false}
+	a.gate = gate
+	a.backend = &mockBackend{responses: []*llm.Response{
+		{ToolCalls: []llm.ToolCall{shellLane("touch x", "write")}},
+		{Content: "done"},
+		{ToolCalls: []llm.ToolCall{shellLane("touch y", "write")}},
+		{Content: "done"},
+	}}
+	for _, turn := range []string{"最初の依頼", "次の依頼"} {
+		if _, err := a.Run(context.Background(), turn, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(gate.asked) != 2 {
+		t.Errorf("asked %d times over two turns, want 2: %v", len(gate.asked), gate.asked)
+	}
+}
+
+// Approving is a mode change and nothing more. The call then goes
+// through the ordinary rules, which is a second, separate question —
+// treating the lift as the call's approval spent an "always" policy
+// without its prompt and skipped the ladder entirely (independent
+// review, 2026-09-09).
+func TestCeilingLiftApprovedTurnsTheModeOff(t *testing.T) {
+	a := ceilingAgent(t, "on")
+	gate := &liftGate{answer: true}
+	a.gate = gate
+
+	if _, _, _, err := a.execCallInner(context.Background(), writeCall("f.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if a.CeilingState().ReadOnly {
+		t.Fatalf("the mode did not change: %+v", a.CeilingState())
+	}
+	if len(gate.asked) != 2 {
+		t.Fatalf("asked %d times, want 2 (the mode, then the call): %v", len(gate.asked), gate.asked)
+	}
+	if !gate.lifts[0] || gate.lifts[1] {
+		t.Errorf("questions = %v, want the mode change then a tool approval", gate.lifts)
+	}
+
+	// What follows is an ordinary session again: the ceiling is gone, so
+	// the next write asks as itself and not as another lift.
+	if _, _, _, err := a.execCallInner(context.Background(), writeCall("f.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if len(gate.asked) != 3 || gate.lifts[2] {
+		t.Errorf("the ceiling asked again after it was lifted: %v", gate.lifts)
+	}
+}
+
+// The lift answers the ceiling's question, never the tool's. A tool the
+// operator marked "always" still gets its own prompt, and under auto the
+// ladder still runs — before this, a lift skipped both.
+func TestCeilingLiftDoesNotSpendTheToolsOwnGate(t *testing.T) {
+	pol, _, err := policy.Build(map[string]string{"write_file": "always"}, nil, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := ceilingAgent(t, "on")
+	a.policy = pol
+	gate := &liftGate{answer: true}
+	a.gate = gate
+	if _, _, _, err := a.execCallInner(context.Background(), writeCall("f.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if len(gate.asked) != 2 {
+		t.Fatalf("asked %d times, want 2: %v", len(gate.asked), gate.asked)
+	}
+	// The second is the tool's own must-prompt question, not the lift.
+	if gate.lifts[1] || !gate.mustPrompts[1] {
+		t.Errorf("the \"always\" policy was spent by the lift: lifts=%v mustPrompts=%v",
+			gate.lifts, gate.mustPrompts)
+	}
+}
+
+// A floor is a different question and is asked on its own terms: the
+// lift does not carry a Block-tier call past the floor that stops it.
+func TestCeilingLiftDoesNotCarryACallPastAFloor(t *testing.T) {
+	a := ceilingAgent(t, "on")
+	gate := &liftGate{answer: true}
+	a.gate = gate
+	if _, _, _, err := a.execCallInner(context.Background(), shellLane("sudo rm -rf /", "write")); err != nil {
+		t.Fatal(err)
+	}
+	if len(gate.asked) != 2 {
+		t.Fatalf("asked %d times, want 2 (the lift, then the floor): %v", len(gate.asked), gate.asked)
+	}
+	if !gate.lifts[0] || gate.lifts[1] {
+		t.Errorf("questions = %v, want the mode change then a tool approval", gate.lifts)
+	}
+	if !gate.mustPrompts[1] {
+		t.Error("the floor question was not must-prompt")
+	}
+}
+
+// The ceiling and the watcher are independent, and both directions of
+// ceilingAllowGate answers from a session allowlist the way the real gates
+// do after the operator has pressed 'a' once.
+type ceilingAllowGate struct {
+	always      map[string]bool
+	prompts     []string
+	mustPrompts []bool
+	reasons     []string
+}
+
+func (g *ceilingAllowGate) Approve(name, detail, purpose, reason string, mustPrompt bool) (bool, bool, string) {
+	if !mustPrompt && g.always[name] {
+		return true, true, "" // answered without the operator
+	}
+	g.prompts = append(g.prompts, name)
+	g.mustPrompts = append(g.mustPrompts, mustPrompt)
+	g.reasons = append(g.reasons, reason)
+	return true, false, ""
+}
+func (g *ceilingAllowGate) ApproveLift(name, detail, purpose, reason string) (bool, string) {
+	return false, ""
+}
+
+// A call the ceiling cannot bound — an MCP tool, whose server runs
+// outside every profile — is the operator's while the ceiling is in
+// force. Before this, an allowlisted MCP write ran with no prompt at
+// all while the banner said the session changed nothing (independent
+// review, 2026-09-09).
+func TestCeilingMakesUnboundedCallsTheOperatorsOwn(t *testing.T) {
+	mcp := &tools.Tool{Name: "mcp__vault__patch", Description: "Patch a note.", Mutating: true,
+		Parameters: map[string]any{"type": "object"},
+		Run:        func(context.Context, map[string]any) (string, error) { return "PATCHED", nil }}
+	call := llm.ToolCall{ID: "c", Name: "mcp__vault__patch", Args: map[string]any{"path": "n.md"}}
+
+	// With the ceiling on, neither an allowlist entry nor a "never"
+	// policy answers it.
+	for _, tc := range []struct {
+		name string
+		pol  map[string]string
+	}{
+		{"session allowlist", nil},
+		{"never policy", map[string]string{"mcp__vault__patch": "never"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := ceilingAgent(t, "on", mcp)
+			if tc.pol != nil {
+				pol, _, err := policy.Build(tc.pol, nil, nil, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				a.policy = pol
+			}
+			gate := &ceilingAllowGate{always: map[string]bool{"mcp__vault__patch": true}}
+			a.gate = gate
+			if _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
+				t.Fatal(err)
+			}
+			if len(gate.prompts) != 1 {
+				t.Fatalf("the operator was asked %d times, want 1: %v", len(gate.prompts), gate.prompts)
+			}
+			if !gate.mustPrompts[0] {
+				t.Error("the question was answerable by the allowlist")
+			}
+			if !strings.Contains(gate.reasons[0], "read-only") {
+				t.Errorf("the reason does not say why: %q", gate.reasons[0])
+			}
+		})
+	}
+
+	// With no ceiling, nothing changes: the allowlist answers as before.
+	a := ceilingAgent(t, "off", mcp)
+	gate := &ceilingAllowGate{always: map[string]bool{"mcp__vault__patch": true}}
+	a.gate = gate
+	if _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
+		t.Fatal(err)
+	}
+	if len(gate.prompts) != 0 {
+		t.Errorf("the ceiling was off and the operator was asked anyway: %v", gate.prompts)
+	}
+}
+
+// A call the ceiling cannot bound is asked once, with no standing
+// answer offered. `a` and `p` are refused while the ceiling is up, so
+// the keystroke bought nothing then and everything later: the entry
+// registered silently and began applying the moment the operator lifted
+// the mode — a session allowlist entry, or in `p`'s case a global,
+// cross-session policy file (independent review, pass 2).
+func TestCeilingUnboundedCallsAreAskedOnceOnly(t *testing.T) {
+	mcp := &tools.Tool{Name: "mcp__vault__patch", Description: "d", Mutating: true,
+		Run: func(ctx context.Context, args map[string]any) (string, error) { return "ok", nil }}
+	call := llm.ToolCall{ID: "m", Name: "mcp__vault__patch", Args: map[string]any{"k": "v"}}
+
+	a := ceilingAgent(t, "on", mcp)
+	gate := &onceGate{answer: true}
+	a.gate = gate
+	if _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
+		t.Fatal(err)
+	}
+	if len(gate.once) != 1 || len(gate.asked) != 0 {
+		t.Fatalf("once=%v asked=%v, want the once-only question", gate.once, gate.asked)
+	}
+	if !strings.Contains(gate.once[0], "read-only") {
+		t.Errorf("the reason does not say why: %q", gate.once[0])
+	}
+
+	// With no ceiling it is the ordinary dialog again: the answers this
+	// removes are removed by the mode, not by the tool being MCP.
+	a = ceilingAgent(t, "off", mcp)
+	gate = &onceGate{answer: true}
+	a.gate = gate
+	if _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
+		t.Fatal(err)
+	}
+	if len(gate.once) != 0 || len(gate.asked) != 1 {
+		t.Errorf("once=%v asked=%v, want the ordinary dialog", gate.once, gate.asked)
+	}
+}
+
+// Under --auto the ladder overwrites the escalation reason wholesale,
+// and it did so over the one sentence that explains the two answers the
+// dialog no longer offers — so the operator saw an ordinary title,
+// three options and a line about the risk evaluator, with nothing
+// saying why 'a' and 'p' were gone (second independent review).
+func TestCeilingUnboundedReasonSurvivesTheLadder(t *testing.T) {
+	mcp := &tools.Tool{Name: "mcp__vault__patch", Description: "d", Mutating: true,
+		Run: func(ctx context.Context, args map[string]any) (string, error) { return "ok", nil }}
+	call := llm.ToolCall{ID: "m", Name: "mcp__vault__patch", Args: map[string]any{"k": "v"}}
+
+	a := ceilingAgent(t, "on", mcp)
+	a.auto = true
+	// The rule tier escalates an MCP write on its own, so the ladder
+	// sets a reason of its own on the way to the gate.
+	gate := &onceGate{answer: false}
+	a.gate = gate
+	if _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
+		t.Fatal(err)
+	}
+	if len(gate.once) != 1 {
+		t.Fatalf("once=%v asked=%v", gate.once, gate.asked)
+	}
+	if !strings.Contains(gate.once[0], "read-only") {
+		t.Errorf("the ladder's reason displaced the ceiling's: %q", gate.once[0])
+	}
+	// And the ladder's own objection is not lost either — it is why the
+	// call is being asked about at all.
+	if !strings.Contains(gate.once[0], "auto-approve escalated") {
+		t.Errorf("the ceiling's reason displaced the ladder's: %q", gate.once[0])
+	}
+}
+
+// A gate that does not implement OnceApprover still gets asked — the
+// interface is optional, and falling silent would be worse than falling
+// back.
+func TestCeilingUnboundedFallsBackToApprove(t *testing.T) {
+	mcp := &tools.Tool{Name: "mcp__vault__patch", Description: "d", Mutating: true,
+		Run: func(ctx context.Context, args map[string]any) (string, error) { return "ok", nil }}
+	a := ceilingAgent(t, "on", mcp)
+	gate := &ceilingAllowGate{}
+	a.gate = gate
+	if _, _, _, err := a.execCallInner(context.Background(),
+		llm.ToolCall{ID: "m", Name: "mcp__vault__patch", Args: map[string]any{}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(gate.prompts) != 1 {
+		t.Errorf("a gate without ApproveOnce was asked %d times, want 1", len(gate.prompts))
+	}
+}
+
+// Every ceiling change leaves a record, whoever made it: the record is
+// written by the setter, so a new caller cannot forget one. /readonly
+// changed the ceiling with no record at all while the ADR said every
+// change was recorded (independent review, 2026-09-09).
+func TestCeilingChangesAreRecorded(t *testing.T) {
+	a := ceilingAgent(t, "off")
+	log := &capturingLog{}
+	a.log = log
+
+	a.SetReadOnly(true, "operator")
+	a.SetReadOnly(true, "operator") // no change, no record
+	a.SetReadOnly(false, "operator")
+
+	var got []string
+	for i, kind := range log.kinds {
+		if kind != "mode_change" {
+			continue
+		}
+		rec, ok := log.data[i].(map[string]any)
+		if !ok {
+			t.Fatalf("mode_change payload is %T", log.data[i])
+		}
+		got = append(got, rec["setting"].(string)+"="+rec["to"].(string)+" by "+rec["by"].(string))
+	}
+	want := []string{"read_only=on by operator", "read_only=off by operator"}
+	if len(got) != len(want) {
+		t.Fatalf("records = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("record %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+// The transcript says what happened, not what was proposed. The record
+// was written at detection, so a call the operator then let through
+// still left a "ceiling_refused" behind it — the one record an audit
+// would count (independent review).
+func TestCeilingRecordsTheOutcomeNotTheProposal(t *testing.T) {
+	for _, tc := range []struct {
+		answer bool
+		want   string
+	}{
+		{false, "ceiling_refused"},
+		{true, "ceiling_lifted"},
+	} {
+		a := ceilingAgent(t, "on")
+		a.gate = &liftGate{answer: tc.answer}
+		log := &capturingLog{}
+		a.log = log
+		if _, _, _, err := a.execCallInner(context.Background(), shellLane("touch x", "write")); err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, kind := range log.kinds {
+			if strings.HasPrefix(kind, "ceiling_") {
+				got = append(got, kind)
+			}
+		}
+		if len(got) != 1 || got[0] != tc.want {
+			t.Errorf("lift answered %v → records %v, want exactly [%s]", tc.answer, got, tc.want)
+		}
+	}
+}
+
+// Each refusal kind gets its own sentence. The shell one names the lane
+// the call declared, memory names what a memory write costs, and the
+// rest says "state", not "files" — web_search is mutating for its
+// egress and changes no file (independent review, 2026-09-09).
+func TestCeilingReasonNamesTheRightThing(t *testing.T) {
+	egress := &tools.Tool{Name: "web_search", Description: "Search the web.", Mutating: true,
+		Parameters: map[string]any{"type": "object"},
+		Run:        func(context.Context, map[string]any) (string, error) { return "", nil }}
+	a := ceilingAgent(t, "on", egress)
+
+	for _, tc := range []struct {
+		call    llm.ToolCall
+		want    string
+		wantNot string
+	}{
+		{shellLane("touch x", "write"), "declared write", ""},
+		{writeCall("f.txt"), "changes state", "changes files"},
+		// The one the false sentence was written for.
+		{llm.ToolCall{ID: "c", Name: "web_search", Args: map[string]any{"query": "x"}}, "changes state", "files"},
+	} {
+		d := a.decide(tc.call)
+		if !d.OverCeiling {
+			t.Fatalf("%s was not refused", tc.call.Name)
+		}
+		got := a.ceilingPrompt(d, tc.call)
+		if !strings.Contains(got, tc.want) {
+			t.Errorf("%s: reason %q lacks %q", tc.call.Name, got, tc.want)
+		}
+		if tc.wantNot != "" && strings.Contains(got, tc.wantNot) {
+			t.Errorf("%s: reason %q says %q, which is not true of it", tc.call.Name, got, tc.wantNot)
+		}
+	}
+}
+
+// Under --auto an unbounded call — an MCP write no Seatbelt profile
+// reaches — is a Review with no model tier to answer it here: the
+// operator is asked, an earlier 'a' does not answer for them, and the
+// backend is never consulted as a judge.
+func TestCeilingUnboundedUnderAuto(t *testing.T) {
+	mcp := &tools.Tool{Name: "mcp__vault__patch", Description: "Patch a note.", Mutating: true,
+		Parameters: map[string]any{"type": "object"},
+		Run:        func(context.Context, map[string]any) (string, error) { return "PATCHED", nil }}
+	call := llm.ToolCall{ID: "c", Name: "mcp__vault__patch", Args: map[string]any{}}
+	b := &autoBackend{responses: []*llm.Response{{Content: "done"}}, verdict: `{"approve": true, "confidence": 0.99, "reason": "would approve"}`}
+	a := ceilingAgent(t, "on", mcp)
+	a.backend = b
+	a.SetAutoApprove(true)
+	gate := &ceilingAllowGate{always: map[string]bool{"mcp__vault__patch": true}}
+	a.gate = gate
+	if _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
+		t.Fatal(err)
+	}
+	if len(gate.prompts) != 1 {
+		t.Fatalf("operator asked %d times, want 1 (prompts=%v)", len(gate.prompts), gate.prompts)
+	}
+	if !gate.mustPrompts[0] {
+		t.Error("an earlier 'a' could have answered it")
+	}
+	if len(b.evals) != 0 {
+		t.Errorf("the backend was consulted as a judge: %q", b.evals)
+	}
+}
+
+// askGate hardcodes fromAllowlist=false on the once path, which is
+// correct only because an mcp__ call can never be OperatorOnly:
+// operatorWrite = ok && OperatorOnly && !fromAllowlist would otherwise
+// start granting the write-guard on a path that never consults the
+// allowlist. That invariant lives in another package and nothing pinned
+// it (second independent review).
+func TestMCPCallsAreNeverOperatorOnly(t *testing.T) {
+	for _, name := range []string{
+		"mcp__vault__patch", "mcp__srv__shell_exec", "mcp__srv__write_file",
+		"mcp__srv__save_memory", "mcp__x__y",
+	} {
+		for _, mutating := range []bool{false, true} {
+			v := risk.Classify(name, mutating,
+				map[string]any{"command": "sudo rm -rf /", "path": "/etc/hosts"}, "/p", "/w")
+			if v.OperatorOnly {
+				t.Errorf("%s (mutating=%v) is OperatorOnly: askGate's fromAllowlist=false "+
+					"would grant operatorWrite without an allowlist consultation", name, mutating)
+			}
+		}
+	}
+}
