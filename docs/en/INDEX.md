@@ -49,3 +49,7 @@ excepted).
   MCP tools are advertised on demand — a catalog in the facts message,
   one `mcp_load` tool, native calls after a load; `[mcp].preload`,
   `[mcp].advertise = "all"` as the baseline
+- [`ADR-0005`](adr/0005-images-reach-the-model.md) — images reach the
+  model: a dropped image path attaches without an `@` (escaped spaces
+  read), `view_image` returns, and a reference that did not attach is
+  said to the model

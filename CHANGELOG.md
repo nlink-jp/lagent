@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Images reach the model** (ADR-0005). An image path dropped on the
+  terminal attaches without an `@` (backslash-escaped spaces read, in
+  `@` references too); the `view_image` built-in returns so the model
+  can look at an image a tool saved; and a reference that did not
+  attach is told to the model as `[not attached: <ref> — <reason>]`
+  beside the operator's warning. Measured cause: a pasted screenshot
+  path attached nothing, and the model described an image it never
+  had.
+
 ### Fixed
 
 - `/readonly` and `/help` described commands this runtime does not

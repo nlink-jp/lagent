@@ -84,7 +84,7 @@ func TestSavedFilesAreContentAddressed(t *testing.T) {
 // bytes deliberately do NOT ride back inline: an attachment is replayed
 // with the conversation every round (ADR-0027), so it belongs in
 // history only when the model asks for it.
-func TestImageIsSavedAndTheModelIsToldHowToLookAtIt(t *testing.T) {
+func TestImageIsSavedAndPointedAtViewImage(t *testing.T) {
 	work := t.TempDir()
 	in := newMCPIntake(fixedDir(work))
 	png := []byte("\x89PNG\r\n\x1a\npixels")
@@ -97,7 +97,7 @@ func TestImageIsSavedAndTheModelIsToldHowToLookAtIt(t *testing.T) {
 	if !strings.Contains(out, `{"page":"example.test"}`) {
 		t.Errorf("the text block was lost: %q", out)
 	}
-	if !strings.Contains(out, "@<path>") {
+	if !strings.Contains(out, "view_image") {
 		t.Errorf("the model is not told how to look at it: %q", out)
 	}
 	if strings.Contains(out, "non-text content") {

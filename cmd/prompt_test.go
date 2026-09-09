@@ -137,12 +137,12 @@ func TestSessionFactsOmitTheDirectoryWhenNone(t *testing.T) {
 // that does not exist (the fork-era seam).
 func TestSystemPromptNamesOnlyRegisteredTools(t *testing.T) {
 	sys := buildSystemPrompt("/proj", "")
-	for _, absent := range []string{"agentic_file_search", "summarize_file", "view_image", "read_document", "datetime", "gem_agent_purpose", "Vertex", "Gemini"} {
+	for _, absent := range []string{"agentic_file_search", "summarize_file", "read_document", "datetime", "gem_agent_purpose", "Vertex", "Gemini"} {
 		if strings.Contains(sys, absent) {
 			t.Errorf("system prompt names %q, which this runtime does not have", absent)
 		}
 	}
-	for _, present := range []string{"list_tree", "search_files", "read_file", "edit_file", "write_file", "shell_exec", "lagent_purpose"} {
+	for _, present := range []string{"list_tree", "search_files", "read_file", "edit_file", "write_file", "shell_exec", "view_image", "lagent_purpose"} {
 		if !strings.Contains(sys, present) {
 			t.Errorf("system prompt lost %q", present)
 		}

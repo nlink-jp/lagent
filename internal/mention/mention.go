@@ -97,11 +97,21 @@ const pathChars = `._-/~\`
 // "@README.md、これ直して" has no space to stop at.
 const stoppers = `,;:)]}"'、。，．「」『』（）【】〜|` + "`"
 
-// Refs extracts @-references from text: an @ at a word start, followed
-// by a run of path characters.
+// Refs extracts the references in text: an @ at a word start followed
+// by a run of path characters, and — without any @ — an absolute or
+// ~ path to an image (ADR-0005): a file dropped on the terminal arrives
+// as its path, spaces escaped with a backslash, and the drop is the
+// operator's intent to attach it. Only images are taken bare; a text
+// file's path in prose is a mention, not an attachment.
 func Refs(text string) []string {
 	var refs []string
 	seen := map[string]bool{}
+	add := func(ref string) {
+		if ref != "" && !seen[ref] {
+			seen[ref] = true
+			refs = append(refs, ref)
+		}
+	}
 	for i, r := range text {
 		if r != '@' {
 			continue
@@ -115,24 +125,72 @@ func Refs(text string) []string {
 				continue
 			}
 		}
-		rest := text[i+1:]
-		end := strings.IndexFunc(rest, func(r rune) bool {
-			return unicode.IsSpace(r) || strings.ContainsRune(stoppers, r)
-		})
-		if end < 0 {
-			end = len(rest)
-		}
-		ref := strings.TrimRight(rest[:end], ".")
-		if ref == "" {
-			continue
-		}
-		if !seen[ref] {
-			seen[ref] = true
-			refs = append(refs, ref)
-		}
+		raw, _ := scanPath(text[i+1:])
+		add(strings.TrimRight(unescapeSpaces(raw), "."))
+	}
+	for _, ref := range bareImageRefs(text) {
+		add(ref)
 	}
 	return refs
 }
+
+// scanPath reads a run of path characters: up to whitespace or a
+// stopper, except that a backslash-escaped space is part of the path.
+// It returns the raw run (escapes intact) and its byte length.
+func scanPath(rest string) (string, int) {
+	j := 0
+	for j < len(rest) {
+		r, size := utf8.DecodeRuneInString(rest[j:])
+		if r == '\\' && j+size < len(rest) && rest[j+size] == ' ' {
+			j += size + 1
+			continue
+		}
+		if unicode.IsSpace(r) || strings.ContainsRune(stoppers, r) {
+			break
+		}
+		j += size
+	}
+	return rest[:j], j
+}
+
+// unescapeSpaces turns the shell's "\ " back into a space.
+func unescapeSpaces(s string) string { return strings.ReplaceAll(s, "\\ ", " ") }
+
+// bareImageRefs finds absolute and ~ image paths written without an @:
+// the shape a drop onto the terminal produces. A candidate starts at
+// the beginning of the text or after whitespace or an opener (quote,
+// backtick, bracket), and ends at whitespace or a stopper — an escaped
+// space is part of it.
+func bareImageRefs(text string) []string {
+	var out []string
+	i := 0
+	for i < len(text) {
+		r, size := utf8.DecodeRuneInString(text[i:])
+		startsHere := (r == '/' || (r == '~' && strings.HasPrefix(text[i:], "~/"))) &&
+			(i == 0 || func() bool {
+				prev, _ := utf8.DecodeLastRuneInString(text[:i])
+				return unicode.IsSpace(prev) || strings.ContainsRune(openers, prev)
+			}())
+		if !startsHere {
+			i += size
+			continue
+		}
+		raw, n := scanPath(text[i:])
+		ref := strings.TrimRight(unescapeSpaces(raw), ".")
+		if IsImagePath(ref) {
+			out = append(out, ref)
+		}
+		if n == 0 {
+			n = size
+		}
+		i += n
+	}
+	return out
+}
+
+// openers are the characters a dropped path may follow without a space:
+// the quotes and brackets a shell or an editor puts around it.
+const openers = "`\"'([{「『（【"
 
 // Expand resolves every reference in text against projectDir — and, for
 // absolute paths, the session work directory (ADR-0058): spilled MCP

@@ -62,7 +62,8 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
 ## What it does
 
 - **Tools:** `list_files`, `list_tree`, `search_files`, `read_file`,
-  `file_info`, `write_file`, `edit_file`, `shell_exec`, `ask_user`, and
+  `file_info`, `view_image`, `write_file`, `edit_file`, `shell_exec`,
+  `ask_user`, and
   every tool of the MCP servers in `.mcp.json` — shown to the model as a
   catalog, and advertised per server once it calls `mcp_load` (a local
   model cannot afford 243 schemas on every turn; `[mcp].preload` and
@@ -77,6 +78,14 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
 - **Not here:** web search and fetch, media uploads, audit-log export,
   history compaction, skills, agent memory, hooks — see the RFP and
   [ADR-0002](docs/en/adr/0002-features-not-reproduced.md).
+
+## Attachments
+
+`@<path>` attaches a project file or directory; `@<image>` attaches an
+image from anywhere (absolute or `~` paths), and an image path dropped
+on the terminal attaches without the `@` — escaped spaces included.
+A reference that cannot be read is reported to you and told to the
+model.
 
 ## Build
 

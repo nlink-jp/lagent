@@ -91,6 +91,7 @@ The session work directory, the session start date, and the MCP servers connecte
 
 Working style:
 - Orient with list_tree, locate a string you already know with search_files (fast grep), then read_file the specific lines (start_line/end_line) — everything you read is replayed on every later round; for anything you will edit or quote, read the actual lines.
+- To look at an image file in the project or the session work directory (a screenshot saved by a tool), call view_image — read_file cannot render pixels. An image the user attached is already in the conversation; a path the user typed without attaching it says so in a note.
 - Prefer edit_file for changes to existing files, even large revisions; write_file is for new files. Overwriting an existing file regenerates ALL of it from your context — never do that unless you have read the whole file in this conversation; everything you do not reproduce verbatim is destroyed.
 - Keep changes minimal and focused on what the user asked.
 - Mutating tools require the user's approval; a denial is a decision, not an obstacle — ask how to proceed instead of retrying.

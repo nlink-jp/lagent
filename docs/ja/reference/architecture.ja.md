@@ -15,15 +15,15 @@ lagent の現在の挙動を、前提知識なしで読めるように書く。�
 cmd/            flags, config load, project resolution, wiring, REPL/TUI
   |-- internal/config      strict-decode TOML + env/flag precedence
   |-- internal/llm         Backend interface + the OpenAI-compatible client (stream observer)
-  |-- internal/tools       the eight file/shell built-ins + Register
+  |-- internal/tools       the nine file/shell/image built-ins + Register
   |-- internal/agent       the turn loop, approval dispatch, the round ladder
   `-- internal/tui         Bubble Tea inline UI (or internal/repl, non-TTY)
 ```
 
-tools パッケージはプロジェクトディレクトリだけを要する 8 つの組込ツール
+tools パッケージはプロジェクトディレクトリだけを要する 9 つの組込ツール
 （`list_files`、`list_tree`、`search_files`、`read_file`、`file_info`、
-`write_file`、`edit_file`、`shell_exec`）を持つ。`cmd/` は同じ `Register`
-で `ask_user` と全 MCP ツールを登録する。
+`view_image`、`write_file`、`edit_file`、`shell_exec`）を持つ。`cmd/` は
+同じ `Register` で `ask_user` と `mcp_load` と全 MCP ツールを登録する。
 
 補助パッケージ: `internal/sandbox`（レーンごとの Seatbelt プロファイル
 生成、永続ファイルと資格情報の一覧）、`internal/approve`（plain REPL の
@@ -31,7 +31,8 @@ tools パッケージはプロジェクトディレクトリだけを要する 8
 ごとの承認ポリシー）、`internal/mcp`（stdio JSON-RPC クライアント）、
 `internal/mcpfilter`（`[mcp] exclude` の背後にある唯一の述語）、
 `internal/banner`（操作者が何か打つ前に出る行と、どの行を出すかの規則）、
-`internal/mention`（`@` 参照: ファイル、ディレクトリ、画像）、
+`internal/mention`（`@` 参照: ファイル、ディレクトリ、画像 — および `@`
+無しでドロップされた画像パス、ADR-0005）、
 `internal/instructions`（`AGENTS.md` の発見）、`internal/ignore`（ignore
 対応の列挙: 組込ディレクトリ一覧 + gitignore マッチャ）、
 `internal/session`（transcript: ロガー + 再開ローダ、usage レコード）、

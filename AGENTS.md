@@ -99,6 +99,10 @@ is new; the others are ports minus the ADR-0002 features.
 - **`--version` must always answer** and `version` must print the same
   line (pinned by `cmd/root_test.go`) — a Homebrew formula's `brew test`
   runs it.
+- **A dropped image path attaches without an `@`** (ADR-0005), and a
+  reference that could not attach is told to the model as a `missing`
+  attachment rendered outside the nonce tag. Only images are taken
+  bare; extend `mention.bareImageRefs`, never widen it to text files.
 - **No string for a feature this runtime does not have.** The catalog,
   `/help`, tool descriptions, notes and error text name only what is
   here; a leftover from the porting source (`/readonly auto`, `/skill`,

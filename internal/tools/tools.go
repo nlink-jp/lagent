@@ -170,7 +170,7 @@ func New(projectDir string, execFn ExecFunc, shellTimeout time.Duration) (*Regis
 		tools:        map[string]*Tool{},
 		abandoned:    new(atomic.Int64),
 	}
-	for _, t := range []*Tool{r.listFiles(), r.listTree(), r.searchFiles(), r.readFile(), r.fileInfo(), r.writeFile(), r.editFile(), r.shellExec()} {
+	for _, t := range []*Tool{r.listFiles(), r.listTree(), r.searchFiles(), r.readFile(), r.fileInfo(), r.viewImage(), r.writeFile(), r.editFile(), r.shellExec()} {
 		r.tools[t.Name] = t
 		r.order = append(r.order, t.Name)
 	}
@@ -718,6 +718,12 @@ func (r *Registry) List() []*Tool {
 	return out
 }
 
+// ViewImageName is the tool that attaches an in-project image to the
+// conversation as visual input. The agent special-cases it: the tool
+// result is metadata, and the agent attaches the bytes to that result,
+// which the backend turns into an image part (ADR-0005).
+const ViewImageName = "view_image"
+
 // ShellExecName is the one tool whose effect is a whole command line
 // rather than a named argument, which is why several layers treat it
 // specially — the approval detail, and the per-command policy and
@@ -815,6 +821,32 @@ func (r *Registry) ReadImage(p string) (data []byte, mime string, err error) {
 		return nil, "", fmt.Errorf("not an image (detected %s)", http.DetectContentType(data))
 	}
 	return data, mime, nil
+}
+
+func (r *Registry) viewImage() *Tool {
+	return &Tool{
+		Name: ViewImageName,
+		Description: "Attach an image file from the project to the conversation as visual input " +
+			"(screenshots fetched by tools, extracted images, diagrams). The image itself arrives " +
+			"in the next message; this call returns confirmation. Read-only. " +
+			"PNG, JPEG, WebP, GIF, HEIC.",
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{"type": "string", "description": "image path relative to the project root"},
+			},
+			"required": []string{"path"},
+		},
+		Mutating: false,
+		Run: func(ctx context.Context, args map[string]any) (string, error) {
+			p, _ := args["path"].(string)
+			data, mime, err := r.ReadImage(p)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("image attached: %s (%s, %d bytes) — it follows in the next message as visual input", p, mime, len(data)), nil
+		},
+	}
 }
 
 func intArg(args map[string]any, key string) int {
@@ -1203,7 +1235,7 @@ func (r *Registry) readFile() *Tool {
 				return "", err
 			}
 			if isImageExt(p) {
-				return "", fmt.Errorf("%s is an image, not text — attach it with an @-reference instead (read_file would return unusable binary)", p)
+				return "", fmt.Errorf("%s is an image — use the view_image tool to look at it (read_file would return unusable binary)", p)
 			}
 			f, err := r.openRead(abs)
 			if err != nil {

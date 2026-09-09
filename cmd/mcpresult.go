@@ -181,7 +181,7 @@ func (in mcpIntake) binary(server, tool string, b mcp.Content) string {
 // refuse the block without saving it.
 func (in mcpIntake) binaryNote(_, _ string, b mcp.Content, path string) string {
 	if b.Type == "image" {
-		return fmt.Sprintf("[image saved at %s (%d bytes, %s) — attach it with @<path> to look at it]", path, len(b.Data), b.MIME)
+		return fmt.Sprintf("[image saved at %s (%d bytes, %s) — use view_image on that path to look at it]", path, len(b.Data), b.MIME)
 	}
 	return fmt.Sprintf("[%s content saved at %s (%d bytes, %s)]", b.Type, path, len(b.Data), b.MIME)
 }

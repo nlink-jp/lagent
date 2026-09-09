@@ -60,7 +60,8 @@ lagent
 ## できること
 
 - **ツール:** `list_files`、`list_tree`、`search_files`、`read_file`、
-  `file_info`、`write_file`、`edit_file`、`shell_exec`、`ask_user`、および
+  `file_info`、`view_image`、`write_file`、`edit_file`、`shell_exec`、
+  `ask_user`、および
   `.mcp.json` の MCP サーバが提供する全ツール — モデルには目録として見せ、
   サーバごとに `mcp_load` を呼んだ時点で広告する（ローカルモデルは毎ターン
   243 スキーマを読む余裕がない。`[mcp].preload` と `[mcp].advertise = "all"`
@@ -75,6 +76,13 @@ lagent
 - **無いもの:** web 検索と取得、メディアアップロード、監査ログ出力、
   履歴圧縮、skills、agent memory、hooks — RFP と
   [ADR-0002](docs/ja/adr/0002-features-not-reproduced.ja.md) を参照。
+
+## 添付
+
+`@<path>` はプロジェクト内のファイルやディレクトリを、`@<image>` はどこに
+あっても画像を添付する（絶対パス・`~` パス可）。端末にドロップした画像の
+パスは `@` 無しでも添付され、エスケープ済みの空白も読む。読めない参照は
+操作者に警告され、モデルにも伝えられる。
 
 ## ビルド
 

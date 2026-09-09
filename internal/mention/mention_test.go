@@ -522,3 +522,28 @@ func TestFIFOIsRefusedAndHEICAccepted(t *testing.T) {
 		t.Fatal("Expand blocked on the FIFO")
 	}
 }
+
+// ADR-0005: a file dropped on the terminal arrives as its path, spaces
+// escaped — with or without an @, an image path is a reference; a text
+// file's bare path is not.
+func TestRefsTakeDroppedImagePathsAndEscapedSpaces(t *testing.T) {
+	for _, tc := range []struct {
+		in   string
+		want []string
+	}{
+		{"`/Users/x/Desktop/スクリーンショット\\ 2026-09-10\\ 2.28.02.png`", []string{"/Users/x/Desktop/スクリーンショット 2026-09-10 2.28.02.png"}},
+		{"what is in /Users/x/shot.png ?", []string{"/Users/x/shot.png"}},
+		{"see ~/Desktop/a.jpg and '/tmp/b.webp'", []string{"~/Desktop/a.jpg", "/tmp/b.webp"}},
+		{"@~/Desktop/with\\ space.png", []string{"~/Desktop/with space.png"}},
+		{"@src/main.go and /etc/hosts", []string{"src/main.go"}},
+		{"path/in/prose.png", nil},
+		{"/usr/local/bin/tool", nil},
+		{"the file /Users/x/a.png.", []string{"/Users/x/a.png"}},
+		{"@/Users/x/a.png /Users/x/a.png", []string{"/Users/x/a.png"}},
+	} {
+		got := Refs(tc.in)
+		if strings.Join(got, "|") != strings.Join(tc.want, "|") {
+			t.Errorf("Refs(%q) = %v, want %v", tc.in, got, tc.want)
+		}
+	}
+}

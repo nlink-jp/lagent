@@ -101,8 +101,8 @@ func TestPlainAnswer(t *testing.T) {
 	if mb.systems[0] != "test system" {
 		t.Error("system prompt not passed through")
 	}
-	if len(mb.toolDefs[0]) != 8 { // the built-ins; MCP tools register in cmd
-		t.Errorf("tool defs = %d, want 8 built-ins", len(mb.toolDefs[0]))
+	if len(mb.toolDefs[0]) != 9 { // the built-ins; ask_user, mcp_load and MCP tools register in cmd
+		t.Errorf("tool defs = %d, want 9 built-ins", len(mb.toolDefs[0]))
 	}
 }
 
@@ -686,5 +686,31 @@ func TestAdvertiseHidesRegisteredToolsUntilRefreshed(t *testing.T) {
 	}
 	if !declared || ran != 1 {
 		t.Errorf("after refresh: declared=%v ran=%d", declared, ran)
+	}
+}
+
+// A reference the runtime could not attach is told to the model as
+// well as to the operator (ADR-0005): the text still names the file,
+// and a model not told the file is absent describes it from thin air.
+func TestUnattachedReferenceIsToldToTheModel(t *testing.T) {
+	mb := &mockBackend{responses: []*llm.Response{{Content: "ok"}}}
+	a, _ := newAgent(t, mb, &approveAll{}, 5)
+	var problems []mention.Problem
+	a.onAttach = func(_ []mention.Attachment, p []mention.Problem) { problems = p }
+	if _, err := a.Run(context.Background(), "what is in /nonexistent/dir/shot.png ?", nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(problems) != 1 {
+		t.Fatalf("operator problems = %v", problems)
+	}
+	sent := mb.calls[0][len(mb.calls[0])-1]
+	if !strings.Contains(sent.Content, "[not attached: /nonexistent/dir/shot.png") {
+		t.Errorf("the model was not told: %q", sent.Content)
+	}
+	if len(sent.Attachments) != 0 {
+		t.Errorf("a missing reference produced a wire attachment: %+v", sent.Attachments)
+	}
+	if !strings.Contains(a.history[len(a.history)-2].Content, "shot.png") {
+		t.Error("the operator's text was rewritten")
 	}
 }

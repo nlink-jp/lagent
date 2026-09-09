@@ -15,15 +15,16 @@ One binary, one process, one conversation. `main.go` hands off to
 cmd/            flags, config load, project resolution, wiring, REPL/TUI
   |-- internal/config      strict-decode TOML + env/flag precedence
   |-- internal/llm         Backend interface + the OpenAI-compatible client (stream observer)
-  |-- internal/tools       the eight file/shell built-ins + Register
+  |-- internal/tools       the nine file/shell/image built-ins + Register
   |-- internal/agent       the turn loop, approval dispatch, the round ladder
   `-- internal/tui         Bubble Tea inline UI (or internal/repl, non-TTY)
 ```
 
-The tools package holds the eight built-ins that need only the project
+The tools package holds the nine built-ins that need only the project
 directory: `list_files`, `list_tree`, `search_files`, `read_file`,
-`file_info`, `write_file`, `edit_file`, `shell_exec`. `cmd/` registers
-`ask_user` through the same `Register`, plus every MCP tool.
+`file_info`, `view_image`, `write_file`, `edit_file`, `shell_exec`.
+`cmd/` registers `ask_user` and `mcp_load` through the same `Register`,
+plus every MCP tool.
 
 Supporting packages: `internal/sandbox` (Seatbelt profile generation
 per lane, the persistent-file and credential lists), `internal/approve`
@@ -32,7 +33,8 @@ per lane, the persistent-file and credential lists), `internal/approve`
 JSON-RPC client), `internal/mcpfilter` (the one predicate behind
 `[mcp] exclude`), `internal/banner` (the lines printed before the
 operator has typed anything, and the rule that decides which ones),
-`internal/mention` (`@`-references: files, directories, images),
+`internal/mention` (`@`-references: files, directories, images — and a
+dropped image path without the `@`, ADR-0005),
 `internal/instructions` (`AGENTS.md` discovery), `internal/ignore`
 (ignore-aware enumeration: builtin dir list + gitignore matcher),
 `internal/session` (transcript: logger + resume loader, usage records),

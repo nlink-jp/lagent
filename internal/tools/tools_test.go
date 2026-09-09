@@ -37,7 +37,7 @@ func TestRegistryShape(t *testing.T) {
 	r := newRegistry(t)
 	want := map[string]bool{ // name → Mutating
 		"list_files": false, "list_tree": false, "search_files": false,
-		"read_file": false, "file_info": false,
+		"read_file": false, "file_info": false, "view_image": false,
 		"write_file": true, "edit_file": true, "shell_exec": true,
 	}
 	if len(r.List()) != len(want) {
@@ -273,7 +273,7 @@ func TestReadFileRefusesImages(t *testing.T) {
 	}
 	tool, _ := r.Get("read_file")
 	_, err := tool.Run(context.Background(), map[string]any{"path": "s.png"})
-	if err == nil || !strings.Contains(err.Error(), "@-reference") {
+	if err == nil || !strings.Contains(err.Error(), "view_image") {
 		t.Fatalf("read_file on an image: %v", err)
 	}
 }
