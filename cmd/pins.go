@@ -18,8 +18,8 @@ import (
 	"github.com/nlink-jp/lagent/internal/uitext"
 )
 
-// projectGrant is what the trust decision (ADR-0023) and the content
-// pins (ADR-0074) together allow this session to load from the project:
+// projectGrant is what the trust decision (gem-agent ADR-0023) and the content
+// pins (gem-agent ADR-0074) together allow this session to load from the project:
 // trusted says the directory is, excluded names the agent-facing files
 // whose content changed since the operator trusted them and were not
 // re-trusted — loaded by nobody until they are. Every loader of project
@@ -38,7 +38,7 @@ func (g projectGrant) mcp() bool { return g.trusted && !g.excluded[".mcp.json"] 
 
 // config reports whether the project's .lagent.toml is trusted
 // content: when it is not, the file may still tighten the approval
-// policy (as an untrusted project's may, ADR-0023 §4) but never loosen.
+// policy (as an untrusted project's may, gem-agent ADR-0023 §4) but never loosen.
 func (g projectGrant) config() bool { return g.trusted && !g.excluded[".lagent.toml"] }
 
 // skill reports whether the project skill directory entry may be loaded.
@@ -49,14 +49,14 @@ func (g projectGrant) skill(entry string) bool {
 }
 
 // checkPins compares the project's agent-facing files with the pins the
-// operator trusted (ADR-0074 §1) and returns the names to exclude this
+// operator trusted (gem-agent ADR-0074 §1) and returns the names to exclude this
 // session.
 //
 // No pins recorded yet (the first start after the upgrade, a grant that
 // predates them): an interactive start pins the current content and
 // names what it pinned — the operator is there to read the list; a
 // non-interactive run loads as before and says that nothing is pinned
-// yet, because recording trust nobody confirmed is what ADR-0023 §5
+// yet, because recording trust nobody confirmed is what gem-agent ADR-0023 §5
 // refuses to do. An empty set counts as recorded (pinned_at), so a
 // project with no agent-facing files is not re-pinned forever.
 //
@@ -171,7 +171,7 @@ func pinNameForWrite(projectDir string, tc llm.ToolCall) string {
 
 // repinName re-records the pin of one name after a write the operator
 // approved as OperatorOnly: they saw that write, and only that one
-// (ADR-0074 §1). Nothing else in the set moves — not a file that
+// (gem-agent ADR-0074 §1). Nothing else in the set moves — not a file that
 // changed on its own since it was trusted, and not a name this session
 // excluded: the operator has not seen the content it replaced. No
 // pins recorded yet means nothing to update.
@@ -236,7 +236,7 @@ func (g *writeGuard) end(tc llm.ToolCall, name string) bool {
 // command, which pinned files now differ from their pins. The command
 // was approved; its effect on the trusted files was not shown, so the
 // pins are not refreshed — the difference is named and the next start
-// asks (review of ADR-0074, F7).
+// asks (review of gem-agent ADR-0074, F7).
 func pinChangesNote(cfg *config.Config, policyFile *config.PolicyFile, projectDir string, trusted bool, msgs *uitext.Messages) string {
 	if !trusted || !cfg.Approval.PinTrustedFiles || !policyFile.HasPins(projectDir) {
 		return ""
@@ -300,8 +300,8 @@ func mutatePins(policyPath, projectDir string, policyFile *config.PolicyFile, fn
 
 // loadProjectConfig reads the project's .lagent.toml and reports
 // whether it may loosen the approval policy: only when the operator's
-// own config names the project (ADR-0023 §4) AND the file is trusted
-// content under the grant (ADR-0074) — a changed file may still
+// own config names the project (gem-agent ADR-0023 §4) AND the file is trusted
+// content under the grant (gem-agent ADR-0074) — a changed file may still
 // tighten, as an untrusted project's may, never loosen.
 func loadProjectConfig(cfg *config.Config, projectDir string, grant projectGrant) (projectCfg *config.ProjectConfig, mayLoosen bool, err error) {
 	projectCfg, err = config.LoadProject(projectDir)
@@ -313,7 +313,7 @@ func loadProjectConfig(cfg *config.Config, projectDir string, grant projectGrant
 
 // persistentStateFile is where the previous session's snapshot of the
 // project's persistent files lives: the per-project state directory,
-// beside the work directories (ADR-0074 §3/§4).
+// beside the work directories (gem-agent ADR-0074 §3/§4).
 func persistentStateFile(projectDir string) (string, error) {
 	root, err := statedir.Root()
 	if err != nil {

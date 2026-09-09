@@ -1,6 +1,6 @@
 package tui
 
-// The read-only lift is a mode change, not a tool approval (ADR-0080
+// The read-only lift is a mode change, not a tool approval (gem-agent ADR-0080
 // §4). Operator report, 2026-09-09: it rendered as "承認が必要です:
 // write_file" with an English reason and the full option row, so what
 // was being decided, and what would change, were both unclear — and 'a'
@@ -113,7 +113,7 @@ func TestModeChangeIgnoresTheAnswersItDoesNotOffer(t *testing.T) {
 	}
 }
 
-// The footer carries both settings in one badge (ADR-0080 §1): the
+// The footer carries both settings in one badge (gem-agent ADR-0080 §1): the
 // padlock is the ceiling right now, the word is the mode. A watcher
 // armed mid-session had no lasting surface before this, and an armed
 // watcher that had not fired hid the ceiling it was about to move.
@@ -178,7 +178,7 @@ func TestFooterBadgeCarriesBothSettings(t *testing.T) {
 // cannot bound is an ordinary tool approval, but 'a' and 'p' are
 // refused an answer while the ceiling is up, so pressing one buys
 // nothing then and starts applying invisibly the moment the mode is
-// lifted (ADR-0080 §5, independent review pass 2).
+// lifted (gem-agent ADR-0080 §5, independent review pass 2).
 func noStandingModel(t *testing.T, lang uitext.Lang) (Model, chan ApprovalAnswer) {
 	t.Helper()
 	m := New(Options{Msgs: uitext.For(lang), Theme: "notty"})

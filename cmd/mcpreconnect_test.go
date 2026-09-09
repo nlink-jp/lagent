@@ -179,7 +179,7 @@ func TestReconnectReportsAStaleEntry(t *testing.T) {
 	attachMCPServer(ctx, a, reg, &warn, filterOf(t), inv)
 
 	// Named against the server that listed: a function of one that
-	// never listed proves nothing (ADR-0077 §2).
+	// never listed proves nothing (gem-agent ADR-0077 §2).
 	reconnectMCPServer(ctx, "a", a, nil, reg, &warn, filterOf(t, "a/nope"), inv)
 	if got := reloadWarnings(warn.String()); !strings.Contains(got, "nope") {
 		t.Errorf("the stale entry is not reported: %q", warn.String())

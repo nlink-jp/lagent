@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// The trust command shows and refreshes the content pins of ADR-0074
+// The trust command shows and refreshes the content pins of gem-agent ADR-0074
 // without starting a model session: a scripted `-p` flow that edited
 // AGENTS.md re-pins with `--accept` instead of running interactively.
 
@@ -66,7 +66,7 @@ func trustReport(projectDir, cfgPath string, accept bool, out io.Writer) error {
 	trust := policyFile.TrustFor(projectDir)
 	granted := trust == config.TrustGranted
 	// [approval].trusted_projects is the stronger, hand-written grant
-	// (ADR-0023 §4); it counts as trust here as it does at startup.
+	// (gem-agent ADR-0023 §4); it counts as trust here as it does at startup.
 	if cfg, err := config.LoadWithOverrides(cfgPath, config.Overrides{}); err == nil && cfg.TrustsProject(projectDir) {
 		granted = true
 		trust = config.TrustGranted + " (config: trusted_projects)"

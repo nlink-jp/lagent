@@ -25,7 +25,7 @@ func (f *fakeStdin) String() string {
 	return f.buf.String()
 }
 
-// ADR-0021: a stale incarnation's frame (the read loop's refusal of a
+// gem-agent ADR-0021: a stale incarnation's frame (the read loop's refusal of a
 // server-initiated request, racing a kill-and-respawn) is dropped, not
 // injected into the successor's stdin mid-handshake.
 func TestStaleGenerationSendIsDropped(t *testing.T) {

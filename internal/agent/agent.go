@@ -24,7 +24,7 @@ import (
 	"github.com/nlink-jp/nlk/guard"
 )
 
-// UsageStats is the session's per-category token accounting (ADR-0019).
+// UsageStats is the session's per-category token accounting (gem-agent ADR-0019).
 // Main-loop numbers feed the footer; risk and compaction are side-calls
 // that must NOT touch the footer's context gauge — a risk check stomping
 // "ctx" with its own prompt size was the bug that shaped this split.
@@ -32,7 +32,7 @@ type UsageStats struct {
 	Rounds                           int
 	Prompt, Output, Thoughts, Cached int
 	LastPrompt, Window               int
-	// AbandonedRunning counts tool calls the ADR-0065 floor gave up
+	// AbandonedRunning counts tool calls the gem-agent ADR-0065 floor gave up
 	// on that have not returned yet — goroutines still holding a
 	// syscall, whose effect may still land. The exit receipt names
 	// them when the count is not zero.
@@ -46,30 +46,30 @@ type UsageStats struct {
 // being asked.
 type Approver interface {
 	// Approve asks the operator about one call. mustPrompt says the
-	// session allowlist ('a') may not answer this one (ADR-0021 §5): the
+	// session allowlist ('a') may not answer this one (gem-agent ADR-0021 §5): the
 	// call is Block-tier, or the operator's policy pins the tool to
 	// "always". Without it, one 'a' on a benign call waved every later
 	// Block-tier call of that tool through unprompted — measured.
 	// purpose is the model's own declaration of why it wants the call
-	// (ADR-0047) — context for the human, never a gate input.
+	// (gem-agent ADR-0047) — context for the human, never a gate input.
 	// It returns the verdict and whether the SESSION ALLOWLIST answered
-	// rather than a human (ADR-0048 §1). That second value is
+	// rather than a human (gem-agent ADR-0048 §1). That second value is
 	// load-bearing for learning, not for safety: an allowlist answer is
 	// one keystroke standing in for any number of calls, so counting it
 	// like a typed decision inflates the evidence. Reported here rather
 	// than inferred later, because only the gate knows.
 	//
 	// denyReason is the operator's optional typed reason for a denial
-	// (ADR-0060) — non-empty only when approved is false, and delivered
+	// (gem-agent ADR-0060) — non-empty only when approved is false, and delivered
 	// to the model inside the denial function response, the one slot the
-	// API leaves open mid-round (ADR-0012 §5).
+	// API leaves open mid-round (gem-agent ADR-0012 §5).
 	//
 	// Plain returns instead of a struct: a shared type would have
 	// to live in a package both gates and the agent import, and
 	// `internal/agent`'s own tests already import `internal/approve`.
 	Approve(toolName, detail, purpose, reason string, mustPrompt bool) (approved, fromAllowlist bool, denyReason string)
 	// ApproveLift asks whether to turn the session's read-only mode off
-	// (ADR-0080 §4). It is a separate method because it is a separate
+	// (gem-agent ADR-0080 §4). It is a separate method because it is a separate
 	// question: a mode is not a call, so there is no allowlist answer to
 	// return and no "allow for this session" to offer — an 'a' on the
 	// tool-approval dialog registers the tool even when the allowlist
@@ -89,10 +89,10 @@ type Agent struct {
 	registry *tools.Registry
 	gate     Approver
 	log      SessionLog
-	model    string // for the accounting records only (ADR-0057)
+	model    string // for the accounting records only (gem-agent ADR-0057)
 	// ceiling is the lane ceiling and its watcher, read and written
 	// under mu: /readonly changes either, and the watcher raises the
-	// ceiling (never lowers it — ADR-0080 §2). The two are independent,
+	// ceiling (never lowers it — gem-agent ADR-0080 §2). The two are independent,
 	// so raising the ceiling leaves the watcher armed and lifting it
 	// does not disarm what the operator asked for.
 	ceiling sandbox.Ceiling
@@ -119,7 +119,7 @@ type Agent struct {
 	mu   sync.Mutex // guards auto and window (both set from the UI goroutine)
 	auto bool
 	// window is the model's input token limit, 0 while unknown. Set
-	// asynchronously: the footer's lookup feeds it (ADR-0006).
+	// asynchronously: the footer's lookup feeds it (gem-agent ADR-0006).
 	window int
 
 	// turnInput is the operator's typed request for this turn, kept for
@@ -136,16 +136,16 @@ type Agent struct {
 	epoch int
 	// lateNotices are messages queued for the start of the next turn
 	// by abandoned MUTATING calls that completed in the background
-	// (ADR-0065 §2): the model was told "interrupted, result
+	// (gem-agent ADR-0065 §2): the model was told "interrupted, result
 	// discarded", and the effect landed anyway. Written from the
 	// abandoned goroutine, under mu; drained on the turn goroutine.
 	lateNotices []string
 	// pendingAtts are text attachments queued by AttachData for the
-	// next Run's user message (ADR-0055: one-shot piped stdin). Set
+	// next Run's user message (gem-agent ADR-0055: one-shot piped stdin). Set
 	// between turns only, drained by Run.
 	pendingAtts []llm.Attachment
 
-	// ADR-0040 per-turn state, agent goroutine only: the intervention
+	// gem-agent ADR-0040 per-turn state, agent goroutine only: the intervention
 	// callback and switch, the activity trace the progress reviewer
 	// reads, and the loop detector (consecutive identical calls;
 	// signatures the intervention already blessed — polling).
@@ -158,11 +158,11 @@ type Agent struct {
 	loopStreak   int
 	loopOK       map[string]bool
 	// mcpFaults is the per-turn ledger of remote tools answering with
-	// one identical error text (ADR-0075 §2), keyed by registry tool
+	// one identical error text (gem-agent ADR-0075 §2), keyed by registry tool
 	// name; it starts fresh with the loop guard's state.
 	mcpFaults map[string]*mcpFault
 
-	// policy is the operator's per-tool approval policy (ADR-0008). The
+	// policy is the operator's per-tool approval policy (gem-agent ADR-0008). The
 	// zero value leaves every tool at the default behaviour.
 	policy policy.Policy
 
@@ -172,22 +172,22 @@ type Agent struct {
 	advertise func(name string) bool
 
 	// msgs is the operator's language for the notices this package
-	// writes mid-turn (ADR-0029). Never nil: New falls back to English,
+	// writes mid-turn (gem-agent ADR-0029). Never nil: New falls back to English,
 	// so a caller that does not care — every test — needs no wiring.
 	msgs *uitext.Messages
-	// clipboard captures the clipboard image (ADR-0012). May be nil.
+	// clipboard captures the clipboard image (gem-agent ADR-0012). May be nil.
 	clipboard func() ([]byte, error)
 
-	// stats is the per-category usage accounting (ADR-0019), guarded by
+	// stats is the per-category usage accounting (gem-agent ADR-0019), guarded by
 	// mu with everything else the UI goroutine reads.
 	stats UsageStats
 
 	// logDead marks the transcript as stopped after a conversation-
-	// bearing write failed (ADR-0021): the file keeps a consistent
+	// bearing write failed (gem-agent ADR-0021): the file keeps a consistent
 	// prefix instead of drifting from the live history. Guarded by mu.
 	logDead bool
 
-	// tag is the session-scoped isolation tag (ADR-0018). Stable across
+	// tag is the session-scoped isolation tag (gem-agent ADR-0018). Stable across
 	// rounds and turns so the request prefix stays byte-identical and
 	// implicit caching can hit; regenerated on Reset and SetHistory.
 	// Session scope is sound because guard.Wrap refuses content that
@@ -199,7 +199,7 @@ type Agent struct {
 	history  []llm.Message
 	toolDefs []llm.ToolDef
 	// purposeTools names the tools whose advertised schema lagent
-	// extended with the purpose argument (ADR-0047). Only those calls
+	// extended with the purpose argument (gem-agent ADR-0047). Only those calls
 	// have it stripped before execution — an argument a server declared
 	// itself belongs to that server.
 	purposeTools map[string]bool
@@ -219,10 +219,10 @@ type Options struct {
 	// a hang).
 	OnToolCall func(tc llm.ToolCall)
 	// Ceiling is the session's starting lane ceiling and watcher
-	// (ADR-0080 §1). The zero value is today's behaviour.
+	// (gem-agent ADR-0080 §1). The zero value is today's behaviour.
 	Ceiling sandbox.Ceiling
 	// Model names the model these calls bill against. Record-keeping
-	// only (ADR-0057): it goes into the usage records so a transcript
+	// only (gem-agent ADR-0057): it goes into the usage records so a transcript
 	// can be priced without joining the header, and into an
 	// auto_decision the model tier answered, so a verdict can be read
 	// back against the model that gave it. The backend picks the model.
@@ -230,9 +230,9 @@ type Options struct {
 	// OnUsage, when set, receives per-round token usage (prompt tokens
 	// approximate the current context size; output tokens the round's
 	// generation; cached tokens the share of the prompt served from the
-	// implicit cache, ADR-0018) — the TUI footer consumes it.
+	// implicit cache, gem-agent ADR-0018) — the TUI footer consumes it.
 	OnUsage func(u llm.Usage)
-	// AutoApprove starts the session in auto-approve mode (ADR-0004).
+	// AutoApprove starts the session in auto-approve mode (gem-agent ADR-0004).
 	AutoApprove bool
 	// OnAutoDecision, when set, observes each auto-mode verdict so the
 	// UI can show what ran without asking, and why.
@@ -240,7 +240,7 @@ type Options struct {
 	// BeforeOperatorWrite, when set, is told that a call the operator
 	// approved as OperatorOnly — a write into the files later sessions
 	// trust — is about to run; OnOperatorWrite, when set, is told that
-	// it ran to completion (ADR-0074 §1). The pair lets the runtime
+	// it ran to completion (gem-agent ADR-0074 §1). The pair lets the runtime
 	// compare the file before and after: the operator saw the write,
 	// not what had happened to the file before it.
 	BeforeOperatorWrite func(tc llm.ToolCall)
@@ -252,7 +252,7 @@ type Options struct {
 	// content-filter block, a compaction) so the operator sees what
 	// happened.
 	OnNotice func(msg string)
-	// Policy is the per-tool approval policy (ADR-0008).
+	// Policy is the per-tool approval policy (gem-agent ADR-0008).
 	Policy policy.Policy
 	// Advertise, when set, decides which registered tools are declared
 	// to the model; the others stay registered — gated, recorded,
@@ -261,7 +261,7 @@ type Options struct {
 	// tool is refused with the route to it.
 	Advertise func(name string) bool
 	// ClipboardImage captures the clipboard image as PNG bytes for the
-	// @clipboard reference (ADR-0012). nil reports it unavailable.
+	// @clipboard reference (gem-agent ADR-0012). nil reports it unavailable.
 	ClipboardImage func() ([]byte, error)
 	// Msgs is the resolved UI catalog. Nil means English.
 	Msgs *uitext.Messages
@@ -332,7 +332,7 @@ func New(opts Options) *Agent {
 // Reset clears the conversation history (REPL /clear). The isolation
 // tag rotates with it — a fresh conversation gets a fresh nonce, and the
 // cache prefix restarts anyway. The clear is recorded in the transcript
-// (ADR-0021): it is a history mutation like any other, and without the
+// (gem-agent ADR-0021): it is a history mutation like any other, and without the
 // record a resumed session resurrected everything the operator
 // discarded — with post-clear compaction indices applied to the wrong
 // list on replay.
@@ -346,7 +346,7 @@ func (a *Agent) Reset() {
 	a.logRecord(session.KindClear, map[string]any{"messages": cleared})
 }
 
-// Restart is Reset for a new session (ADR-0071 §2): the history is
+// Restart is Reset for a new session (gem-agent ADR-0071 §2): the history is
 // emptied and the transcript switched to log, with no clear record —
 // the old transcript ends where the conversation ended and stays
 // resumable by its own id. Same between-turns discipline as Reset.
@@ -364,7 +364,7 @@ func (a *Agent) Restart(log SessionLog) {
 	a.epoch++
 	a.log = log
 	a.logDead = false
-	// An abandoned call's late note (ADR-0065 §2) answers the model's
+	// An abandoned call's late note (gem-agent ADR-0065 §2) answers the model's
 	// own "result discarded" — a conversation that never made the
 	// call has nothing to correct; the tool_late_return record and
 	// the audit event still capture the effect.
@@ -396,7 +396,7 @@ func (a *Agent) SetContextWindow(tokens int) {
 	a.mu.Unlock()
 }
 
-// Usage returns a snapshot of the session's accounting (ADR-0019).
+// Usage returns a snapshot of the session's accounting (gem-agent ADR-0019).
 func (a *Agent) Usage() UsageStats {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -406,7 +406,7 @@ func (a *Agent) Usage() UsageStats {
 	return s
 }
 
-// SetPolicy replaces the per-tool approval policy (ADR-0008), which the
+// SetPolicy replaces the per-tool approval policy (gem-agent ADR-0008), which the
 // settings panel edits mid-session. Guarded because the UI goroutine
 // sets it while the agent goroutine reads it per tool call.
 func (a *Agent) SetPolicy(p policy.Policy) {
@@ -417,7 +417,7 @@ func (a *Agent) SetPolicy(p policy.Policy) {
 
 // Policy returns the approval policy currently in force — the live
 // value, so displays follow mid-session /settings edits instead of the
-// startup snapshot (ADR-0021).
+// startup snapshot (gem-agent ADR-0021).
 func (a *Agent) Policy() policy.Policy {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -425,12 +425,12 @@ func (a *Agent) Policy() policy.Policy {
 }
 
 // callPolicy resolves the policy for one concrete call: the per-command
-// table (ADR-0045) refines the tool's policy for shell commands. Every
+// table (gem-agent ADR-0045) refines the tool's policy for shell commands. Every
 // gate decision goes through here, so a learned rule and an
 // operator-set one are the same thing everywhere downstream.
 //
 // The purpose argument is stripped first: lagent's own field is not
-// part of what the command runs (ADR-0047 §2).
+// part of what the command runs (gem-agent ADR-0047 §2).
 func (a *Agent) callPolicy(tc llm.ToolCall) policy.Decision {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -438,7 +438,7 @@ func (a *Agent) callPolicy(tc llm.ToolCall) policy.Decision {
 }
 
 // shellCommand returns the command a shell call runs, with lagent's
-// own purpose field removed (ADR-0047 §2). Empty for every other tool.
+// own purpose field removed (gem-agent ADR-0047 §2). Empty for every other tool.
 func (a *Agent) shellCommand(tc llm.ToolCall) string {
 	if tc.Name != tools.ShellExecName {
 		return ""
@@ -448,7 +448,7 @@ func (a *Agent) shellCommand(tc llm.ToolCall) string {
 }
 
 // learnKey is the key a learned rule would be written under for this
-// call (ADR-0045 §3): the command key for a shell call, the tool name
+// call (gem-agent ADR-0045 §3): the command key for a shell call, the tool name
 // otherwise, and "" for a shell command too complex to key — which no
 // rule may ever match, and therefore no rule may be learned from.
 //
@@ -466,7 +466,7 @@ func (a *Agent) learnKey(tc llm.ToolCall) string {
 	return key
 }
 
-// CeilingState reports the lane ceiling and its watcher (ADR-0080 §1).
+// CeilingState reports the lane ceiling and its watcher (gem-agent ADR-0080 §1).
 func (a *Agent) CeilingState() sandbox.Ceiling {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -475,7 +475,7 @@ func (a *Agent) CeilingState() sandbox.Ceiling {
 
 // SetReadOnly turns the ceiling on or off, leaving the watcher alone.
 // Lowering it is the operator's act: nothing inside the runtime calls
-// this with false (ADR-0080 §2). by names who moved it, and the record
+// this with false (gem-agent ADR-0080 §2). by names who moved it, and the record
 // is written here rather than at each call site — /readonly changed the
 // ceiling with no record at all while the ADR said every change was
 // recorded (independent review, 2026-09-09).
@@ -586,17 +586,17 @@ func (a *Agent) AnnounceSession(facts string) {
 }
 
 // AttachData queues one text attachment for the next Run's user message
-// (ADR-0055): one-shot mode uses it to carry piped stdin as
+// (gem-agent ADR-0055): one-shot mode uses it to carry piped stdin as
 // nonce-wrapped untrusted data. It must never be merged into the input
 // string instead — that would hand the risk evaluator's trusted
-// instruction channel (ADR-0038/0054) to whatever produced the pipe.
+// instruction channel (gem-agent ADR-0038/0054) to whatever produced the pipe.
 // Same between-turns discipline as AddContext.
 func (a *Agent) AttachData(ref, kind, content string) {
 	a.pendingAtts = append(a.pendingAtts, llm.Attachment{Ref: ref, Kind: kind, Content: content})
 }
 
 // RefreshTools re-caches the tool declarations from the registry
-// (ADR-0039: an MCP reload changed what the registry holds). Called
+// (gem-agent ADR-0039: an MCP reload changed what the registry holds). Called
 // only between turns — a slash command structurally cannot run while
 // a turn is in flight — so it shares AddContext's single-writer
 // discipline.
@@ -604,9 +604,9 @@ func (a *Agent) RefreshTools() {
 	a.toolDefs, a.purposeTools = toolDefs(a.registry, a.advertise)
 }
 
-// SetSystem replaces the system prompt (ADR-0039: a skills reload
+// SetSystem replaces the system prompt (gem-agent ADR-0039: a skills reload
 // rebuilt its skill section). The byte-identical request prefix
-// changes with it, so the implicit cache (ADR-0018) re-warms on the
+// changes with it, so the implicit cache (gem-agent ADR-0018) re-warms on the
 // next round — the deliberate cost of an operator-initiated reload.
 // Same between-turns discipline as AddContext.
 func (a *Agent) SetSystem(s string) { a.system = s }
@@ -619,28 +619,28 @@ func (a *Agent) HistoryLen() int { return len(a.history) }
 func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out string, retErr error) {
 	// An empty user message would be appended to the transcript but
 	// silently dropped from the request (buildContents skips it) — a
-	// history the model never saw. Refuse it at the door (ADR-0021).
+	// history the model never saw. Refuse it at the door (gem-agent ADR-0021).
 	if strings.TrimSpace(input) == "" {
 		return "", fmt.Errorf("empty input")
 	}
 	// The typed input (never attachment content — the string carries
 	// @ref tokens, not bytes) is kept for the round-limit dialog.
 	a.turnInput = input
-	// A declined lift is declined for the rest of the turn (ADR-0080
+	// A declined lift is declined for the rest of the turn (gem-agent ADR-0080
 	// §4): a model pushed by a poisoned tool result must not be able
 	// to raise one prompt per proposed write until the operator
 	// clears it to make them stop.
 	a.liftDeclined = false
 	a.logModeStart()
 	// An abandoned mutating call that completed since the last turn
-	// is announced before this turn's message (ADR-0065 §2): the
+	// is announced before this turn's message (gem-agent ADR-0065 §2): the
 	// model's last word on it was "interrupted, result discarded".
 	for _, note := range a.takeLateNotices() {
 		a.appendMessage(llm.Message{Role: llm.RoleUser, Content: note})
 	}
 	// @-references become attachments carried beside the text; the text
 	// the operator typed is left exactly as written. Queued data
-	// attachments (ADR-0055: piped stdin) ride the same lane.
+	// attachments (gem-agent ADR-0055: piped stdin) ride the same lane.
 	msg := llm.Message{Role: llm.RoleUser, Content: input}
 	msg.Attachments = append(msg.Attachments, a.pendingAtts...)
 	a.pendingAtts = nil
@@ -669,12 +669,12 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 	}
 	a.appendMessage(msg)
 
-	// ADR-0040 per-turn state: the loop detector and the reviewer's
+	// gem-agent ADR-0040 per-turn state: the loop detector and the reviewer's
 	// activity trace start fresh with every turn.
 	a.turnCalls, a.loopPrevSig, a.loopStreak, a.loopOK = nil, "", 0, nil
 	a.mcpFaults = nil
 	// limit grows by intervention grants; the cap is the ceiling no
-	// verdict can lift (ADR-0040 §3).
+	// verdict can lift (gem-agent ADR-0040 §3).
 	limit := a.maxTurns
 	roundCap := a.maxTurns * roundCapMultiplier
 
@@ -695,7 +695,7 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 			}
 		}
 		a.turnRound = round
-		// The session-scoped tag (ADR-0018): stable across rounds and
+		// The session-scoped tag (gem-agent ADR-0018): stable across rounds and
 		// turns so the request prefix stays byte-identical and implicit
 		// caching can hit. Reuse is sound because guard.Wrap refuses
 		// content containing the tag name — a leaked tag cannot escape
@@ -759,7 +759,7 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 			if a.onToolCall != nil {
 				a.onToolCall(tc)
 			}
-			// Loop detector (ADR-0040 §1): three consecutive identical
+			// Loop detector (gem-agent ADR-0040 §1): three consecutive identical
 			// calls escalate NOW instead of burning rounds to the limit.
 			// A "continue" blesses the signature for the rest of the
 			// turn (polling asks once, not every three polls); a "stop"
@@ -810,12 +810,12 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 				ToolName:   tc.Name,
 				ToolCallID: tc.ID,
 				Content:    result,
-				// Provenance, not content (ADR-0060 §3): the wrap layer
+				// Provenance, not content (gem-agent ADR-0060 §3): the wrap layer
 				// trusts this flag, so it is set only from execCall's
 				// gate-denial verdict, never inferred from the text.
 				Denial: denied,
 				// The runtime's own words about a remote tool's repeated
-				// identical failure (ADR-0075 §3): provenance again — set
+				// identical failure (gem-agent ADR-0075 §3): provenance again — set
 				// here from the typed error the executor returned, never
 				// from the result text. Empty for every other call.
 				RuntimeNote: a.remoteFault(tc.Name, remote, ran, round),
@@ -880,7 +880,7 @@ func (a *Agent) appendMessage(m llm.Message) {
 // Attachments are wrapped for the same reason tool output is: the
 // operator chose the file, but not what is inside it.
 //
-// instructionTools are the exception (ADR-0010): a skill body is an
+// instructionTools are the exception (gem-agent ADR-0010): a skill body is an
 // instruction file the operator installed, same trust tier as the
 // AGENTS.md already injected unwrapped — and wrapping it as data while
 // the system prompt forbids following data would leave every skill
@@ -891,11 +891,11 @@ func wrapToolMessages(history []llm.Message, tag guard.Tag) []llm.Message {
 	copy(out, history)
 	for i := range out {
 		if out[i].Role == llm.RoleTool {
-			// Gate denials are the other trusted tool result (ADR-0060
+			// Gate denials are the other trusted tool result (gem-agent ADR-0060
 			// §3): their content is authored by lagent and the
 			// operator, and wrapping the operator's typed guidance as
 			// data the system prompt forbids following would leave it
-			// half-inert — the ADR-0010 argument, applied to the party
+			// half-inert — the gem-agent ADR-0010 argument, applied to the party
 			// the system already trusts unwrapped. The flag is
 			// provenance from the executor, never derived from content.
 			if out[i].Denial {
@@ -913,7 +913,7 @@ func wrapToolMessages(history []llm.Message, tag guard.Tag) []llm.Message {
 						att.Kind, att.Ref)
 				}
 			}
-			// The runtime's note rides outside the tag too (ADR-0075
+			// The runtime's note rides outside the tag too (gem-agent ADR-0075
 			// §3): lagent's words, at the system prompt's trust level,
 			// after the wrapped server text. Provenance is the field; a
 			// result whose text merely looks like the note stays wrapped.
@@ -927,7 +927,7 @@ func wrapToolMessages(history []llm.Message, tag guard.Tag) []llm.Message {
 		}
 		// Text attachments flatten into wrapped text; image attachments
 		// survive as attachments — the LLM layer turns them into image
-		// parts, which no tag can wrap (ADR-0012).
+		// parts, which no tag can wrap (gem-agent ADR-0012).
 		var b strings.Builder
 		b.WriteString(out[i].Content)
 		var images []llm.Attachment
@@ -969,13 +969,13 @@ func wrapUntrusted(content string, tag guard.Tag) string {
 // silent drops (Gemini pairs every function call with a response).
 // deniedResult is execCall's answer for a bare gate denial; the denied
 // return value, not this text, is what the attach branches and the
-// audit outcome recognize (ADR-0060 §3) — they used to match the
+// audit outcome recognize (gem-agent ADR-0060 §3) — they used to match the
 // string, which was one denial-shaped tool output away from
 // misclassification.
 const deniedResult = "Tool execution denied by the user. Do not retry the same call; ask the user how to proceed instead."
 
 // deniedWithReason renders a denial that carries the operator's typed
-// reason (ADR-0060 §2): guidance delivered in the denial function
+// reason (gem-agent ADR-0060 §2): guidance delivered in the denial function
 // response, the one slot the API leaves open mid-round.
 func deniedWithReason(reason string) string {
 	return "Tool execution denied by the user, who gave this reason:\n" +
@@ -983,9 +983,9 @@ func deniedWithReason(reason string) string {
 		"\nDo not retry the same call; follow the reason, or ask the user how to proceed."
 }
 
-// execCall wraps execCallInner with the ADR-0035 tool.call audit
+// execCall wraps execCallInner with the gem-agent ADR-0035 tool.call audit
 // event: what ran, for how long, with what outcome. denied is
-// provenance, not content (ADR-0060 §3): true exactly when the gate
+// provenance, not content (gem-agent ADR-0060 §3): true exactly when the gate
 // refused the call.
 //
 // ran is true exactly when the tool's Run was reached and returned on
@@ -997,7 +997,7 @@ func deniedWithReason(reason string) string {
 // the flag nor the "error:" prefix: the pixels rode along with the
 // refusal.
 //
-// remote is the typed failure of a remote (MCP) call (ADR-0075 §1),
+// remote is the typed failure of a remote (MCP) call (gem-agent ADR-0075 §1),
 // read from the error value the tool returned — provenance for the
 // fault ledger, never inferred from the result text. Nil for every
 // other outcome.
@@ -1013,8 +1013,8 @@ func (a *Agent) execCall(ctx context.Context, tc llm.ToolCall) (result string, d
 
 // execCallInner reports, beside the result, three provenance facts the
 // callers must not infer from the text: denied (the gate refused,
-// ADR-0060 §3), hookDenied (a pre-tool hook refused, ADR-0044 §2), and
-// the ADR-0065 floor state.
+// gem-agent ADR-0060 §3), hookDenied (a pre-tool hook refused, gem-agent ADR-0044 §2), and
+// the gem-agent ADR-0065 floor state.
 //
 // runErr is the error the tool's Run returned, when it did (nil for a
 // refusal at any layer): the caller reads a remote call's provenance
@@ -1025,13 +1025,13 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 	// dead call is the last thing they asked for (review round 2).
 	if ctx.Err() != nil {
 		// Audited as interrupted, not error: the call never ran
-		// because the operator stopped the turn (ADR-0065 review).
+		// because the operator stopped the turn (gem-agent ADR-0065 review).
 		return "error: interrupted before execution", false, floorInterrupted, nil
 	}
 	tool, ok := a.registry.Get(tc.Name)
 	if !ok {
 		if a.registry.Excluded(tc.Name) {
-			// The operator removed this one from the session (ADR-0077).
+			// The operator removed this one from the session (gem-agent ADR-0077).
 			// The model is told what every unresolved name is told: a
 			// tool that was excluded and a tool that never existed are
 			// the same fact from where it stands, and giving the first
@@ -1064,7 +1064,7 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 		// different question — lift the mode? — and it is must-prompt,
 		// so neither an 'a', a "never" policy (the ceiling is tested
 		// before the policy gate) nor the model tier answers it. A mode
-		// is not a call (ADR-0080 §4).
+		// is not a call (gem-agent ADR-0080 §4).
 		// The record is written where the outcome is known, not here:
 		// logging "refused" on detection put a ceiling_refused in the
 		// transcript for every call the operator then let through
@@ -1106,7 +1106,7 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 		}
 		// The ceiling only. The watcher the operator armed stays armed,
 		// so a later read-only request is caught the same way the first
-		// one was (ADR-0080 §1).
+		// one was (gem-agent ADR-0080 §1).
 		a.SetReadOnly(false, "operator")
 		// A mode change, not this call's approval. SetReadOnly above
 		// already emitted mode.change; this record is what names the
@@ -1137,15 +1137,15 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 	}
 	if a.gated(d, tc) {
 		approved, reason := false, ""
-		// The floor (ADR-0021 §5): a Block-tier call, an OperatorOnly
-		// Review (ADR-0072 §4.5), or a tool whose policy is "always",
+		// The floor (gem-agent ADR-0021 §5): a Block-tier call, an OperatorOnly
+		// Review (gem-agent ADR-0072 §4.5), or a tool whose policy is "always",
 		// may not be answered by the gates' session allowlist. One
-		// decision (ADR-0073 §4), read here and in the ladder.
+		// decision (gem-agent ADR-0073 §4), read here and in the ladder.
 		mustPrompt := a.callPolicy(tc) == policy.AlwaysAsk
 		// No standing shortcut answers a call the ceiling cannot bound:
 		// the allowlist may not, and `gated` below refuses a `never`
 		// policy the same way. The model tier still judges it — that is
-		// ADR-0080 §5, and it is a judgment rather than a guarantee.
+		// gem-agent ADR-0080 §5, and it is a judgment rather than a guarantee.
 		if d.Floor() {
 			mustPrompt = true
 			// Shown on the prompt, so the operator sees why an
@@ -1176,7 +1176,7 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 				"tier": d.Tier.String(), "reason": d.Reason, "model": d.ModelConsulted,
 				// The learner reads this to tell an escalation the
 				// operator then approved from a call the ladder passed
-				// on its own (ADR-0045): only the first is evidence of
+				// on its own (gem-agent ADR-0045): only the first is evidence of
 				// what the operator wants.
 				"key": a.learnKey(tc),
 			}
@@ -1195,7 +1195,7 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 		}
 		if !approved {
 			// "gate" covers the operator and the session allowlist —
-			// the gates answer as one (ADR-0035 v1 granularity).
+			// the gates answer as one (gem-agent ADR-0035 v1 granularity).
 			detail, purpose := a.Describe(tc)
 			// The ceiling's sentence is the only thing on the prompt
 			// that explains the two missing answers, so it survives
@@ -1219,8 +1219,8 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 				source = "allowlist"
 			}
 			operatorWrite = ok && d.Verdict.OperatorOnly && !fromAllowlist
-			// The transcript record (ADR-0045 §7) survives /learn's
-			// withdrawal (ADR-0049 §2): telemetry is opt-in and
+			// The transcript record (gem-agent ADR-0045 §7) survives /learn's
+			// withdrawal (gem-agent ADR-0049 §2): telemetry is opt-in and
 			// off-machine, and any future learning design needs a local
 			// record of the operator's own decisions — inferring them
 			// from what ran cannot tell a typed 'y' from a policy that
@@ -1232,7 +1232,7 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 			// that can never match a learned rule, which is exactly the
 			// call that must not produce one either.
 			// source tells a typed answer from one the session allowlist
-			// gave (ADR-0048 §1): only the gate knows, and the learner
+			// gave (gem-agent ADR-0048 §1): only the gate knows, and the learner
 			// weighs the two differently.
 			record := map[string]any{
 				"name": tc.Name, "decision": decision, "must_prompt": mustPrompt,
@@ -1240,8 +1240,8 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 				"lane": a.laneOf(tc),
 			}
 			// The operator's own words about their own decision — the
-			// strongest evidence ADR-0045 stores. Local record only:
-			// free text stays out of the telemetry export (ADR-0060 §4).
+			// strongest evidence gem-agent ADR-0045 stores. Local record only:
+			// free text stays out of the telemetry export (gem-agent ADR-0060 §4).
 			if denyReason != "" {
 				record["deny_reason"] = denyReason
 			}
@@ -1282,7 +1282,7 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 	return out, false, state, nil
 }
 
-// floorState says how a tool call came back through the ADR-0065
+// floorState says how a tool call came back through the gem-agent ADR-0065
 // floor: on its own, after the cancel but inside the grace, or not at
 // all (abandoned — the floor returned without it).
 type floorState int
@@ -1294,7 +1294,7 @@ const (
 )
 
 // abandonGrace is how long the floor waits, after the turn's context
-// is cancelled, for a tool to return on its own (ADR-0065 §2). A walk
+// is cancelled, for a tool to return on its own (gem-agent ADR-0065 §2). A walk
 // that consults the context is back within one syscall on a
 // filesystem that answers, and that partial result must win the race
 // against the floor; a blocking syscall on a hung mount never comes
@@ -1308,10 +1308,10 @@ const abandonGrace = time.Second
 // on: the effect may still land, the result never will.
 const abandonedResult = "error: interrupted — the call was abandoned; it may still complete in the background and its result is discarded"
 
-// runWithFloor runs the tool under the return guarantee of ADR-0065
+// runWithFloor runs the tool under the return guarantee of gem-agent ADR-0065
 // §2: the call runs in its own goroutine, and once the context is
 // cancelled the caller waits at most abandonGrace for it. The stop is
-// best-effort, the return is guaranteed — ADR-0034's rule applied to
+// best-effort, the return is guaranteed — gem-agent ADR-0034's rule applied to
 // the process, which a cooperative check alone cannot deliver (a
 // ReadDir on a hung mount returns when the kernel says so). Only the
 // run is under the floor, never the approval gate, and a tool that
@@ -1327,7 +1327,7 @@ const abandonedResult = "error: interrupted — the call was abandoned; it may s
 // best-effort after the session has ended. Nothing consumes the late
 // result itself.
 func (a *Agent) runWithFloor(ctx context.Context, tool *tools.Tool, tc llm.ToolCall) (out string, state floorState, err error) {
-	// The purpose argument is lagent's, not the tool's (ADR-0047
+	// The purpose argument is lagent's, not the tool's (gem-agent ADR-0047
 	// §2): no MCP server may receive an argument its schema never
 	// declared.
 	args := a.stripPurpose(tc.Name, tc.Args)
@@ -1433,7 +1433,7 @@ func (a *Agent) askGate(tc llm.ToolCall, detail, purpose, reason string, mustPro
 }
 
 // gated reports whether this call goes through the approval machinery at
-// all, applying the operator's per-tool policy (ADR-0008) on top of the
+// all, applying the operator's per-tool policy (gem-agent ADR-0008) on top of the
 // default "mutating tools ask" rule.
 //
 // The one subtlety is `never`: it skips the gate, but it does not lift
@@ -1450,7 +1450,7 @@ func (a *Agent) gated(d Decision, tc llm.ToolCall) bool {
 	case policy.NeverAsk:
 		// Block and OperatorOnly are floors a `never` policy — or a
 		// one-shot --allow grant, which is the same policy for one run
-		// — does not lift (ADR-0072 §4.9: `--allow write_file --auto`
+		// — does not lift (gem-agent ADR-0072 §4.9: `--allow write_file --auto`
 		// wrote AGENTS.md unattended).
 		return d.Floor()
 	default:
@@ -1497,7 +1497,7 @@ func (a *Agent) notify(msg string) {
 	}
 }
 
-// logUsage writes one accounting record per model call (ADR-0057).
+// logUsage writes one accounting record per model call (gem-agent ADR-0057).
 // EVERY call goes through here — main loop, risk evaluation, progress
 // review, compaction — because a tally that lives only in memory is
 // gone when the process exits, and the API never reports cost.
@@ -1515,7 +1515,7 @@ func (a *Agent) logUsage(source string, u llm.Usage) {
 func (a *Agent) logRecord(kind string, data any) {
 	// log is read under mu beside the dead mark: Restart swaps it
 	// from the UI goroutine while an abandoned call's late-return
-	// goroutine (ADR-0065 §2) may still be about to record.
+	// goroutine (gem-agent ADR-0065 §2) may still be about to record.
 	a.mu.Lock()
 	log, dead := a.log, a.logDead
 	a.mu.Unlock()
@@ -1526,7 +1526,7 @@ func (a *Agent) logRecord(kind string, data any) {
 	// conversation-bearing record that failed to land breaks the file's
 	// second job as the resume source of truth: the live history and the
 	// transcript would drift, and every later compaction index would be
-	// computed against a list the replay does not have (ADR-0021). So a
+	// computed against a list the replay does not have (gem-agent ADR-0021). So a
 	// failed conversation write stops the transcript at a consistent
 	// prefix, loudly; diagnostics-only failures stay best-effort.
 	if err := log.Log(kind, data); err != nil {
@@ -1541,7 +1541,7 @@ func (a *Agent) logRecord(kind string, data any) {
 }
 
 // clip truncates for display, by runes: a byte cut can split a UTF-8
-// sequence and print U+FFFD mid-word (ADR-0021).
+// sequence and print U+FFFD mid-word (gem-agent ADR-0021).
 func clip(s string, limit int) string {
 	r := []rune(s)
 	if len(r) <= limit {

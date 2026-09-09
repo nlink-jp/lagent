@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// ADR-0067: a piped stdin that closes promptly is read silently; one
+// gem-agent ADR-0067: a piped stdin that closes promptly is read silently; one
 // that stays open past the grace is announced exactly once and still
 // read to EOF.
 
@@ -74,7 +74,7 @@ func TestReadPipedStdinNoticing_IdlePipeClosedEmptyAfterNotice(t *testing.T) {
 	}
 }
 
-// ADR-0067 §2: an announced wait is seen to end; a silent read stays
+// gem-agent ADR-0067 §2: an announced wait is seen to end; a silent read stays
 // silent; a warning already says nothing was attached.
 func TestStdinOutcomeLine(t *testing.T) {
 	cases := []struct {

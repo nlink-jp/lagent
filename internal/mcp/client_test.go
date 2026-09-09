@@ -311,7 +311,7 @@ func TestToolListPagination(t *testing.T) {
 
 // A server may answer with an image. The client used to flatten every
 // non-text block to "[non-text content: image]", so a screenshot from
-// chrome-pilot-mcp was invisible to the model (ADR-0058).
+// chrome-pilot-mcp was invisible to the model (gem-agent ADR-0058).
 func TestNonTextContentSurvives(t *testing.T) {
 	png := []byte("\x89PNG\r\n\x1a\nfake pixels")
 	f := &fakeServer{}
@@ -372,7 +372,7 @@ func TestUndecodableContentIsReportedNotDropped(t *testing.T) {
 	}
 }
 
-// ADR-0075 §1: a server's JSON-RPC error object is the server's words,
+// gem-agent ADR-0075 §1: a server's JSON-RPC error object is the server's words,
 // delivered as a rejection rather than a result. CallTool wraps it in a
 // CallError that the adapter unwraps by type — never by matching text —
 // and a transport cause travels in the same envelope.
@@ -405,7 +405,7 @@ func TestRPCErrorIsTypedThroughCallError(t *testing.T) {
 	}
 }
 
-// ADR-0075 §1 (pre-release review A-1): a server that refuses to start —
+// gem-agent ADR-0075 §1 (pre-release review A-1): a server that refuses to start —
 // its initialize answered with a JSON-RPC error — has not rejected the
 // call; the call was never sent. CallError says so, and the RPCError is
 // still reachable as the cause.

@@ -2,7 +2,7 @@ package policy
 
 import "testing"
 
-// ADR-0045 §3: the key is a syntactic fact. The table is the contract
+// gem-agent ADR-0045 §3: the key is a syntactic fact. The table is the contract
 // both sides of the feature share — the learner aggregates by it and the
 // gate matches by it — so every exclusion is pinned here.
 func TestCommandKey(t *testing.T) {
@@ -68,7 +68,7 @@ func TestCommandKeyEvalIsAWordNotASubstring(t *testing.T) {
 	}
 }
 
-// ADR-0045 §4: the per-command table decides only where the tool policy
+// gem-agent ADR-0045 §4: the per-command table decides only where the tool policy
 // leaves room, and the tighter of the two always wins.
 func TestForCallCombinesTighter(t *testing.T) {
 	for _, tc := range []struct {

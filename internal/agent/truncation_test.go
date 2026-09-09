@@ -20,7 +20,7 @@ func (b *scriptedBackend) ChatStream(ctx context.Context, system string, message
 	return r, nil
 }
 
-// ADR-0021 §8: a cut-off response with partial text is kept but
+// gem-agent ADR-0021 §8: a cut-off response with partial text is kept but
 // reported — the empty guard alone let it pass as a complete answer.
 func TestTruncatedResponseIsReported(t *testing.T) {
 	backend := &scriptedBackend{responses: []*llm.Response{
@@ -60,7 +60,7 @@ func TestCompleteResponseNotReported(t *testing.T) {
 	}
 }
 
-// ADR-0021: an empty input is refused before it desyncs the transcript
+// gem-agent ADR-0021: an empty input is refused before it desyncs the transcript
 // from the requests (buildContents would drop it from the request).
 func TestEmptyInputRefused(t *testing.T) {
 	log := &recordingLog{}

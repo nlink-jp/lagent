@@ -103,7 +103,7 @@ func TestSettingsPolicyEditPersistsAndApplies(t *testing.T) {
 }
 
 // Project scope is expressed inside the machine-owned file, so nothing
-// is written into the operator's repository (ADR-0009 §4).
+// is written into the operator's repository (gem-agent ADR-0009 §4).
 func TestSettingsProjectScopeStaysOutOfTheRepository(t *testing.T) {
 	s := newStore(t)
 	if _, line := s.Apply(tui.SettingChange{Tool: "edit_file", Value: "never", Scope: tui.ScopeProject}); !strings.Contains(line, "in ") {
@@ -192,7 +192,7 @@ func TestWriteSettingsTableGroupsBySection(t *testing.T) {
 	}
 }
 
-// An untrusted project's "never" is dropped (ADR-0008). Crediting it as
+// An untrusted project's "never" is dropped (gem-agent ADR-0008). Crediting it as
 // the deciding source would tell the operator the opposite of the truth.
 func TestSettingsMarksAnIgnoredProjectEntry(t *testing.T) {
 	s := newStore(t)

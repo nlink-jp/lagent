@@ -20,7 +20,7 @@ func openWithHeader(t *testing.T, dir string) *Logger {
 	return lg
 }
 
-// ADR-0021 §2: a crash's torn last line costs exactly itself. Reopen
+// gem-agent ADR-0021 §2: a crash's torn last line costs exactly itself. Reopen
 // repairs the missing newline so later appends stay parseable, and Load
 // skips the torn line instead of dropping everything after it.
 func TestTornLineCostsOnlyItself(t *testing.T) {
@@ -77,7 +77,7 @@ func TestCorruptMiddleLineIsSkippedNotFatal(t *testing.T) {
 	}
 }
 
-// ADR-0021 §2 guard: a compaction record whose index base may have been
+// gem-agent ADR-0021 §2 guard: a compaction record whose index base may have been
 // shifted by skipped lines is refused — replaying the wrong messages is
 // worse than refusing.
 func TestCompactionAfterSkippedLinesRefused(t *testing.T) {
@@ -101,7 +101,7 @@ func TestCompactionAfterSkippedLinesRefused(t *testing.T) {
 	}
 }
 
-// ADR-0021 §1: a clear record replays as "history empties here", so a
+// gem-agent ADR-0021 §1: a clear record replays as "history empties here", so a
 // cleared session resumes cleared — and post-clear compaction indices
 // are relative to the fresh history.
 func TestClearRecordReplays(t *testing.T) {
@@ -149,7 +149,7 @@ func TestClearResetsCompactionSkipGuard(t *testing.T) {
 	}
 }
 
-// ADR-0021 §4: the second process resuming a live session is refused.
+// gem-agent ADR-0021 §4: the second process resuming a live session is refused.
 func TestConcurrentReopenRefused(t *testing.T) {
 	dir := t.TempDir()
 	lg := openWithHeader(t, dir)

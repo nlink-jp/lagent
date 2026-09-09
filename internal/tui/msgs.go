@@ -1,4 +1,4 @@
-// Package tui implements the interactive terminal UI (ADR-0002):
+// Package tui implements the interactive terminal UI (gem-agent ADR-0002):
 // Bubble Tea in inline mode — completed conversation flushes to the
 // terminal's native scrollback, only the live region (streaming text,
 // status, input box) is managed. The agent core stays UI-agnostic; the
@@ -16,7 +16,7 @@ import (
 // TextDelta carries one streamed chunk of model text.
 type TextDelta string
 
-// AskRequest is the ask_user tool's dialog (ADR-0036): the model's
+// AskRequest is the ask_user tool's dialog (gem-agent ADR-0036): the model's
 // question with 2-8 options. Resp receives the chosen index, or -1
 // when the operator declines (Esc).
 type AskRequest struct {
@@ -25,7 +25,7 @@ type AskRequest struct {
 	Resp     chan int
 }
 
-// StreamUpdate is turn observability from the backend (ADR-0033):
+// StreamUpdate is turn observability from the backend (gem-agent ADR-0033):
 // Kind "chunk" (heartbeat), "thought" (a live thought-summary delta),
 // or "retry" (a scheduled backoff retry).
 type StreamUpdate struct {
@@ -39,7 +39,7 @@ type StreamUpdate struct {
 
 // ToolCall announces a tool invocation (shown as an event line).
 // Purpose is the model's declaration of why it wants the call
-// (ADR-0047); empty for read-only tools, which are not gated and carry
+// (gem-agent ADR-0047); empty for read-only tools, which are not gated and carry
 // no such field.
 type ToolCall struct {
 	Name    string
@@ -76,8 +76,8 @@ type Attached struct {
 
 // ShellDone signals completion of a direct (!-prefixed) shell command.
 // Interrupted marks a Ctrl+C'd run: a message queued during it is
-// handed back rather than auto-sent (ADR-0007's rule, which the shell
-// path previously ignored — ADR-0021).
+// handed back rather than auto-sent (gem-agent ADR-0007's rule, which the shell
+// path previously ignored — gem-agent ADR-0021).
 type ShellDone struct {
 	Output      string
 	Interrupted bool
@@ -89,7 +89,7 @@ type Usage struct {
 	Prompt int
 	Output int
 	// Cached is the share of Prompt served from the implicit cache
-	// (ADR-0018) — the footer shows it so "is caching firing" is a
+	// (gem-agent ADR-0018) — the footer shows it so "is caching firing" is a
 	// glance, not an investigation.
 	Cached int
 }
@@ -105,7 +105,7 @@ type ContextWindow struct {
 
 // Output carries plain lines to the scrollback from work running
 // outside the event loop — /riskbook learn's progress and draft, for
-// one (ADR-0050). Attached exists for two other things and neither
+// one (gem-agent ADR-0050). Attached exists for two other things and neither
 // fits: its Lines are attachments (📎) and its Notes warnings (⚠);
 // a draft rendered as a column of warnings reads as a column of
 // problems.
@@ -114,7 +114,7 @@ type Output struct{ Lines []string }
 // ApprovalAnswer is the UI's reply to one ApprovalRequest. Key is the
 // dialog answer byte ('y', 'n', 'a' — 'p' resolves to 'y' before it is
 // sent, and a reasoned denial arrives as 'n'); Reason is the operator's
-// typed denial reason (ADR-0060), empty for every other answer.
+// typed denial reason (gem-agent ADR-0060), empty for every other answer.
 type ApprovalAnswer struct {
 	Key    byte
 	Reason string
@@ -126,7 +126,7 @@ type ApprovalRequest struct {
 	Tool   string
 	Detail string
 	// Purpose is the model's own one-sentence declaration of why it
-	// wants this call (ADR-0047). The arguments say what will run and
+	// wants this call (gem-agent ADR-0047). The arguments say what will run and
 	// Reason says why the operator is being asked; without this the
 	// third question — why the agent wants it — had no answer anywhere
 	// on screen. Empty when the model declared nothing, which is shown
@@ -136,7 +136,7 @@ type ApprovalRequest struct {
 	// of running it — the operator needs to know why they are being
 	// asked, and which tier objected.
 	Reason string
-	// ModeChange marks the read-only lift question (ADR-0080 §4). It is
+	// ModeChange marks the read-only lift question (gem-agent ADR-0080 §4). It is
 	// not a tool approval: the dialog says what changes, and offers
 	// y/n/N only — "allow for this session" and "always allow" are
 	// answers about a tool, and an 'a' here would register the tool in
@@ -144,7 +144,7 @@ type ApprovalRequest struct {
 	ModeChange bool
 	// NoStanding marks an ordinary tool approval that no standing
 	// answer may settle — an MCP call while the ceiling is in force
-	// (ADR-0080 §5). The question is the usual one, so the title and
+	// (gem-agent ADR-0080 §5). The question is the usual one, so the title and
 	// the consequence stay as they are; what goes is 'a' and 'p', which
 	// the ceiling refuses to honour anyway and which would therefore
 	// take effect only later, invisibly.
@@ -203,7 +203,7 @@ func (g *Gate) ApproveLift(toolName, detail, purpose, reason string) (bool, stri
 // answers removed. The dialog does not offer 'a' or 'p', and this
 // method could not honour them: while the ceiling is up the allowlist
 // may not answer, so the keystroke's only effect would be one the
-// operator cannot see until they lift the mode (ADR-0080 §5).
+// operator cannot see until they lift the mode (gem-agent ADR-0080 §5).
 func (g *Gate) ApproveOnce(toolName, detail, purpose, reason string) (bool, string) {
 	g.mu.Lock()
 	prog := g.prog
@@ -223,16 +223,16 @@ func (g *Gate) ApproveOnce(toolName, detail, purpose, reason string) (bool, stri
 
 // Approve implements agent.Approver. Fails closed when no program is
 // bound. mustPrompt says the session allowlist may not answer this call
-// (Block-tier, or an "always" policy — ADR-0021 §5); an 'a' answered on
+// (Block-tier, or an "always" policy — gem-agent ADR-0021 §5); an 'a' answered on
 // such a prompt still registers, for future non-Block calls. A denial
-// may carry the operator's typed reason (ADR-0060), which rides back
+// may carry the operator's typed reason (gem-agent ADR-0060), which rides back
 // to the agent verbatim.
 func (g *Gate) Approve(toolName, detail, purpose, reason string, mustPrompt bool) (approved, fromAllowlist bool, denyReason string) {
 	g.mu.Lock()
 	if !mustPrompt && g.always[toolName] {
 		g.mu.Unlock()
 		// One keystroke standing in for this call: the learner must not
-		// read it as a decision made here (ADR-0048 §1).
+		// read it as a decision made here (gem-agent ADR-0048 §1).
 		return true, true, ""
 	}
 	prog := g.prog

@@ -29,7 +29,7 @@ type Config struct {
 	// Sources records where each setting's effective value came from,
 	// keyed by its TOML path ("llm.model"). Three precedence layers with
 	// nothing on screen is a design that assumes the operator remembers
-	// them; /settings shows this instead (ADR-0009).
+	// them; /settings shows this instead (gem-agent ADR-0009).
 	Sources map[string]string `toml:"-"`
 }
 
@@ -56,7 +56,7 @@ func (c *Config) Source(key string) string {
 	return FromDefault
 }
 
-// ApprovalConfig carries the per-tool approval policy (ADR-0008).
+// ApprovalConfig carries the per-tool approval policy (gem-agent ADR-0008).
 type ApprovalConfig struct {
 	// Tools maps a tool name — or a trailing-wildcard prefix such as
 	// "mcp__tor-exit-lookup__*" — to "always" or "never".
@@ -65,18 +65,18 @@ type ApprovalConfig struct {
 	// .lagent.toml may REMOVE approvals. Everywhere else a project
 	// file may only add them: a directory's contents are not necessarily
 	// written by the operator, and cloning a repository must not be able
-	// to switch the gate off (ADR-0008 §4).
+	// to switch the gate off (gem-agent ADR-0008 §4).
 	TrustedProjects []string `toml:"trusted_projects"`
-	// PinTrustedFiles keys project trust on content (ADR-0074): the
+	// PinTrustedFiles keys project trust on content (gem-agent ADR-0074): the
 	// agent-facing files are digested when trusted and a changed one
 	// asks again before it is loaded. Default true; false restores the
-	// ADR-0023 behaviour (a trusted directory stays trusted whatever
+	// gem-agent ADR-0023 behaviour (a trusted directory stays trusted whatever
 	// its files come to contain).
 	PinTrustedFiles bool `toml:"pin_trusted_files"`
 }
 
 // ProjectConfig is <project>/.lagent.toml — the project-scoped half
-// of ADR-0008. Deliberately tiny: it carries policy, nothing else. Model
+// of gem-agent ADR-0008. Deliberately tiny: it carries policy, nothing else. Model
 // names, credentials and sandbox settings stay in the operator's own
 // config, where a checked-out repository cannot reach them.
 type ProjectConfig struct {
@@ -86,7 +86,7 @@ type ProjectConfig struct {
 
 // ProjectMCP is the project file's [mcp] table. It carries `exclude`
 // and nothing else: a project may only REMOVE tools from the session
-// (ADR-0077 §2), which is why it needs no trust condition — narrowing
+// (gem-agent ADR-0077 §2), which is why it needs no trust condition — narrowing
 // is the only composition available to it.
 type ProjectMCP struct {
 	Exclude []string `toml:"exclude"`
@@ -112,7 +112,7 @@ func LoadProject(dir string) (*ProjectConfig, error) {
 		}
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
-	// Untrusted input read before the trust prompt (ADR-0072 §4.5): a
+	// Untrusted input read before the trust prompt (gem-agent ADR-0072 §4.5): a
 	// bounded read, then the decode — never the file whole.
 	raw, err := readCapped(path, ProjectFileCap)
 	if err != nil {
@@ -135,7 +135,7 @@ func LoadProject(dir string) (*ProjectConfig, error) {
 
 // TrustsProject reports whether the operator listed dir as a project
 // whose own policy file may remove approvals. Both sides are compared
-// as resolved paths (ADR-0021): dir arrives symlink-resolved (/tmp is
+// as resolved paths (gem-agent ADR-0021): dir arrives symlink-resolved (/tmp is
 // /private/tmp on macOS), so raw string equality made a trust entry
 // under a symlinked path silently never match — and the startup note
 // told the operator to add exactly the path that would not work.
@@ -178,7 +178,7 @@ type TUIConfig struct {
 	Theme string `toml:"theme"`
 	// Language: "auto" (LC_ALL → LC_MESSAGES → LANG, POSIX-style),
 	// "ja", or "en" — the language of the interactive chrome
-	// (ADR-0029). Resolved once at startup.
+	// (gem-agent ADR-0029). Resolved once at startup.
 	Language string `toml:"language"`
 	// ShowThoughts streams the model's reasoning deltas, when the
 	// server sends them, into the live area. Display-only — never
@@ -235,10 +235,10 @@ type ModelConfig struct {
 type SandboxConfig struct {
 	Enabled bool `toml:"enabled"`
 	// ReadLaneDenyExec adds programs the read lane may not launch, by
-	// name or absolute path, to sandbox.DefaultDenyExec (ADR-0073).
+	// name or absolute path, to sandbox.DefaultDenyExec (gem-agent ADR-0073).
 	ReadLaneDenyExec []string `toml:"read_lane_deny_exec"`
 	// ReadLanePrompts keeps the approval prompt for read-lane commands
-	// (ADR-0073 §5 — the opt-out from "runs unasked"): the kernel cage
+	// (gem-agent ADR-0073 §5 — the opt-out from "runs unasked"): the kernel cage
 	// still applies, the operator is asked as for any other call.
 	ReadLanePrompts bool `toml:"read_lane_prompts"`
 }
@@ -247,11 +247,11 @@ type SandboxConfig struct {
 type AgentConfig struct {
 	MaxTurns        int `toml:"max_turns"`
 	ShellTimeoutSec int `toml:"shell_timeout_sec"`
-	// AutoApprove starts sessions in auto-approve mode (ADR-0004).
+	// AutoApprove starts sessions in auto-approve mode (gem-agent ADR-0004).
 	// Default false: weakening the primary defense is opt-in.
 	AutoApprove bool `toml:"auto_approve"`
 	// ReadOnly starts the session with its lane ceiling in force
-	// (ADR-0080 §1), on an axis of its own: auto-approve decides who
+	// (gem-agent ADR-0080 §1), on an axis of its own: auto-approve decides who
 	// answers the gate, this decides what the session may reach at all.
 	ReadOnly bool `toml:"read_only"`
 }
@@ -281,16 +281,16 @@ func defaults() Config {
 type Overrides struct {
 	Model string
 	// MCP overrides [mcp].enabled for this run: "on" or "off"
-	// (ADR-0039). "off" is the one-shot pipeline case — no server
+	// (gem-agent ADR-0039). "off" is the one-shot pipeline case — no server
 	// child is spawned; "on" forces MCP against a config that
 	// disables it. Empty means the flag was not given.
 	MCP string
-	// ReadOnly overrides [agent].read_only for this run (ADR-0080):
+	// ReadOnly overrides [agent].read_only for this run (gem-agent ADR-0080):
 	// "on" or "off", empty when neither flag was given. Unlike Auto this
 	// is not one-way — --writable exists precisely so a run can step out
 	// of a configured ceiling, per invocation and visibly.
 	ReadOnly string
-	// Auto arms auto-approve for this run (ADR-0053). One-way: the
+	// Auto arms auto-approve for this run (gem-agent ADR-0053). One-way: the
 	// flag can only arm, so false simply means "flag not given" and
 	// the config value stands.
 	Auto bool
@@ -458,7 +458,7 @@ const ProjectFileCap = 1 << 20
 func readCapped(path string, cap int64) ([]byte, error) {
 	// Through an os.Root at the file's directory: a link leaving the
 	// directory is refused, as the instruction loader refuses it — the
-	// pins digest the same view (ADR-0074, review F1).
+	// pins digest the same view (gem-agent ADR-0074, review F1).
 	root, err := os.OpenRoot(filepath.Dir(path))
 	if err != nil {
 		return nil, err

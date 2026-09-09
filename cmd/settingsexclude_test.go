@@ -71,7 +71,7 @@ func excludeRow(d tui.SettingsData, entry string) (tui.SettingRow, bool) {
 	return tui.SettingRow{}, false
 }
 
-// ADR-0077 §3: two levels — the servers, and the functions of the ones
+// gem-agent ADR-0077 §3: two levels — the servers, and the functions of the ones
 // that listed. A server's row exists whether or not it is running.
 func TestPanelDrawsServersAndTheirFunctions(t *testing.T) {
 	s := newStore(t)
@@ -208,7 +208,7 @@ func TestPanelProvenanceShowsTheShadowingFile(t *testing.T) {
 	}
 }
 
-// The approval section adopts the same two levels (ADR-0009 decision 1,
+// The approval section adopts the same two levels (gem-agent ADR-0009 decision 1,
 // amended): built-ins stay flat, a server's tools sit under it.
 func TestApprovalRowsAreGroupedByServer(t *testing.T) {
 	s := newStore(t)

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// New ids are UUID v4 (ADR-0071 §1); the timestamp form stays valid so
+// New ids are UUID v4 (gem-agent ADR-0071 §1); the timestamp form stays valid so
 // every existing transcript still lists and resumes; anything else is
 // refused, as before, so an id can never be a path.
 func TestIDFormats(t *testing.T) {

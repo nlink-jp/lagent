@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// The argv first message (ADR-0064) is armed by the first size report
+// The argv first message (gem-agent ADR-0064) is armed by the first size report
 // — after the banner, via tea.Sequence — cleared there so a resize can
 // never resubmit it, and runs through the exact typed path.
 func TestInitialInputSubmitsOnceThroughTypedPath(t *testing.T) {
@@ -73,7 +73,7 @@ func TestInitialCmdCarriesTheMessage(t *testing.T) {
 // The queueing wiring itself: the first frame's command list carries
 // the initial message LAST, after every banner line — the load-bearing
 // append the once-only test cannot see (independent review of
-// ADR-0064, finding 2).
+// gem-agent ADR-0064, finding 2).
 func TestFirstFrameCmdsCarryInitialMessageLast(t *testing.T) {
 	c := &capture{}
 	m := New(Options{
@@ -102,8 +102,8 @@ func TestFirstFrameCmdsCarryInitialMessageLast(t *testing.T) {
 
 // A type-ahead turn can already be running when the initial message
 // arrives — the input reader subscribes before the first size report.
-// Then it queues like an Enter during a running turn (ADR-0007), and a
-// command is refused visibly instead of merging (ADR-0021 §7).
+// Then it queues like an Enter during a running turn (gem-agent ADR-0007), and a
+// command is refused visibly instead of merging (gem-agent ADR-0021 §7).
 func TestInitialSubmitDuringRunningTurnQueues(t *testing.T) {
 	c := &capture{}
 	m := newTestModel(c)

@@ -8,7 +8,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/llm"
 )
 
-// ADR-0055: a queued data attachment rides the next Run's user message,
+// gem-agent ADR-0055: a queued data attachment rides the next Run's user message,
 // reaches the model nonce-wrapped and quoted as data, and is drained —
 // it must not leak into later turns.
 func TestAttachDataRidesTheNextRunWrapped(t *testing.T) {

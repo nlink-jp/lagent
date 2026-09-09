@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// ADR-0037: Subset builds a positive allowlist — exact membership in
+// gem-agent ADR-0037: Subset builds a positive allowlist — exact membership in
 // the given order, and an unknown name is a loud error, never a
 // silently smaller registry.
 func TestSubset(t *testing.T) {
@@ -37,7 +37,7 @@ func TestSubset(t *testing.T) {
 	}
 }
 
-// ADR-0039: RemoveByPrefix clears exactly the matching tools (the
+// gem-agent ADR-0039: RemoveByPrefix clears exactly the matching tools (the
 // mcp__* adapters on reload) and leaves order and everything else
 // intact.
 func TestRemoveByPrefix(t *testing.T) {
@@ -100,7 +100,7 @@ func TestSubsetKeepsConfinement(t *testing.T) {
 
 // Remove takes exactly the named tools and their exclusion notes, and
 // nothing that merely shares a prefix — the per-server reconnect's
-// contract (ADR-0077 §3).
+// contract (gem-agent ADR-0077 §3).
 func TestRemoveIsExactAndClearsNotes(t *testing.T) {
 	reg, err := New(t.TempDir(), nil, 0)
 	if err != nil {

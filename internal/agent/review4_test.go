@@ -15,9 +15,9 @@ import (
 )
 
 // Review round 4: a view_image / read_document call refused by a
-// Review round 4: Restart (ADR-0071 /clear) hands the agent a fresh
+// Review round 4: Restart (gem-agent ADR-0071 /clear) hands the agent a fresh
 // transcript. A transcript that died in the previous session (a
-// conversation write failed, ADR-0021) must not keep the NEW one
+// conversation write failed, gem-agent ADR-0021) must not keep the NEW one
 // dead: the operator was told "recording stopped" once, about a file
 // that no longer receives anything; the new file is a different file.
 func TestRestartRevivesADeadTranscript(t *testing.T) {
@@ -130,7 +130,7 @@ func (g *allowlistGate) Approve(name, detail, purpose, reason string, mustPrompt
 	return true, true, ""
 }
 
-// ADR-0072 §4.5: OperatorOnly is a floor like Block — an earlier 'a'
+// gem-agent ADR-0072 §4.5: OperatorOnly is a floor like Block — an earlier 'a'
 // for write_file must not answer a write to AGENTS.md.
 func TestOperatorOnlyIsNotAnsweredByTheAllowlist(t *testing.T) {
 	mb := &mockBackend{responses: []*llm.Response{
@@ -151,7 +151,7 @@ func TestOperatorOnlyIsNotAnsweredByTheAllowlist(t *testing.T) {
 	}
 }
 
-// ADR-0072 §4.9: a `never` policy (and the one-shot --allow grant it
+// gem-agent ADR-0072 §4.9: a `never` policy (and the one-shot --allow grant it
 // stands for) lifts the ordinary gate, not the OperatorOnly floor —
 // found live: `--allow write_file --auto` wrote AGENTS.md unattended.
 func TestNeverPolicyKeepsTheOperatorOnlyFloor(t *testing.T) {

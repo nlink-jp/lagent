@@ -9,7 +9,7 @@ import (
 
 // PurposeArg is the reserved argument every approval-gated tool takes:
 // the model's one-sentence declaration of why the call is needed
-// (ADR-0047). Gemini 3 practically never writes a preamble as a text
+// (gem-agent ADR-0047). Gemini 3 practically never writes a preamble as a text
 // part when it calls a tool — 1 turn in 349, measured — so the
 // motivation lived only in the thought stream, which is display-only
 // and wiped the moment the round ends in a call. This field is the
@@ -40,7 +40,7 @@ const purposeDescription = "Why this call is needed, in ONE sentence, in the lan
 	"not a restatement of the other arguments."
 
 // CallPurpose returns the purpose declared on a call, or "" when the
-// model omitted it. Absence is reported, never punished (ADR-0047 §4).
+// model omitted it. Absence is reported, never punished (gem-agent ADR-0047 §4).
 func CallPurpose(tc llm.ToolCall) string {
 	s, _ := tc.Args[PurposeArg].(string)
 	return strings.TrimSpace(s)
@@ -49,7 +49,7 @@ func CallPurpose(tc llm.ToolCall) string {
 // gatedForPurpose reports whether a tool advertises the purpose
 // argument. Scope is the static Mutating flag, not the live per-tool
 // policy: the advertised schema must stay byte-identical for the whole
-// session or the implicit cache (ADR-0018) re-warms on every policy
+// session or the implicit cache (gem-agent ADR-0018) re-warms on every policy
 // change.
 func gatedForPurpose(t *tools.Tool) bool {
 	return t.Mutating && !declaresPurpose(t.Parameters)
@@ -187,7 +187,7 @@ func (a *Agent) declaredPurpose(tc llm.ToolCall) string {
 // declared purpose — because lagent never offered that tool a field
 // to declare one in. Filtering the summary by name instead would hide a
 // real argument from the prompt, which is the one thing an approval
-// prompt may never do (ADR-0021).
+// prompt may never do (gem-agent ADR-0021).
 func (a *Agent) Describe(tc llm.ToolCall) (detail, purpose string) {
 	stripped := llm.ToolCall{Name: tc.Name, Args: a.stripPurpose(tc.Name, tc.Args)}
 	detail = CallDetail(stripped)
@@ -197,7 +197,7 @@ func (a *Agent) Describe(tc llm.ToolCall) (detail, purpose string) {
 	if lane := a.laneOf(tc); lane != "" {
 		detail = "[" + lane + "] " + detail
 	}
-	// A tool's display annotation (ADR-0051) rides the detail so the
+	// A tool's display annotation (gem-agent ADR-0051) rides the detail so the
 	// approval dialog and the gate_decision record both carry it —
 	// e.g. write_file's "replaces existing file: 42KB → 8KB".
 	if t, ok := a.registry.Get(tc.Name); ok && t.Annotate != nil {
@@ -211,7 +211,7 @@ func (a *Agent) Describe(tc llm.ToolCall) (detail, purpose string) {
 // callSig is the loop-detector signature with the purpose removed: the
 // guard compares repeated calls, and a model that re-words its
 // justification every round while repeating the identical call would
-// otherwise never trip it (ADR-0047 §3).
+// otherwise never trip it (gem-agent ADR-0047 §3).
 func (a *Agent) callSig(tc llm.ToolCall) string {
 	return canonicalCallSig(llm.ToolCall{Name: tc.Name, Args: a.stripPurpose(tc.Name, tc.Args)})
 }

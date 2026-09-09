@@ -59,7 +59,7 @@ func TestDenyGateAlwaysDenies(t *testing.T) {
 	if !strings.Contains(buf.String(), "one-shot") {
 		t.Errorf("denial should explain itself: %q", buf.String())
 	}
-	// The generic line must name the remedies (ADR-0053 §3).
+	// The generic line must name the remedies (gem-agent ADR-0053 §3).
 	for _, remedy := range []string{"--auto", "--allow"} {
 		if !strings.Contains(buf.String(), remedy) {
 			t.Errorf("denial should name %s: %q", remedy, buf.String())
@@ -68,7 +68,7 @@ func TestDenyGateAlwaysDenies(t *testing.T) {
 }
 
 // --allow entries merge into the global policy scope at flag precedence
-// with the [approval.tools] vocabulary (ADR-0053 §2).
+// with the [approval.tools] vocabulary (gem-agent ADR-0053 §2).
 func TestApplyAllowFlag(t *testing.T) {
 	merged := map[string]string{
 		"write_file": "always", // from a config file — the flag outranks it
@@ -103,7 +103,7 @@ func TestApplyAllowFlag(t *testing.T) {
 }
 
 // A reason handed to the gate — a ladder escalation's cause, a Block
-// verdict — is the denial's story, not something to swallow (ADR-0053 §3).
+// verdict — is the denial's story, not something to swallow (gem-agent ADR-0053 §3).
 func TestDenyGateShowsTheReason(t *testing.T) {
 	var buf strings.Builder
 	g := denyGate{out: &buf}
@@ -118,7 +118,7 @@ func TestDenyGateShowsTheReason(t *testing.T) {
 	}
 }
 
-// The one-shot contract of ADR-0053: config arms interactive sessions
+// The one-shot contract of gem-agent ADR-0053: config arms interactive sessions
 // only, the flag arms any mode.
 func TestEffectiveAuto(t *testing.T) {
 	for _, tc := range []struct {

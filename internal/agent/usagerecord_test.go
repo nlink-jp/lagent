@@ -24,7 +24,7 @@ func usageRecords(t *testing.T, log *capturingLog) []session.UsageRecord {
 	return out
 }
 
-// ADR-0057: a model call that leaves no record cannot be priced later —
+// gem-agent ADR-0057: a model call that leaves no record cannot be priced later —
 // Compaction is the other spend that used to die with the process.
 // A call that spent nothing is not an accounting event — a mock or a
 // failed call must not pad the transcript with zero rows.

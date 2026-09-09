@@ -82,7 +82,7 @@ func TestSavedFilesAreContentAddressed(t *testing.T) {
 
 // An image is saved and the model is told to use view_image on it. The
 // bytes deliberately do NOT ride back inline: an attachment is replayed
-// with the conversation every round (ADR-0027), so it belongs in
+// with the conversation every round (gem-agent ADR-0027), so it belongs in
 // history only when the model asks for it.
 func TestImageIsSavedAndPointedAtViewImage(t *testing.T) {
 	work := t.TempDir()
@@ -126,7 +126,7 @@ func TestWithoutAWorkDirTheLossIsStated(t *testing.T) {
 	}
 }
 
-// ADR-0075 §1: the intake renders a server-marked error like any text;
+// gem-agent ADR-0075 §1: the intake renders a server-marked error like any text;
 // saying whose words it is (and prefixing `error:`) is the adapter's and
 // the executor's job, by provenance — the intake no longer marks it.
 func TestServerErrorsRenderUnmarked(t *testing.T) {
@@ -179,7 +179,7 @@ func extractPath(t *testing.T, out, work string) string {
 // for the test's lifetime.
 func fixedDir(dir string) func() string { return func() string { return dir } }
 
-// ADR-0072 §4.5: many blocks each under the cap share one budget per
+// gem-agent ADR-0072 §4.5: many blocks each under the cap share one budget per
 // response — the inline text never exceeds one cap.
 func TestManySmallBlocksShareOneBudget(t *testing.T) {
 	work := t.TempDir()

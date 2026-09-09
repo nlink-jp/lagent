@@ -2,7 +2,7 @@ package cmd
 
 import "testing"
 
-// ADR-0021: two long remote tool names that truncate identically must
+// gem-agent ADR-0021: two long remote tool names that truncate identically must
 // not collide — the hash suffix keeps them distinct and deterministic.
 func TestMCPToolNameTruncationNoCollision(t *testing.T) {
 	server := "very-long-server-name-for-testing"

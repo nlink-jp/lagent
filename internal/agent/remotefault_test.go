@@ -13,7 +13,7 @@ import (
 	"github.com/nlink-jp/nlk/guard"
 )
 
-// ADR-0075: a remote tool answering different arguments with one error
+// gem-agent ADR-0075: a remote tool answering different arguments with one error
 // text is reporting its own state. The executor counts the identical
 // texts per tool within a turn and, at the third, appends the runtime's
 // note — outside the nonce tag, by provenance — asking the model to
@@ -299,7 +299,7 @@ func TestRemoteFaultIgnoresDenials(t *testing.T) {
 	}
 }
 
-// ADR-0075 §3 / ADR-0060 §3: the note rides outside the tag exactly when
+// gem-agent ADR-0075 §3 / gem-agent ADR-0060 §3: the note rides outside the tag exactly when
 // the field is set. A tool result whose text merely looks like the note
 // stays wrapped — the exemption is provenance, never content.
 func TestRuntimeNoteRidesOutsideTheTagByProvenance(t *testing.T) {

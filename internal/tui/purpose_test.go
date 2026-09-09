@@ -9,7 +9,7 @@ import (
 
 const why = "staging the report so the next call can upload it to Slack"
 
-// The dialog answers the third question (ADR-0047): what runs, why the
+// The dialog answers the third question (gem-agent ADR-0047): what runs, why the
 // operator is being asked, and why the agent wants it.
 func TestApprovalDialogShowsDeclaredPurpose(t *testing.T) {
 	c := &capture{}

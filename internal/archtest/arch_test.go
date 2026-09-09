@@ -1,4 +1,4 @@
-// Package archtest pins the structural rules of ADR-0073 §4: the
+// Package archtest pins the structural rules of gem-agent ADR-0073 §4: the
 // three classes of finding that kept returning (check-then-use on a
 // lexical path, unbounded I/O, permission decided in several places)
 // are closed by construction here, not by review. A violation is a
@@ -198,7 +198,7 @@ func report(t *testing.T, calls []call, allow map[string]string) {
 // pathPackages take paths from the model or the project. Every open,
 // stat and listing in them goes through an os.Root or a handle that
 // was opened through one: the confinement check and the use are one
-// operation (ADR-0072 §4, four re-finds in ADR-0072 §4.1–§4.5).
+// operation (gem-agent ADR-0072 §4, four re-finds in gem-agent ADR-0072 §4.1–§4.5).
 var pathPackages = []string{
 	"internal/tools", "internal/mention", "internal/instructions", "internal/ignore",
 }
@@ -216,7 +216,7 @@ func TestPathPackagesOpenThroughRoots(t *testing.T) {
 		"internal/tools resolveExisting": "containment check; the use is the root open",
 		// The operator's own absolute reference outside both roots
 		// (`@~/Desktop/shot.png`): operator input, no confinement to
-		// enforce (ADR-0072 §4.4 recorded).
+		// enforce (gem-agent ADR-0072 §4.4 recorded).
 		"internal/mention resolveImagePath": "operator-typed absolute image path outside the roots",
 		"internal/mention openConfined":     "operator-typed absolute path outside the roots",
 		// The default FileReader for callers without a root (tests, the
@@ -254,7 +254,7 @@ func TestReadsAreBounded(t *testing.T) {
 
 // TestOneDecisionPoint: the rule tier is consulted in exactly one
 // function of the agent, and every gate reads that function's result
-// (ADR-0072 §1.1, §4.5, §4.9 — three re-implementations of the floors,
+// (gem-agent ADR-0072 §1.1, §4.5, §4.9 — three re-implementations of the floors,
 // each missing one).
 func TestOneDecisionPoint(t *testing.T) {
 	root := repoRoot(t)
@@ -279,9 +279,9 @@ func TestOneDecisionPoint(t *testing.T) {
 
 // TestProjectContentLoadsThroughGrant: what a project provides —
 // instruction files, .mcp.json, .lagent.toml — is read by
-// exactly the cmd functions that take the projectGrant (ADR-0023 trust
-// and ADR-0074 pins together). A loader called from anywhere else would
-// bypass both (review of ADR-0074, B-1).
+// exactly the cmd functions that take the projectGrant (gem-agent ADR-0023 trust
+// and gem-agent ADR-0074 pins together). A loader called from anywhere else would
+// bypass both (review of gem-agent ADR-0074, B-1).
 func TestProjectContentLoadsThroughGrant(t *testing.T) {
 	calls := collectCalls(t, repoRoot(t), []string{"internal", "cmd"}, []string{
 		"instructions.Load", "mcp.LoadConfig", "config.LoadProject",
@@ -290,7 +290,7 @@ func TestProjectContentLoadsThroughGrant(t *testing.T) {
 		"cmd loadInstructions":  "filters the project's files by the grant",
 		"cmd connectMCPServers": "reads the project's .mcp.json only when the grant allows",
 		"cmd loadProjectConfig": "reports whether .lagent.toml may loosen by the grant",
-		// The ADR-0023 trust prompt counts what the project offers
+		// The gem-agent ADR-0023 trust prompt counts what the project offers
 		// BEFORE trust exists; the parsed servers are counted, never
 		// started or registered.
 		"cmd probeProject": "counts .mcp.json servers for the trust prompt; nothing is loaded",
@@ -299,7 +299,7 @@ func TestProjectContentLoadsThroughGrant(t *testing.T) {
 
 // operatorTextPackages hold the strings an operator (or the model)
 // reads: UI catalogs, banners, notes, flag help, tool descriptions and
-// results. A design reference (`ADR-0074`) or a reason clause belongs
+// results. A design reference (`gem-agent ADR-0074`) or a reason clause belongs
 // in the docs, the ADR and the commit message — never in what the
 // screen shows (the fourth time this habit shipped; the knowledge base's
 // "status output is not documentation").

@@ -6,7 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// ADR-0028: the settings panel budgets itself to height-1, which is
+// gem-agent ADR-0028: the settings panel budgets itself to height-1, which is
 // taller than the rows left below already-printed content — rendering
 // it scrolls the terminal and moves the frame anchor up. The printed
 // counter must follow (self-heal), or closing the panel leaves the

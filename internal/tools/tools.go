@@ -54,18 +54,18 @@ type Tool struct {
 	// Mutating tools require MITL approval before each run.
 	Mutating bool
 	// MutatesWith, when set, decides per call whether it changes state
-	// (ADR-0073): shell_exec in a kernel-enforced read lane does not.
+	// (gem-agent ADR-0073): shell_exec in a kernel-enforced read lane does not.
 	// Nil means Mutating answers for every call.
 	MutatesWith func(args map[string]any) bool
 	// WaitsOnOperator marks a tool whose Run blocks on the operator's
-	// own input (ask_user). The ADR-0065 floor never abandons such a
+	// own input (ask_user). The gem-agent ADR-0065 floor never abandons such a
 	// call: a stdin read left behind would be a second reader on the
 	// plain REPL's one stdin, eating the operator's next line. The
 	// operator, not a filesystem, decides when it returns.
 	WaitsOnOperator bool
 	Run             func(ctx context.Context, args map[string]any) (string, error)
 	// Annotate, when set, returns extra display lines for the approval
-	// prompt derived from live filesystem state (ADR-0051) — e.g. what
+	// prompt derived from live filesystem state (gem-agent ADR-0051) — e.g. what
 	// an overwrite replaces. Display-only: it must not mutate anything,
 	// and an empty return means nothing to add.
 	Annotate func(args map[string]any) string
@@ -77,7 +77,7 @@ type Tool struct {
 type ExecFunc func(ctx context.Context, command string) *exec.Cmd
 
 // LaneExecFunc builds the exec.Cmd for a shell command in a lane
-// (ADR-0073): the production implementation wraps the command in
+// (gem-agent ADR-0073): the production implementation wraps the command in
 // sandbox-exec with that lane's profile.
 type LaneExecFunc func(ctx context.Context, command string, lane sandbox.Lane) *exec.Cmd
 
@@ -110,7 +110,7 @@ type Registry struct {
 	projectRoot *rootHandle
 	workRoot    *rootHandle
 	// rootsMu guards workDir and workRoot: /clear rotates them from
-	// the UI goroutine while an abandoned call (ADR-0065) may still be
+	// the UI goroutine while an abandoned call (gem-agent ADR-0065) may still be
 	// resolving or opening on its own goroutine. A reader acquires the
 	// handle under the lock and releases it after its open; a rotated-
 	// out handle closes when its last holder releases it (review after
@@ -121,7 +121,7 @@ type Registry struct {
 	// child's too.
 	parent *Registry
 	// excluded holds the registry names the MCP filter removed
-	// (ADR-0077). They are not registered, so a call naming one is
+	// (gem-agent ADR-0077). They are not registered, so a call naming one is
 	// refused by the executor like any name it cannot resolve — this
 	// set exists so the transcript can say the operator removed it
 	// rather than that it never was.
@@ -132,7 +132,7 @@ type Registry struct {
 	excludedPrefixes []string
 	execFn           ExecFunc
 	// laneExec, when set, runs shell commands in the lane they declare;
-	// enf is what the runtime established about the sandbox (ADR-0073
+	// enf is what the runtime established about the sandbox (gem-agent ADR-0073
 	// §5): a read-lane call is non-mutating only when enf.ReadLane.
 	laneExec     LaneExecFunc
 	enf          sandbox.Enforcement
@@ -140,7 +140,7 @@ type Registry struct {
 	tools        map[string]*Tool
 	order        []string
 	// abandoned counts tool calls the agent's floor gave up on that
-	// have not returned yet (ADR-0065 §2). It lives on the registry,
+	// have not returned yet (gem-agent ADR-0065 §2). It lives on the registry,
 	// not the agent, so a delegated child (Subset) shares the parent's
 	// counter: the goroutine holding the syscall is the child's, and
 	// the exit receipt is the parent's.
@@ -237,7 +237,7 @@ func (r *Registry) rootState() rootState {
 // resolved the same way the project is (absolute, symlinks evaluated),
 // so containment compares like with like.
 //
-// An empty dir removes the second root: /clear (ADR-0071 §2) may end
+// An empty dir removes the second root: /clear (gem-agent ADR-0071 §2) may end
 // up with no work directory where the previous session had one.
 func (r *Registry) UseWorkDir(dir string) error {
 	if r.parent != nil {
@@ -321,7 +321,7 @@ func (r *Registry) openRead(abs string) (*os.File, error) {
 // openRegular opens for reading without blocking and admits only a
 // regular file or a directory, checked on the opened descriptor: a
 // FIFO with no writer blocks a plain open for ever, past any context,
-// and a device would block the read (ADR-0072 §4.8). O_NONBLOCK does
+// and a device would block the read (gem-agent ADR-0072 §4.8). O_NONBLOCK does
 // not change how a regular file reads; it is cleared afterwards so a
 // pipe-shaped consumer downstream is not surprised.
 func openRegular(open func(flag int) (*os.File, error)) (*os.File, error) {
@@ -348,7 +348,7 @@ func openRegular(open func(flag int) (*os.File, error)) (*os.File, error) {
 // renaming it into place, through the root. A write never lands in an
 // inode reached through another name: a hard link or a symlink named
 // `notes.md` that points at `AGENTS.md` gets a fresh regular file, and
-// `AGENTS.md` keeps its bytes (ADR-0073 final review R2 — the
+// `AGENTS.md` keeps its bytes (gem-agent ADR-0073 final review R2 — the
 // name-based verdict was Safe, and the in-place write went through the
 // link).
 //
@@ -494,7 +494,7 @@ func (r *Registry) readForSearch(abs string) ([]byte, bool) {
 // swapped for a link that leads out between the walk's check and this
 // call is refused at the open (review after v0.68.1 — the walks used
 // os.ReadDir on the lexical path). At most DirEntryCap entries are
-// returned; more reports that the directory had more (ADR-0072 §4.5 —
+// returned; more reports that the directory had more (gem-agent ADR-0072 §4.5 —
 // ReadDir(-1) allocated every entry before any cap).
 func (r *Registry) readDirIn(abs string) (entries []os.DirEntry, more bool, err error) {
 	f, err := r.openRead(abs)
@@ -557,7 +557,7 @@ func (r *Registry) Register(t *Tool) error {
 // order, sharing this registry's project confinement (the tool closures
 // keep resolving paths against the same project directory). Unknown
 // names are errors: a security-relevant allowlist that silently drops a
-// typo would hide exactly the mistake it exists to prevent (ADR-0037).
+// typo would hide exactly the mistake it exists to prevent (gem-agent ADR-0037).
 func (r *Registry) Subset(names ...string) (*Registry, error) {
 	sub := &Registry{
 		projectDir:   r.projectDir,
@@ -590,7 +590,7 @@ func (r *Registry) AbandonedRunning() int { return int(r.abandoned.Load()) }
 
 // RemoveByPrefix deletes every tool whose name starts with prefix and
 // returns how many were removed — the MCP half of an integration
-// reload (ADR-0039): all mcp__* adapters go before the connect path
+// reload (gem-agent ADR-0039): all mcp__* adapters go before the connect path
 // re-registers the fresh set.
 func (r *Registry) RemoveByPrefix(prefix string) int {
 	removed := 0
@@ -605,7 +605,7 @@ func (r *Registry) RemoveByPrefix(prefix string) int {
 	}
 	r.order = kept
 	// The reload re-derives what the filter removes, so yesterday's
-	// answer must not survive it (ADR-0039 + ADR-0077).
+	// answer must not survive it (gem-agent ADR-0039 + gem-agent ADR-0077).
 	for n := range r.excluded {
 		if strings.HasPrefix(n, prefix) {
 			delete(r.excluded, n)
@@ -687,7 +687,7 @@ func (r *Registry) NoteExcludedPrefix(prefix string) {
 // Excluded reports whether this name was removed by the MCP filter,
 // which is how the executor tells "the operator took this away" from
 // "no such tool has ever existed" — a distinction the transcript keeps
-// and the model is deliberately not given (ADR-0077 §5).
+// and the model is deliberately not given (gem-agent ADR-0077 §5).
 func (r *Registry) Excluded(name string) bool {
 	if r.excluded[name] {
 		return true
@@ -727,7 +727,7 @@ const ViewImageName = "view_image"
 // ShellExecName is the one tool whose effect is a whole command line
 // rather than a named argument, which is why several layers treat it
 // specially — the approval detail, and the per-command policy and
-// learning of ADR-0045.
+// learning of gem-agent ADR-0045.
 const ShellExecName = "shell_exec"
 
 // imageExts gates ReadImage and read_file's refusal. The bytes are
@@ -741,7 +741,7 @@ func isImageExt(p string) bool { return imageExts[strings.ToLower(filepath.Ext(p
 
 // sniffImage returns the image MIME the bytes prove, or "" — the
 // magics http.DetectContentType knows plus HEIC/HEIF, which it does
-// not (ADR-0072 §4.8: the advertised format was refused). A HEIF file
+// not (gem-agent ADR-0072 §4.8: the advertised format was refused). A HEIF file
 // is an ISO BMFF whose first box is `ftyp` with a HEIF brand; the box
 // length and the brand list are checked, not just the four letters.
 func sniffImage(data []byte) string {
@@ -856,7 +856,7 @@ func intArg(args map[string]any, key string) int {
 	return 0
 }
 
-// sliceLines applies an optional 1-based inclusive line window (ADR-0014).
+// sliceLines applies an optional 1-based inclusive line window (gem-agent ADR-0014).
 // A partial view must never masquerade as the whole file, so any window
 // gets a trailing note in the established truncation style.
 func sliceLines(content string, start, end int) (string, string, error) {
@@ -866,7 +866,7 @@ func sliceLines(content string, start, end int) (string, string, error) {
 	lines := strings.Split(content, "\n")
 	// A newline-terminated file splits into a phantom empty final
 	// element; counting it reported N one high and accepted a window on
-	// a line that does not exist (ADR-0021).
+	// a line that does not exist (gem-agent ADR-0021).
 	if n := len(lines); n > 0 && lines[n-1] == "" {
 		lines = lines[:n-1]
 	}
@@ -899,7 +899,7 @@ func readWindow(ctx context.Context, f io.Reader, start, end, cap int) (string, 
 	}
 	if cutLines > 0 {
 		// A line longer than the cap is shown cut; the reader is told
-		// (ADR-0072 §4.5 — the cut was silent).
+		// (gem-agent ADR-0072 §4.5 — the cut was silent).
 		note += fmt.Sprintf("\n[%d line(s) longer than %d bytes were cut]", cutLines, cap)
 	}
 	if dropped > 0 {
@@ -976,7 +976,7 @@ func readLineCapped(br *bufio.Reader, cap int) (line string, cut bool, err error
 	finish := func() string {
 		if cut {
 			// The cut landed on a byte; drop an incomplete trailing rune
-			// (ADR-0072 §4.8 — a Japanese line ended in a broken byte).
+			// (gem-agent ADR-0072 §4.8 — a Japanese line ended in a broken byte).
 			buf = bounded.TrimIncompleteRune(buf)
 		}
 		return strings.TrimSuffix(string(buf), "\n")
@@ -1062,7 +1062,7 @@ func resolveExisting(path string) (string, error) {
 // String-level checks alone are insufficient — a symlink inside a root
 // pointing outside would pass them — so the real path is checked too.
 // OS-level containment for child processes is the sandbox's job
-// (ADR-0001); this guards the built-in file tools.
+// (gem-agent ADR-0001); this guards the built-in file tools.
 func (r *Registry) resolvePath(p string) (string, error) {
 	if p == "" {
 		return "", errors.New("path is required")
@@ -1080,7 +1080,7 @@ func (r *Registry) resolvePath(p string) (string, error) {
 		// Deliberately not %w: the OS error names the path where
 		// resolution stumbled, which for an escaping link chain lies
 		// OUTSIDE the roots — an error message must not leak
-		// out-of-project path fragments to the model (ADR-0021).
+		// out-of-project path fragments to the model (gem-agent ADR-0021).
 		return "", fmt.Errorf("resolve %s: a link in the path is broken or its target is not accessible", p)
 	}
 	if !withinAny(r.roots(), real) {
@@ -1176,7 +1176,7 @@ func (r *Registry) listFiles() *Tool {
 				}
 				// Annotation only — the entry is still listed. A
 				// non-recursive listing is not the enumeration cost
-				// ADR-0052 removes; the marker just teaches the model
+				// gem-agent ADR-0052 removes; the marker just teaches the model
 				// not to descend before it tries.
 				if rules.Ignored(e.Name(), e.IsDir()) {
 					n += " [ignored]"
@@ -1272,7 +1272,7 @@ func (r *Registry) readFile() *Tool {
 const (
 	// shrinkGuardMinBytes: existing files smaller than this may be
 	// overwritten freely — a small diff is cheap to review, and tiny
-	// files hit high shrink ratios with legitimate edits (ADR-0051).
+	// files hit high shrink ratios with legitimate edits (gem-agent ADR-0051).
 	shrinkGuardMinBytes = 2048
 	// shrinkGuardPct: overwriting an existing file with content below
 	// this percentage of its current size is refused without an
@@ -1375,7 +1375,7 @@ func sizeLabel(n int64) string {
 	}
 }
 
-// SetLaneExec installs the lane-aware runner (ADR-0073) and what the
+// SetLaneExec installs the lane-aware runner (gem-agent ADR-0073) and what the
 // runtime verified about the sandbox: enf.ReadLane lets a read-lane
 // call run without approval; enf.Confined false is the unconfined mode
 // the agent treats as the operator's alone.
@@ -1432,7 +1432,7 @@ const readLaneDeniedNote = "\n[the read lane denied an operation — the sandbox
 // the project: the files later sessions trust — so `git init`, `git
 // clone`, `git remote add` (they write .git/config and hooks) and an
 // edit of AGENTS.md need the operator lane, and the model is told
-// rather than left to retry (agent-board review of ADR-0073).
+// rather than left to retry (agent-board review of gem-agent ADR-0073).
 const writeLaneDeniedNote = "\n[the write lane denied a write — inside the project it denies only the instruction/configuration files (AGENTS.md, CLAUDE.md, .mcp.json, .lagent.toml, .claude/) and .git/hooks, .git/info, .git/config (so git init, clone and remote add land here), renaming or removing a directory that contains one of those files, plus credential reads and anything outside the project and work directory; if the command must do that, call shell_exec again with access: \"operator\", which asks the user]"
 
 func (r *Registry) shellExec() *Tool {
@@ -1491,7 +1491,7 @@ func (r *Registry) shellExec() *Tool {
 			}
 			cmd.Dir = r.projectDir
 			hardenExec(cmd)
-			// The output is bounded as it arrives (ADR-0072 §4.5):
+			// The output is bounded as it arrives (gem-agent ADR-0072 §4.5):
 			// CombinedOutput held everything until exit, so a command
 			// printing without end exhausted memory before the cap ran.
 			out := newBoundedOutput(OutputCap)
@@ -1505,7 +1505,7 @@ func (r *Registry) shellExec() *Tool {
 			// the output pipe past WaitDelay (a `… &` in a start
 			// script). Go reports that as an error; the output before
 			// the cut is the result, and the model is told where it
-			// was cut (ADR-0065 §2 review: the shorter WaitDelay must
+			// was cut (gem-agent ADR-0065 §2 review: the shorter WaitDelay must
 			// not turn such commands into failures).
 			if errors.Is(err, exec.ErrWaitDelay) {
 				return result + fmt.Sprintf("\n[a background child still held the output pipe %s after the command exited — later output is not captured]", ShellWaitDelay), nil
@@ -1541,7 +1541,7 @@ func (r *Registry) shellExec() *Tool {
 	}
 }
 
-// hardenExec makes cancellation actually END a shell call (ADR-0034).
+// hardenExec makes cancellation actually END a shell call (gem-agent ADR-0034).
 // exec.CommandContext kills only the DIRECT child; a grandchild (a
 // skill's python under sandbox-exec/bash) survived holding the
 // inherited output pipe, and CombinedOutput's Wait blocked until EOF —
@@ -1552,7 +1552,7 @@ func (r *Registry) shellExec() *Tool {
 //   - WaitDelay: the backstop for a setsid/double-fork escapee — Wait
 //     stops waiting for inherited pipes instead of hanging the session
 //     for an orphan. The kill is best-effort; the return is guaranteed.
-//     It is shorter than the agent's abandon grace (ADR-0065 §2) on
+//     It is shorter than the agent's abandon grace (gem-agent ADR-0065 §2) on
 //     purpose: the output produced before the cut must reach the
 //     model, not be discarded by the floor a moment before Wait
 //     returns it.
@@ -1562,7 +1562,7 @@ func hardenExec(cmd *exec.Cmd) {
 	}
 	// Setsid, not Setpgid: a new session drops the controlling
 	// terminal, so /dev/tty does not resolve for the command and no
-	// keystroke can be injected into the operator's terminal (ADR-0073
+	// keystroke can be injected into the operator's terminal (gem-agent ADR-0073
 	// review F-01). The child still leads its own process group (pgid
 	// = pid), so the group kill below is unchanged.
 	cmd.SysProcAttr.Setsid = true
@@ -1576,6 +1576,6 @@ func hardenExec(cmd *exec.Cmd) {
 }
 
 // ShellWaitDelay bounds how long a cancelled shell call waits for an
-// escapee's inherited pipes (ADR-0034 §2). The agent's abandon grace
+// escapee's inherited pipes (gem-agent ADR-0034 §2). The agent's abandon grace
 // must stay longer than this (pinned by a test in internal/agent).
 const ShellWaitDelay = 500 * time.Millisecond

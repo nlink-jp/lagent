@@ -1,5 +1,5 @@
 // Package statedir is the one implementation of lagent's per-project
-// machine-state convention (ADR-0020/0022): a state root under
+// machine-state convention (gem-agent ADR-0020/0022): a state root under
 // ~/.local/state/lagent (overridable for test isolation), per-project
 // subdirectories named by a lossy path escape, and a .project marker
 // that keeps an escape collision from misattributing one project's
@@ -22,7 +22,7 @@ import (
 // EnvRoot overrides the state root — the parent of sessions/ and
 // memory/. Its purpose is isolation: an E2E or drill pointed at a
 // scratch tree cannot see, and therefore cannot delete, the operator's
-// real state (ADR-0022 §4).
+// real state (gem-agent ADR-0022 §4).
 const EnvRoot = "LAGENT_STATE_DIR"
 
 // Root returns the state root: $LAGENT_STATE_DIR, or the org-standard

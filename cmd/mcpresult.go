@@ -20,21 +20,21 @@ import (
 // MCP results were passed through whole, so every server in the fleet
 // grew a workspace_root of its own to keep from flooding a context it
 // cannot measure. A server cannot know the model's context window. This
-// side can (ADR-0058).
+// side can (gem-agent ADR-0058).
 //
 // Nothing is dropped. Text past the cap is written to the session work
 // directory and the model is handed a preview and the path — the work
 // directory is a root of the file tools, so read_file reaches it.
 // Non-text blocks are written the same way; an image comes back as a
 // path the model can hand to view_image, which is the deliberate look
-// ADR-0012 designed and keeps media out of the replayed history that
-// ADR-0027 was written to protect.
+// gem-agent ADR-0012 designed and keeps media out of the replayed history that
+// gem-agent ADR-0027 was written to protect.
 type mcpIntake struct {
 	// workDir is where oversized and binary blocks land. Empty means
 	// there is nowhere to write, and the fallback is a truncation that
 	// says so — losing part of an answer silently is the one outcome
 	// this must never produce.
-	// It is read per call: /clear rotates the directory (ADR-0071 §2).
+	// It is read per call: /clear rotates the directory (gem-agent ADR-0071 §2).
 	workDir func() string
 	// cap is the byte size above which a text block is spilled.
 	cap int
@@ -49,10 +49,10 @@ func newMCPIntake(workDir func() string) mcpIntake {
 // render assembles the text the model receives for one call. A result
 // the server marked isError renders the same way; the adapter wraps it
 // in a tools.RemoteError and the executor says whose words it is
-// (ADR-0075 §1) — the intake stops prefixing `error:` itself.
+// (gem-agent ADR-0075 §1) — the intake stops prefixing `error:` itself.
 func (in mcpIntake) render(server, tool string, blocks []mcp.Content) string {
 	parts := make([]string, 0, len(blocks))
-	// One budget for the whole response (ADR-0072 §4.5): many blocks
+	// One budget for the whole response (gem-agent ADR-0072 §4.5): many blocks
 	// each under the cap used to add up without limit. A block that no
 	// longer fits the remaining budget is spilled like an oversized
 	// one, so the inline text never exceeds one cap.
@@ -163,7 +163,7 @@ func (in mcpIntake) spillText(server, tool, s string) string {
 
 // binary writes a non-text block and tells the model how to look at it.
 // The bytes never ride back inline: an attachment is replayed with the
-// conversation every round (ADR-0027), so it belongs in history only
+// conversation every round (gem-agent ADR-0027), so it belongs in history only
 // when the model deliberately asks for it.
 func (in mcpIntake) binary(server, tool string, b mcp.Content) string {
 	if len(b.Data) == 0 {

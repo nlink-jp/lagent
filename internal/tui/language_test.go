@@ -9,7 +9,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/uitext"
 )
 
-// TestChromeFollowsLanguage pins ADR-0029 on the TUI side: the model
+// TestChromeFollowsLanguage pins gem-agent ADR-0029 on the TUI side: the model
 // renders the catalog it was built with, and nil defaults to English
 // (plain REPL fallback, tests).
 func TestChromeFollowsLanguage(t *testing.T) {

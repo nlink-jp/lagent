@@ -481,7 +481,7 @@ func TestPreviewPrefersTypedMessagesAndRendersShellCommands(t *testing.T) {
 	}
 }
 
-// InUse is the not-while-live guard for workdirs clean (ADR-0059): a
+// InUse is the not-while-live guard for workdirs clean (gem-agent ADR-0059): a
 // running logger holds the transcript flock, so its session reads as in
 // use exactly until it closes.
 func TestInUseTracksTheTranscriptLock(t *testing.T) {

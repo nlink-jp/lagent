@@ -75,7 +75,7 @@ func runSessions(cmd *cobra.Command, args []string) error {
 func writeSessions(out io.Writer, metas []session.Meta, showProject bool) {
 	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	for _, m := range metas {
-		// The id no longer carries the start time (ADR-0071 §1): the
+		// The id no longer carries the start time (gem-agent ADR-0071 §1): the
 		// listing shows both, the id shortened to what resume accepts.
 		row := []string{session.Short(m.ID), m.Started.Local().Format("2006-01-02 15:04"), ago(m.LastActive), humanBytes(m.Size), m.Header.Model}
 		if showProject {
@@ -91,7 +91,7 @@ func writeSessions(out io.Writer, metas []session.Meta, showProject bool) {
 // resolveResume finds the session --continue / --resume names and loads
 // it, refusing rather than warning when it does not belong here.
 //
-// Both refusals are deliberate (ADR-0005): a transcript replayed in the
+// Both refusals are deliberate (gem-agent ADR-0005): a transcript replayed in the
 // wrong tree describes files that are not there, and thought signatures
 // are model-bound opaque tokens with no basis for cross-model replay.
 // Each message names what to do instead.
@@ -112,7 +112,7 @@ func resolveResume(dir, projectDir, model, id string) (session.Meta, error) {
 		}
 		meta = latest
 	} else {
-		// A full id or an unambiguous prefix of one (ADR-0071 §1): the
+		// A full id or an unambiguous prefix of one (gem-agent ADR-0071 §1): the
 		// listing shows eight characters, and eight is what one types.
 		found, err := session.FindByPrefix(dir, projectDir, id)
 		if err != nil {
@@ -152,7 +152,7 @@ func loadResumedHistory(lg *session.Logger, id string) ([]llm.Message, []string,
 	var notes []string
 	if skipped > 0 {
 		// A shorter conversation that says nothing looks complete; the
-		// count is the honest version (ADR-0021).
+		// count is the honest version (gem-agent ADR-0021).
 		notes = append(notes, fmt.Sprintf("session %s: %d unreadable line(s) skipped — likely a torn write from a crash; the rest of the conversation is intact", id, skipped))
 	}
 	return history, notes, nil
@@ -160,7 +160,7 @@ func loadResumedHistory(lg *session.Logger, id string) ([]llm.Message, []string,
 
 // openSessionLog starts a new transcript, or reopens the one being
 // resumed. A resumed session appends to its own file: one file is one
-// conversation, however many processes it took (ADR-0005).
+// conversation, however many processes it took (gem-agent ADR-0005).
 func openSessionLog(dir, resumeID, projectDir, model, version string) (*session.Logger, error) {
 	if resumeID != "" {
 		lg, err := session.Reopen(dir, projectDir, resumeID)

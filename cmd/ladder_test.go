@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// ADR-0065 §3: the three-press ladder outside the TUI.
+// gem-agent ADR-0065 §3: the three-press ladder outside the TUI.
 
 func TestLadderStepShape(t *testing.T) {
 	for n, want := range map[int]string{1: "cancel", 2: "warn", 3: "quit", 4: "quit"} {

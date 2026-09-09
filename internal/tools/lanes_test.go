@@ -12,7 +12,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/sandbox"
 )
 
-// ADR-0073: shell_exec declares a lane; the registry's word on whether
+// gem-agent ADR-0073: shell_exec declares a lane; the registry's word on whether
 // the call mutates depends on the lane and on whether a kernel-enforced
 // read lane exists.
 func TestShellLaneDecidesMutation(t *testing.T) {

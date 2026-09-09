@@ -129,13 +129,13 @@ func expandEnv(s string) string {
 }
 
 // mcpFileCap bounds a .mcp.json read: the project's one is read before
-// the trust prompt (ADR-0072 §4.5).
+// the trust prompt (gem-agent ADR-0072 §4.5).
 const mcpFileCap = 1 << 20
 
 func readCapped(path string, cap int64) ([]byte, error) {
 	// Through an os.Root at the file's directory: a link leaving the
 	// directory is refused, as the instruction loader refuses it — the
-	// pins digest the same view (ADR-0074, review F1).
+	// pins digest the same view (gem-agent ADR-0074, review F1).
 	root, err := os.OpenRoot(filepath.Dir(path))
 	if err != nil {
 		return nil, err

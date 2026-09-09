@@ -65,7 +65,7 @@ func TestResolveResumeRefusesAnotherProject(t *testing.T) {
 
 // Thought signatures are model-bound opaque tokens; replaying one
 // model's into another has no basis, and the failure would land after
-// the operator thought they were back at work (ADR-0005).
+// the operator thought they were back at work (gem-agent ADR-0005).
 func TestResolveResumeRefusesADifferentModel(t *testing.T) {
 	dir := t.TempDir()
 	id := seed(t, dir, "/proj", "gemini-recorded", llm.Message{Role: llm.RoleUser, Content: "hi"})
@@ -147,7 +147,7 @@ func TestWriteSessionsShowsIDAndPreview(t *testing.T) {
 	var b strings.Builder
 	writeSessions(&b, metas, false)
 	out := b.String()
-	// The listing shows the id shortened to what resume accepts (ADR-0071).
+	// The listing shows the id shortened to what resume accepts (gem-agent ADR-0071).
 	for _, want := range []string{session.Short(id), "fix the parser", "gemini-x", "--resume"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("listing is missing %q:\n%s", want, out)

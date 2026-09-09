@@ -98,7 +98,7 @@ func TestExitSummary(t *testing.T) {
 	}
 }
 
-// ADR-0065 §2: a goroutine the floor left behind is named on the way
+// gem-agent ADR-0065 §2: a goroutine the floor left behind is named on the way
 // out — and only then.
 func TestExitSummaryNamesAbandonedCalls(t *testing.T) {
 	en := uitext.For(uitext.EN)

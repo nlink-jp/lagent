@@ -12,7 +12,7 @@ import (
 
 // A shell command told to put its output in $LAGENT_WORK_DIR has to
 // be able to: the work directory is a writable root of the sandbox
-// profile, not just a path the model is told about (ADR-0058).
+// profile, not just a path the model is told about (gem-agent ADR-0058).
 func TestSandboxAllowsWritesToTheWorkDirectory(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("sandbox-exec is macOS-only")
@@ -89,7 +89,7 @@ func outsideEveryRoot(t *testing.T) string {
 	return dir
 }
 
-// The rule tier now reads the sandbox's scratch list (ADR-0070 §2); the
+// The rule tier now reads the sandbox's scratch list (gem-agent ADR-0070 §2); the
 // profile must actually allow what that list promises — /dev/null in
 // particular, the redirect session 20260904-225330 was Blocked for.
 func TestSandboxAllowsDevNull(t *testing.T) {

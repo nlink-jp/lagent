@@ -12,7 +12,7 @@ import (
 
 // TestProvenanceFieldsAreSetOnce: `llm.Message.Denial` and
 // `llm.Message.RuntimeNote` are the two tool-message fields the
-// send-time wrap trusts (ADR-0060 §3, ADR-0075 §3). Trust by provenance
+// send-time wrap trusts (gem-agent ADR-0060 §3, gem-agent ADR-0075 §3). Trust by provenance
 // holds only while the provenance is assigned in one place — the
 // executor's tool-message construction in Agent.Run — so every
 // composite-literal key and every field assignment naming them, in any

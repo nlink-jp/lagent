@@ -176,7 +176,7 @@ func TestDeniedMutatingCall(t *testing.T) {
 }
 
 // denyWithReasonGate denies every call with the operator's typed
-// reason (ADR-0060).
+// reason (gem-agent ADR-0060).
 type denyWithReasonGate struct{ reason string }
 
 func (d *denyWithReasonGate) ApproveLift(name, detail, purpose, reason string) (bool, string) {
@@ -187,7 +187,7 @@ func (d *denyWithReasonGate) Approve(name, detail, purpose, reason string, mustP
 	return false, false, d.reason
 }
 
-// ADR-0060 §2/§3: the typed reason rides inside the denial function
+// gem-agent ADR-0060 §2/§3: the typed reason rides inside the denial function
 // response, and the denial ships unwrapped — guidance the model may
 // follow, not nonce-tagged data the system prompt forbids following.
 func TestDeniedWithReasonReachesModelUnwrapped(t *testing.T) {
@@ -215,7 +215,7 @@ func TestDeniedWithReasonReachesModelUnwrapped(t *testing.T) {
 	}
 }
 
-// ADR-0060 §3: the wrap exemption keys on message provenance, never on
+// gem-agent ADR-0060 §3: the wrap exemption keys on message provenance, never on
 // content — a tool result that merely looks like a denial stays wrapped.
 func TestWrapExemptsDenialByProvenanceOnly(t *testing.T) {
 	tag := guard.NewTagWithPrefix("tool_output")
@@ -270,7 +270,7 @@ func TestMaxTurnsCap(t *testing.T) {
 	mb := &mockBackend{responses: []*llm.Response{loop, loop, loop, loop, loop}}
 	a, _ := newAgent(t, mb, &approveAll{}, 3)
 	_, err := a.Run(context.Background(), "loop forever", nil)
-	// ADR-0040 §4: the stop message must teach recovery ("continue"),
+	// gem-agent ADR-0040 §4: the stop message must teach recovery ("continue"),
 	// and must NOT recommend /clear — the one action that destroys the
 	// recoverable state.
 	if err == nil || !strings.Contains(err.Error(), "round limit") ||
@@ -414,13 +414,13 @@ func TestToolResultsNonceWrapped(t *testing.T) {
 	if strings.Contains(mb.systems[1], "{{DATA_TAG}}") {
 		t.Error("placeholder not expanded")
 	}
-	// ADR-0018 inverted the per-call rule for the MAIN loop: the tag is
+	// gem-agent ADR-0018 inverted the per-call rule for the MAIN loop: the tag is
 	// session-scoped so the request prefix stays byte-identical and
 	// implicit caching can hit (guard.Wrap's collision refusal is what
 	// makes reuse sound). Stability is pinned by
 	// TestIsolationTagIsStableAcrossRoundsAndTurns.
 	if mb.systems[0] != mb.systems[1] {
-		t.Error("main-loop tag must be session-scoped (ADR-0018)")
+		t.Error("main-loop tag must be session-scoped (gem-agent ADR-0018)")
 	}
 }
 
@@ -488,7 +488,7 @@ func TestCallDetail(t *testing.T) {
 	}
 }
 
-// ADR-0018: the isolation tag is session-scoped so the request prefix
+// gem-agent ADR-0018: the isolation tag is session-scoped so the request prefix
 // stays byte-identical across rounds AND turns — the shape implicit
 // caching rewards. Reset rotates it.
 func TestIsolationTagIsStableAcrossRoundsAndTurns(t *testing.T) {
@@ -539,7 +539,7 @@ func TestIsolationTagIsStableAcrossRoundsAndTurns(t *testing.T) {
 	}
 }
 
-// Cached tokens flow through the usage pipeline (ADR-0018) — the
+// Cached tokens flow through the usage pipeline (gem-agent ADR-0018) — the
 // measured answer to "is caching actually firing".
 func TestUsageCarriesCachedTokens(t *testing.T) {
 	mb := &mockBackend{responses: []*llm.Response{
@@ -570,7 +570,7 @@ func TestUsageCarriesCachedTokens(t *testing.T) {
 	}
 }
 
-// ADR-0019: side-calls (risk eval here) must accumulate into their own
+// gem-agent ADR-0019: side-calls (risk eval here) must accumulate into their own
 // Review round 2: a tool call reached after the turn's context is
 // cancelled must not open an approval prompt on behalf of a dead turn.
 func TestExecCallRefusesAfterCancel(t *testing.T) {

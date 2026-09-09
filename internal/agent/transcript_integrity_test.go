@@ -50,7 +50,7 @@ func (l *recordingLog) count(kind string) int {
 	return n
 }
 
-// ADR-0021 §1: /clear is a history mutation like any other — it must
+// gem-agent ADR-0021 §1: /clear is a history mutation like any other — it must
 // leave a transcript record, or resume resurrects what was discarded.
 func TestResetWritesClearRecord(t *testing.T) {
 	log := &recordingLog{}
@@ -65,7 +65,7 @@ func TestResetWritesClearRecord(t *testing.T) {
 	}
 }
 
-// ADR-0021 §3: after a conversation-bearing write fails, the transcript
+// gem-agent ADR-0021 §3: after a conversation-bearing write fails, the transcript
 // stops at a consistent prefix (no later record may land) and the
 // operator is told.
 func TestFailedConversationWriteStopsTranscript(t *testing.T) {

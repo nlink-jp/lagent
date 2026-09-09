@@ -1,15 +1,15 @@
 // Package uitext holds the operator-facing UI strings in two complete
-// catalogs, Japanese and English (ADR-0029). One struct field per
+// catalogs, Japanese and English (gem-agent ADR-0029). One struct field per
 // string keeps the two languages covering the same surface: the
 // completeness test fails on any field left empty in either catalog,
 // which is the mechanism that stops the historical one-string-at-a-time
 // language drift from ever re-accumulating.
 //
-// Deliberately NOT here (ADR-0029 §3): banner labels and "warning:"
+// Deliberately NOT here (gem-agent ADR-0029 §3): banner labels and "warning:"
 // lines (grep-stable log output), cobra --help, model-facing text, and
 // Go error chains.
 //
-// A notice the agent writes mid-turn IS here (ADR-0079). Until v0.72.0
+// A notice the agent writes mid-turn IS here (gem-agent ADR-0079). Until v0.72.0
 // the agent never read this package, so the same event printed Japanese
 // when the operator asked for it and English when the runtime decided.
 //
@@ -76,23 +76,23 @@ type Messages struct {
 	ApprovalTitleFmt  string // dialog title: %s = tool name
 	ApproveAllow      string // dialog answer: allow once
 	ApproveDeny       string // dialog answer: deny
-	ApproveDenyReason string // dialog answer: deny with a typed reason (ADR-0060)
+	ApproveDenyReason string // dialog answer: deny with a typed reason (gem-agent ADR-0060)
 	ApproveAlways     string // dialog answer: allow for the session
-	ApprovePersist    string // dialog answer: persist never-ask (ADR-0009 §5)
+	ApprovePersist    string // dialog answer: persist never-ask (gem-agent ADR-0009 §5)
 	ApprovalHint      string // key help under the dialog
 	// ApprovalHintNoStanding is the same help for a call no standing
 	// answer may settle: the two keys it drops are the two the dialog
 	// does not offer.
 	ApprovalHintNoStanding string
-	// Reason field (ADR-0060): the label above the input, its
+	// Reason field (gem-agent ADR-0060): the label above the input, its
 	// placeholder, and the key help while it is open.
 	ApprovalReasonPrompt      string
 	ApprovalReasonPlaceholder string
 	ApprovalReasonHint        string
 	// ApprovalHiddenFmt warns that %d detail lines were clipped
-	// (ADR-0021: never approve what you have not seen).
+	// (gem-agent ADR-0021: never approve what you have not seen).
 	ApprovalHiddenFmt string
-	// PurposePrefix marks the model's declared purpose (ADR-0047), and
+	// PurposePrefix marks the model's declared purpose (gem-agent ADR-0047), and
 	// PurposeNone stands in its place when the model declared none —
 	// "it did not say" and "there is nothing to say" must not look the
 	// same on an approval prompt.
@@ -111,10 +111,10 @@ type Messages struct {
 
 	// --- input chrome (TUI) ---
 	Placeholder  string // empty input box hint
-	QueueRefused string // ! and / cannot be queued mid-turn (ADR-0021)
+	QueueRefused string // ! and / cannot be queued mid-turn (gem-agent ADR-0021)
 	QueuedPrefix string // prefix before an echoed queued message
 	// QueueHandback explains a queued message returning unsent after a
-	// failed or interrupted turn (ADR-0007).
+	// failed or interrupted turn (gem-agent ADR-0007).
 	QueueHandback string
 	Interrupted   string // "(interrupted)" marker
 	ErrorPrefix   string // prefix before a turn/shell error
@@ -133,7 +133,7 @@ type Messages struct {
 	SettingsUnavailable     string // /settings in a mode without the panel
 	NoOutput                string // a shell command printed nothing
 
-	// --- running-status chrome (TUI, ADR-0033) ---
+	// --- running-status chrome (TUI, gem-agent ADR-0033) ---
 	StatusThinking     string
 	StatusInterrupting string
 	StatusToolWait     string
@@ -150,15 +150,15 @@ type Messages struct {
 	// ThoughtPrefix marks a live thought-summary line.
 	ThoughtPrefix string
 	// InterruptStuckWarn: the second Ctrl+C while already
-	// interrupting — the next one quits (ADR-0034 §3).
+	// interrupting — the next one quits (gem-agent ADR-0034 §3).
 	InterruptStuckWarn string
-	// AskTitleFmt / AskHint: the ask_user dialog (ADR-0036).
+	// AskTitleFmt / AskHint: the ask_user dialog (gem-agent ADR-0036).
 	AskTitleFmt string // %s = the model's question
 	AskHint     string
 	// AskHiddenFmt discloses %d wrapped question lines the box could
 	// not show (review round 3 — never answer what you have not read).
 	AskHiddenFmt string
-	// Round-limit intervention (ADR-0040): the dialog question, the
+	// Round-limit intervention (gem-agent ADR-0040): the dialog question, the
 	// review verdict shown as evidence, and the two answers.
 	RoundLimitAskFmt    string // %d rounds used, %d hard cap, %s evidence
 	RoundLoopAskFmt     string // %s repeated call, %s evidence
@@ -178,7 +178,7 @@ type Messages struct {
 	ExitSessionFmt string
 	// ExitUsageFmt: rounds, prompt tokens, output tokens.
 	ExitUsageFmt string
-	// ExitAbandonedFmt: %d = tool calls the ADR-0065 floor abandoned
+	// ExitAbandonedFmt: %d = tool calls the gem-agent ADR-0065 floor abandoned
 	// that are still running at exit — their effect may land after
 	// the process is gone, so the operator hears it.
 	ExitAbandonedFmt string
@@ -200,7 +200,7 @@ type Messages struct {
 	// /readonly shows the current state as well as setting one, so a
 	// transition verb ("…に戻りました") is a lie on the showing path.
 	// Operator report, 2026-09-09.
-	// The lift question (ADR-0080 §4) is a mode change, not a tool
+	// The lift question (gem-agent ADR-0080 §4) is a mode change, not a tool
 	// approval: its own title, its own consequence line, and only
 	// y/n/N, because "allow for this session" and "always allow" are
 	// answers to a question nobody asked here.
@@ -251,11 +251,11 @@ type Messages struct {
 	// UnknownCommandFmt: %s = the input that matched no command.
 	UnknownCommandFmt string
 	MCPNone           string // /mcp with nothing connected
-	// Integration reload results (ADR-0039).
+	// Integration reload results (gem-agent ADR-0039).
 	MCPDisabled    string // /mcp reload while [mcp].enabled=false / --mcp off
 	MCPReloadedFmt string // fmt: servers (int), tools (int)
 
-	// --- startup safety (ADR-0023, cmd) ---
+	// --- startup safety (gem-agent ADR-0023, cmd) ---
 	// TrustHeaderFmt opens the first-run prompt: project dir.
 	TrustHeaderFmt string
 	// TrustItem*Fmt describe what the project provides, naming what
@@ -264,7 +264,7 @@ type Messages struct {
 	TrustItemMCPFmt          string // %d = server count
 	TrustItemSkillsFmt       string // %d = skill count
 	TrustQuestion            string // the [y/N] question
-	// Content pins (ADR-0074).
+	// Content pins (gem-agent ADR-0074).
 	PinRecordedFmt         string // %d = files recorded, %s = their names
 	PinNonePending         string // no pins yet, non-interactive: loaded as before
 	PinChangeFmt           string // %s name, %s kind (PinKindChanged/PinKindAdded), %s size — one described change
@@ -282,7 +282,7 @@ type Messages struct {
 	// TrustDeclinedFmt is the banner note after declining: policy path.
 	TrustDeclinedFmt string
 	TrustUndecided   string // non-interactive, undecided: ran bare
-	// Broad-root gate (ADR-0023 §1). Reasons name what projectDir is.
+	// Broad-root gate (gem-agent ADR-0023 §1). Reasons name what projectDir is.
 	ReasonFSRoot        string
 	ReasonHome          string
 	ReasonHomeAncestor  string

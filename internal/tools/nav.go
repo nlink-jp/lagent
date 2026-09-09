@@ -1,9 +1,9 @@
 package tools
 
-// Project navigation tools (ADR-0013, reshaped by ADR-0052): a tree
+// Project navigation tools (gem-agent ADR-0013, reshaped by gem-agent ADR-0052): a tree
 // listing and a fast grep. Both are read-only, project-confined, and
 // dependency-free — an optional ripgrep prerequisite would fork the
-// behavior into two variants (ADR-0013). Neither follows symlinks: a
+// behavior into two variants (gem-agent ADR-0013). Neither follows symlinks: a
 // walk that follows links can leave the project through a link the
 // per-path checks never see.
 //
@@ -31,7 +31,7 @@ const (
 	treeEntryCap = 800
 	// treePerDirCap bounds entries shown per directory, so one huge
 	// directory cannot starve every sibling that sorts after it
-	// (ADR-0052). The remainder is reported, never silent.
+	// (gem-agent ADR-0052). The remainder is reported, never silent.
 	treePerDirCap = 50
 	// treeDepthDefault/Max bound recursion. Depth 0 means "default".
 	treeDepthDefault = 12
@@ -41,7 +41,7 @@ const (
 	// reported, never silent.
 	searchMatchCap = 200
 	// searchPerFileCap bounds match lines shown per file; the rest of
-	// the file is still counted and the count reported (ADR-0052), so
+	// the file is still counted and the count reported (gem-agent ADR-0052), so
 	// a capped result carries distribution, not the alphabetical head.
 	searchPerFileCap = 5
 	// searchFileCap skips files larger than this — grep on a huge
@@ -59,7 +59,7 @@ const (
 var vcsDirs = map[string]bool{".git": true, ".hg": true, ".svn": true}
 
 // ignoreTally aggregates what a walk skipped, for the honesty footer
-// (ADR-0052: every skip is reported).
+// (gem-agent ADR-0052: every skip is reported).
 type ignoreTally struct {
 	dirs, files int
 	names       []string
@@ -137,7 +137,7 @@ func (r *Registry) listTree() *Tool {
 				if truncated != "" || interrupted {
 					return
 				}
-				// Cancellation ends the walk (ADR-0065 §1): consulted
+				// Cancellation ends the walk (gem-agent ADR-0065 §1): consulted
 				// before every directory read, so Ctrl+C on a slow
 				// filesystem costs one syscall, not the remaining tree.
 				if ctx.Err() != nil {
@@ -201,7 +201,7 @@ func (r *Registry) listTree() *Tool {
 					case row.ignored:
 						fmt.Fprintf(&b, "%s%s/ [ignored]\n", indent, e.Name())
 					case e.Type()&os.ModeSymlink != 0:
-						// Shown, never followed (ADR-0013 §3).
+						// Shown, never followed (gem-agent ADR-0013 §3).
 						fmt.Fprintf(&b, "%s%s@\n", indent, e.Name())
 					case e.IsDir():
 						if dirsOnly {
@@ -235,7 +235,7 @@ func (r *Registry) listTree() *Tool {
 			}
 			if interrupted {
 				// A partial tree is a result, never silently a whole
-				// one (ADR-0052's rule applied to ADR-0065's cut).
+				// one (gem-agent ADR-0052's rule applied to gem-agent ADR-0065's cut).
 				out += "[interrupted — the tree above is partial]\n"
 			}
 			if s := tally.summary(); s != "" {
@@ -333,7 +333,7 @@ func (r *Registry) searchFiles() *Tool {
 				if capped || interrupted {
 					return
 				}
-				// Cancellation ends the walk (ADR-0065 §1): consulted
+				// Cancellation ends the walk (gem-agent ADR-0065 §1): consulted
 				// before every directory read and every file read, so
 				// the partial result is back within one syscall of
 				// the cancel instead of after the remaining project.
@@ -358,7 +358,7 @@ func (r *Registry) searchFiles() *Tool {
 						return
 					}
 					if e.Type()&os.ModeSymlink != 0 {
-						continue // never follow links out of the walk (ADR-0013 §3)
+						continue // never follow links out of the walk (gem-agent ADR-0013 §3)
 					}
 					if vcsDirs[e.Name()] {
 						continue // a submodule's .git is a file — skip by name either way
@@ -395,7 +395,7 @@ func (r *Registry) searchFiles() *Tool {
 					count := 0
 					for i, line := range strings.Split(string(data), "\n") {
 						// A 2 MB file under a heavy pattern can outlast
-						// the abandon grace on its own (ADR-0065 §2); the
+						// the abandon grace on its own (gem-agent ADR-0065 §2); the
 						// check is periodic so a cancel lands mid-file
 						// too. This file's partial count is dropped —
 						// the footer names the cut.

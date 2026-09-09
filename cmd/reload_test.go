@@ -23,4 +23,4 @@ func TestSlashReloadSubcommands(t *testing.T) {
 	// Reload unavailable (nil closure) reads as unknown, not a panic.
 }
 
-// ADR-0039 §3: load_skill reads the live list through its getter, and
+// gem-agent ADR-0039 §3: load_skill reads the live list through its getter, and

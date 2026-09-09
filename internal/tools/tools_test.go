@@ -227,7 +227,7 @@ func TestShellExecTimeout(t *testing.T) {
 	}
 }
 
-// --- images (ADR-0012) ---
+// --- images (gem-agent ADR-0012) ---
 
 var tinyPNG = []byte{
 	0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
@@ -253,7 +253,7 @@ func TestReadImageConfinedAndSniffed(t *testing.T) {
 		t.Fatalf("ReadImage: %v %q %d", err, mime, len(data))
 	}
 	// Outside the project: same refusal as every file tool — the
-	// model-triggered route gets no out-of-tree exception (ADR-0012).
+	// model-triggered route gets no out-of-tree exception (gem-agent ADR-0012).
 	if _, _, err := r.ReadImage("../outside.png"); err == nil {
 		t.Fatal("ReadImage escaped the project")
 	}
@@ -278,7 +278,7 @@ func TestReadFileRefusesImages(t *testing.T) {
 	}
 }
 
-// --- partial reads (ADR-0014) ---
+// --- partial reads (gem-agent ADR-0014) ---
 
 func TestReadFileLineWindows(t *testing.T) {
 	r := newRegistry(t)
@@ -344,7 +344,7 @@ func TestReadFileLineWindows(t *testing.T) {
 	}
 }
 
-// ADR-0034: the operator's deadlock. A command whose background child
+// gem-agent ADR-0034: the operator's deadlock. A command whose background child
 // inherits the output pipe used to hang CombinedOutput forever after
 // timeout/cancel — the direct child died, the grandchild held the
 // pipe, Wait waited for EOF. Both paths must return promptly.
@@ -364,7 +364,7 @@ func TestShellExecTimeoutReturnsDespitePipeHoldingChild(t *testing.T) {
 			t.Errorf("expected timeout report, got %q", out)
 		}
 	case <-time.After(5 * time.Second):
-		t.Fatal("shell_exec hung after timeout — the pipe-holding child deadlock (ADR-0034)")
+		t.Fatal("shell_exec hung after timeout — the pipe-holding child deadlock (gem-agent ADR-0034)")
 	}
 }
 
@@ -386,13 +386,13 @@ func TestShellExecCancelReturnsDespitePipeHoldingChild(t *testing.T) {
 	case <-done:
 		// returned — content doesn't matter, promptness does
 	case <-time.After(5 * time.Second):
-		t.Fatal("shell_exec hung after cancel — the Ctrl+C deadlock (ADR-0034)")
+		t.Fatal("shell_exec hung after cancel — the Ctrl+C deadlock (gem-agent ADR-0034)")
 	}
 }
 
 // A command that exits but leaves a background child holding the
 // output pipe past WaitDelay is a result with a note, not a failure
-// (ADR-0065 §2 review: the shorter WaitDelay widened this band).
+// (gem-agent ADR-0065 §2 review: the shorter WaitDelay widened this band).
 func TestShellExecKeepsOutputWhenBackgroundChildHoldsPipe(t *testing.T) {
 	r, err := New(t.TempDir(), directExec, time.Minute)
 	if err != nil {
@@ -411,7 +411,7 @@ func TestShellExecKeepsOutputWhenBackgroundChildHoldsPipe(t *testing.T) {
 	}
 }
 
-// The abandoned-call counter is shared with a Subset (ADR-0065 §2): the
+// The abandoned-call counter is shared with a Subset (gem-agent ADR-0065 §2): the
 // delegated child's abandoned goroutines count on the session's receipt.
 func TestSubsetSharesAbandonedCounter(t *testing.T) {
 	r := newRegistry(t)

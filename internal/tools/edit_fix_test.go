@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// ADR-0021: a file starting with blank lines must not shift the
+// gem-agent ADR-0021: a file starting with blank lines must not shift the
 // near-miss diagnosis — the quoted snippet and line number must name
 // the real near-match region.
 func TestNearMissAlignedWithLeadingBlankLines(t *testing.T) {

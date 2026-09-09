@@ -114,7 +114,7 @@ func TestFlagOverrideBeatsEnv(t *testing.T) {
 	}
 }
 
-// ADR-0039 §5: --mcp on|off overrides [mcp].enabled at the top of the
+// gem-agent ADR-0039 §5: --mcp on|off overrides [mcp].enabled at the top of the
 // precedence, with flag provenance; anything else is a loud error.
 func TestMCPFlagOverride(t *testing.T) {
 	clearEnv(t)
@@ -139,7 +139,7 @@ func TestMCPFlagOverride(t *testing.T) {
 }
 
 // --auto arms auto-approve with flag provenance; not passing it leaves
-// the config value alone (the flag is one-way — ADR-0053).
+// the config value alone (the flag is one-way — gem-agent ADR-0053).
 func TestAutoFlagOverride(t *testing.T) {
 	clearEnv(t)
 	t.Setenv("LAGENT_MODEL", "m")
@@ -282,7 +282,7 @@ trusted_projects = ["/work/mine"]
 }
 
 // Four precedence layers with nothing on screen assumes the operator
-// remembers them. /settings shows this instead (ADR-0009).
+// remembers them. /settings shows this instead (gem-agent ADR-0009).
 func TestConfigRecordsWhereEachValueCameFrom(t *testing.T) {
 	clearEnv(t)
 	path := writeConfig(t, `
@@ -310,7 +310,7 @@ max_turns = 7
 }
 
 // Hooks entries parse from [[hooks.pre_tool_use]] and are validated:
-// ADR-0072 §4.5: a project config is untrusted input read before the
+// gem-agent ADR-0072 §4.5: a project config is untrusted input read before the
 // trust prompt; an oversized one is refused, never parsed.
 func TestLoadProjectRefusesOversizeFile(t *testing.T) {
 	dir := t.TempDir()

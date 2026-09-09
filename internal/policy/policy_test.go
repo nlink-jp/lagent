@@ -133,7 +133,7 @@ func TestInvalidPatternsAndValuesAreErrors(t *testing.T) {
 	}
 }
 
-// ValidateEntry is the exported face of the pattern rules (ADR-0053):
+// ValidateEntry is the exported face of the pattern rules (gem-agent ADR-0053):
 // the --allow flag carries the same vocabulary, and its errors must
 // name the flag rather than a config table.
 func TestValidateEntryNamesItsLabel(t *testing.T) {
@@ -187,12 +187,12 @@ func TestEmptyPolicyIsDefaultEverywhere(t *testing.T) {
 	}
 }
 
-// ADR-0021 §6: scope beats pattern specificity. A project may tighten
+// gem-agent ADR-0021 §6: scope beats pattern specificity. A project may tighten
 // past a more-specific global rule, and a trusted project's loosening
 // beats a global exact rule — the nearest scope wins.
 func TestScopeBeatsSpecificity(t *testing.T) {
 	// Untrusted project tightens with a wildcard over a global exact
-	// "never": the tighten must be honoured (ADR-0008's core promise).
+	// "never": the tighten must be honoured (gem-agent ADR-0008's core promise).
 	p, notes, err := Build(
 		map[string]string{"web_search": "never"},
 		map[string]string{"web_*": "always"},

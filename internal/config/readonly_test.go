@@ -1,7 +1,7 @@
 package config
 
 // The ceiling and its watcher are two settings, not one tri-state
-// (ADR-0080 §1), so they load, default and override independently.
+// (gem-agent ADR-0080 §1), so they load, default and override independently.
 
 import (
 	"os"

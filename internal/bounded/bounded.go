@@ -1,8 +1,8 @@
 // Package bounded is the one place a read, a listing or a process
-// output is capped (ADR-0073 §4). Every function that takes a cap
+// output is capped (gem-agent ADR-0073 §4). Every function that takes a cap
 // returns whether the cap was reached, so a caller cannot obtain the
 // bytes without also holding the fact that they are not all of them —
-// twenty of the findings in ADR-0072 were caps without that fact, or
+// twenty of the findings in gem-agent ADR-0072 were caps without that fact, or
 // reads with no cap at all. An architecture test (internal/archtest)
 // forbids the unbounded primitives outside this package.
 //
@@ -55,7 +55,7 @@ func Scanner(r io.Reader, initial, max int) *bufio.Scanner {
 
 // Writer keeps the first limit bytes written to it and counts the
 // rest: the output of a process that prints without end is bounded as
-// it arrives, not after it exits (ADR-0072 §4.5). The kept bytes are
+// it arrives, not after it exits (gem-agent ADR-0072 §4.5). The kept bytes are
 // cut on a rune boundary.
 type Writer struct {
 	mu    sync.Mutex

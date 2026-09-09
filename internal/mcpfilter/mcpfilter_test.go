@@ -71,7 +71,7 @@ func TestServerAndFunc(t *testing.T) {
 	}
 }
 
-// Per server, the nearest scope decides whole (ADR-0077 §2): policy
+// Per server, the nearest scope decides whole (gem-agent ADR-0077 §2): policy
 // replaces config for that server, and leaves every other server alone.
 func TestPolicyReplacesConfigPerServer(t *testing.T) {
 	f, err := Build(
@@ -93,7 +93,7 @@ func TestPolicyReplacesConfigPerServer(t *testing.T) {
 	}
 }
 
-// The project file may only add (ADR-0008 §4's direction rule, held by
+// The project file may only add (gem-agent ADR-0008 §4's direction rule, held by
 // construction): it can never bring back something a nearer scope excluded.
 func TestProjectOnlyAdds(t *testing.T) {
 	f, err := Build([]string{"obsidian/patch_vault_file"}, PolicyScope{}, []string{"github", "obsidian/get_vault_file"})

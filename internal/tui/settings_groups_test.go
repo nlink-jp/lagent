@@ -9,7 +9,7 @@ import (
 )
 
 // groupRows is one server with two functions, plus an ungrouped row —
-// the shape the panel gets from ADR-0077's two levels.
+// the shape the panel gets from gem-agent ADR-0077's two levels.
 func groupRows() []SettingRow {
 	return []SettingRow{
 		{Section: "mcp tools", Label: "obsidian", Value: "on", Values: []string{"on", "off"},
@@ -44,7 +44,7 @@ func groupModel(t *testing.T, applied *[]SettingChange) Model {
 	return next.(Model)
 }
 
-// ADR-0077 §3: groups open closed. Flat, this list is hundreds of rows
+// gem-agent ADR-0077 §3: groups open closed. Flat, this list is hundreds of rows
 // on a machine with a full server list, which is the state the two
 // levels exist to end.
 func TestGroupsOpenClosed(t *testing.T) {
@@ -183,7 +183,7 @@ func TestGroupsBornDuringAnEditOpenClosed(t *testing.T) {
 
 // The panel showed the startup snapshot every time it was reopened, so
 // an exclusion turned off read `on` again on the next open — and with
-// ADR-0077 that row is the only place the state appears at all
+// gem-agent ADR-0077 that row is the only place the state appears at all
 // (pre-release review).
 func TestPanelRereadsOnEveryOpen(t *testing.T) {
 	rows := groupRows()

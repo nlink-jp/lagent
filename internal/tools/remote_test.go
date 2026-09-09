@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// ADR-0075 §1: the three provenances render as three shapes, each
+// gem-agent ADR-0075 §1: the three provenances render as three shapes, each
 // naming the server and the tool, and the value survives wrapping so the
 // executor can read it with errors.As instead of matching text.
 func TestRemoteErrorRendersProvenance(t *testing.T) {

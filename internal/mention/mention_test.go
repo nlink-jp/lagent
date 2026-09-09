@@ -181,7 +181,7 @@ func contains(xs []string, want string) bool {
 	return false
 }
 
-// --- images (ADR-0012) ---
+// --- images (gem-agent ADR-0012) ---
 
 // realTempDir resolves the macOS /var → /private/var symlink, as the
 // production caller does for the project dir (registry.ProjectDir()).
@@ -303,7 +303,7 @@ func TestExpandImageLimits(t *testing.T) {
 	}
 }
 
-// The session work directory (ADR-0058) holds spilled MCP results and
+// The session work directory (gem-agent ADR-0058) holds spilled MCP results and
 // staged intermediates, and the operator can see those paths in the
 // conversation — so an @-reference to one has to attach. Found by
 // applying the v0.56.1 lesson (enumerate every consumer of the old
@@ -384,7 +384,7 @@ func TestNoWorkDirKeepsTheOneRootWording(t *testing.T) {
 	}
 }
 
-// ADR-0072 §4.5: attachments are size-gated on the open descriptor
+// gem-agent ADR-0072 §4.5: attachments are size-gated on the open descriptor
 // and read bounded; text is cut on a rune boundary with the real size
 // in the note.
 func TestAttachmentsAreBoundedAndRuneSafe(t *testing.T) {
@@ -489,7 +489,7 @@ func TestDirectoryOmissionIsNotACount(t *testing.T) {
 	}
 }
 
-// ADR-0072 §4.8: an @fifo with no writer is refused promptly, not
+// gem-agent ADR-0072 §4.8: an @fifo with no writer is refused promptly, not
 // waited on; a HEIC attachment is identified by its ftyp box.
 func TestFIFOIsRefusedAndHEICAccepted(t *testing.T) {
 	project, _ := filepath.EvalSymlinks(t.TempDir())

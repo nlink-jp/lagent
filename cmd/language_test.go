@@ -7,7 +7,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/uitext"
 )
 
-// TestSlashHelpFollowsLanguage pins ADR-0029: /help is monolingual in
+// TestSlashHelpFollowsLanguage pins gem-agent ADR-0029: /help is monolingual in
 // the resolved language — the historical mixed EN/JA text must not
 // come back.
 func TestSlashHelpFollowsLanguage(t *testing.T) {

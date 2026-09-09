@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// ADR-0021: a keystroke already in flight for the input box when the
+// gem-agent ADR-0021: a keystroke already in flight for the input box when the
 // approval dialog appears must not answer it — within the grace window
 // keys are dropped; after it, they work.
 func TestApprovalTypeAheadGrace(t *testing.T) {
@@ -35,7 +35,7 @@ func TestApprovalTypeAheadGrace(t *testing.T) {
 	}
 }
 
-// ADR-0021 §7: ! and / cannot be queued mid-run — the merged pending
+// gem-agent ADR-0021 §7: ! and / cannot be queued mid-run — the merged pending
 // would be prefix-routed whole (queued prose executed as shell, or
 // dropped after a slash command). The text stays in the box.
 func TestCommandsCannotBeQueuedMidRun(t *testing.T) {
@@ -66,7 +66,7 @@ func TestCommandsCannotBeQueuedMidRun(t *testing.T) {
 	}
 }
 
-// ADR-0021: a half-typed draft survives the queued message being sent —
+// gem-agent ADR-0021: a half-typed draft survives the queued message being sent —
 // and on a failed turn both come back, in writing order.
 func TestDraftSurvivesQueuedSend(t *testing.T) {
 	c := &capture{}
@@ -107,7 +107,7 @@ func TestDraftAndQueueHandedBackOnError(t *testing.T) {
 	}
 }
 
-// ADR-0021: an interrupted ! command hands a queued message back
+// gem-agent ADR-0021: an interrupted ! command hands a queued message back
 // instead of auto-sending it against a world that no longer exists;
 // a cleanly completed one still auto-sends.
 func TestShellInterruptHandsQueuedBack(t *testing.T) {

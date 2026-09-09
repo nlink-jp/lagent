@@ -1,6 +1,6 @@
 package tools
 
-// edit_file v2 (ADR-0015): batched, atomic, diagnosed, self-verifying
+// edit_file v2 (gem-agent ADR-0015): batched, atomic, diagnosed, self-verifying
 // exact-string replacement. The anchor stays a unique literal string —
 // line-number addressing writes to the wrong place *silently* when the
 // number is stale, while a string anchor fails loudly or works.
@@ -94,7 +94,7 @@ func (r *Registry) editFile() *Tool {
 			if err != nil {
 				return "", err
 			}
-			// Every syscall-shaped step consults ctx (ADR-0065 §1): a
+			// Every syscall-shaped step consults ctx (gem-agent ADR-0065 §1): a
 			// call the floor abandoned during a slow read must not go
 			// on to write after the operator was told "interrupted"
 			// (review after v0.68.0).
@@ -282,7 +282,7 @@ func nearMiss(content, needle string) (line int, snippet string, ok bool) {
 	// normalizeLines drops leading blank lines, and on a file starting
 	// with blanks that shifted every reported line number and made the
 	// quoted "use this exact text" snippet come from the wrong region —
-	// real file text, so the follow-up edit landed there (ADR-0021).
+	// real file text, so the follow-up edit landed there (gem-agent ADR-0021).
 	contentRaw := strings.Split(content, "\n")
 	contentNorm := make([]string, len(contentRaw))
 	for i, l := range contentRaw {
@@ -348,14 +348,14 @@ func occurrenceLines(content, needle string) string {
 
 // editReport renders the changed region with context — the evidence
 // that replaces a read-back verification round. The line span lives in
-// the header, never as per-line prefixes on content (ADR-0014: numbered
+// the header, never as per-line prefixes on content (gem-agent ADR-0014: numbered
 // content poisons the exact-match contract the moment it is copied).
 func editReport(n int, content string, offset, newLen int) string {
 	lines := strings.Split(content, "\n")
 	startLine := strings.Count(content[:offset], "\n") // 0-based
 	end := offset + newLen
 	// A replacement ending in '\n' terminates its own last line; that
-	// newline must not count as reaching the next line (ADR-0021).
+	// newline must not count as reaching the next line (gem-agent ADR-0021).
 	if newLen > 0 && content[end-1] == '\n' {
 		end--
 	}

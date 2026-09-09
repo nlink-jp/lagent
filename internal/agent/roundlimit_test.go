@@ -77,7 +77,7 @@ func TestRoundLimitNonInteractiveStops(t *testing.T) {
 }
 
 // Fail-closed: a stuck verdict stops the turn with a message that
-// teaches recovery and never recommends /clear (ADR-0040 §4).
+// teaches recovery and never recommends /clear (gem-agent ADR-0040 §4).
 func TestRoundLimitStopsFailClosed(t *testing.T) {
 	b := &rlBackend{responses: loopRounds(9), verdict: stuckVerdict}
 	a := newRLAgent(t, b, 2, nil)

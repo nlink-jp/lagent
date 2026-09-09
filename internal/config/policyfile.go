@@ -13,7 +13,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// PolicyFileName is the machine-owned approval-policy file (ADR-0009).
+// PolicyFileName is the machine-owned approval-policy file (gem-agent ADR-0009).
 // It is separate from config.toml on purpose: the TOML encoder does not
 // preserve comments, and config.toml is hand-written and commented. A
 // settings panel that rewrote it would delete its own documentation the
@@ -37,11 +37,11 @@ const policyFileHeader = `# lagent approval policy — WRITTEN BY lagent.
 
 // PolicyFile is the machine-owned policy: a global table plus per-project
 // tables, which is how the panel scopes a policy to one project without
-// writing a file into that project's repository (ADR-0009 §4).
+// writing a file into that project's repository (gem-agent ADR-0009 §4).
 type PolicyFile struct {
 	Tools    map[string]string        `toml:"tools"`
 	Projects map[string]ProjectPolicy `toml:"projects"`
-	// MCP carries what the panel excluded (ADR-0077). It is global, not
+	// MCP carries what the panel excluded (gem-agent ADR-0077). It is global, not
 	// per project: the operator's judgement about what a server's
 	// functions are for does not change when they cd elsewhere.
 	MCP PolicyMCP `toml:"mcp"`
@@ -50,7 +50,7 @@ type PolicyFile struct {
 // PolicyMCP is policy.toml's [mcp] table: the exclusions the panel
 // wrote. Per server it replaces config.toml's word entirely — what the
 // operator last said in the panel is not merged with the file they
-// wrote last month (ADR-0077 §2).
+// wrote last month (gem-agent ADR-0077 §2).
 type PolicyMCP struct {
 	// Decided names the servers this file has an opinion about. It is
 	// not derivable from Exclude: "the panel decided this server has
@@ -63,7 +63,7 @@ type PolicyMCP struct {
 	Exclude []string `toml:"exclude"`
 }
 
-// Trust values for ProjectPolicy.Trust (ADR-0023).
+// Trust values for ProjectPolicy.Trust (gem-agent ADR-0023).
 const (
 	TrustGranted  = "granted"
 	TrustDeclined = "declined"
@@ -72,26 +72,26 @@ const (
 // ProjectPolicy is one entry of the [projects] table.
 type ProjectPolicy struct {
 	// Trust records the first-run answer to "trust this project's
-	// agent-facing files?" (ADR-0023): TrustGranted, TrustDeclined, or
+	// agent-facing files?" (gem-agent ADR-0023): TrustGranted, TrustDeclined, or
 	// "" while unasked. Deleting the key re-asks on the next start.
 	Trust string            `toml:"trust,omitempty"`
 	Tools map[string]string `toml:"tools"`
 	// Pins are the SHA-256 digests of the project's agent-facing files
-	// as the operator last trusted them (ADR-0074): a changed file asks
+	// as the operator last trusted them (gem-agent ADR-0074): a changed file asks
 	// again before it is loaded. PinnedAt records that pins were taken
 	// at all (RFC 3339), so an empty set is "pinned, nothing there" and
 	// not "never pinned" (review F2).
 	Pins     map[string]string `toml:"pins"`
 	PinnedAt string            `toml:"pinned_at,omitempty"`
 	// Commands holds the per-command rules the withdrawn /learn wrote
-	// (ADR-0045 §4), keyed by policy.CommandKey. Parsed so existing
-	// files keep loading; NOT fed into the live policy since ADR-0049.
+	// (gem-agent ADR-0045 §4), keyed by policy.CommandKey. Parsed so existing
+	// files keep loading; NOT fed into the live policy since gem-agent ADR-0049.
 	// There is deliberately no global counterpart.
 	Commands map[string]string `toml:"commands"`
 }
 
 // SetMCPExclusions replaces every [mcp].exclude entry about one server
-// with the ones given, leaving other servers alone (ADR-0077 §2: per
+// with the ones given, leaving other servers alone (gem-agent ADR-0077 §2: per
 // server, the nearest scope decides whole). entries are full entries —
 // "obsidian" or "obsidian/patch_vault_file" — and an empty slice means
 // the server has nothing excluded, which is still a statement: it
@@ -221,8 +221,8 @@ func (pf *PolicyFile) Set(projectDir, tool, decision string) {
 	}
 	setOrDelete(entry.Tools, tool, decision)
 	// The entry survives with no tools when it still carries a trust
-	// decision (ADR-0023), learned command rules (ADR-0045) or content
-	// pins (ADR-0074 — a project trusted through the operator's config
+	// decision (gem-agent ADR-0023), learned command rules (gem-agent ADR-0045) or content
+	// pins (gem-agent ADR-0074 — a project trusted through the operator's config
 	// has pins and no trust key; "back to default" must not drop them).
 	if entry.empty() {
 		delete(pf.Projects, projectDir)
@@ -237,7 +237,7 @@ func (e ProjectPolicy) empty() bool {
 }
 
 // CommandsFor returns the per-command rules recorded for projectDir
-// (ADR-0045 §4). Project scope only, so an empty projectDir has none.
+// (gem-agent ADR-0045 §4). Project scope only, so an empty projectDir has none.
 func (pf *PolicyFile) CommandsFor(projectDir string) map[string]string {
 	if projectDir == "" {
 		return nil
@@ -266,7 +266,7 @@ func (pf *PolicyFile) SetCommand(projectDir, key, decision string) {
 	}
 	setOrDelete(entry.Commands, key, decision)
 	// The entry survives with nothing in it only while it carries a
-	// trust decision (ADR-0023) or content pins (ADR-0074).
+	// trust decision (gem-agent ADR-0023) or content pins (gem-agent ADR-0074).
 	if entry.empty() {
 		delete(pf.Projects, projectDir)
 		return
@@ -280,7 +280,7 @@ func (pf *PolicyFile) TrustFor(projectDir string) string {
 	return pf.Projects[projectDir].Trust
 }
 
-// SetTrust records the first-run trust decision (ADR-0023). An empty
+// SetTrust records the first-run trust decision (gem-agent ADR-0023). An empty
 // value removes it, which re-asks on the next start.
 func (pf *PolicyFile) SetTrust(projectDir, trust string) {
 	entry := pf.Projects[projectDir]

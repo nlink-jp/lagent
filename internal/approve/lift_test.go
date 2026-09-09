@@ -1,6 +1,6 @@
 package approve
 
-// The plain REPL's mode question (ADR-0080 §4). It had no test at all,
+// The plain REPL's mode question (gem-agent ADR-0080 §4). It had no test at all,
 // including the one that matters: 'a' is not an answer here, because a
 // mode is not a call (independent review, 2026-09-09).
 

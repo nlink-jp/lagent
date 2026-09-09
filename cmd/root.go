@@ -86,7 +86,7 @@ and sandboxed shell commands cannot write outside it.
 
 macOS only. Documentation: README.md.`,
 	// One optional positional argument: the first interactive turn
-	// (ADR-0064). It runs through the same path a typed message takes,
+	// (gem-agent ADR-0064). It runs through the same path a typed message takes,
 	// then the session is ordinary interactive lagent.
 	Args:         cobra.MaximumNArgs(1),
 	SilenceUsage: true,
@@ -124,7 +124,7 @@ func reloadWarnings(report string) string {
 }
 
 // workDirNoteFloor is the size a session's leftovers reach before the
-// startup note is worth an operator's attention (ADR-0078 §4). Below it
+// startup note is worth an operator's attention (gem-agent ADR-0078 §4). Below it
 // the directories exist but nothing has accumulated.
 const workDirNoteFloor = 10 << 20 // 10 MiB
 
@@ -136,7 +136,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// Startup warnings are teed: they hit stderr immediately (plain
 	// REPL, one-shot, early failures), but the TUI's first ClearScreen
 	// wipes that copy — a broken skill or unreadable memory flashed for
-	// milliseconds and vanished (ADR-0021) — so the recorded lines ride
+	// milliseconds and vanished (gem-agent ADR-0021) — so the recorded lines ride
 	// the banner too.
 	notes := &startupNotes{w: cmd.ErrOrStderr()}
 	var stderr io.Writer = notes
@@ -161,7 +161,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	// The first interactive turn, from the positional argument
-	// (ADR-0064). Never combined with -p: the two select different
+	// (gem-agent ADR-0064). Never combined with -p: the two select different
 	// session shapes, and ambiguity is refused, not resolved.
 	initialInput, err := firstMessage(args, oneShot)
 	if err != nil {
@@ -171,13 +171,13 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// raw config field.
 	autoOn := effectiveAuto(cfg.Agent.AutoApprove, oneShot, flagAuto)
 	// The ceiling this run starts with, resolved once for the same
-	// reason (ADR-0080 §1).
+	// reason (gem-agent ADR-0080 §1).
 	ceiling := effectiveCeiling(cfg.Agent)
-	// UI language, resolved once (ADR-0029): the chrome that follows —
+	// UI language, resolved once (gem-agent ADR-0029): the chrome that follows —
 	// prompts, TUI, slash output — is built with it.
 	uiLang := uitext.Resolve(cfg.TUI.Language, os.Getenv)
 	msgs := uitext.For(uiLang)
-	// The escape ladder for turns outside the TUI (ADR-0065 §3): the
+	// The escape ladder for turns outside the TUI (gem-agent ADR-0065 §3): the
 	// TUI has its own three-press exit; the plain REPL and one-shot
 	// mode get the same one here. The quit skips the deferred flushes
 	// on purpose — the transcript is per event, and the warning that
@@ -201,7 +201,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// --- startup safety (ADR-0023) ---
+	// --- startup safety (gem-agent ADR-0023) ---
 	// Both gates read one unbuffered line from stdin before the REPL/TUI
 	// takes over. One-shot mode counts as non-interactive even on a TTY:
 	// a scripted -p must behave deterministically.
@@ -219,14 +219,14 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// --- first-run project trust (ADR-0023): does this project's own
+	// --- first-run project trust (gem-agent ADR-0023): does this project's own
 	// instruction files / .mcp.json / skills get loaded at all? ---
 	projectTrusted, trustNote := resolveProjectTrust(
 		cfg, policyFile, policyPath, projectDir, interactive, os.Stdin, cmd.ErrOrStderr(), msgs)
 	if trustNote != "" {
 		fmt.Fprintf(stderr, "%s\n", trustNote)
 	}
-	// Content pins (ADR-0074): trust was given to a directory; what is
+	// Content pins (gem-agent ADR-0074): trust was given to a directory; what is
 	// loaded is content, and content that changed since asks again.
 	// Decided before anything of the project is read — .lagent.toml
 	// below included.
@@ -237,7 +237,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(stderr, "%s\n", n)
 	}
 
-	// --- per-tool approval policy (ADR-0008) ---
+	// --- per-tool approval policy (gem-agent ADR-0008) ---
 	// The project half may tighten freely and may only loosen where the
 	// operator trusted this directory and its content is what they
 	// trusted: a checked-out repository must not be able to switch the
@@ -246,7 +246,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	// The MCP tool filter (ADR-0077): what this session does not have.
+	// The MCP tool filter (gem-agent ADR-0077): what this session does not have.
 	// Built once — the reload re-derives what it removes, but the files
 	// it is built from are config, and config changes need a restart
 	// like every other key. A malformed entry refuses to start: an
@@ -262,7 +262,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		mergedTools[k] = v
 	}
 	// The machine-owned file wins: a change made through /settings must
-	// not be silently overridden by the hand-written config (ADR-0009).
+	// not be silently overridden by the hand-written config (gem-agent ADR-0009).
 	for k, v := range policyFile.ForProject(projectDir) {
 		mergedTools[k] = v
 	}
@@ -270,11 +270,11 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// hand-written, the order the config system already declares) and
 	// compile into the same policy build — so the project tighten, the
 	// Block floor, hooks, and the bare-"*" ban all hold without knowing
-	// the flag exists (ADR-0053 §2).
+	// the flag exists (gem-agent ADR-0053 §2).
 	if err := applyAllowFlag(mergedTools, flagAllow); err != nil {
 		return err
 	}
-	// Learned command rules are parsed but NOT applied (ADR-0049 §3):
+	// Learned command rules are parsed but NOT applied (gem-agent ADR-0049 §3):
 	// /learn is withdrawn, nothing displays or manages those entries, and
 	// invisible standing permissions are the state the withdrawal exists
 	// to end. Ignoring them only ever tightens. The note tells the
@@ -288,7 +288,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(stderr, "note: %s has %d obsolete [projects.<dir>.commands] entries — ignored; delete them to silence this note\n", policyPath, n)
 	}
 
-	// The persistent-file snapshot (ADR-0074 §3/§4): what this session
+	// The persistent-file snapshot (gem-agent ADR-0074 §3/§4): what this session
 	// starts from, compared with what the previous session left, and
 	// compared again at the end so what the session added or changed
 	// is said — the parent directories it names are denied by name in
@@ -325,7 +325,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	}
 	defer func() { afterDirectShell = nil }()
 
-	// --- session transcript: the log, and the resume source (ADR-0005) ---
+	// --- session transcript: the log, and the resume source (gem-agent ADR-0005) ---
 	if flagContinue && flagResume != "" {
 		return fmt.Errorf("--continue and --resume name different sessions; use one")
 	}
@@ -352,7 +352,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	var sessionLog agent.SessionLog
 	sessionPath := "(disabled)"
 	sessionID := ""
-	// curLog is the transcript in use; /clear replaces it (ADR-0071 §2),
+	// curLog is the transcript in use; /clear replaces it (gem-agent ADR-0071 §2),
 	// so the exit-time close reads the variable, not a snapshot.
 	var curLog *session.Logger
 	defer func() {
@@ -376,7 +376,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			sessionID = lg.ID()
 			// Exported before any MCP server starts, so a registration
 			// line can hand the session to a server that keeps
-			// per-session state (ADR-0069 addendum 2).
+			// per-session state (gem-agent ADR-0069 addendum 2).
 			if err := session.Export(sessionID); err != nil {
 				fmt.Fprintf(stderr, "warning: cannot set %s: %v\n", session.EnvVar, err)
 			}
@@ -396,7 +396,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// --- session work directory (ADR-0058) ---
+	// --- session work directory (gem-agent ADR-0058) ---
 	// Everything the session produces outside the project lands here: an
 	// MCP result too large to hold in context, binary a server returned,
 	// scratch a shell command wrote. It has to exist BEFORE the sandbox
@@ -407,7 +407,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// That ordering is why the session block above was moved ahead of
 	// this one: the directory is keyed by session id, so a resume lands
 	// back in the directory its earlier self used.
-	// The project directory is the third fact a child sees (ADR-0071
+	// The project directory is the third fact a child sees (gem-agent ADR-0071
 	// §3), beside the session id and the work directory.
 	if err := os.Setenv(workdir.ProjectEnvVar, projectDir); err != nil {
 		fmt.Fprintf(stderr, "warning: cannot set %s: %v\n", workdir.ProjectEnvVar, err)
@@ -436,7 +436,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			if err := exportWorkDir(workDir); err != nil {
 				fmt.Fprintf(stderr, "warning: cannot set %s: %v\n", workdir.EnvVar, err)
 			}
-			// Gated on bytes, not on the count (ADR-0078 §4): two empty
+			// Gated on bytes, not on the count (gem-agent ADR-0078 §4): two empty
 			// leftovers are not an accumulation, and a line reading "0B"
 			// asks the operator to look at nothing.
 			// `more` means the scan was cut, so bytes is a lower bound:
@@ -455,10 +455,10 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// --- shell execution strategy (ADR-0001 defense-in-depth) ---
+	// --- shell execution strategy (gem-agent ADR-0001 defense-in-depth) ---
 	sandboxOn := cfg.Sandbox.Enabled && !flagNoSandbox
 	if sandboxOn {
-		// Fail closed (ADR-0073 §5): a sandbox that cannot apply here
+		// Fail closed (gem-agent ADR-0073 §5): a sandbox that cannot apply here
 		// (a nested Seatbelt) must not degrade silently into unconfined
 		// execution — the operator says --no-sandbox, or nothing runs.
 		if err := sandbox.Available(); err != nil {
@@ -470,7 +470,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if cfg.Sandbox.ReadLanePrompts {
-		// The operator's opt-out (ADR-0073 §5): read-lane commands keep
+		// The operator's opt-out (gem-agent ADR-0073 §5): read-lane commands keep
 		// their cage and their prompt.
 		enforcement.ReadLane = false
 	}
@@ -478,7 +478,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(stderr, "warning: %s\n", n)
 	}
 	// The strategy is swapped when /clear rotates the work directory
-	// (ADR-0071 §2): the sandbox profile names the directory, so a
+	// (gem-agent ADR-0071 §2): the sandbox profile names the directory, so a
 	// profile built at startup denied every write to the new one.
 	shellExec := &liveExec{fn: execFn}
 
@@ -486,7 +486,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	// The lanes (ADR-0073): a read-lane command runs without approval
+	// The lanes (gem-agent ADR-0073): a read-lane command runs without approval
 	// only where the read lane's denials were verified on this machine;
 	// with the sandbox off every shell call is the operator's alone.
 	registry.SetLaneExec(shellExec.run, enforcement)
@@ -504,7 +504,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// including ancestor directories, exactly as other agents read them)
 	// Read here, with the skills, before any process the project names
 	// (an MCP server) starts: the pins were digested moments ago, and
-	// the gap between digest and read is kept to this (ADR-0074).
+	// the gap between digest and read is kept to this (gem-agent ADR-0074).
 	projectContext, contextLabels, contextNotes := loadInstructions(projectDir, grant)
 	for _, n := range contextNotes {
 		fmt.Fprintf(stderr, "warning: instruction file %s\n", n)
@@ -532,7 +532,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// The TUI needs a real terminal on both ends (ADR-0002); piped use
+	// The TUI needs a real terminal on both ends (gem-agent ADR-0002); piped use
 	// falls back to the plain line REPL so scripts and smoke pipelines
 	// keep working.
 	useTUI := !oneShot &&
@@ -562,7 +562,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// prog is assigned before the TUI runs; the agent only executes
 	// inside prog.Run, so the callbacks below never see it half-set.
 	var prog *tea.Program
-	// Turn observability (ADR-0033): stream heartbeat, retries, and
+	// Turn observability (gem-agent ADR-0033): stream heartbeat, retries, and
 	// thought summaries reach the TUI when one is running; the plain
 	// REPL and one-shot mode stay quiet — their output goes to pipes.
 	backend.SetObserver(func(ev llm.StreamEvent) {
@@ -575,11 +575,11 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 	})
 
-	// --- ask_user: a structured mid-turn choice (ADR-0036) ---
+	// --- ask_user: a structured mid-turn choice (gem-agent ADR-0036) ---
 	// Registered before agent.New (declarations are cached there). The
 	// asker picks its mode at call time: one-shot has nobody to ask,
 	// the TUI shows a dialog, the plain REPL reads a number. The same
-	// asker carries the round-limit dialog (ADR-0040).
+	// asker carries the round-limit dialog (gem-agent ADR-0040).
 	// The plain-REPL asker reads the SHARED stdin reader: a second
 	// bufio.Reader over the same fd strands typed-ahead input in one
 	// buffer while the other blocks (AGENTS.md gotcha; review round 3).
@@ -637,8 +637,8 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	}
 
 	// The system prompt is composed in ONE place so a skills reload
-	// rebuilds exactly what startup built (ADR-0039). It says nothing
-	// about diagrams on any surface (ADR-0063): fence rendering is a
+	// rebuilds exactly what startup built (gem-agent ADR-0039). It says nothing
+	// about diagrams on any surface (gem-agent ADR-0063): fence rendering is a
 	// view-layer concern the model is never told about, and both a
 	// prohibition and a format instruction were measured steering the
 	// model away from the behavior its own prior already had.
@@ -646,7 +646,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		return buildSystemPrompt(projectDir, projectContext)
 	}
 	// writes pairs the agent's before/after hooks around an
-	// operator-approved write (ADR-0074 §1).
+	// operator-approved write (gem-agent ADR-0074 §1).
 	writes := &writeGuard{}
 	// notice puts a one-line warning in front of the operator wherever
 	// they are: the TUI's note strip when it runs, stderr otherwise.
@@ -659,9 +659,9 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	}
 	ag = agent.New(agent.Options{
 		// The operator's language for the notices the agent writes
-		// mid-turn (ADR-0029 §3: they are chrome, not error chains).
+		// mid-turn (gem-agent ADR-0029 §3: they are chrome, not error chains).
 		Msgs: msgs,
-		// Accounting only (ADR-0057): the model name that goes into
+		// Accounting only (gem-agent ADR-0057): the model name that goes into
 		// this session's usage records.
 		Model:          cfg.LLM.Model,
 		Backend:        backend,
@@ -681,7 +681,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		OnOperatorWrite: func(tc llm.ToolCall) {
 			// The operator approved a write into the files later
 			// sessions trust: that content — the one file they saw
-			// written — is now what they trust (ADR-0074 §1), provided
+			// written — is now what they trust (gem-agent ADR-0074 §1), provided
 			// the file was still what its pin records when the write
 			// began; a file that had drifted before is left for the
 			// next start to ask about. An operator-lane command shows
@@ -706,7 +706,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			// Describe, not CallDetail+CallPurpose: only the agent knows
 			// which tools it added the purpose field to, and a tool that
 			// publishes an argument of that name must keep it visible
-			// among the arguments (ADR-0047 §2).
+			// among the arguments (gem-agent ADR-0047 §2).
 			detail, purpose := ag.Describe(tc)
 			if prog != nil {
 				prog.Send(tui.ToolCall{Name: tc.Name, Detail: detail, Purpose: purpose})
@@ -714,7 +714,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			}
 			fmt.Fprintf(stderr, "\n[tool] %s %s\n", tc.Name, detail)
 			// Headless runs (-p, piped stdin) get the declared purpose
-			// on its own line too (ADR-0047 §5): the transcript of a
+			// on its own line too (gem-agent ADR-0047 §5): the transcript of a
 			// scripted run is the only record it leaves behind.
 			if purpose != "" {
 				fmt.Fprintf(stderr, "[tool] ↪ %s\n", purpose)
@@ -805,7 +805,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	}
 	settingsData := settings.data()
 
-	// --- in-session integration reload (ADR-0039) ---
+	// --- in-session integration reload (gem-agent ADR-0039) ---
 	// Both closures reuse the startup code paths and the startup trust
 	// verdict — a reload can never widen what the trust gate allowed.
 	// They run only between turns (slash commands cannot be queued), so
@@ -824,7 +824,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// write would corrupt the display.
 		var warn bytes.Buffer
 		// A changed .mcp.json is re-checked against its pin first
-		// (ADR-0074); mid-session there is nobody at a prompt, so a
+		// (gem-agent ADR-0074); mid-session there is nobody at a prompt, so a
 		// change is left out and named.
 		if recheck {
 			var pinNotes []string
@@ -879,7 +879,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	}
 	// The panel writes an exclusion for one server and then asks for
 	// this: the filter is re-derived from the files it just changed, and
-	// that one server is reconnected under it (ADR-0039 + ADR-0077 §3).
+	// that one server is reconnected under it (gem-agent ADR-0039 + gem-agent ADR-0077 §3).
 	// Rebuilt rather than patched so the panel and the runtime read the
 	// same three files in the same order the next start will. One
 	// server, not the set: the edit names one, and reconnecting all of
@@ -1078,18 +1078,18 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 		// Same argument for the ceiling: one-shot has no footer to carry
 		// it and no /readonly to type, so the only place this fact can
-		// appear is here (ADR-0080 §1, ADR-0078's test for a line).
+		// appear is here (gem-agent ADR-0080 §1, gem-agent ADR-0078's test for a line).
 		if ag.CeilingState().ReadOnly {
 			fmt.Fprintln(stderr, banner.ReadOnlyOneShotLine(registry.Confined()))
 		}
 		// Piped stdin becomes a nonce-wrapped data attachment
-		// (ADR-0055) — never prompt text: the -p string alone is the
-		// instruction the risk evaluator sees (ADR-0038/0054). A
+		// (gem-agent ADR-0055) — never prompt text: the -p string alone is the
+		// instruction the risk evaluator sees (gem-agent ADR-0038/0054). A
 		// terminal stdin is never read, so an interactive `-p` cannot
 		// hang waiting for input. A non-terminal stdin that never
 		// closes (an idle pipe inherited from a scheduler or harness)
 		// is read to EOF like any other, but the wait is announced
-		// after a short grace so it cannot pass for a hang (ADR-0067).
+		// after a short grace so it cannot pass for a hang (gem-agent ADR-0067).
 		if f, ok := cmd.InOrStdin().(*os.File); !ok || !term.IsTerminal(int(f.Fd())) {
 			waited := false
 			content, warning := readPipedStdinNoticing(cmd.InOrStdin(), stdinWaitNotice, func() {
@@ -1126,7 +1126,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		return runErr
 	}
 
-	// --- banner (ADR-0078) ---
+	// --- banner (gem-agent ADR-0078) ---
 	// The rule, and the composition, live in internal/banner: a line
 	// earns a place here only if nothing else will say it, and that
 	// rule needs somewhere to be stated, tested and rendered for the
@@ -1151,12 +1151,12 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		Notes:           warnLines,
 	})
 
-	// --- interactive TUI (ADR-0002/0003) ---
+	// --- interactive TUI (gem-agent ADR-0002/0003) ---
 	if useTUI {
 		// The banner goes through the TUI (not stderr): bottom pinning
 		// counts every printed line, and the startup clear would wipe a
 		// pre-printed banner anyway. Startup warnings join it for the
-		// same reason (ADR-0021).
+		// same reason (gem-agent ADR-0021).
 		bannerLines = append(bannerLines, notes.lines...)
 		// Nothing reads the tee after the banner; without this the
 		// stderr stream accumulated every line for the whole session
@@ -1164,7 +1164,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		notes.freeze()
 		model := tui.New(tui.Options{
 			BaseCtx: ctx,
-			// Msgs is the wiring ADR-0029 shipped without: the catalog
+			// Msgs is the wiring gem-agent ADR-0029 shipped without: the catalog
 			// was resolved here but never handed to the TUI, so the
 			// whole chrome fell back to English (review round 2).
 			Msgs:          msgs,
@@ -1191,7 +1191,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 				go func() {
 					out := runDirectShell(shellCtx, registry, ag, command)
 					// Interrupted runs hand a queued message back instead
-					// of auto-sending it (ADR-0007 via ADR-0021).
+					// of auto-sending it (gem-agent ADR-0007 via gem-agent ADR-0021).
 					prog.Send(tui.ShellDone{Output: out, Interrupted: shellCtx.Err() != nil})
 				}()
 			},
@@ -1229,10 +1229,10 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(stderr, "/help for commands, Ctrl+D to quit\n")
 
 	// --- plain REPL loop (non-TTY fallback) ---
-	// The argv first message (ADR-0064) runs before the first read,
+	// The argv first message (gem-agent ADR-0064) runs before the first read,
 	// through the same handling a read line gets; the echoed "> line"
 	// keeps the terminal record showing what ran. Piped stdin lines
-	// follow as they always have (ADR-0055's boundary is untouched).
+	// follow as they always have (gem-agent ADR-0055's boundary is untouched).
 	pending := initialInput
 	for {
 		var input string
@@ -1260,7 +1260,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 				continue
 			}
 			// runTurn's signal handling: Ctrl+C interrupts the command,
-			// not the process (ADR-0021 — outside it, the default action
+			// not the process (gem-agent ADR-0021 — outside it, the default action
 			// killed the whole session).
 			_ = runTurnWith(ctx, ladder, func(shellCtx context.Context) error {
 				fmt.Fprintln(cmd.OutOrStdout(), runDirectShell(shellCtx, registry, ag, command))
@@ -1303,7 +1303,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 var errInterrupted = errors.New("interrupted")
 
 // startupNotes tees startup-time stderr lines so the TUI can replay
-// them in the banner after its first ClearScreen (ADR-0021).
+// them in the banner after its first ClearScreen (gem-agent ADR-0021).
 type startupNotes struct {
 	w      io.Writer
 	lines  []string
@@ -1325,14 +1325,14 @@ func (s *startupNotes) Write(p []byte) (int, error) {
 	return s.w.Write(p)
 }
 
-// stdinCap bounds a piped stdin read (ADR-0055 §2): history is resent
+// stdinCap bounds a piped stdin read (gem-agent ADR-0055 §2): history is resent
 // every round, so an unbounded pipe would burn the context window
 // before the first response. The clip is disclosed inside the
-// attachment so a part cannot masquerade as the whole (ADR-0014).
+// attachment so a part cannot masquerade as the whole (gem-agent ADR-0014).
 const stdinCap = 256 * 1024
 
 // readPipedStdin reads bounded piped stdin for one-shot mode
-// (ADR-0055). It returns the attachment content ("" when stdin is
+// (gem-agent ADR-0055). It returns the attachment content ("" when stdin is
 // empty) and a warning ("" when none): binary input is skipped with the
 // warning naming why.
 func readPipedStdin(r io.Reader) (content, warning string) {
@@ -1361,15 +1361,15 @@ func readPipedStdin(r io.Reader) (content, warning string) {
 }
 
 // stdinWaitNotice is the grace before a still-open piped stdin is
-// announced (ADR-0067 §1): long enough that `< /dev/null`, here-strings
+// announced (gem-agent ADR-0067 §1): long enough that `< /dev/null`, here-strings
 // and `echo … |` stay silent, short enough that an idle inherited pipe
 // is named before anyone reads the silence as a hang. The TUI
-// heartbeat (ADR-0033 §1) never runs in -p, so this is the only wait
+// heartbeat (gem-agent ADR-0033 §1) never runs in -p, so this is the only wait
 // notice in play here.
 const stdinWaitNotice = 2 * time.Second
 
 // stdinOutcomeLine is the stderr line that closes a piped-stdin read
-// (ADR-0067 §2): the byte count when content was attached; the "ended
+// (gem-agent ADR-0067 §2): the byte count when content was attached; the "ended
 // empty" line only when the wait was announced and no warning already
 // said nothing was attached; nothing otherwise, so the silent fast
 // path stays silent.
@@ -1389,7 +1389,7 @@ const stdinWaitMessage = "[stdin: waiting for piped input to end (no EOF after 2
 
 // readPipedStdinNoticing is readPipedStdin with the wait announced:
 // if the read has not finished within `after`, notify is called once,
-// then the read continues to EOF unchanged (ADR-0067). The reader is
+// then the read continues to EOF unchanged (gem-agent ADR-0067). The reader is
 // never abandoned — a slow producer must not be cut off — so a truly
 // endless pipe still blocks, but no longer silently.
 func readPipedStdinNoticing(r io.Reader, after time.Duration, notify func()) (content, warning string) {
@@ -1412,7 +1412,7 @@ func readPipedStdinNoticing(r io.Reader, after time.Duration, notify func()) (co
 }
 
 // applyAllowFlag merges --allow entries into the global policy scope as
-// "never" values (ADR-0053 §2). It carries the [approval.tools]
+// "never" values (gem-agent ADR-0053 §2). It carries the [approval.tools]
 // vocabulary and validation exactly; entries are trimmed because the
 // comma-separated form invites "a, b".
 func applyAllowFlag(merged map[string]string, entries []string) error {
@@ -1427,7 +1427,7 @@ func applyAllowFlag(merged map[string]string, entries []string) error {
 }
 
 // firstMessage resolves the positional argument into the first
-// interactive turn (ADR-0064). Whitespace-only counts as absent. -p
+// interactive turn (gem-agent ADR-0064). Whitespace-only counts as absent. -p
 // beside it is an error, because the two select different session
 // shapes — one answers and exits, the other starts and stays — and
 // ambiguity is refused, not resolved by precedence.
@@ -1445,7 +1445,7 @@ func firstMessage(args []string, oneShot bool) (string, error) {
 	return msg, nil
 }
 
-// effectiveAuto derives the session's auto-approve state (ADR-0053):
+// effectiveAuto derives the session's auto-approve state (gem-agent ADR-0053):
 // the config key arms interactive sessions only — an unattended run's
 // grant must be visible on the invocation itself — and --auto arms any
 // mode.
@@ -1485,7 +1485,7 @@ func (d denyGate) ApproveOnce(toolName, detail, _, reason string) (bool, string)
 
 // ApproveLift refuses in one-shot: there is nobody to ask, so the
 // ceiling holds and the reason goes to stderr like every other denial
-// here (ADR-0080 §4). --read-only is how a run says it meant this.
+// here (gem-agent ADR-0080 §4). --read-only is how a run says it meant this.
 func (d denyGate) ApproveLift(toolName, detail, _, reason string) (bool, string) {
 	fmt.Fprintf(d.out, "[denied: %s %s — %s]\n", toolName, detail, reason)
 	return false, ""
@@ -1501,25 +1501,25 @@ func (d denyGate) Approve(toolName, detail, purpose, reason string, mustPrompt b
 	if reason != "" {
 		// The ladder or the rule tier said why this call needs a human;
 		// with no human here, that reason is the denial's story
-		// (ADR-0053 §3).
+		// (gem-agent ADR-0053 §3).
 		why = reason + " — nobody to ask in one-shot mode"
 	}
 	fmt.Fprintf(d.out, "[denied: %s %s — %s]\n", toolName, detail, why)
 	// What it wanted, on the record: a one-shot run that ends in denials
 	// is exactly the case where the operator has to reconstruct the
-	// agent's plan afterwards (ADR-0047 §5).
+	// agent's plan afterwards (gem-agent ADR-0047 §5).
 	if purpose != "" {
 		fmt.Fprintf(d.out, "[denied: ↪ %s]\n", purpose)
 	}
-	// No operator, no typed reason (ADR-0060 §1): the model keeps the
+	// No operator, no typed reason (gem-agent ADR-0060 §1): the model keeps the
 	// standing "ask the user" denial text.
 	return false, false, ""
 }
 
 // interruptLadder is the plain REPL / one-shot counterpart of the
-// TUI's three-press exit (ADR-0034 §3, extended by ADR-0065 §3). The
+// TUI's three-press exit (gem-agent ADR-0034 §3, extended by gem-agent ADR-0065 §3). The
 // first Ctrl+C of a turn cancels it; the second calls Warn; the third
-// calls Quit. Before ADR-0065, signal.NotifyContext swallowed every
+// calls Quit. Before gem-agent ADR-0065, signal.NotifyContext swallowed every
 // SIGINT after the first, so a wedged turn outside the TUI could only
 // be killed from another terminal. Armed is a test hook: it fires once
 // the signal handler is registered, so a test can raise SIGINT
@@ -1548,8 +1548,8 @@ func ladderStep(n int) string {
 }
 
 // runTurn runs fn under a SIGINT-cancellable context with no ladder:
-// extra presses do nothing, which is the pre-ADR-0065 behaviour the
-// tests pin.
+// extra presses do nothing, which is the behaviour the tests pin
+// (before gem-agent ADR-0065 there was no ladder either).
 func runTurn(parent context.Context, fn func(ctx context.Context) error) error {
 	return runTurnWith(parent, nil, fn)
 }
@@ -1609,7 +1609,7 @@ func runTurnWith(parent context.Context, ladder *interruptLadder, fn func(ctx co
 }
 
 // buildExecFn returns the shell execution strategy and what could be
-// established about it (ADR-0073 §5): with the sandbox on, one profile
+// established about it (gem-agent ADR-0073 §5): with the sandbox on, one profile
 // per lane and a read lane enabled only when VerifyReadLane passed on
 // this machine (notes say why when it did not); with the sandbox off,
 // direct bash and Confined=false — the unconfined mode the agent gates
@@ -1632,7 +1632,7 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 	}
 	spec := sandbox.Spec{ProjectDir: projectDir, DenyExec: append(append([]string{}, sandbox.DefaultDenyExec...), denyExec...), PersistentParents: persistentParents}
 	if workDir != "" {
-		// The session work directory (ADR-0058). A shell command told to
+		// The session work directory (gem-agent ADR-0058). A shell command told to
 		// put its output in $LAGENT_WORK_DIR has to be able to.
 		if resolved, err := sandbox.ResolveWriteDir(workDir); err == nil {
 			spec.WorkDir = resolved
@@ -1669,7 +1669,7 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 			notes = append(notes, fmt.Sprintf("read lane disabled: %v; every shell_exec asks", err))
 		}
 	}
-	// Confinement itself is measured, not assumed (ADR-0073 §7): where
+	// Confinement itself is measured, not assumed (gem-agent ADR-0073 §7): where
 	// the write lane's denials cannot be confirmed — a sandbox-exec that
 	// applies no cage, a build that stubbed it — the session runs as
 	// unconfined, and every shell command is the operator's to answer.
@@ -1753,7 +1753,7 @@ func removeFallbackScratch() {
 // command and returns a note for the output: the operator's own shell
 // may have changed the files later sessions trust, and the command
 // line does not show that — the difference is named, the pins are not
-// moved (ADR-0074 §1).
+// moved (gem-agent ADR-0074 §1).
 var afterDirectShell func() string
 
 func runDirectShell(ctx context.Context, registry *tools.Registry, ag *agent.Agent, command string) string {
@@ -1761,7 +1761,7 @@ func runDirectShell(ctx context.Context, registry *tools.Registry, ag *agent.Age
 	if !ok {
 		return "error: shell_exec is unavailable"
 	}
-	// The operator typed it: the operator lane (ADR-0073), as the
+	// The operator typed it: the operator lane (gem-agent ADR-0073), as the
 	// operator's own shell would be.
 	out, err := tool.Run(ctx, map[string]any{"command": command, "access": sandbox.LaneOperator.String()})
 	if err != nil {
@@ -1846,7 +1846,7 @@ func resolveTheme(configured string) string {
 // slashOutput executes a /command and returns its output text — shared
 // by the TUI (which prints it into scrollback, errors highlighted) and
 // the plain REPL (which writes it to stderr).
-// slashReloads carries the ADR-0039 reload closures into slashOutput;
+// slashReloads carries the gem-agent ADR-0039 reload closures into slashOutput;
 // either may be nil (tests), which reads as "not available here".
 type slashReloads struct {
 	mcp func() string
@@ -1886,13 +1886,13 @@ func slashOutput(input string, ag *agent.Agent, registry *tools.Registry, mcpSum
 	}
 	switch fields[0] {
 	case "/help":
-		// The text lives in uitext (ADR-0029) — both languages in full,
+		// The text lives in uitext (gem-agent ADR-0029) — both languages in full,
 		// pinned to the command set by TestHelpListsEveryCommand.
 		b.WriteString(msgs.Help)
 	case "/tools":
 		// The LIVE policy: a /settings edit or a 'p' answer mid-session
 		// must show here, or the display the operator audits gating with
-		// no longer reflects the gate (ADR-0021).
+		// no longer reflects the gate (gem-agent ADR-0021).
 		pol := ag.Policy()
 		for _, t := range registry.List() {
 			marker := "read-only"
@@ -1975,7 +1975,7 @@ func slashOutput(input string, ag *agent.Agent, registry *tools.Registry, mcpSum
 	case "/version":
 		b.WriteString(versionLine(version))
 	case "/clear":
-		// A cleared conversation is a new session (ADR-0071 §2): onClear
+		// A cleared conversation is a new session (gem-agent ADR-0071 §2): onClear
 		// closes the old transcript where the conversation ended — no
 		// clear record, so it stays resumable — and starts the next.
 		// Without it (tests), the history is cleared in place.
@@ -2020,9 +2020,9 @@ func exportWorkDir(dir string) error {
 }
 
 // liveExec is the shell strategy the registry calls through, so /clear
-// can swap the sandbox profile for the new work directory (ADR-0071
+// can swap the sandbox profile for the new work directory (gem-agent ADR-0071
 // §2) without rebuilding the registry. Guarded: an abandoned shell call
-// (ADR-0065) may still hold the old strategy while the next turn
+// (gem-agent ADR-0065) may still hold the old strategy while the next turn
 // starts on the new one.
 type liveExec struct {
 	mu sync.RWMutex
@@ -2043,7 +2043,7 @@ func (e *liveExec) set(fn tools.LaneExecFunc) {
 }
 
 // liveLog is a SessionLog that forwards to whichever transcript is in
-// use — the value /clear reassigns (ADR-0071 §2) — for the side-call
+// use — the value /clear reassigns (gem-agent ADR-0071 §2) — for the side-call
 // tools registered at startup. nil (session log disabled) fails the
 // write, which every side call already treats as best-effort.
 type liveLog struct{ get func() agent.SessionLog }

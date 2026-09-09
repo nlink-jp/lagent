@@ -93,7 +93,7 @@ func TestSandboxExecEnforcement(t *testing.T) {
 	}
 }
 
-// ADR-0073: the lanes. The profile text is checked for the rules each
+// gem-agent ADR-0073: the lanes. The profile text is checked for the rules each
 // lane must carry; the live test below checks that Seatbelt enforces
 // them.
 func TestLaneProfiles(t *testing.T) {
@@ -169,7 +169,7 @@ func TestPersistentAndCredentialRulesAgree(t *testing.T) {
 // TestLaneEnforcement runs real sandbox-exec: the read lane denies a
 // project write, the network and a preference write; the write lane
 // allows the project write but denies AGENTS.md, .git/hooks and a
-// credential read through every spelling probed in ADR-0073; the
+// credential read through every spelling probed in gem-agent ADR-0073; the
 // operator lane allows all of them.
 func TestLaneEnforcement(t *testing.T) {
 	if runtime.GOOS != "darwin" {
@@ -296,7 +296,7 @@ func TestLaneEnforcement(t *testing.T) {
 }
 
 // TestReadLaneCorpus is the old shell corpus moved from the text tier
-// to the kernel (design review of ADR-0073): every spelling that once
+// to the kernel (design review of gem-agent ADR-0073): every spelling that once
 // needed a regex to catch — redirects, tee, sed -i, find -exec, xargs,
 // env, awk system(), command substitution, python, dd, install, mv,
 // truncate, chmod — is tried against the read lane, and the project
@@ -393,7 +393,7 @@ func TestReadLaneCorpus(t *testing.T) {
 // TestVerifyReadLane: the real read profile passes; a profile that
 // allows everything is refused, so an environment where the kernel
 // does not deny what the lane claims never gets an unasked read lane.
-// The write lane is a verified claim too (ADR-0073 §7): the real profile
+// The write lane is a verified claim too (gem-agent ADR-0073 §7): the real profile
 // passes, an allow-everything profile — what a stubbed or foreign
 // sandbox-exec amounts to — fails, and nothing of the project is left
 // behind by the probes.
@@ -573,7 +573,7 @@ func TestScrubEnvAndHintTail(t *testing.T) {
 	}
 }
 
-// ADR-0074 §2: the write lane denies renaming the parent directory of a
+// gem-agent ADR-0074 §2: the write lane denies renaming the parent directory of a
 // persistent file (the swap that replaced sub/CLAUDE.md under an
 // unchanged name), while ordinary writes inside it stay allowed.
 func TestWriteLaneDeniesPersistentParents(t *testing.T) {

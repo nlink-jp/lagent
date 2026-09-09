@@ -11,7 +11,7 @@
 // what its earlier self produced.
 //
 // The directory is keyed by session id and lives under the same state
-// root as transcripts and memory (ADR-0020/0022), so LAGENT_STATE_DIR
+// root as transcripts and memory (gem-agent ADR-0020/0022), so LAGENT_STATE_DIR
 // isolates it for tests and drills exactly as it isolates those, and a
 // resume lands back in the same directory.
 //
@@ -20,7 +20,7 @@
 // and an agent that tidies its own output away between runs is worse
 // than one that accumulates. Retention is the operator's call, and
 // Remove is its instrument: invoked only by the explicit workdirs
-// command (ADR-0059), behind a confirmation this package never gives
+// command (gem-agent ADR-0059), behind a confirmation this package never gives
 // itself.
 //
 // Ported from gem-agent internal/workdir at be7609980022e38314268c58ca94a6517e6f5d28 (v0.74.0), ADR-0001.
@@ -46,7 +46,7 @@ import (
 // own directory without lagent knowing anything about that server.
 const EnvVar = "LAGENT_WORK_DIR"
 
-// ProjectEnvVar names the project directory for children (ADR-0071
+// ProjectEnvVar names the project directory for children (gem-agent ADR-0071
 // §3): the third of the three facts a Claude Code child also sees
 // (its CLAUDE_PROJECT_DIR), beside the session id and the work
 // directory.
@@ -205,7 +205,7 @@ func (d dirEntry) Info() (os.FileInfo, error) { return d.FileInfo, nil }
 // directories exist and how many bytes they hold. It is deliberately a
 // report and not a deletion. Removing a tree of files the operator may
 // not have looked at yet is not a decision an agent gets to make on its
-// own; the explicit remedy is the workdirs command (ADR-0059).
+// own; the explicit remedy is the workdirs command (gem-agent ADR-0059).
 //
 // more reports that the count is a lower bound (List was cut, or a
 // directory's walk was).
@@ -227,7 +227,7 @@ func Sweep(projectDir, currentSessionID string) (dirs int, bytes int64, more boo
 	return dirs, bytes, more, nil
 }
 
-// Remove deletes one session's work directory (ADR-0059). The path is
+// Remove deletes one session's work directory (gem-agent ADR-0059). The path is
 // computed from a validated single-segment id, never taken from input,
 // so there is nothing to traverse; the caller owns confirmation and the
 // not-while-live check. The parent work/ directory is folded up when

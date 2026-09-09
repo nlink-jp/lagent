@@ -20,7 +20,7 @@ func navProject(t *testing.T) *Registry {
 		".git/config":         "[core]\n",
 		".git/objects/junk":   strings.Repeat("x", 100),
 		"assets/logo.png":     string(tinyPNG),
-		// Ignored content (ADR-0052): a dependency store and a
+		// Ignored content (gem-agent ADR-0052): a dependency store and a
 		// .gitignore'd file, both holding the needle.
 		"node_modules/pkg/index.js": "const maxRetries = 1\n",
 		".gitignore":                "*.secret\n",
@@ -208,7 +208,7 @@ func TestSearchFilesFindsAcrossTheTree(t *testing.T) {
 		}
 	}
 	// Binary skipped by sniff; the out-of-project symlink never followed;
-	// ignored content skipped and reported (ADR-0052).
+	// ignored content skipped and reported (gem-agent ADR-0052).
 	if strings.Contains(out, "blob.bin") || strings.Contains(out, "SECRET") || strings.Contains(out, "link.txt") {
 		t.Errorf("search read what it must skip:\n%s", out)
 	}

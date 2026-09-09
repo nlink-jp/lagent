@@ -1,8 +1,8 @@
-// Package risk is the rule tier of the approval ladder (ADR-0004): a
+// Package risk is the rule tier of the approval ladder (gem-agent ADR-0004): a
 // pure, model-free classifier that reads a tool call's named arguments
 // and returns Safe, Review or Block with a reason.
 //
-// Since ADR-0073 the tier decides nothing about what a shell command
+// Since gem-agent ADR-0073 the tier decides nothing about what a shell command
 // will do. That question belongs to the kernel: shell_exec runs in a
 // Seatbelt lane the model declares (read, write, operator) and the
 // lane, not the command text, bounds its effects. What remains here
@@ -55,11 +55,11 @@ type Verdict struct {
 	Tier   Tier
 	Reason string
 	// OperatorOnly marks a Review verdict the model tier may not answer
-	// (ADR-0072 §4): the write lands in what later sessions trust —
+	// (gem-agent ADR-0072 §4): the write lands in what later sessions trust —
 	// instruction files, the runtime's own configuration — so the
-	// party that proposed it cannot also be its judge (ADR-0020 §4,
+	// party that proposed it cannot also be its judge (gem-agent ADR-0020 §4,
 	// applied beyond memory). The ladder hands such calls straight to
-	// the operator. A shell command in the operator lane (ADR-0073) is
+	// the operator. A shell command in the operator lane (gem-agent ADR-0073) is
 	// the same verdict: the lane can write those files.
 	OperatorOnly bool
 }
@@ -85,7 +85,7 @@ const gitGlobalOpts = `(?:(?:-C|-c|--git-dir|--work-tree|--namespace)(?:=\S+|\s+
 var blockPatterns = []blockPattern{
 	{regexp.MustCompile(`(^|[\s;&|(])(sudo|doas|su)\s`), "privilege escalation"},
 	// AppleScript's administrator prompt is the same escalation by
-	// another door (ADR-0072 §4.8).
+	// another door (gem-agent ADR-0072 §4.8).
 	{regexp.MustCompile(`(?i)with\s+administrator\s+privileges`), "privilege escalation (administrator privileges)"},
 	{regexp.MustCompile(`(^|[\s;&|(])(dd|mkfs\S*|fdisk|diskutil|newfs\S*)\s`), "raw disk / filesystem operation"},
 	{regexp.MustCompile(`(^|[\s;&|(])git\s+` + gitGlobalOpts +
@@ -104,7 +104,7 @@ var blockPatterns = []blockPattern{
 
 // Classify returns the logical verdict for one tool call. projectDir is
 // the confinement root and workDir the session work directory — the
-// second root of ADR-0058, empty when the session has none. Both are
+// second root of gem-agent ADR-0058, empty when the session has none. Both are
 // ordinary places for a session to write. args come straight from the
 // model. mutating is the tool's own word on whether this call changes
 // state — for shell_exec that depends on the lane (tools.Tool.MutatesFor).
@@ -132,7 +132,7 @@ func Classify(toolName string, mutating bool, args map[string]any, projectDir, w
 		if workDir != "" && filepath.IsAbs(p) && withinDir(workDir, filepath.Clean(p)) {
 			return Verdict{Tier: Safe, Reason: "edits a file inside the session work directory"}
 		}
-		// What the file is decides the rest (ADR-0072 §4): version
+		// What the file is decides the rest (gem-agent ADR-0072 §4): version
 		// control internals and the files later sessions take
 		// instructions or configuration from are not ordinary edits.
 		if v, ok := persistentTarget(projectRelative(p, projectDir)); ok {
@@ -149,7 +149,7 @@ func Classify(toolName string, mutating bool, args map[string]any, projectDir, w
 	return Verdict{Tier: Review, Reason: "unrecognised tool"}
 }
 
-// classifyShell judges a shell_exec call (ADR-0073): the Block floor
+// classifyShell judges a shell_exec call (gem-agent ADR-0073): the Block floor
 // first, in every lane; then the lane decides. mutating is false only
 // when the registry has a read lane and the call asked for it — a
 // read-lane request with no sandbox to back it is a write-lane call.
@@ -185,7 +185,7 @@ func classifyShell(args map[string]any, mutating bool) Verdict {
 }
 
 // blockFloor is the text part of the shell verdict that survives
-// ADR-0073: it can only raise a call to Block.
+// gem-agent ADR-0073: it can only raise a call to Block.
 func blockFloor(trimmed string) (Verdict, bool) {
 	norm := normalizeHeads(trimmed)
 	if rmRecursiveForce(norm) {
@@ -252,14 +252,14 @@ func projectRelative(p, projectDir string) string {
 }
 
 // persistentTarget judges a project-relative write target by what the
-// file is (ADR-0072 §4). Version-control internals are Block: a hook
+// file is (gem-agent ADR-0072 §4). Version-control internals are Block: a hook
 // or a config value under .git/ runs outside the sandbox on the
 // operator's next git command, and no file tool has business there.
 // The instruction files, the runtime's own configuration and the
 // .claude directory — sandbox.PersistentFile, the one list the write
-// lane's profile also denies (ADR-0073 §3) — are Review that only the
+// lane's profile also denies (gem-agent ADR-0073 §3) — are Review that only the
 // operator may answer: the edit persists into what every later session
-// trusts, so the evaluator-is-the-proposer objection of ADR-0020 §4
+// trusts, so the evaluator-is-the-proposer objection of gem-agent ADR-0020 §4
 // applies to it exactly as to memory.
 func persistentTarget(rel string) (Verdict, bool) {
 	if rel == "" {
@@ -403,7 +403,7 @@ func rmRecursiveForce(command string) bool {
 }
 
 // gitBranchForceDelete reports `git branch` deleting with force in any
-// spelling — `-D`, `-d -f`, `-f -d`, `-df`, `--delete --force` (ADR-0072
+// spelling — `-D`, `-d -f`, `-f -d`, `-df`, `--delete --force` (gem-agent ADR-0072
 // §4.8: the pattern knew `-D` alone).
 func gitBranchForceDelete(command string) bool {
 	for _, seg := range segmentSplit.Split(command, -1) {

@@ -63,7 +63,7 @@ func has(list []string, want string) bool {
 // Approval-gated tools advertise the purpose argument; read-only tools
 // do not — the field exists for the prompt the operator answers, and
 // putting it on every read would cost tokens on every call for a line
-// nobody is shown (ADR-0047 §1).
+// nobody is shown (gem-agent ADR-0047 §1).
 func TestGatedToolsAdvertisePurpose(t *testing.T) {
 	a, reg := bashAgent(t, &mockBackend{}, &approveAll{})
 
@@ -91,7 +91,7 @@ func TestGatedToolsAdvertisePurpose(t *testing.T) {
 	}
 }
 
-// The purpose is lagent's field, not the tool's contract (ADR-0047
+// The purpose is lagent's field, not the tool's contract (gem-agent ADR-0047
 // §2): what reaches Run is exactly what the tool's own schema declared.
 func TestPurposeStrippedBeforeRun(t *testing.T) {
 	reg, err := tools.New(t.TempDir(),
@@ -188,7 +188,7 @@ func TestServerDeclaredPurposeIsLeftAlone(t *testing.T) {
 	// The prompt must show the argument. Filtering the summary by name
 	// once made this call render as "(no arguments)" while it granted
 	// access "for a billing audit" — an approval prompt that hides what
-	// is being approved (ADR-0021).
+	// is being approved (gem-agent ADR-0021).
 	if !strings.Contains(gate.asked[0], "billing audit") {
 		t.Errorf("the operator was asked to approve an invisible argument: %q", gate.asked[0])
 	}
@@ -200,7 +200,7 @@ func TestServerDeclaredPurposeIsLeftAlone(t *testing.T) {
 }
 
 // The declaration reaches the operator's prompt as its own field, and
-// stays out of the argument summary beside it (ADR-0047 §5).
+// stays out of the argument summary beside it (gem-agent ADR-0047 §5).
 func TestPurposeReachesTheGateSeparately(t *testing.T) {
 	mb := &mockBackend{responses: []*llm.Response{
 		{ToolCalls: []llm.ToolCall{{ID: "c1", Name: "shell_exec",
@@ -223,7 +223,7 @@ func TestPurposeReachesTheGateSeparately(t *testing.T) {
 	}
 }
 
-// A missing declaration is surfaced, never punished (ADR-0047 §4): the
+// A missing declaration is surfaced, never punished (gem-agent ADR-0047 §4): the
 // call still runs, and the gate is told there was nothing to show.
 func TestMissingPurposeStillRuns(t *testing.T) {
 	mb := &mockBackend{responses: []*llm.Response{

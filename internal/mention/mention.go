@@ -28,7 +28,7 @@ type Limits struct {
 	PerFileBytes int
 	TotalBytes   int
 	DirEntries   int
-	// Image budgets are separate from the text budget (ADR-0012): one
+	// Image budgets are separate from the text budget (gem-agent ADR-0012): one
 	// screenshot must not evict the source files attached beside it.
 	ImageBytes int // per image
 	MaxImages  int // per message
@@ -52,8 +52,8 @@ type Attachment struct {
 	Kind    string // "file", "directory" or "image"
 	Content string
 	Bytes   int
-	// Data and MIME are set for images (ADR-0012), inline documents
-	// (ADR-0026), and inline media (ADR-0027).
+	// Data and MIME are set for images (gem-agent ADR-0012), inline documents
+	// (gem-agent ADR-0026), and inline media (gem-agent ADR-0027).
 	Data []byte
 	MIME string
 }
@@ -193,7 +193,7 @@ func bareImageRefs(text string) []string {
 const openers = "`\"'([{「『（【"
 
 // Expand resolves every reference in text against projectDir — and, for
-// absolute paths, the session work directory (ADR-0058): spilled MCP
+// absolute paths, the session work directory (gem-agent ADR-0058): spilled MCP
 // results and staged intermediates land there, and an operator who can
 // see a path in the conversation must be able to @-reference it. Text
 // itself is not modified: what the operator typed stays what the model
@@ -208,7 +208,7 @@ func Expand(ctx context.Context, text, projectDir, workDir string, lim Limits) (
 		// Images ride the same syntax but their own rules: a separate
 		// byte budget, a per-message count, and — because an @ is
 		// always operator-typed, never model-triggered — permission to
-		// come from outside the project (ADR-0012).
+		// come from outside the project (gem-agent ADR-0012).
 		if ref == ClipboardRef || IsImagePath(ref) {
 			att, err := attachImage(ref, projectDir, lim, &images)
 			if err != nil {
@@ -225,7 +225,7 @@ func Expand(ctx context.Context, text, projectDir, workDir string, lim Limits) (
 		}
 		// One open through the root, then everything — the kind, the
 		// size, the read or the listing — comes from that descriptor
-		// (ADR-0073 §4: a Stat by name before the open was the
+		// (gem-agent ADR-0073 §4: a Stat by name before the open was the
 		// check-then-use shape the roots exist to remove).
 		f, err := openConfined(abs, projectDir, workDir)
 		if err != nil {
@@ -291,7 +291,7 @@ func attachImage(ref, projectDir string, lim Limits, images *int) (Attachment, e
 		if rerr != nil {
 			return Attachment{}, rerr
 		}
-		// Size on the open descriptor, before the read (ADR-0072
+		// Size on the open descriptor, before the read (gem-agent ADR-0072
 		// §4.5): the file was read whole and measured after.
 		data, err = readBounded(abs, projectDir, lim.ImageBytes)
 		if err != nil {
@@ -308,7 +308,7 @@ func attachImage(ref, projectDir string, lim Limits, images *int) (Attachment, e
 	}
 	// Sniff the real type: the extension gated the route, the bytes
 	// decide the claim. http.DetectContentType knows the common image
-	// magics; HEIC/HEIF is identified by its ftyp box (ADR-0072 §4.8).
+	// magics; HEIC/HEIF is identified by its ftyp box (gem-agent ADR-0072 §4.8).
 	mime := http.DetectContentType(data)
 	if !strings.HasPrefix(mime, "image/") {
 		mime = heifMIME(data)
@@ -323,7 +323,7 @@ func attachImage(ref, projectDir string, lim Limits, images *int) (Attachment, e
 // resolveImagePath resolves an image reference. In-project paths go
 // through the same confinement as everything else; absolute and ~
 // paths are allowed for images because the reference is operator-typed
-// (ADR-0012 — revisit if @ ever parses anything but typed input).
+// (gem-agent ADR-0012 — revisit if @ ever parses anything but typed input).
 func resolveImagePath(projectDir, ref string) (string, error) {
 	p := ref
 	if strings.HasPrefix(p, "~/") || p == "~" {
@@ -358,7 +358,7 @@ func attachFile(ref string, f *os.File, cap int) (Attachment, error) {
 	if st, err := f.Stat(); err == nil {
 		size = st.Size()
 	}
-	// Bounded read and a rune-boundary cut (ADR-0072 §4.5): the file
+	// Bounded read and a rune-boundary cut (gem-agent ADR-0072 §4.5): the file
 	// was read whole and sliced by byte.
 	data, more, err := bounded.ReadAll(f, cap)
 	if err != nil {
@@ -400,7 +400,7 @@ func openConfined(abs string, roots ...string) (*os.File, error) {
 
 // openRegular opens for reading without blocking and admits only a
 // regular file or a directory, checked on the opened descriptor: an
-// `@fifo` with no writer blocked the open past any cancel (ADR-0072
+// `@fifo` with no writer blocked the open past any cancel (gem-agent ADR-0072
 // §4.8). O_NONBLOCK does not change how a regular file reads, and is
 // cleared afterwards.
 func openRegular(open func(flag int) (*os.File, error)) (*os.File, error) {
@@ -447,7 +447,7 @@ func readBounded(abs, projectDir string, cap int) ([]byte, error) {
 // through the root; attachDir closes it).
 func attachDir(ref string, d *os.File, lim Limits) (Attachment, error) {
 	defer func() { _ = d.Close() }()
-	// Bounded listing through the root (ADR-0072 §4.5): one entry past
+	// Bounded listing through the root (gem-agent ADR-0072 §4.5): one entry past
 	// the display cap is enough to say "more" — how many more is not
 	// known, and is not claimed.
 	entries, more, err := bounded.ReadDir(d, lim.DirEntries)

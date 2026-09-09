@@ -35,7 +35,7 @@ const (
 // style: mcp__<server>__<tool>, sanitized to Gemini's charset. An
 // over-long name is truncated with a deterministic hash suffix: a bare
 // cut collided two long remote names into one registry entry, silently
-// dropping the second tool (ADR-0021). The hash is stable across runs,
+// dropping the second tool (gem-agent ADR-0021). The hash is stable across runs,
 // so an exact [approval.tools] entry can still target it.
 func mcpToolName(server, tool string) string {
 	name := "mcp__" + sanitizeToolName(server) + "__" + sanitizeToolName(tool)
@@ -64,7 +64,7 @@ func sanitizeToolName(s string) string {
 // tool cannot know which remote operations mutate what.
 func registerMCPTools(registry *tools.Registry, client mcpCaller, list []mcp.Tool) (added []string, errs []string) {
 	// The intake spills to the registry's work directory, so a result
-	// it saves is one the file tools can read back (ADR-0058).
+	// it saves is one the file tools can read back (gem-agent ADR-0058).
 	intake := newMCPIntake(registry.WorkDir)
 	for _, t := range list {
 		remoteName := t.Name
@@ -83,7 +83,7 @@ func registerMCPTools(registry *tools.Registry, client mcpCaller, list []mcp.Too
 			Mutating:    true,
 			Run: func(ctx context.Context, args map[string]any) (string, error) {
 				blocks, isErr, err := client.CallTool(ctx, remoteName, args)
-				// Provenance is typed, never inferred from text (ADR-0075
+				// Provenance is typed, never inferred from text (gem-agent ADR-0075
 				// §1): the server's rejection travels as *mcp.RPCError
 				// inside the call error; anything else is a failure of
 				// lagent's own to complete the call.
@@ -120,7 +120,7 @@ func registerMCPTools(registry *tools.Registry, client mcpCaller, list []mcp.Too
 }
 
 // policyScope is the machine-owned file's word, in the shape the filter
-// composes (ADR-0077 §2). Decided travels beside the entries because a
+// composes (gem-agent ADR-0077 §2). Decided travels beside the entries because a
 // server the panel decided to exclude NOTHING of still shadows
 // config.toml — see PolicyMCP.Decided.
 func policyScope(pf *config.PolicyFile) mcpfilter.PolicyScope {
@@ -145,7 +145,7 @@ func mcpToolPrefix(server string) string {
 // whether or not it was excluded), and the function names of the ones
 // that answered tools/list. The settings panel needs both to draw its
 // two levels — a server excluded whole has no functions to list, and its
-// row still has to be there to turn back on (ADR-0077 §1).
+// row still has to be there to turn back on (gem-agent ADR-0077 §1).
 //
 // It also keeps what a later reconnect of ONE server needs from the
 // files the full connect read: how to start it, which names the
@@ -241,7 +241,7 @@ func (inv mcpInventory) catalogLines(adv *mcpAdvertiser) []string {
 const catalogSentenceCap = 200
 
 // warnUnmatched names every exclude entry that did no work, with its own
-// remedy (ADR-0077 §2). Checked against the whole inventory because a
+// remedy (gem-agent ADR-0077 §2). Checked against the whole inventory because a
 // stale entry is stale whichever server was just touched.
 func (inv mcpInventory) warnUnmatched(filter mcpfilter.Filter, stderr io.Writer) {
 	for _, note := range filter.Unmatched(inv.configured, inv.Offered, inv.complete) {
@@ -261,7 +261,7 @@ type mcpServer interface {
 	Close()
 }
 
-// excludeMCPServer records a server the session does not start (ADR-0077
+// excludeMCPServer records a server the session does not start (gem-agent ADR-0077
 // §1): no process, no credentials touched, nothing of it in the
 // declarations. Its row still comes from .mcp.json, so it can be turned
 // back on without having been running.
@@ -269,7 +269,7 @@ func excludeMCPServer(name string, registry *tools.Registry, inv *mcpInventory) 
 	// Recorded by prefix: the server never listed, so there are no
 	// function names to note one by one, and a call naming one must
 	// still read as the operator's doing in the transcript rather than
-	// as a tool that never existed (ADR-0077 §5, pre-release review).
+	// as a tool that never existed (gem-agent ADR-0077 §5, pre-release review).
 	registry.NoteExcludedPrefix(mcpToolPrefix(name))
 	delete(inv.Offered, name)
 	inv.summary[name] = fmt.Sprintf("%s [%s] (not started — excluded)", name, inv.Scopes[name])
@@ -301,7 +301,7 @@ func attachMCPServer(ctx context.Context, client mcpServer, registry *tools.Regi
 	offered, kept, excluded := splitByFilter(name, toolList, filter)
 	for _, n := range excluded {
 		// Not registered. The name is kept so the transcript can say
-		// the operator removed it (ADR-0077 §5).
+		// the operator removed it (gem-agent ADR-0077 §5).
 		registry.NoteExcluded(n)
 	}
 	removed := len(excluded)
@@ -331,7 +331,7 @@ func attachMCPServer(ctx context.Context, client mcpServer, registry *tools.Regi
 }
 
 // reconnectMCPServer applies the filter to ONE server and leaves every
-// other server's process and tools alone (ADR-0077 §3: the panel's edit
+// other server's process and tools alone (gem-agent ADR-0077 §3: the panel's edit
 // names one server, and that is the whole of what changes). running is
 // the server's client if the session has one, nil otherwise; start
 // makes a fresh one. The server's own registry names are removed
@@ -366,7 +366,7 @@ func reconnectMCPServer(ctx context.Context, name string, running mcpServer, sta
 }
 
 // splitByFilter divides one server's advertised tools into what the
-// session declares and what it does not (ADR-0077 §1). It answers in
+// session declares and what it does not (gem-agent ADR-0077 §1). It answers in
 // three parts: every function name the server offered (what a stale
 // exclusion is checked against), the tools to register, and the REGISTRY
 // names of the excluded ones — the filter matches the name the server
@@ -394,7 +394,7 @@ func splitByFilter(server string, list []mcp.Tool, filter mcpfilter.Filter) (off
 // session, it must not block the runtime from starting.
 // scopes maps each connected server to "global" or "project" — kept
 // for consumers that must not treat a project-supplied server like an
-// operator-installed one (none today; /learn was, before ADR-0049).
+// operator-installed one (none today; /learn was, before gem-agent ADR-0049).
 func connectMCPServers(ctx context.Context, cfg *config.Config, projectDir, version string, registry *tools.Registry, stderr io.Writer, grant projectGrant, filter mcpfilter.Filter) (clients []*mcp.Client, summary []string, inv mcpInventory) {
 	if !cfg.MCP.Enabled {
 		return nil, nil, mcpInventory{Offered: map[string][]string{}, summary: map[string]string{}}
@@ -429,8 +429,8 @@ func connectMCPServers(ctx context.Context, cfg *config.Config, projectDir, vers
 		global = load(gp, "global")
 	}
 	// A server entry is a child process, so an untrusted project's
-	// .mcp.json is not read at all (ADR-0023 §2) — nor one whose content
-	// changed since it was trusted (ADR-0074).
+	// .mcp.json is not read at all (gem-agent ADR-0023 §2) — nor one whose content
+	// changed since it was trusted (gem-agent ADR-0074).
 	var project map[string]mcp.ServerConfig
 	if grant.mcp() {
 		project = load(filepath.Join(projectDir, ".mcp.json"), "project")
@@ -455,7 +455,7 @@ func connectMCPServers(ctx context.Context, cfg *config.Config, projectDir, vers
 	inv.Servers = names
 
 	// What the filter is checked against, so a stale entry can be told
-	// from one that did its work (ADR-0077 §2): every configured server,
+	// from one that did its work (gem-agent ADR-0077 §2): every configured server,
 	// and the function names of the ones that actually listed.
 	inv.configured = make(map[string]bool, len(names)+len(skippedNames))
 	inv.Offered = map[string][]string{}

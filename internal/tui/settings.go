@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// SettingRow is one line of the settings panel (ADR-0009). Rows the
+// SettingRow is one line of the settings panel (gem-agent ADR-0009). Rows the
 // operator can change carry Values; the rest are shown with their
 // provenance and nothing else, because a menu that offers to change
 // something it cannot change is worse than a read-only row.
@@ -28,7 +28,7 @@ type SettingRow struct {
 	Values []string
 	// Tool marks a row as an approval-policy row for the named tool.
 	Tool string
-	// Exclude marks a row as an MCP exclusion row (ADR-0077) and
+	// Exclude marks a row as an MCP exclusion row (gem-agent ADR-0077) and
 	// carries the entry it writes: a server ("obsidian"), or one
 	// function of one server ("obsidian/patch_vault_file").
 	Exclude string
@@ -37,7 +37,7 @@ type SettingRow struct {
 	Child bool
 	Group string
 	// Collapsible marks the parent of a Group. There are two levels and
-	// no third, which is the type saying what ADR-0077 §1 says: a
+	// no third, which is the type saying what gem-agent ADR-0077 §1 says: a
 	// server, and a function of a server.
 	Collapsible bool
 	// Detail is an optional dim note (why a row is read-only, say).
@@ -60,7 +60,7 @@ type SettingChange struct {
 	Label string
 	Tool  string
 	// Exclude is set for an MCP exclusion row and carries the entry
-	// (ADR-0077): "server" or "server/function".
+	// (gem-agent ADR-0077): "server" or "server/function".
 	Exclude string
 	Value   string
 	Scope   string
@@ -84,7 +84,7 @@ func (m Model) openSettings() (tea.Model, tea.Cmd) {
 		return m, m.emit(m.st.errS.Render(m.msgs.SettingsUnavailable))
 	}
 	// Re-read on every open: the panel is the only surface for what
-	// ADR-0077 lets an operator change, and a snapshot taken at startup
+	// gem-agent ADR-0077 lets an operator change, and a snapshot taken at startup
 	// told them their own last edit had not happened.
 	data := *m.settingsData
 	if m.refreshSettings != nil {
@@ -94,7 +94,7 @@ func (m Model) openSettings() (tea.Model, tea.Cmd) {
 	m.settingsCursor = 0
 	m.settingsScope = ScopeGlobal
 	// Groups open closed. Flat, this list is hundreds of rows on a
-	// machine with a full server list, which is the state ADR-0077 §3
+	// machine with a full server list, which is the state gem-agent ADR-0077 §3
 	// exists to end.
 	m.settingsCollapsed = withNewGroupsClosed(nil, data.Rows)
 	m.phase = phaseSettings

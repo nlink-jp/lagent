@@ -13,7 +13,7 @@ import (
 // loadInstructions collects the project's agent-instruction files (the
 // vendor conventions, walked up through ancestor directories) and
 // returns the prompt section plus the labels for the banner. When the
-// project is untrusted (ADR-0023), its OWN files are excluded — the
+// project is untrusted (gem-agent ADR-0023), its OWN files are excluded — the
 // ancestor and global files stay: a clone cannot plant those.
 func loadInstructions(projectDir string, grant projectGrant) (section string, labels []string, notes []string) {
 	home, _ := os.UserHomeDir()
@@ -24,7 +24,7 @@ func loadInstructions(projectDir string, grant projectGrant) (section string, la
 	files, notes := instructions.Load(projectDir, home, globalDir, instructions.DefaultLimits())
 	// The project's own files load only as far as the grant says: not
 	// at all when untrusted, and not a file whose content changed since
-	// it was trusted (ADR-0074).
+	// it was trusted (gem-agent ADR-0074).
 	kept := files[:0]
 	for _, f := range files {
 		if filepath.Dir(f.Path) == filepath.Clean(projectDir) && !grant.instruction(filepath.Base(f.Path)) {

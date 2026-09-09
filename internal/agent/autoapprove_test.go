@@ -21,12 +21,12 @@ type autoBackend struct {
 	verdict     string
 	verdictErr  error
 	evals       []string // the payloads the risk evaluator saw
-	evalSystems []string // the system prompts it saw (ADR-0038 variants)
+	evalSystems []string // the system prompts it saw (gem-agent ADR-0038 variants)
 }
 
 func (b *autoBackend) ChatStream(ctx context.Context, system string, msgs []llm.Message, defs []llm.ToolDef, onText func(string)) (*llm.Response, error) {
 	// The auto ceiling's per-turn question is a side call like the risk
-	// tier's (ADR-0080 §2). Answered false so it changes nothing here;
+	// tier's (gem-agent ADR-0080 §2). Answered false so it changes nothing here;
 	// the tests that exercise it use their own backend.
 	if len(defs) == 0 && strings.Contains(system, "changes nothing") {
 		return &llm.Response{Content: `{"read_only": false}`}, nil
@@ -112,7 +112,7 @@ func TestAutoSafeRunsWithoutModelOrGate(t *testing.T) {
 	}
 }
 
-// TestAutoBlockNeverConsultsModel is the ADR-0004 floor: a Block verdict
+// TestAutoBlockNeverConsultsModel is the gem-agent ADR-0004 floor: a Block verdict
 // reaches the human even if the model would have approved.
 func TestAutoBlockNeverConsultsModel(t *testing.T) {
 	b := &autoBackend{

@@ -10,7 +10,7 @@ import (
 )
 
 // Scan is the read path for diagnostic records Load discards: /learn
-// reads the operator's own gate decisions through it (ADR-0045 §2).
+// reads the operator's own gate decisions through it (gem-agent ADR-0045 §2).
 func TestScanSeesDiagnosticRecords(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "s.jsonl")
 	lines := `{"ts":"2026-08-26T10:00:00Z","kind":"session","data":{"schema":2}}

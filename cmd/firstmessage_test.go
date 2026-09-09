@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// The positional argument is the first interactive turn (ADR-0064):
+// The positional argument is the first interactive turn (gem-agent ADR-0064):
 // whitespace-only counts as absent, and combining it with -p is a
 // named refusal, never a silent precedence.
 func TestFirstMessage(t *testing.T) {

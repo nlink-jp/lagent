@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// ADR-0055 §2: bounded read, disclosed clip, text only.
+// gem-agent ADR-0055 §2: bounded read, disclosed clip, text only.
 func TestReadPipedStdin(t *testing.T) {
 	t.Run("plain text passes through", func(t *testing.T) {
 		content, warning := readPipedStdin(strings.NewReader(`{"ip":"192.0.2.7"}`))

@@ -9,7 +9,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/tools"
 )
 
-// ADR-0039 §3: after a reload changes the registry, RefreshTools
+// gem-agent ADR-0039 §3: after a reload changes the registry, RefreshTools
 // re-caches the declarations, and SetSystem swaps the system prompt —
 // both visible to the model on the very next round.
 func TestRefreshToolsAndSetSystem(t *testing.T) {

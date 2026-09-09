@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// ADR-0045 §4: learned command rules live in the machine-owned file
+// gem-agent ADR-0045 §4: learned command rules live in the machine-owned file
 // under the project they were learned in, and survive a rewrite.
 func TestCommandRulesRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), PolicyFileName)

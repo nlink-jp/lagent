@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// ADR-0078: a line earns a place at startup only if nothing else will
+// gem-agent ADR-0078: a line earns a place at startup only if nothing else will
 // say it. The enumerations become one row that names where the detail
 // is — and the count survives because "did my toolset come up" is a
 // question the operator has before typing.
@@ -109,7 +109,7 @@ func TestAbnormalStatesStillPrint(t *testing.T) {
 
 // Starting in auto-approve is the only approval-regime fact with no
 // other startup surface: the TUI footer carries it, the plain REPL has
-// no footer, and ADR-0078 removed the sandbox line that gestured at it.
+// no footer, and gem-agent ADR-0078 removed the sandbox line that gestured at it.
 func TestAutoApproveIsAnnouncedAtStart(t *testing.T) {
 	on := strings.Join(Lines(Facts{Version: "v", Model: "m", SandboxOn: true, ReadLane: true, AutoApprove: true}), "\n")
 	if !strings.Contains(on, "auto-approve: ON at start") || !strings.Contains(on, "/auto") {

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// ADR-0021: file_info's escaping-symlink report only fires when the
+// gem-agent ADR-0021: file_info's escaping-symlink report only fires when the
 // path's PARENT genuinely resolves inside the project. A lexically
 // in-project path under an escaping link must not leak out-of-project
 // link targets.

@@ -8,7 +8,7 @@ import (
 )
 
 // ScratchDirs is the one list both the profile and the rule tier read
-// (ADR-0070 §2): every entry is a real, absolute, existing directory.
+// (gem-agent ADR-0070 §2): every entry is a real, absolute, existing directory.
 // /dev/fd is among them (descriptor duplication); the device sinks are
 // ScratchFiles, allowed as literals — never /dev as a whole.
 func TestScratchDirsAreResolvedExistingDirectories(t *testing.T) {

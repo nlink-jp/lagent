@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// Lane is the capability a shell command runs with (ADR-0073). The
+// Lane is the capability a shell command runs with (gem-agent ADR-0073). The
 // kernel enforces the lane; nothing about the command's text does.
 // A model that declares the wrong lane gains nothing: read can only
 // tighten the cage, write and operator can only add scrutiny.
@@ -34,7 +34,7 @@ const (
 )
 
 // Ceiling is the session's lane ceiling and the watcher that may raise
-// it (ADR-0080 §1-2). The two are **independent**, and a first draft
+// it (gem-agent ADR-0080 §1-2). The two are **independent**, and a first draft
 // that made them one tri-state (off / on / auto) was wrong in both
 // directions: tightening destroyed the fact that the session was
 // watching, and lifting silently disarmed the watcher the operator had
@@ -105,7 +105,7 @@ type Spec struct {
 	// file (and their ancestors below the project root): the write lane
 	// denies operations on those directory entries themselves — rename,
 	// unlink — so a nested AGENTS.md cannot be replaced by swapping its
-	// parent (ADR-0074 §2). Writes inside them stay allowed.
+	// parent (gem-agent ADR-0074 §2). Writes inside them stay allowed.
 	PersistentParents []string
 }
 
@@ -113,7 +113,7 @@ type Spec struct {
 // launch — defence in depth behind readLaneDenies, which already deny
 // the Mach, Apple Event and launch-services capabilities these programs
 // use. The list is not what makes the lane safe (design review of
-// ADR-0073: a program list is a regex by another name); it makes a
+// gem-agent ADR-0073: a program list is a regex by another name); it makes a
 // refusal legible (`Operation not permitted` at exec, not a crash
 // inside the program). The kernel matches the real binary at exec, so
 // `/usr/bin/osascript`, `\osascript` and `OSASCRIPT` are one program.
@@ -131,7 +131,7 @@ var DefaultDenyExec = []string{
 // them protects is a file the other's model may rewrite) and the
 // .claude directory.
 // The write lane denies writes to them; the operator lane allows them.
-// The same set decides the file tools' OperatorOnly verdict (ADR-0072
+// The same set decides the file tools' OperatorOnly verdict (gem-agent ADR-0072
 // §1.4), so the two cannot disagree.
 func PersistentFiles(projectDir string) []string {
 	p := regexp.QuoteMeta(filepath.Clean(projectDir))
@@ -273,7 +273,7 @@ func envTemplate(base string) bool {
 }
 
 // readLaneDenies are the capability families the read lane denies
-// wholesale (ADR-0073 §1, revised after design review): the basis of
+// wholesale (gem-agent ADR-0073 §1, revised after design review): the basis of
 // "non-mutating" is the kernel's list of side-effect operations, not a
 // list of programs. Each entry is an SBPL operation; together with
 // file-write* (below) and network* they cover files, sockets, Mach and
@@ -281,7 +281,7 @@ func envTemplate(base string) bool {
 // and job control. Probed on macOS 26: git, go, python, node, swift,
 // perl, ruby, make, tar, xcodebuild -version and codesign still run
 // under all of them; `ps` does not run under any Seatbelt profile at
-// all (pre-existing since ADR-0001), and `sysctl-write` was left out
+// all (pre-existing since gem-agent ADR-0001), and `sysctl-write` was left out
 // because uname and node's allocator use it.
 var readLaneDenies = []string{
 	"network*", "mach-lookup", "mach-register", "appleevent-send", "ipc-posix*",
@@ -292,14 +292,14 @@ var readLaneDenies = []string{
 // readLaneReadDenies are the trees a read-lane command may not read
 // beyond the credential list (design review V2/V5): external and
 // network mounts — a walk from `/` reaching every share was the cost
-// ADR-0070 §3 named — and the user's Library, which holds mail,
+// gem-agent ADR-0070 §3 named — and the user's Library, which holds mail,
 // messages, cookies and token stores; the toolchain directories under
 // it are re-allowed (readLaneReadAllows).
 var readLaneReadDenies = []string{"/Volumes", "/Network"}
 var readLaneLibraryAllows = []string{"Library/Caches", "Library/Developer", "Library/Python", "Library/Go"}
 
 // Enforcement is what the runtime could establish about the sandbox
-// (ADR-0073 §5): Confined means sandbox-exec applies the lane profiles
+// (gem-agent ADR-0073 §5): Confined means sandbox-exec applies the lane profiles
 // to every shell command; ReadLane means the read lane's denials were
 // verified on this machine at startup (VerifyReadLane), so a read-lane
 // call may run unasked. Confined && !ReadLane gates every call as a
@@ -346,12 +346,12 @@ func resolveDenyExec(names []string) []string {
 	return out
 }
 
-// LaneProfile builds the SBPL profile for one lane (ADR-0073). Every
-// lane starts from the write allowlist of ADR-0001 (the project, the
+// LaneProfile builds the SBPL profile for one lane (gem-agent ADR-0073). Every
+// lane starts from the write allowlist of gem-agent ADR-0001 (the project, the
 // work directory, the scratch locations, the device sinks); the read
 // lane keeps only the scratch part of it and adds the side-effect
 // denials; the write lane denies the persistent files; the operator
-// lane is the ADR-0001 profile unchanged. Seatbelt evaluates rules
+// lane is the gem-agent ADR-0001 profile unchanged. Seatbelt evaluates rules
 // last-match-wins, so each section's denials follow the allows they
 // narrow.
 func LaneProfile(lane Lane, spec Spec) (string, error) {
@@ -516,7 +516,7 @@ func within(dir, p string) bool {
 // a socket connect to a listener this process opens, a signal to this
 // process, opening the terminal, launching a denied program — and two
 // that must succeed (a scratch write, running a program), under real
-// sandbox-exec (ADR-0073 §5). Each must-fail probe is first run
+// sandbox-exec (gem-agent ADR-0073 §5). Each must-fail probe is first run
 // without the sandbox and must succeed there, so a probe that fails
 // for an unrelated reason cannot count as a denial (review F-04/V1:
 // `kill -0 1` and a connect to a closed port fail for any user). A
@@ -619,7 +619,7 @@ func VerifyReadLane(profile string, spec Spec) error {
 // must succeed (an ordinary write into the project, running a program),
 // under real sandbox-exec; each must-fail probe first runs without the
 // sandbox as its control. Confinement is what this measured, never what
-// the configuration says (ADR-0073 §5, extended to the write lane in
+// the configuration says (gem-agent ADR-0073 §5, extended to the write lane in
 // §7): a machine, or a build, where sandbox-exec is present but applies
 // no cage is unconfined, and every shell command asks the operator. The
 // probe files are created exclusively under random names and removed.

@@ -69,7 +69,7 @@ func press(m Model, key tea.KeyMsg) Model {
 
 // The /auto slash route must keep the footer marker in sync: the shared
 // slash handler flips the agent flag but cannot see this model, and the
-// footer said ⚡auto while every change asked (found live, ADR-0060 E2E).
+// footer said ⚡auto while every change asked (found live, gem-agent ADR-0060 E2E).
 func TestSlashAutoUpdatesFooterMarker(t *testing.T) {
 	c := &capture{}
 	on := false
@@ -727,7 +727,7 @@ func TestViewLinesClippedToWidth(t *testing.T) {
 	}
 }
 
-// TestShrinkClearsScreenOnce: the first size report performs the ADR-0003
+// TestShrinkClearsScreenOnce: the first size report performs the gem-agent ADR-0003
 // startup clear (banner follows it inside the same sequence, so nothing
 // is lost); growth must not clear; a genuine width shrink clears to sweep
 // re-wrapped stale frames and resets the line counter.
@@ -756,7 +756,7 @@ func TestShrinkClearsScreenOnce(t *testing.T) {
 	}
 }
 
-// TestBottomPinning pins ADR-0003: the view pads from the top so the
+// TestBottomPinning pins gem-agent ADR-0003: the view pads from the top so the
 // input block sits at the window bottom, the banner prints through the
 // line counter after the startup clear, and the padding floors at zero
 // once the conversation fills the screen.
@@ -863,7 +863,7 @@ func openApproval(t *testing.T, m Model, reason string) (Model, chan ApprovalAns
 	return dialogSeen(next.(Model)), resp
 }
 
-// dialogSeen rewinds the type-ahead grace window (ADR-0021): these
+// dialogSeen rewinds the type-ahead grace window (gem-agent ADR-0021): these
 // tests press keys as an operator who has read the dialog, not as a
 // keystroke that was already in flight when it appeared.
 func dialogSeen(m Model) Model {
@@ -970,7 +970,7 @@ func TestApprovalEscDenies(t *testing.T) {
 	_ = m
 }
 
-// ADR-0060: 'N' opens the reason field instead of answering; Enter then
+// gem-agent ADR-0060: 'N' opens the reason field instead of answering; Enter then
 // sends the denial with the typed reason riding along.
 func TestApprovalDenyWithReasonFlow(t *testing.T) {
 	c := &capture{}
@@ -1002,7 +1002,7 @@ func TestApprovalDenyWithReasonFlow(t *testing.T) {
 	}
 }
 
-// The IME-safe route (ADR-0002 lineage) reaches the reason field too:
+// The IME-safe route (gem-agent ADR-0002 lineage) reaches the reason field too:
 // Tab-select 理由を添えて拒否, Enter — and an empty reason line is
 // exactly a plain deny.
 func TestApprovalReasonSelectionRouteAndEmptyEnter(t *testing.T) {
@@ -1136,7 +1136,7 @@ func TestCtrlCInterruptsTurn(t *testing.T) {
 }
 
 // /compact makes an LLM call, so it must run like a turn — the slash
-// ADR-0007: typing during a turn used to be dropped on the floor, with
+// gem-agent ADR-0007: typing during a turn used to be dropped on the floor, with
 // no characters appearing — the operator retyped the message.
 func TestTypingDuringATurnIsKeptAndQueued(t *testing.T) {
 	c := &capture{}

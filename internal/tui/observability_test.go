@@ -9,7 +9,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/uitext"
 )
 
-// ADR-0033 regression tests: the running status distinguishes a
+// gem-agent ADR-0033 regression tests: the running status distinguishes a
 // thinking model, a stalled stream, and a backoff retry — the three
 // states that used to render identically as "thinking…".
 
@@ -58,7 +58,7 @@ func TestStallWarningAfterSilence(t *testing.T) {
 	}
 }
 
-// ADR-0056: a Gemini function call arrives as one whole part, so a
+// gem-agent ADR-0056: a Gemini function call arrives as one whole part, so a
 // large write_file / edit_file argument is minutes of legitimate
 // silence on the wire. The heartbeat keeps counting; it does not
 // accuse the connection until stallSeconds.
@@ -89,7 +89,7 @@ func TestStallWarningStillFiresPastTheThreshold(t *testing.T) {
 
 // The status line must leave the Ctrl+C hint on screen at 80 columns —
 // the warning is useless if the way out is what gets truncated. This
-// is why StallFmt no longer repeats the hint inside itself (ADR-0056).
+// is why StallFmt no longer repeats the hint inside itself (gem-agent ADR-0056).
 func TestStatusLineKeepsTheCtrlCHintAt80Columns(t *testing.T) {
 	for _, lang := range []uitext.Lang{uitext.EN, uitext.JA} {
 		c := &capture{}
@@ -166,7 +166,7 @@ func TestThoughtTailDisplaysAndYieldsToAnswer(t *testing.T) {
 	}
 }
 
-// Thoughts are ephemeral display (ADR-0033 §3): nothing reaches the
+// Thoughts are ephemeral display (gem-agent ADR-0033 §3): nothing reaches the
 // scrollback printer.
 func TestThoughtsNeverReachScrollback(t *testing.T) {
 	m, c := runningModel(t)
@@ -181,7 +181,7 @@ func TestThoughtsNeverReachScrollback(t *testing.T) {
 	}
 }
 
-// ADR-0034 §3: the last-resort exit. A wedged tool that ignores
+// gem-agent ADR-0034 §3: the last-resort exit. A wedged tool that ignores
 // cancellation must not trap the operator: second Ctrl+C warns, third
 // quits — and a completed turn resets the ladder.
 func TestTripleCtrlCEscapesAWedgedTool(t *testing.T) {
@@ -247,7 +247,7 @@ func TestNoStallWarningWhileAToolRuns(t *testing.T) {
 	}
 }
 
-// ADR-0036: the ask_user dialog — digits pick in one press, Esc
+// gem-agent ADR-0036: the ask_user dialog — digits pick in one press, Esc
 // declines, interrupted turns auto-decline, releaseTurn never strands
 // the blocked tool goroutine.
 func TestAskDialog(t *testing.T) {

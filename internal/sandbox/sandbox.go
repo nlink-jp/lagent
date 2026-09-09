@@ -1,6 +1,6 @@
 // Package sandbox generates macOS Seatbelt (SBPL) profiles and wraps
 // commands with sandbox-exec. This is the defense-in-depth layer of
-// ADR-0001: file writes are confined to explicitly allowed directories;
+// gem-agent ADR-0001: file writes are confined to explicitly allowed directories;
 // the decision boundary (MITL approval) lives in internal/approve.
 //
 // Ported from gem-agent internal/sandbox at be7609980022e38314268c58ca94a6517e6f5d28 (v0.74.0), ADR-0001.
@@ -16,7 +16,7 @@ import (
 
 // Executable is the sandbox-exec binary path. macOS ships it in /usr/bin;
 // Apple marks it deprecated but it remains the de facto standard for
-// CLI agents (see ADR-0001 for the recorded platform risk).
+// CLI agents (see gem-agent ADR-0001 for the recorded platform risk).
 const Executable = "/usr/bin/sandbox-exec"
 
 // Profile builds an SBPL profile that allows everything except file
@@ -40,7 +40,7 @@ func Profile(writeDirs []string, writeFiles []string) (string, error) {
 }
 
 // profileBody is Profile without the non-empty check: the read lane of
-// ADR-0073 may legitimately allow no directory at all.
+// gem-agent ADR-0073 may legitimately allow no directory at all.
 func profileBody(writeDirs []string, writeFiles []string) (string, error) {
 	var b strings.Builder
 	b.WriteString("(version 1)\n")
@@ -73,7 +73,7 @@ func Wrap(profile string, shell string, command string) []string {
 // ScratchDirs returns the scratch directories shell tools legitimately
 // write to — TMPDIR, /private/tmp, and /dev/fd (descriptor
 // duplication) — resolved to the real paths Seatbelt matches against
-// (/tmp arrives as /private/tmp). It is the one list (ADR-0070 §2):
+// (/tmp arrives as /private/tmp). It is the one list (gem-agent ADR-0070 §2):
 // the profile allows exactly these, and the rule tier reads the same
 // slice, so its "outside the writable roots" can never disagree with
 // what Seatbelt denies. A location that does not exist on this

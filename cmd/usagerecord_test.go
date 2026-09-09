@@ -35,7 +35,7 @@ func (c *capturingLog) usage(t *testing.T) []session.UsageRecord {
 	return out
 }
 
-// ADR-0057: a side call is a model call, so it leaves the same
+// gem-agent ADR-0057: a side call is a model call, so it leaves the same
 // The one accounting shape, end to end: what the agent writes and what
 // the tools write must be the same record, or an aggregator has to know
 // which code path spent the tokens.

@@ -49,7 +49,7 @@ func TestEOFDenies(t *testing.T) {
 	}
 }
 
-// ADR-0060 §1: 'N' denies and reads one reason line; the case is
+// gem-agent ADR-0060 §1: 'N' denies and reads one reason line; the case is
 // load-bearing, so a lowercase 'n' must never reach the reason prompt.
 func TestDenyWithReason(t *testing.T) {
 	var out bytes.Buffer
@@ -110,7 +110,7 @@ func TestInvalidInputReprompts(t *testing.T) {
 // all three values.
 func allowed(approved, _ bool, _ string) bool { return approved }
 
-// ADR-0048 §1: the gate reports whether the session allowlist answered,
+// gem-agent ADR-0048 §1: the gate reports whether the session allowlist answered,
 // so the learner can tell one keystroke from many typed decisions.
 func TestApproveReportsAllowlistAnswers(t *testing.T) {
 	g := New(strings.NewReader("a\ny\n"), io.Discard)

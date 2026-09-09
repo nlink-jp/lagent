@@ -41,7 +41,7 @@ func workdirsFixture(t *testing.T) (projectDir string) {
 }
 
 // asTerminal makes the typed confirmation count for one test: the
-// harness feeds a buffer, which the real check refuses (ADR-0059).
+// harness feeds a buffer, which the real check refuses (gem-agent ADR-0059).
 func asTerminal(t *testing.T) {
 	t.Helper()
 	prev := workdirsStdinIsTerminal
@@ -93,7 +93,7 @@ func TestWorkdirsCleanAsksAndEOFMeansNo(t *testing.T) {
 		t.Fatalf("EOF deleted something: %d dirs left", len(infos))
 	}
 
-	// A "y" arriving through a pipe is not consent (ADR-0059: a non-TTY
+	// A "y" arriving through a pipe is not consent (gem-agent ADR-0059: a non-TTY
 	// run consents only through --yes; review round 4).
 	out = runWorkdirs(t, "y\n", "clean")
 	if !strings.Contains(out, "aborted") || !strings.Contains(out, "--yes") {

@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// ADR-0065 §1: the walks consult the context. A cancelled context
+// gem-agent ADR-0065 §1: the walks consult the context. A cancelled context
 // ends the walk within one syscall, and the cut is named in the
 // result — a partial result never poses as a whole one.
 
@@ -71,7 +71,7 @@ func TestNavUninterruptedRunsCarryNoFooter(t *testing.T) {
 // it doubles as the synchronisation point — cancels, then releases
 // the read with EOF. The walk must come back at its very next check
 // without touching the directory that sorts after the stall.
-// A FIFO in the tree is not opened for reading at all (ADR-0072 §4.8):
+// A FIFO in the tree is not opened for reading at all (gem-agent ADR-0072 §4.8):
 // with no writer, a plain open blocked past any cancel. The walk skips
 // it as "not a regular file" and finishes on its own — the old form of
 // this test used the FIFO to stall the walk and cancel mid-file, which

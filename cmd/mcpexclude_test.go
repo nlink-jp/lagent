@@ -26,7 +26,7 @@ func mustFilter(t *testing.T, cfg, policy, project []string) mcpfilter.Filter {
 	return f
 }
 
-// ADR-0077 §1: the two levels are a server and a function of a server;
+// gem-agent ADR-0077 §1: the two levels are a server and a function of a server;
 // a function entry removes exactly that function.
 func TestSplitByFilterRemovesNamedFunctions(t *testing.T) {
 	f := mustFilter(t, []string{"obsidian/patch_vault_file", "obsidian/search_and_replace"}, nil, nil)

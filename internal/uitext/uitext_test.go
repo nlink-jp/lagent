@@ -49,7 +49,7 @@ func TestResolveAuto(t *testing.T) {
 	}
 }
 
-// TestCatalogsComplete is the mechanism of ADR-0029 §2: every field
+// TestCatalogsComplete is the mechanism of gem-agent ADR-0029 §2: every field
 // must be non-empty in BOTH catalogs, so a new chrome string cannot
 // ship in only one language.
 func TestCatalogsComplete(t *testing.T) {

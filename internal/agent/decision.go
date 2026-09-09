@@ -11,10 +11,10 @@ import (
 )
 
 // Decision is the one reading of a tool call that every gate shares
-// (ADR-0073 §4): whether the call changes state, and what the rule
+// (gem-agent ADR-0073 §4): whether the call changes state, and what the rule
 // tier says about it. Three places once computed this separately —
 // the session-allowlist floor, the auto ladder and the policy gate —
-// and each missed a floor the others had (ADR-0072 §1.1, §4.5, §4.9).
+// and each missed a floor the others had (gem-agent ADR-0072 §1.1, §4.5, §4.9).
 // The architecture test pins risk.Classify to this file.
 type Decision struct {
 	// Tool is the registered tool, nil when the name is unknown.
@@ -29,7 +29,7 @@ type Decision struct {
 	// gate rather than gated as something it is not (review F7).
 	Invalid error
 	// OverCeiling is set when the session's lane ceiling is below the
-	// lane this call's effect needs (ADR-0080 §3). It is a refusal, not
+	// lane this call's effect needs (gem-agent ADR-0080 §3). It is a refusal, not
 	// an escalation: the gate can be answered by the session allowlist,
 	// so a ceiling that escalated would be a ceiling an earlier 'a'
 	// could spend. CeilingReason is the operator-facing why.
@@ -37,13 +37,13 @@ type Decision struct {
 	// CeilingReason is the model-facing why, in English like every other
 	// tool result. CeilingKind is the same fact machine-readable, so the
 	// operator-facing prompt can be rendered from the language catalog
-	// instead of shipping this sentence to a Japanese screen (ADR-0079).
+	// instead of shipping this sentence to a Japanese screen (gem-agent ADR-0079).
 	CeilingReason string
 	CeilingKind   ceilingKind
 	// CeilingUnbounded is set when the ceiling is in force and this
 	// call's effects are outside what it can bound — an MCP tool, whose
 	// server runs outside every Seatbelt profile and whose effects the
-	// rule tier cannot read (ADR-0077).
+	// rule tier cannot read (gem-agent ADR-0077).
 	//
 	// What it buys is narrow and deliberate: no standing shortcut
 	// answers such a call. A session allowlist and a `never` policy were
@@ -52,7 +52,7 @@ type Decision struct {
 	// MCP write with no prompt at all while the banner said it changed
 	// nothing (independent review).
 	//
-	// It does NOT take the call away from the model tier. ADR-0080 §5
+	// It does NOT take the call away from the model tier. gem-agent ADR-0080 §5
 	// puts the mode in front of that tier on purpose, and it was
 	// measured escalating an MCP write and passing an MCP read; making
 	// these operator-only would remove the judgment the ADR chose and
@@ -118,7 +118,7 @@ func (a *Agent) decide(tc llm.ToolCall) Decision {
 	if tc.Name == tools.ShellExecName && !a.registry.Confined() && v.Tier != risk.Block {
 		// Unconfined mode (--no-sandbox): the approval buys none of the
 		// lane's constraints, so it is not an ordinary write-lane call
-		// (ADR-0073 §5) — the operator alone approves, and neither a
+		// (gem-agent ADR-0073 §5) — the operator alone approves, and neither a
 		// session allowlist nor a policy lifts it.
 		v = risk.Verdict{Tier: risk.Review, OperatorOnly: true,
 			Reason: "unconfined shell (the sandbox is off): no lane bounds this command — the operator decides"}
@@ -153,11 +153,11 @@ func laneOrDefault(tc llm.ToolCall) sandbox.Lane {
 
 // overCeiling maps a call to the lane its effect needs and compares it
 // with the session's ceiling, so one setting bounds every tool instead
-// of a list kept per tool (ADR-0080 §3).
+// of a list kept per tool (gem-agent ADR-0080 §3).
 //
 // An MCP tool is never over the ceiling here. The rule tier cannot read
-// another server's effects (ADR-0077), and a ceiling that guessed would
-// be guessing about the one place no profile reaches; ADR-0080 §5 states
+// another server's effects (gem-agent ADR-0077), and a ceiling that guessed would
+// be guessing about the one place no profile reaches; gem-agent ADR-0080 §5 states
 // the ceiling to the model tier instead, which is a judgment and is
 // documented as one.
 func overCeiling(name string, mutating bool, declared, ceiling sandbox.Lane) (ceilingKind, string) {
@@ -176,7 +176,7 @@ func overCeiling(name string, mutating bool, declared, ceiling sandbox.Lane) (ce
 	}
 	// No `ceiling >= LaneWrite` case: Ceiling.Lane yields LaneRead or
 	// LaneOperator only, and LaneOperator returned above. A write
-	// ceiling — expressible, not decided (ADR-0080 §1) — would need one,
+	// ceiling — expressible, not decided (gem-agent ADR-0080 §1) — would need one,
 	// and that is where to add it.
 	return ceilingState, fmt.Sprintf("this session is capped at the %s lane, and this tool changes state outside it", ceiling)
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// ADR-0023: the trust decision and tool policies coexist in one project
+// gem-agent ADR-0023: the trust decision and tool policies coexist in one project
 // entry, survive a save/load round trip, and clearing trust with no
 // tools removes the entry (re-ask on next start).
 func TestPolicyFileTrustRoundTrip(t *testing.T) {
@@ -41,7 +41,7 @@ func TestPolicyFileTrustRoundTrip(t *testing.T) {
 	}
 }
 
-// ADR-0074: pins ride the project entry, survive a save/load, and go
+// gem-agent ADR-0074: pins ride the project entry, survive a save/load, and go
 // when trust is withdrawn.
 // An empty pin set is still "pinned": the marker round-trips, so a
 // project with no agent-facing files is not trust-on-first-used again

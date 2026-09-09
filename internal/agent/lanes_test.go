@@ -60,7 +60,7 @@ func laneCall(command, access string) llm.ToolCall {
 	return llm.ToolCall{ID: "c", Name: "shell_exec", Args: args}
 }
 
-// ADR-0073 §1: a read-lane command is non-mutating by construction and
+// gem-agent ADR-0073 §1: a read-lane command is non-mutating by construction and
 // runs without a prompt in the default mode; the same command with no
 // read lane behind it (sandbox off) is gated like any mutating call.
 func TestReadLaneRunsUngated(t *testing.T) {
@@ -147,7 +147,7 @@ func TestDecisionIsOneReading(t *testing.T) {
 	}
 }
 
-// ADR-0073 §5: with the sandbox off no lane bounds the command, so a
+// gem-agent ADR-0073 §5: with the sandbox off no lane bounds the command, so a
 // shell call is the operator's alone in every lane — a `never` policy
 // (the --allow grant) does not lift it, and the audit record says
 // "unconfined:".
@@ -180,7 +180,7 @@ func TestUnconfinedShellIsTheOperatorsAlone(t *testing.T) {
 	}
 }
 
-// The boundary does not move with the mode (design review of ADR-0073,
+// The boundary does not move with the mode (design review of gem-agent ADR-0073,
 // class E): the same Decision is read in the default mode, under a
 // never policy and by the auto ladder, so for every lane × command the
 // floor, the mutation flag and the gate agree.
@@ -286,7 +286,7 @@ func TestFileToolVerdictFollowsTheLink(t *testing.T) {
 	}
 }
 
-// ADR-0074 §1: a write the operator approved as OperatorOnly reports
+// gem-agent ADR-0074 §1: a write the operator approved as OperatorOnly reports
 // itself after running, so the pins can follow; an allowlisted or
 // ordinary write does not.
 func TestOperatorWriteIsReported(t *testing.T) {

@@ -18,7 +18,7 @@ func TestReadOnlyToolsAreSafe(t *testing.T) {
 
 // The Block floor reaches the operator in every lane — the read lane
 // included, where the cage would refuse most of these anyway: the
-// operator sees the attempt (ADR-0073 §2).
+// operator sees the attempt (gem-agent ADR-0073 §2).
 func TestShellBlockFloorInEveryLane(t *testing.T) {
 	blocked := []string{
 		"rm -rf /",
@@ -150,7 +150,7 @@ func TestFileToolPaths(t *testing.T) {
 }
 
 // Writes into what later sessions trust are the operator's alone; the
-// version-control internals are Block (ADR-0072 §1.4). The list is
+// version-control internals are Block (gem-agent ADR-0072 §1.4). The list is
 // sandbox.PersistentFile — the same one the write lane denies.
 func TestPersistentTargetsAreNotOrdinaryEdits(t *testing.T) {
 	for _, p := range []string{".git/hooks/pre-commit", ".git/config", proj + "/.git/HEAD", "sub/.git/info/exclude"} {
@@ -192,7 +192,7 @@ func TestEmptyProjectDirIsConservative(t *testing.T) {
 }
 
 // The rule tier reads named arguments only, so the model's declared
-// purpose (ADR-0047) cannot move a verdict in either direction.
+// purpose (gem-agent ADR-0047) cannot move a verdict in either direction.
 func TestDeclaredPurposeDoesNotMoveTheVerdict(t *testing.T) {
 	cases := []struct {
 		name string
@@ -221,7 +221,7 @@ func TestDeclaredPurposeDoesNotMoveTheVerdict(t *testing.T) {
 	}
 }
 
-// The session work directory (ADR-0058) is the second writable root.
+// The session work directory (gem-agent ADR-0058) is the second writable root.
 func TestWorkDirIsAWritableRoot(t *testing.T) {
 	proj, work := "/proj", "/state/work/sess-1"
 	v := Classify("write_file", true, map[string]any{"path": "/state/work/sess-1/verify-resume.txt", "content": "x"}, proj, work)

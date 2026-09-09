@@ -14,11 +14,11 @@ import (
 )
 
 // broadRoot names why projectDir is too broad to confine anything
-// (ADR-0023 §1), or "" when it is an ordinary project directory. Broad
+// (gem-agent ADR-0023 §1), or "" when it is an ordinary project directory. Broad
 // means: the filesystem root, the home directory, or an ancestor of
 // home — "confined to the project" would quietly mean the operator's
 // entire tree. The return value is a stable key ("root", "home",
-// "home-ancestor") that uitext localizes for display (ADR-0029).
+// "home-ancestor") that uitext localizes for display (gem-agent ADR-0029).
 func broadRoot(projectDir, home string) string {
 	if projectDir == string(filepath.Separator) {
 		return "root"
@@ -37,7 +37,7 @@ func broadRoot(projectDir, home string) string {
 }
 
 // projectOffering is what a project directory provides that the trust
-// gate covers (ADR-0023 §2).
+// gate covers (gem-agent ADR-0023 §2).
 type projectOffering struct {
 	Instructions []string // instruction file names present in projectDir
 	MCPServers   int      // server entries in the project's .mcp.json
@@ -99,7 +99,7 @@ func probeProject(projectDir string) projectOffering {
 			// os.Stat, as skills.Discover does: a symlinked skill
 			// directory reports IsDir()=false on the DirEntry, and a
 			// project whose skills are all links counted as offering
-			// none — and was trusted without a prompt (ADR-0072 §4.5).
+			// none — and was trusted without a prompt (gem-agent ADR-0072 §4.5).
 			dir := filepath.Join(projectDir, ".claude", "skills", e.Name())
 			if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 				continue
@@ -113,7 +113,7 @@ func probeProject(projectDir string) projectOffering {
 }
 
 // resolveProjectTrust decides whether projectDir's own agent-facing
-// files may load (ADR-0023). It may prompt (interactive, undecided,
+// files may load (gem-agent ADR-0023). It may prompt (interactive, undecided,
 // offering non-empty) and may persist the answer. The returned note,
 // when non-empty, belongs in the banner.
 func resolveProjectTrust(cfg *config.Config, policyFile *config.PolicyFile, policyPath, projectDir string, interactive bool, in io.Reader, out io.Writer, msgs *uitext.Messages) (trusted bool, note string) {
@@ -121,7 +121,7 @@ func resolveProjectTrust(cfg *config.Config, policyFile *config.PolicyFile, poli
 	case cfg.TrustsProject(projectDir):
 		// Hand-declared in [approval].trusted_projects — the stronger
 		// statement (it even loosens approvals); asking again would be
-		// noise (ADR-0023 §4).
+		// noise (gem-agent ADR-0023 §4).
 		return true, ""
 	case policyFile.TrustFor(projectDir) == config.TrustGranted:
 		return true, ""
@@ -135,7 +135,7 @@ func resolveProjectTrust(cfg *config.Config, policyFile *config.PolicyFile, poli
 	}
 	if !interactive {
 		// Undecided and nobody to ask: run bare, decide nothing
-		// (ADR-0023 §5) — refusing would break read-only -p pipelines
+		// (gem-agent ADR-0023 §5) — refusing would break read-only -p pipelines
 		// over fresh clones, the legitimate inspection workflow.
 		return false, msgs.TrustUndecided
 	}
@@ -169,7 +169,7 @@ func resolveProjectTrust(cfg *config.Config, policyFile *config.PolicyFile, poli
 	return false, fmt.Sprintf(msgs.TrustDeclinedFmt, policyPath)
 }
 
-// confirmBroadRoot asks the ADR-0023 §1 question. Non-interactive runs
+// confirmBroadRoot asks the gem-agent ADR-0023 §1 question. Non-interactive runs
 // are refused outright: a prompt nobody answers is a hang. reason is a
 // broadRoot key.
 func confirmBroadRoot(reason, projectDir string, interactive bool, in io.Reader, out io.Writer, msgs *uitext.Messages) error {

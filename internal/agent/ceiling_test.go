@@ -1,7 +1,7 @@
 package agent
 
 // The session's lane ceiling refuses a call whose effect needs a lane
-// above it, before any gate (ADR-0080 §2-3). One setting bounds every
+// above it, before any gate (gem-agent ADR-0080 §2-3). One setting bounds every
 // tool: what is pinned here is which calls it reaches and which it
 // deliberately does not.
 
@@ -147,7 +147,7 @@ func (g *liftGate) ApproveLift(name, detail, purpose, reason string) (bool, stri
 
 // Declining leaves the ceiling in place, and the rest of the turn is not
 // asked again: a model pushed by a poisoned tool result must not be able
-// to raise one prompt per proposed write (ADR-0080 §4).
+// to raise one prompt per proposed write (gem-agent ADR-0080 §4).
 func TestCeilingLiftDeclinedIsNotAskedTwiceInATurn(t *testing.T) {
 	a := ceilingAgent(t, "on")
 	gate := &liftGate{answer: false}
@@ -174,7 +174,7 @@ func TestCeilingLiftDeclinedIsNotAskedTwiceInATurn(t *testing.T) {
 		t.Errorf("result = %q", out)
 	}
 	// Not an operator's denial of the tool: the learner reads that from
-	// the exact deniedResult text (ADR-0045).
+	// the exact deniedResult text (gem-agent ADR-0045).
 	if denied || out == deniedResult {
 		t.Error("a ceiling refusal was reported as an operator denial")
 	}

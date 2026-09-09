@@ -18,7 +18,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/uitext"
 )
 
-// settingsStore builds the panel's rows and applies its edits (ADR-0009).
+// settingsStore builds the panel's rows and applies its edits (gem-agent ADR-0009).
 // It owns the merge of the two policy sources so the panel can stay a
 // renderer: the UI shows what was actually stored, never what a keypress
 // asked for.
@@ -32,7 +32,7 @@ type settingsStore struct {
 	ag         *agent.Agent
 	// current is the resolved policy the agent is using.
 	current policy.Policy
-	// filter and inv are the MCP half of the panel (ADR-0077 §3): what
+	// filter and inv are the MCP half of the panel (gem-agent ADR-0077 §3): what
 	// is excluded, and what there is to exclude. Both are replaced by
 	// reloadMCP, which re-derives the filter from the files and
 	// reconnects that one server — the panel never edits the live tool
@@ -98,7 +98,7 @@ func (s *settingsStore) Rebuild() (tui.SettingsData, error) {
 	for k, v := range s.policyFile.ForProject(s.projectDir) {
 		merged[k] = v
 	}
-	// Learned command rules are parsed but not applied (ADR-0049 §3).
+	// Learned command rules are parsed but not applied (gem-agent ADR-0049 §3).
 	p, _, err := policy.Build(merged, s.projectCfg.Approval.Tools,
 		nil, s.cfg.TrustsProject(s.projectDir))
 	if err != nil {
@@ -160,7 +160,7 @@ func (s *settingsStore) data() tui.SettingsData {
 	// message instead of seeing the real cause here (review round 2).
 	ro("limits", "mcp.enabled", strconv.FormatBool(s.cfg.MCP.Enabled), "mcp.enabled",
 		"false disables ALL MCP servers, global and project")
-	// Read-only by design (ADR-0029 §1): the chrome is built with the
+	// Read-only by design (gem-agent ADR-0029 §1): the chrome is built with the
 	// resolved language at startup; a live switch would bisect the
 	// scrollback into two languages. "auto" shows what it resolved TO
 	// — the one row whose purpose is display gave the least display
@@ -209,7 +209,7 @@ func declaredValue(present bool) string {
 
 var onOffValues = []string{"on", "off"}
 
-// mcpRows draws the two levels of ADR-0077 §3: every configured server —
+// mcpRows draws the two levels of gem-agent ADR-0077 §3: every configured server —
 // present whether or not it is running, because the row comes from
 // .mcp.json and not from the server — and, for the ones that listed,
 // their functions.
@@ -271,8 +271,8 @@ func (s *settingsStore) excludeSource(server, entry string) string {
 
 // approvalRows groups the approval policy by server, for the reason the
 // tool rows are grouped: flat, this section is hundreds of lines on a
-// machine with a full server list (ADR-0009 decision 1, amended by
-// ADR-0077). Built-ins stay ungrouped — there are a dozen of them and
+// machine with a full server list (gem-agent ADR-0009 decision 1, amended by
+// gem-agent ADR-0077). Built-ins stay ungrouped — there are a dozen of them and
 // they have no server to sit under.
 func (s *settingsStore) approvalRows(d *tui.SettingsData) {
 	row := func(name string, child bool, group string) tui.SettingRow {
@@ -329,7 +329,7 @@ func (s *settingsStore) policySource(tool string) string {
 	if _, ok := s.projectCfg.Approval.Tools[tool]; ok {
 		// An entry that was dropped for being an untrusted loosening
 		// decided nothing, and crediting it would say the opposite of
-		// what happened (ADR-0008 §4).
+		// what happened (gem-agent ADR-0008 §4).
 		if s.current.For(tool) == policy.Default {
 			return config.ProjectFileName + " (ignored: untrusted)"
 		}
@@ -380,7 +380,7 @@ func (s *settingsStore) markSessionEdit(key string) {
 // applyExclude writes one server's whole exclusion state and reconnects.
 //
 // The whole state, not a delta: per server the nearest scope decides
-// (ADR-0077 §2), so the first thing the panel writes about a server
+// (gem-agent ADR-0077 §2), so the first thing the panel writes about a server
 // shadows config.toml's word about it entirely. Carrying the effective
 // set across is what keeps an operator who toggled one function from
 // silently losing the three their own file excluded.
@@ -529,7 +529,7 @@ func (s *settingsStore) applyPolicy(ch tui.SettingChange) (tui.SettingsData, str
 // writeSettingsTable renders the panel content as plain text, for the
 // non-TTY REPL and pipes. Same rows, no editor.
 func writeSettingsTable(out io.Writer, d tui.SettingsData) {
-	// The project, first. ADR-0078 §5 dropped `project:` from the banner
+	// The project, first. gem-agent ADR-0078 §5 dropped `project:` from the banner
 	// on the grounds that /settings shows it in both modes — and this
 	// renderer, the footer-less one, never printed it. The path is
 	// symlink-resolved, so "the operator is standing in it" is not an

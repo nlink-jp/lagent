@@ -13,7 +13,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/tools"
 )
 
-// floorGate records the mustPrompt flag execCall passes (ADR-0021 §5).
+// floorGate records the mustPrompt flag execCall passes (gem-agent ADR-0021 §5).
 type floorGate struct {
 	calls []bool
 }

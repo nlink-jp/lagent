@@ -122,7 +122,7 @@ func TestLiveExecSwaps(t *testing.T) {
 }
 
 // The plain confirmation helper refuses without a terminal even when a
-// "y" is waiting (ADR-0059).
+// "y" is waiting (gem-agent ADR-0059).
 func TestConfirmYesNeedsATerminal(t *testing.T) {
 	if confirmYes(strings.NewReader("y\n"), false) {
 		t.Fatal("a piped y counted as consent")
@@ -138,7 +138,7 @@ func TestConfirmYesNeedsATerminal(t *testing.T) {
 var _ = errors.New
 
 // /clear prints what onClear returns — the hook notes and the MCP
-// reconnection report — inside the slash output (ADR-0071 addendum).
+// reconnection report — inside the slash output (gem-agent ADR-0071 addendum).
 func TestClearOutputCarriesTheRestartReport(t *testing.T) {
 	out, isErr, quit := slashOutput("/clear", nil, nil, nil, slashReloads{}, nil, "", uitext.For(uitext.EN),
 		func() string { return "[⚠ note]\nmcp reloaded: 1 server(s), 2 tool(s)\n" })
@@ -208,7 +208,7 @@ func TestClearSequenceMatchesTheADR(t *testing.T) {
 	}
 }
 
-// ADR-0072 §4.5: the trust probe counts a symlinked skill directory the
+// gem-agent ADR-0072 §4.5: the trust probe counts a symlinked skill directory the
 // way discovery loads it — a project whose skills are all links used to
 // count as offering none, and was trusted without a prompt.
 func TestTrustProbeCountsSymlinkedSkills(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/statedir"
 )
 
-// ADR-0022 §1: new sessions live under projects/<escaped>/ with the
+// gem-agent ADR-0022 §1: new sessions live under projects/<escaped>/ with the
 // shared .project marker — a glob or cleanup in one project's directory
 // cannot touch another project's transcripts.
 func TestOpenCreatesPerProjectLayout(t *testing.T) {
@@ -31,7 +31,7 @@ func TestOpenCreatesPerProjectLayout(t *testing.T) {
 	}
 }
 
-// ADR-0022 §3: legacy flat files are read in place — listed, found, and
+// gem-agent ADR-0022 §3: legacy flat files are read in place — listed, found, and
 // resumed without ever being moved.
 func TestLegacyFlatSessionStaysUsable(t *testing.T) {
 	dir := t.TempDir()
@@ -125,7 +125,7 @@ func TestOpenRefusesMarkerCollision(t *testing.T) {
 	}
 }
 
-// ADR-0022 §4: LAGENT_STATE_DIR redirects the state root — the
+// gem-agent ADR-0022 §4: LAGENT_STATE_DIR redirects the state root — the
 // isolation that makes an E2E structurally unable to touch real state.
 func TestStateDirEnvOverride(t *testing.T) {
 	scratch := t.TempDir()

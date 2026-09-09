@@ -30,7 +30,7 @@ func pinFixture(t *testing.T) (cfg *config.Config, pf *config.PolicyFile, policy
 	return &c, pf, policyPath, proj
 }
 
-// ADR-0074 §1: the first start after trust pins silently; a changed
+// gem-agent ADR-0074 §1: the first start after trust pins silently; a changed
 // file then asks interactively — y re-pins, N excludes — and is left
 // out without a prompt non-interactively.
 func TestCheckPinsTrustsOnFirstUseThenAsks(t *testing.T) {

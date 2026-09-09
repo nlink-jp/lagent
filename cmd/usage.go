@@ -17,7 +17,7 @@ type sessionLogger interface {
 	Log(kind string, data any) error
 }
 
-// logUsage writes one accounting record for a side call (ADR-0057).
+// logUsage writes one accounting record for a side call (gem-agent ADR-0057).
 // Same shape and same kind as the agent's own: an aggregator reads one
 // record type, sums by source, and prices by model.
 func logUsage(log sessionLogger, source, model string, u llm.Usage) {
@@ -87,7 +87,7 @@ func exitSummary(s agent.UsageStats, sessionID string, msgs *uitext.Messages) []
 	lines = append(lines, fmt.Sprintf(msgs.ExitUsageFmt,
 		s.Rounds, humanTok(s.Prompt), humanTok(s.Output)))
 	if s.AbandonedRunning > 0 {
-		// ADR-0065 §2: a goroutine the floor left behind may still
+		// gem-agent ADR-0065 §2: a goroutine the floor left behind may still
 		// write after the process is gone; the operator hears it.
 		lines = append(lines, fmt.Sprintf(msgs.ExitAbandonedFmt, s.AbandonedRunning))
 	}

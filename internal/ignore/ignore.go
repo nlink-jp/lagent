@@ -1,4 +1,4 @@
-// Package ignore decides what the enumeration walks skip (ADR-0052).
+// Package ignore decides what the enumeration walks skip (gem-agent ADR-0052).
 //
 // Two independent layers: a curated list of well-known dependency and
 // build-output directory names (works in projects that are not git

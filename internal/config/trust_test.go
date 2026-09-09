@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// ADR-0021: trust entries match as resolved paths — /tmp/x must trust a
+// gem-agent ADR-0021: trust entries match as resolved paths — /tmp/x must trust a
 // projectDir that arrived as /private/tmp/x, and ~ expands.
 func TestTrustsProjectResolvesPaths(t *testing.T) {
 	dir := t.TempDir() // typically /var/... which resolves to /private/var/...

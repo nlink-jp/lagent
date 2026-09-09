@@ -21,7 +21,7 @@ func policyAgent(t *testing.T, mb *mockBackend, gate Approver, tools map[string]
 	return New(Options{Backend: mb, Registry: reg, Gate: gate, System: "s", MaxTurns: 5, Policy: p}), reg
 }
 
-// The friction ADR-0008 exists for: a read-only lookup that asks on every
+// The friction gem-agent ADR-0008 exists for: a read-only lookup that asks on every
 // call because the client cannot know what a server's tool does.
 func TestNeverPolicySkipsTheGate(t *testing.T) {
 	mb := &mockBackend{responses: []*llm.Response{

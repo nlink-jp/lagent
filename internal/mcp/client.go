@@ -37,7 +37,7 @@ func (e *RPCError) Error() string {
 	return fmt.Sprintf("rpc error %d: %s", e.Code, e.Message)
 }
 
-// CallError is a tools/call that did not return a result (ADR-0075 §1):
+// CallError is a tools/call that did not return a result (gem-agent ADR-0075 §1):
 // Err is either the server's *RPCError — the server's own words,
 // delivered as a rejection — or a cause of lagent's own (transport,
 // timeout, exit, framing). Sent records whether the tools/call request
@@ -131,7 +131,7 @@ type Client struct {
 	gen   int // spawn generation; read loops of dead incarnations must not touch newer state
 	// endCause says why the current incarnation's read loop ended
 	// (scanner error — the frame cap — or plain EOF), for the waiters
-	// it fails (ADR-0072 §4.8).
+	// it fails (gem-agent ADR-0072 §4.8).
 	endCause string
 	nextID   int64
 
@@ -163,7 +163,7 @@ func (c *Client) Instructions() string {
 func NewStdio(name string, cfg ServerConfig, timeout time.Duration, clientVersion string) *Client {
 	spawn := func() (io.WriteCloser, io.ReadCloser, func(), error) {
 		cmd := exec.Command(cfg.Command, cfg.Args...)
-		// Its own process group, killed as a group (ADR-0072 §4.5): a
+		// Its own process group, killed as a group (gem-agent ADR-0072 §4.5): a
 		// wrapper's child — the server behind an npx or uvx launcher —
 		// outlived a timeout that killed only the direct child.
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -381,7 +381,7 @@ func (c *Client) readLoop(stdout io.ReadCloser, gen int) {
 // mid-handshake (a response with an id the fresh server never issued).
 // gen < 0 means "whatever is current". The stdin snapshot is taken
 // under mu — reading the field under wmu alone raced ensureStarted's
-// write of it (ADR-0021).
+// write of it (gem-agent ADR-0021).
 //
 // The write is bounded by ctx, and so is the wait for wmu. Neither ends
 // on its own: a server that stops reading its stdin fills the pipe and
@@ -493,7 +493,7 @@ func (c *Client) ListTools(ctx context.Context) ([]Tool, error) {
 	cursor := ""
 	seen := map[string]bool{}
 	for pages := 0; ; pages++ {
-		// Bounds on a foreign server's pagination (ADR-0072 §4.5): a
+		// Bounds on a foreign server's pagination (gem-agent ADR-0072 §4.5): a
 		// cursor that repeats, too many pages, or too many tools ends
 		// the listing with the server's name, not a 30-second wait.
 		if pages >= maxToolListPages {

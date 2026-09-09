@@ -43,10 +43,10 @@ const (
 
 // approvalAnswers are the approval dialog's selectable answers, in
 // display order. The index is the model's `choice`; the labels come
-// from the language catalog (ADR-0029). Persisting ('p') is
+// from the language catalog (gem-agent ADR-0029). Persisting ('p') is
 // deliberately a separate answer from 'a': one is a session
-// convenience, the other edits a file on disk (ADR-0009 §5).
-// 'N' (ADR-0060) sits next to 'n' — the same verdict, plus a typed
+// convenience, the other edits a file on disk (gem-agent ADR-0009 §5).
+// 'N' (gem-agent ADR-0060) sits next to 'n' — the same verdict, plus a typed
 // reason; it opens the reason field rather than answering directly.
 var approvalAnswers = []byte{'y', 'n', 'N', 'a', 'p'}
 
@@ -61,7 +61,7 @@ func (m Model) approvalLabels() []string {
 // questions have three answers. A mode change: 'a' would register the
 // tool in the session allowlist and 'p' would write a policy, and both
 // answer a question about a tool rather than the one on screen
-// (ADR-0080 §4). A call the ceiling cannot bound: the same two answers
+// (gem-agent ADR-0080 §4). A call the ceiling cannot bound: the same two answers
 // are refused while the ceiling is up, so pressing one would buy
 // nothing now and take effect the moment the mode was lifted (§5).
 func (m Model) approvalAnswerCount() int {
@@ -147,7 +147,7 @@ type Options struct {
 	Shell     ShellStarter
 	Slash     SlashHandler
 	BaseCtx   context.Context
-	// Msgs is the resolved language catalog (ADR-0029); nil means
+	// Msgs is the resolved language catalog (gem-agent ADR-0029); nil means
 	// English.
 	Msgs *uitext.Messages
 	// Theme is "dark", "light", or "notty" (plain: no colors anywhere).
@@ -161,10 +161,10 @@ type Options struct {
 	ProjectDir string
 	// Banner lines are printed by the TUI itself right after the
 	// startup screen clear — they must go through the line counter or
-	// the bottom pinning (ADR-0003) would drift from frame one.
+	// the bottom pinning (gem-agent ADR-0003) would drift from frame one.
 	Banner []string
 	// InitialInput is submitted as the first message once the banner
-	// has printed (ADR-0064), through the exact path a typed message
+	// has printed (gem-agent ADR-0064), through the exact path a typed message
 	// takes — !shell, slash commands, /skill expansion, @ mentions —
 	// and echoed as "> line". argv is operator input, the same trust
 	// as the keyboard. Empty starts the session idle.
@@ -178,7 +178,7 @@ type Options struct {
 	// interception into the shared slash handler. The ceiling never had
 	// that bug because it was read, not mirrored.
 	AutoState func() bool
-	// ReadOnlyState reports the session's lane-ceiling state (ADR-0080
+	// ReadOnlyState reports the session's lane-ceiling state (gem-agent ADR-0080
 	// §1). A getter rather than a mirrored field: the ceiling changes
 	// from three places — /readonly, the auto state tightening itself,
 	// and a lift the operator approved — and two of them are inside the
@@ -193,14 +193,14 @@ type Options struct {
 	// starts with "/" — the command names.
 	CompleteSlash func(prefix string) []string
 	// Settings supplies the panel's initial content, and ApplySetting
-	// stores one edit and returns the refreshed content (ADR-0009).
+	// stores one edit and returns the refreshed content (gem-agent ADR-0009).
 	// Both nil disables /settings (the plain REPL prints a table).
 	Settings     *SettingsData
 	ApplySetting SettingsApplier
 	// RefreshSettings re-reads the panel's content. Without it the panel
 	// showed the startup snapshot every time it was reopened: an
 	// exclusion turned off, Esc, reopen, and the row read on again —
-	// with ADR-0077 that row is the only place the state is visible at
+	// with gem-agent ADR-0077 that row is the only place the state is visible at
 	// all (pre-release review).
 	RefreshSettings func() SettingsData
 	// Printer overrides tea.Println for tests.
@@ -215,7 +215,7 @@ type Options struct {
 type Model struct {
 	ta   textarea.Model
 	spin spinner.Model
-	// msgs is the resolved language catalog (ADR-0029); never nil.
+	// msgs is the resolved language catalog (gem-agent ADR-0029); never nil.
 	msgs *uitext.Messages
 
 	phase   phase
@@ -231,11 +231,11 @@ type Model struct {
 	live   *strings.Builder
 	status string
 	// pending holds a message typed and entered while a turn was running
-	// (ADR-0007). It is sent when the turn finishes cleanly, and handed
+	// (gem-agent ADR-0007). It is sent when the turn finishes cleanly, and handed
 	// back to the input box unsent when it does not.
 	pending  string
 	approval *ApprovalRequest
-	// hold is the bottom-hold render state (ADR-0024): once the screen
+	// hold is the bottom-hold render state (gem-agent ADR-0024): once the screen
 	// is full, the frame's total height is held steady so the footer
 	// stops moving when the view shrinks (flush resets, dialog closes).
 	// A pointer, like live: View runs on a copy of the model, and this
@@ -243,17 +243,17 @@ type Model struct {
 	hold *bottomHold
 	// approvalAt is when the dialog appeared. Keys arriving within the
 	// grace window are dropped: the operator types during runs
-	// (ADR-0007), so an Enter or a letter aimed at the input box can
+	// (gem-agent ADR-0007), so an Enter or a letter aimed at the input box can
 	// land one message behind the dialog and answer it — 'a' would even
-	// session-allowlist the tool (ADR-0021).
+	// session-allowlist the tool (gem-agent ADR-0021).
 	approvalAt time.Time
-	// reasonMode: the operator chose 'N' (ADR-0060) and the dialog's
+	// reasonMode: the operator chose 'N' (gem-agent ADR-0060) and the dialog's
 	// options row is replaced by the one-line reason field below.
 	// textinput is value-copy safe (no noCopy fields), like textarea.
 	reasonMode  bool
 	reasonInput textinput.Model
 
-	// Settings panel (ADR-0009). settingsData is the caller-supplied
+	// Settings panel (gem-agent ADR-0009). settingsData is the caller-supplied
 	// snapshot used to open the panel; settings is the live copy.
 	settingsData    *SettingsData
 	refreshSettings func() SettingsData
@@ -261,7 +261,7 @@ type Model struct {
 	settingsCursor  int
 	settingsScope   string
 	// settingsCollapsed is UI state, keyed by group (an MCP server
-	// name): the panel's two levels (ADR-0077 §3). Groups open closed.
+	// name): the panel's two levels (gem-agent ADR-0077 §3). Groups open closed.
 	settingsCollapsed map[string]bool
 	applySetting      SettingsApplier
 	// choice indexes approvalOptions. Selection + Enter exists because
@@ -281,7 +281,7 @@ type Model struct {
 	completeSlashFn func(prefix string) []string
 	baseCtx         context.Context
 	cancelTurn      context.CancelFunc
-	// ask is the pending ask_user dialog (ADR-0036).
+	// ask is the pending ask_user dialog (gem-agent ADR-0036).
 	ask       *AskRequest
 	askChoice int
 	askAt     time.Time
@@ -290,17 +290,17 @@ type Model struct {
 	// arriving before TurnDone are auto-denied (review round 2).
 	interruptSent bool
 	// interruptPresses counts Ctrl+C AFTER interruptSent: 1 warns
-	// that the next quits, 2 quits (ADR-0034 §3).
+	// that the next quits, 2 quits (gem-agent ADR-0034 §3).
 	interruptPresses int
 
-	// Turn observability (ADR-0033): stream heartbeat + live thoughts.
+	// Turn observability (gem-agent ADR-0033): stream heartbeat + live thoughts.
 	turnStart   time.Time
 	chunkCount  int
 	lastChunk   time.Time
 	retryLine   string
 	thoughtTail string
 	// toolRunning: a tool call is executing, so the stream is silent
-	// BY DESIGN — the stall warning must not cry wolf (ADR-0034
+	// BY DESIGN — the stall warning must not cry wolf (gem-agent ADR-0034
 	// follow-up). Cleared when the stream speaks again.
 	toolRunning bool
 
@@ -308,7 +308,7 @@ type Model struct {
 	height int
 	sized  bool // first WindowSizeMsg received
 	banner []string
-	// initialInput is the argv first message (ADR-0064); cleared when
+	// initialInput is the argv first message (gem-agent ADR-0064); cleared when
 	// the first size report queues its submission, so a resize can
 	// never resubmit it.
 	initialInput string
@@ -323,7 +323,7 @@ type Model struct {
 	ctxTokens     int // last round's prompt+output ≈ current context size
 	usedTokens    int // cumulative prompt+output across the session
 	promptTokens  int // last round's prompt alone (cache-share denominator)
-	cachedTokens  int // last round's cached prompt tokens (ADR-0018)
+	cachedTokens  int // last round's cached prompt tokens (gem-agent ADR-0018)
 	window        int // model input token limit, 0 = unknown
 	windowAssumed bool
 }
@@ -450,7 +450,7 @@ func newGlamourRenderer(width int, style string) func(string) string {
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd { return textarea.Blink }
 
-// initialSubmit carries the argv first message (ADR-0064) into the
+// initialSubmit carries the argv first message (gem-agent ADR-0064) into the
 // typed-input path once the banner has printed.
 type initialSubmit string
 
@@ -465,8 +465,8 @@ func (m Model) initialCmd() tea.Cmd {
 }
 
 // firstFrameCmds builds the first frame's command list: clear screen,
-// banner lines through the counter (ADR-0003), and the argv first
-// message last (ADR-0064). Split out so the queueing wiring itself is
+// banner lines through the counter (gem-agent ADR-0003), and the argv first
+// message last (gem-agent ADR-0064). Split out so the queueing wiring itself is
 // pinned by test; the once-only clearing stays with the caller.
 func (m Model) firstFrameCmds() []tea.Cmd {
 	cmds := []tea.Cmd{tea.ClearScreen}
@@ -502,7 +502,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if height < minHeight {
 			height = minHeight
 		}
-		// Deliberately shrink-only (ADR-0021 §9): growth also reflows in
+		// Deliberately shrink-only (gem-agent ADR-0021 §9): growth also reflows in
 		// some terminals (the counter then over-states and the input
 		// block floats until the next shrink), but clearing on every
 		// grow would erase visible content repeatedly during a drag
@@ -516,14 +516,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.render = m.mkRender(width)
 		switch {
 		case first:
-			// ADR-0003: clear to a known cursor row, then print the
+			// gem-agent ADR-0003: clear to a known cursor row, then print the
 			// banner through the counter so pinning is exact from the
 			// first frame. Deferred to the first size report because
 			// counting needs the real width.
 			m.hold.printed = 0
 			m.hold.lastTotal = 0
 			cmds := m.firstFrameCmds()
-			// The argv first message (ADR-0064) rides last in that
+			// The argv first message (gem-agent ADR-0064) rides last in that
 			// sequence — tea.Sequence guarantees the order — and
 			// exactly once: cleared here so a resize cannot resubmit.
 			m.initialInput = ""
@@ -545,7 +545,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case TextDelta:
 		m.live.WriteString(string(msg))
-		// The visible answer supersedes the thought tail (ADR-0033).
+		// The visible answer supersedes the thought tail (gem-agent ADR-0033).
 		m.thoughtTail = ""
 		return m, nil
 
@@ -594,7 +594,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		line := m.st.tool.Render("⚙ " + msg.Name + " " + msg.Detail)
 		// A gated call that was auto-approved or allowlisted never opens
 		// the dialog, so the event line is the only place its declared
-		// purpose (ADR-0047) can appear. Only gated tools carry one, so
+		// purpose (gem-agent ADR-0047) can appear. Only gated tools carry one, so
 		// read-only chatter stays one line per call.
 		if msg.Purpose != "" {
 			line += "\n" + m.st.hint.Render("  "+m.msgs.PurposePrefix+m.purposeText(msg.Purpose))
@@ -614,7 +614,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case AskRequest:
 		if m.interruptSent {
-			// Same rule as approvals (ADR-0034): no dialogs on behalf
+			// Same rule as approvals (gem-agent ADR-0034): no dialogs on behalf
 			// of dead turns — decline silently.
 			msg.Resp <- -1
 			return m, nil
@@ -653,15 +653,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case initialSubmit:
 		// The argv first message enters the same submit() the Enter
-		// key uses (ADR-0064): !shell, slash commands, /skill
+		// key uses (gem-agent ADR-0064): !shell, slash commands, /skill
 		// expansion, @ mentions and the "> line" echo all behave as
 		// if the operator had typed it.
 		//
 		// A type-ahead line can have taken the turn already — the
 		// input reader subscribes before the first resize delivers
 		// this message — so a busy phase queues it exactly like an
-		// Enter during a running turn (ADR-0007), except commands,
-		// which cannot queue (ADR-0021 §7) and are refused visibly.
+		// Enter during a running turn (gem-agent ADR-0007), except commands,
+		// which cannot queue (gem-agent ADR-0021 §7) and are refused visibly.
 		if m.phase != phaseInput {
 			text := string(msg)
 			if strings.HasPrefix(text, "!") || strings.HasPrefix(text, "/") {
@@ -752,9 +752,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case tea.KeyCtrlC:
 				// Always the interrupt while running, never a draft
 				// clear: an escape hatch conditional on the input box
-				// being empty is not an escape hatch (ADR-0007).
+				// being empty is not an escape hatch (gem-agent ADR-0007).
 				if m.interruptSent {
-					// The last-resort exit (ADR-0034 §3): a wedged
+					// The last-resort exit (gem-agent ADR-0034 §3): a wedged
 					// tool that ignores cancellation must not trap
 					// the operator forever. Second press warns, third
 					// quits. Three, not two — a panic double-tap must
@@ -795,14 +795,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // emit prints one string into scrollback AND counts its physical lines
 // (ANSI-aware, wrap-adjusted) — the accounting the bottom pinning rests
-// on (ADR-0003). Every print of the model must go through here, never
+// on (gem-agent ADR-0003). Every print of the model must go through here, never
 // through m.println directly.
 func (m *Model) emit(s string) tea.Cmd {
 	// Tabs are expanded before counting AND printing: the width counter
 	// sees "\t" as zero cells while the terminal advances to the next
 	// 8-column stop, and every mismatch shifts the pinned input line —
 	// `!git diff` output drifted it one row per wrapped tab line
-	// (ADR-0021). Printing the expansion keeps count and drawing equal.
+	// (gem-agent ADR-0021). Printing the expansion keeps count and drawing equal.
 	s = expandTabs(s)
 	// Then every line is hard-wrapped under the terminal width: an
 	// over-wide scrollback line is NOT harmless (see wrapForScrollback).
@@ -819,7 +819,7 @@ func (m *Model) emit(s string) tea.Cmd {
 		m.hold.printed += total
 		// Each printed line scrolls history up one row; hand those rows
 		// back to the bottom-hold gap so history flows into it
-		// (ADR-0024 §3).
+		// (gem-agent ADR-0024 §3).
 		if m.hold.lastTotal > 0 {
 			m.hold.lastTotal -= total
 			if m.hold.lastTotal < 0 {
@@ -830,7 +830,7 @@ func (m *Model) emit(s string) tea.Cmd {
 	return m.println(s)
 }
 
-// beginTurnStats arms the ADR-0033 heartbeat for a fresh turn.
+// beginTurnStats arms the gem-agent ADR-0033 heartbeat for a fresh turn.
 func (m *Model) beginTurnStats() {
 	m.turnStart = time.Now()
 	m.chunkCount = 0
@@ -841,7 +841,7 @@ func (m *Model) beginTurnStats() {
 }
 
 // stallSeconds is how long with no data before the heartbeat switches
-// to the warning style (ADR-0033 §1, threshold moved by ADR-0056).
+// to the warning style (gem-agent ADR-0033 §1, threshold moved by gem-agent ADR-0056).
 // It was 20s, which accused a working model: a Gemini function call
 // arrives as ONE whole part, so while the model composes a large
 // write_file / edit_file argument the wire carries nothing at all —
@@ -881,7 +881,7 @@ func fmtElapsed(d time.Duration) string {
 }
 
 // purposeText renders the model's declared purpose, or names its
-// absence (ADR-0047 §4). Clipped: the field asks for one sentence, and
+// absence (gem-agent ADR-0047 §4). Clipped: the field asks for one sentence, and
 // a model that writes a paragraph must not push the arguments off the
 // approval prompt.
 func (m Model) purposeText(purpose string) string {
@@ -891,7 +891,7 @@ func (m Model) purposeText(purpose string) string {
 	return m.msgs.PurposeNone
 }
 
-// thoughtView renders the live thought tail (ADR-0033 §3), dim, capped
+// thoughtView renders the live thought tail (gem-agent ADR-0033 §3), dim, capped
 // to the last two lines at the current width. Empty when there is
 // nothing to show.
 func (m Model) thoughtView() string {
@@ -967,7 +967,7 @@ func wrapForScrollback(s string, width int) string {
 // a double-width rune that does not fit in the last column wraps WHOLE
 // to the next row, wasting a cell. ceil(cells/width) assumed perfect
 // packing and under-counted those rows, so the bottom pin drifted one
-// row per straddling CJK line (review round 2 — the ADR-0028 heal
+// row per straddling CJK line (review round 2 — the gem-agent ADR-0028 heal
 // trusts this count and cannot see the drift).
 func physicalRows(line string, width int) int {
 	if width <= 0 {
@@ -1036,7 +1036,7 @@ func (m *Model) takeLive() string {
 // renderer; over a slow terminal (SSH to the test machine) the
 // intermediate frames are visible as content flashing through the
 // output area — the operator saw the Ctrl+C "(interrupted)" line do
-// exactly that. One write, one repaint, no window (ADR-0003 note).
+// exactly that. One write, one repaint, no window (gem-agent ADR-0003 note).
 func (m *Model) emitJoined(parts ...string) tea.Cmd {
 	kept := parts[:0]
 	for _, p := range parts {
@@ -1068,14 +1068,14 @@ func (m Model) echoLine(marker, input string) string {
 // input box, short enough to be imperceptible when answering for real.
 const approvalGrace = 300 * time.Millisecond
 
-// maxDenyReasonRunes caps the typed denial reason (ADR-0060). The
+// maxDenyReasonRunes caps the typed denial reason (gem-agent ADR-0060). The
 // reason rides inside a function response, so the cap is generosity,
 // not protocol: a paragraph fits, a pasted file does not belong.
 const maxDenyReasonRunes = 500
 
 func (m Model) updateApproval(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if time.Since(m.approvalAt) < approvalGrace {
-		return m, nil // typed-ahead key aimed at the input box (ADR-0021)
+		return m, nil // typed-ahead key aimed at the input box (gem-agent ADR-0021)
 	}
 	if m.reasonMode {
 		return m.updateApprovalReason(msg)
@@ -1097,7 +1097,7 @@ func (m Model) updateApproval(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if answer == 0 {
 		// Letter shortcuts still work when the IME is off. 'N' is
 		// matched before the case fold — the one answer whose case is
-		// load-bearing (ADR-0060 §1).
+		// load-bearing (gem-agent ADR-0060 §1).
 		if msg.String() == "N" {
 			answer = 'N'
 		} else {
@@ -1129,7 +1129,7 @@ func (m Model) updateApproval(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // enterReasonMode swaps the options row for the one-line reason field
-// (ADR-0060 §1). A fresh textinput per entry: no stale text from an
+// (gem-agent ADR-0060 §1). A fresh textinput per entry: no stale text from an
 // earlier denial can ride along.
 func (m Model) enterReasonMode() (tea.Model, tea.Cmd) {
 	ti := textinput.New()
@@ -1168,7 +1168,7 @@ func (m Model) updateApprovalReason(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // answerApproval resolves the pending dialog with one answer byte and,
-// for a denial, the operator's typed reason (ADR-0060).
+// for a denial, the operator's typed reason (gem-agent ADR-0060).
 func (m Model) answerApproval(answer byte, denyReason string) (tea.Model, tea.Cmd) {
 	req := m.approval
 	m.approval = nil
@@ -1219,7 +1219,7 @@ func (m Model) answerApproval(answer byte, denyReason string) (tea.Model, tea.Cm
 	return m, tea.Sequence(cmds...)
 }
 
-// updateRunningInput handles typing while a turn is running (ADR-0007).
+// updateRunningInput handles typing while a turn is running (gem-agent ADR-0007).
 // The box stays live so the operator can see what they are writing;
 // Enter queues the message rather than sending it, because the agent
 // loop owns the conversation until it returns.
@@ -1243,7 +1243,7 @@ func (m Model) updateRunningInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if text == "" {
 			return m, nil
 		}
-		// Commands cannot be queued (ADR-0021 §7): queued messages merge
+		// Commands cannot be queued (gem-agent ADR-0021 §7): queued messages merge
 		// into ONE input, and prefix-routing the merged block would run
 		// queued prose as shell after a queued `!`, or silently discard
 		// everything after a queued `/command`. The text stays in the
@@ -1255,7 +1255,7 @@ func (m Model) updateRunningInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ta.SetHeight(1)
 		// A second Enter appends rather than replacing: nothing the
 		// operator typed is dropped, and one pending message keeps the
-		// agent one-turn-per-instruction (ADR-0007).
+		// agent one-turn-per-instruction (gem-agent ADR-0007).
 		if m.pending != "" {
 			m.pending += "\n" + text
 		} else {
@@ -1283,7 +1283,7 @@ func (m *Model) takePending() string {
 }
 
 // resumeAfterTurn returns the UI to the prompt and deals with anything
-// queued while the turn was running (ADR-0007). clean says whether the
+// queued while the turn was running (gem-agent ADR-0007). clean says whether the
 // turn finished normally: a queued message is only sent when it did.
 // A message written during a turn that then failed was written against a
 // world that no longer exists, so it is handed back instead.
@@ -1291,7 +1291,7 @@ func (m Model) resumeAfterTurn(cmds []tea.Cmd, clean bool) (tea.Model, tea.Cmd) 
 	pending := m.takePending()
 	// A half-typed draft (written after the queued Enter, not yet
 	// entered) must survive: overwriting the box with pending erased it
-	// without a trace (ADR-0021).
+	// without a trace (gem-agent ADR-0021).
 	draft := strings.TrimSpace(m.ta.Value())
 	if pending == "" {
 		return m, tea.Sequence(append(cmds, textarea.Blink)...)
@@ -1474,8 +1474,8 @@ func (m Model) submit() (tea.Model, tea.Cmd) {
 	// /auto goes through toggleAutoMode, never the shared slash
 	// handler: the handler flips the agent flag but cannot see this
 	// model, so the footer's ⚡auto marker went stale — it reported
-	// auto ON while every change asked (found live in the ADR-0060
-	// release E2E; ADR-0004 requires the mode visible at all times).
+	// auto ON while every change asked (found live in the gem-agent ADR-0060
+	// release E2E; gem-agent ADR-0004 requires the mode visible at all times).
 	// Matched on the command word, not the whole line: `/auto on` is
 	// still /auto, and an exact-string test sent it to the shared
 	// handler instead — which flips the agent's flag, cannot see this
@@ -1531,16 +1531,16 @@ func (m Model) submit() (tea.Model, tea.Cmd) {
 // renderer's height accounting and leaves stale frames behind.
 //
 // The view is padded from the top so the input block pins to the window
-// bottom (ADR-0003): height − printed lines − view height − 1. Once the
+// bottom (gem-agent ADR-0003): height − printed lines − view height − 1. Once the
 // conversation fills the screen the padding floors at zero and the
 // layout degrades to plain inline following.
 // bottomHold carries the pinning render state across View calls
-// (ADR-0024, extended by ADR-0028): the printed-line counter and the
+// (gem-agent ADR-0024, extended by gem-agent ADR-0028): the printed-line counter and the
 // held frame height live behind a pointer because View runs on a copy
 // of the model, and both must survive it.
 type bottomHold struct {
 	// printed counts the physical rows above the frame top. It is
-	// self-healing (ADR-0028): a frame taller than the rows left below
+	// self-healing (gem-agent ADR-0028): a frame taller than the rows left below
 	// the printed content scrolls the terminal as it renders, moving
 	// the anchor up — printed follows, or the next smaller frame is
 	// positioned against rows that scrolled away (the /settings-ESC
@@ -1555,7 +1555,7 @@ func (m Model) View() string {
 	if m.height > 0 {
 		// The managed view must never exceed height-1 lines: an
 		// over-tall frame scrolls the terminal and permanently desyncs
-		// the printed-line counter (the settings-panel lesson, ADR-0021
+		// the printed-line counter (the settings-panel lesson, gem-agent ADR-0021
 		// generalises it). Drop from the top — the input box and footer
 		// at the bottom are what the operator must always see.
 		if lines := strings.Split(content, "\n"); len(lines) > m.height-1 {
@@ -1566,7 +1566,7 @@ func (m Model) View() string {
 		if m.hold == nil {
 			return content
 		}
-		// Scroll accounting (ADR-0028): rendering past the available
+		// Scroll accounting (gem-agent ADR-0028): rendering past the available
 		// rows scrolls the terminal and moves the frame anchor up by
 		// the overflow; the counter must follow reality.
 		if avail := m.height - 1 - m.hold.printed; core > avail {
@@ -1576,11 +1576,11 @@ func (m Model) View() string {
 			}
 		}
 		if pad := m.height - m.hold.printed - core - 1; pad > 0 {
-			// Screen not full: the pad is the absorber (ADR-0003).
+			// Screen not full: the pad is the absorber (gem-agent ADR-0003).
 			m.hold.lastTotal = 0
 			content = strings.Repeat("\n", pad) + content
 		} else if m.hold != nil {
-			// Bottom-hold (ADR-0024): the pad has clamped to zero, so a
+			// Bottom-hold (gem-agent ADR-0024): the pad has clamped to zero, so a
 			// shrinking view would lift the frame bottom — the footer —
 			// by the difference. Hold the frame's total height instead:
 			// vacated rows render blank at the frame top, and every
@@ -1646,7 +1646,7 @@ func (m Model) viewContent() string {
 	case phaseSettings:
 		return m.settingsView() + "\n" + m.footer() + "\n"
 	case phaseRunning:
-		// The input box renders here too: ADR-0007 promises "the
+		// The input box renders here too: gem-agent ADR-0007 promises "the
 		// operator sees what they are writing" while a turn runs, and
 		// the keys were routed (updateRunningInput) without the box
 		// ever being drawn (review round 2).
@@ -1667,7 +1667,7 @@ func (m Model) viewContent() string {
 		// A multi-line shell command (heredoc, script) must not blow the
 		// box past the view budget — but hiding lines silently would let
 		// the operator approve a command they have not seen, so the
-		// count of hidden lines is shown (ADR-0021).
+		// count of hidden lines is shown (gem-agent ADR-0021).
 		// The detail budget adapts to the terminal: on a short screen
 		// the fixed 8-line budget overflowed the frame, and the View
 		// clamp then cut rows FROM THE TOP with no disclosure — the
@@ -1675,7 +1675,7 @@ func (m Model) viewContent() string {
 		// silent hiding clipDetail exists to prevent (review round 2).
 		// ~13 rows of fixed chrome: box borders, title, purpose, hidden
 		// marker, reason, options, hint, live line, footer, clamp margin.
-		// The reason field (ADR-0060) swaps the options row for a
+		// The reason field (gem-agent ADR-0060) swaps the options row for a
 		// prompt + input + hint — one row taller.
 		chrome := 13
 		if m.reasonMode {
@@ -1727,12 +1727,12 @@ func (m Model) viewContent() string {
 		body := fmt.Sprintf(m.msgs.ApprovalTitleFmt, req.Tool)
 		if req.ModeChange {
 			// A different question: not "approve this call" but "turn
-			// the session's read-only mode off" (ADR-0080 §4). The call
+			// the session's read-only mode off" (gem-agent ADR-0080 §4). The call
 			// stays on screen because it is what raised the question,
 			// and the title says what is actually being decided.
 			body = m.st.warn.Render(m.msgs.CeilingLiftTitle)
 		}
-		// The model's declared purpose (ADR-0047) frames the arguments
+		// The model's declared purpose (gem-agent ADR-0047) frames the arguments
 		// below it: the operator's question about an innocuous-looking
 		// `cp` is never "is this dangerous" but "why does it want this".
 		// Always rendered — a silently absent line would be read as "the
@@ -1753,7 +1753,7 @@ func (m Model) viewContent() string {
 			body += "\n" + m.st.warn.Render(reasonText)
 		}
 		if m.reasonMode {
-			// 'N' chosen (ADR-0060): the options row yields to the
+			// 'N' chosen (gem-agent ADR-0060): the options row yields to the
 			// one-line reason field until Enter, Esc or Ctrl+C.
 			body += "\n" + m.st.tool.Render(m.msgs.ApprovalReasonPrompt) +
 				"\n" + m.reasonInput.View() + "\n" +
@@ -1929,7 +1929,7 @@ func (m Model) toggleAutoMode(echo string) (tea.Model, tea.Cmd) {
 	return m, m.emitJoined(m.takeLive(), echo, m.st.tool.Render(state))
 }
 
-// updateAsk handles the ask_user dialog (ADR-0036): the approval
+// updateAsk handles the ask_user dialog (gem-agent ADR-0036): the approval
 // dialog's interaction grammar — arrows/Tab move, Enter confirms,
 // digits 1-9 select-and-confirm in one press, Esc declines.
 func (m Model) updateAsk(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -2113,7 +2113,7 @@ func (m Model) footer() string {
 		occupancy += fmt.Sprintf(" (%.0f%%)", float64(m.ctxTokens)/float64(m.window)*100)
 	}
 	if m.cachedTokens > 0 && m.promptTokens > 0 {
-		// The measured answer to "is implicit caching firing" (ADR-0018).
+		// The measured answer to "is implicit caching firing" (gem-agent ADR-0018).
 		occupancy += fmt.Sprintf(" · cache %.0f%%", float64(m.cachedTokens)/float64(m.promptTokens)*100)
 	}
 	parts := []string{m.modelName, occupancy, "total " + humanTokens(m.usedTokens)}
@@ -2136,7 +2136,7 @@ func (m Model) footer() string {
 	// padlock with exactly one meaning: in force.
 	//
 	// The word is the one /readonly and the banner use, and it is not
-	// "auto": that is the approval ladder's, and ADR-0080 §1 asks for
+	// "auto": that is the approval ladder's, and gem-agent ADR-0080 §1 asks for
 	// two indicators rather than one blurred word.
 	if m.readOnlyState != nil {
 		badge := ""
@@ -2195,7 +2195,7 @@ func (m Model) liveView() string {
 
 // clip truncates for display, by runes — a byte cut splits a UTF-8
 // sequence two times out of three on Japanese text and prints U+FFFD
-// mid-word (ADR-0021).
+// mid-word (gem-agent ADR-0021).
 func clip(s string, limit int) string {
 	r := []rune(s)
 	if len(r) <= limit {

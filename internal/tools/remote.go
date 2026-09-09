@@ -3,7 +3,7 @@ package tools
 import "fmt"
 
 // RemoteErrorKind says whose words a failed MCP call's text is
-// (ADR-0075 §1): the server's, delivered as a result or as a JSON-RPC
+// (gem-agent ADR-0075 §1): the server's, delivered as a result or as a JSON-RPC
 // rejection, or lagent's own, when the call could not be completed.
 type RemoteErrorKind int
 
@@ -37,9 +37,9 @@ func (k RemoteErrorKind) ServerSpoke() bool {
 	return k == RemoteResult || k == RemoteRejected
 }
 
-// RemoteError is a failed MCP call with its provenance (ADR-0075 §1).
+// RemoteError is a failed MCP call with its provenance (gem-agent ADR-0075 §1).
 // The MCP adapter returns it through Run's error return; the executor
-// detects it with errors.As — never by matching text, the ADR-0040 rule
+// detects it with errors.As — never by matching text, the gem-agent ADR-0040 rule
 // for RoundLimitError — renders it, and counts consecutive identical
 // texts per tool. Server is the name the operator gave the server in
 // mcp.json; Tool is the remote tool's own name, which appears only

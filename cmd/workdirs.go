@@ -17,8 +17,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// The workdirs command is the cleanup half of the ADR-0058 accumulation
-// note (ADR-0059): the note tells the operator what earlier sessions
+// The workdirs command is the cleanup half of the gem-agent ADR-0058 accumulation
+// note (gem-agent ADR-0059): the note tells the operator what earlier sessions
 // left behind, and this is the tool it points at. It is a CLI
 // subcommand, not a slash command, because freeing disk must not
 // require starting a model session.
@@ -122,7 +122,7 @@ func runWorkdirsClean(cmd *cobra.Command, args []string) error {
 
 	// Select: the named ids, or everything not running. Naming an id
 	// that does not exist is an error, not a silent skip — a cleanup
-	// that quietly ignores a typo looks like it worked (ADR-0037's
+	// that quietly ignores a typo looks like it worked (gem-agent ADR-0037's
 	// allowlist lesson, applied to deletion).
 	byID := map[string]workdir.Info{}
 	for _, in := range infos {
@@ -174,7 +174,7 @@ func runWorkdirsClean(cmd *cobra.Command, args []string) error {
 	if !flagWorkdirsYes {
 		// Deny on EOF and on a non-TTY, the approval gate's stance: a
 		// pipe that says nothing has not said yes — and a pipe that says
-		// "y" has not either (ADR-0059: a non-TTY run consents only
+		// "y" has not either (gem-agent ADR-0059: a non-TTY run consents only
 		// through --yes; review round 4 found the pipe was accepted).
 		if !confirmYes(cmd.InOrStdin(), workdirsStdinIsTerminal(cmd.InOrStdin())) {
 			fmt.Fprintln(out, "aborted — nothing deleted (pass --yes to consent without a terminal)")

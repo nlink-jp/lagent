@@ -1,5 +1,5 @@
 // Package trustpin keys project trust on content, not on a path
-// (ADR-0074). A trusted directory stays a name; what lagent consumes
+// (gem-agent ADR-0074). A trusted directory stays a name; what lagent consumes
 // from it — the instruction files, .mcp.json, .lagent.toml, the
 // project skills — is content that a `git pull`, a link, or a renamed
 // parent directory can change without the name changing. Pins are
@@ -10,7 +10,7 @@
 // The same package takes the wider snapshot of every persistent file
 // under the project (the write lane's protected names, nested
 // repositories' hooks included) so a session can report what it added
-// or changed — the residue ADR-0073 §6 recorded, made visible where it
+// or changed — the residue gem-agent ADR-0073 §6 recorded, made visible where it
 // cannot be enforced.
 //
 // Ported from gem-agent internal/trustpin at be7609980022e38314268c58ca94a6517e6f5d28 (v0.74.0), ADR-0001.
@@ -46,7 +46,7 @@ const (
 )
 
 // SkillsDir is the project skills directory (Claude Code's layout,
-// ADR-0011).
+// gem-agent ADR-0011).
 const SkillsDir = ".claude/skills"
 
 // ConfigNames are the runtime's own project configuration files.
@@ -196,7 +196,7 @@ func SnapshotDiff(before, after map[string]string) (added, changed, removed []st
 // Parents returns the distinct absolute parent directories of the
 // snapshot's files, deepest first, excluding projectDir itself — the
 // directories whose rename would replace a persistent file's content
-// under an unchanged name (ADR-0074 §2). Every ancestor between the
+// under an unchanged name (gem-agent ADR-0074 §2). Every ancestor between the
 // file and the project root is included.
 func Parents(projectDir string, snap map[string]string) []string {
 	seen := map[string]bool{}
@@ -357,7 +357,7 @@ func Size(projectDir, name string) string {
 // PinName maps a project-relative path a tool wrote to the pin it
 // belongs to: a root instruction or configuration file is its own pin,
 // a file inside a project skill is that skill's pin, anything else has
-// none (ADR-0074 §1: re-pin only what the operator saw). Names are
+// none (gem-agent ADR-0074 §1: re-pin only what the operator saw). Names are
 // compared regardless of case — the default volume folds it — and the
 // pin returned is the canonical spelling: the loader's name for a root
 // file, the directory entry as listed for a skill (projectDir may be

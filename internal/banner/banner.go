@@ -1,5 +1,5 @@
 // Package banner composes the lines lagent prints before the
-// operator has typed anything (ADR-0078).
+// operator has typed anything (gem-agent ADR-0078).
 //
 // It exists as a package, rather than as a stretch of runREPL, for two
 // reasons. The rule — a line earns a place at startup only if nothing
@@ -35,14 +35,14 @@ type Facts struct {
 	// ResumedID and Restored are set when a session was resumed.
 	ResumedID string
 	Restored  int
-	// The sandbox as this machine actually established it (ADR-0073).
+	// The sandbox as this machine actually established it (gem-agent ADR-0073).
 	SandboxOn       bool
 	ReadLane        bool
 	ReadLanePrompts bool
 	// AutoApprove reports that the session begins running mutating
 	// tools unattended.
 	AutoApprove bool
-	// ReadOnly is the session's lane ceiling and its watcher (ADR-0080).
+	// ReadOnly is the session's lane ceiling and its watcher (gem-agent ADR-0080).
 	// It earns a line because nothing else says it at start: the footer
 	// carries the ceiling in force but shows nothing for a watcher that
 	// has not fired, and one-shot has no footer at all. The zero value
@@ -83,7 +83,7 @@ func Lines(f Facts) []string {
 	return out
 }
 
-// inventory is the one row that replaced the enumerations (ADR-0078
+// inventory is the one row that replaced the enumerations (gem-agent ADR-0078
 // §2): what came up, and the commands that expand it. The count survives
 // the cut because "did my toolset come up as expected" is a question the
 // operator has before typing — a server that fails to start warns, but
@@ -167,7 +167,7 @@ func ReadOnlyOneShotLine(confined bool) string {
 
 // SandboxLine returns the sandbox line only when the sandbox is not in
 // its ordinary state. Enabled with a verified read lane is the normal
-// case and says nothing (ADR-0078 §3); the three exceptions each change
+// case and says nothing (gem-agent ADR-0078 §3); the three exceptions each change
 // what a shell command will do, so each still prints.
 //
 // Exported because one-shot mode prints it without the rest of the

@@ -12,7 +12,7 @@ import (
 
 func TestBroadRoot(t *testing.T) {
 	home := "/Users/op"
-	// broadRoot returns stable keys; uitext localizes them (ADR-0029).
+	// broadRoot returns stable keys; uitext localizes them (gem-agent ADR-0029).
 	broad := map[string]string{
 		"/":         "root",
 		"/Users/op": "home",
@@ -83,7 +83,7 @@ func trustFixture(t *testing.T) (*config.Config, *config.PolicyFile, string, str
 	return cfg, pf, policyPath, project
 }
 
-// ADR-0023 §3: the first interactive answer persists; later runs do not
+// gem-agent ADR-0023 §3: the first interactive answer persists; later runs do not
 // ask again.
 func TestResolveProjectTrustPersists(t *testing.T) {
 	cfg, pf, policyPath, project := trustFixture(t)
@@ -128,7 +128,7 @@ func TestResolveProjectTrustDecline(t *testing.T) {
 	}
 }
 
-// ADR-0023 §5: non-interactive + undecided = bare run, nothing recorded.
+// gem-agent ADR-0023 §5: non-interactive + undecided = bare run, nothing recorded.
 func TestResolveProjectTrustNonInteractiveBare(t *testing.T) {
 	cfg, pf, policyPath, project := trustFixture(t)
 	trusted, note := resolveProjectTrust(cfg, pf, policyPath, project, false, strings.NewReader(""), &strings.Builder{}, uitext.For(uitext.EN))
@@ -143,7 +143,7 @@ func TestResolveProjectTrustNonInteractiveBare(t *testing.T) {
 	}
 }
 
-// ADR-0023 §4: hand-declared trusted_projects skips the question; a
+// gem-agent ADR-0023 §4: hand-declared trusted_projects skips the question; a
 // project offering nothing asks nothing.
 func TestResolveProjectTrustShortcuts(t *testing.T) {
 	cfg, pf, policyPath, project := trustFixture(t)

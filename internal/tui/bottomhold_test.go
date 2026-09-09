@@ -11,7 +11,7 @@ func frameLines(m Model) int {
 	return strings.Count(m.View(), "\n") + 1
 }
 
-// heldWant is the ADR-0024 invariant: the held height minus consumed
+// heldWant is the gem-agent ADR-0024 invariant: the held height minus consumed
 // scrollback lines, floored at the view's own core height (a frame can
 // never render below its content).
 func heldWant(m *Model, held int) int {
@@ -25,7 +25,7 @@ func heldWant(m *Model, held int) int {
 	return held
 }
 
-// ADR-0024's ground truth: in the full-screen regime, the rendered
+// gem-agent ADR-0024's ground truth: in the full-screen regime, the rendered
 // frame's line count must not DECREASE except by exactly the lines
 // printed to scrollback in between — a shrinking view (flush reset,
 // dialog close) must not lift the footer.
@@ -78,7 +78,7 @@ func TestBottomHoldKeepsFrameHeightThroughFlushAndDialog(t *testing.T) {
 	}
 }
 
-// Below the fold the pad absorbs everything, exactly as before ADR-0024
+// Below the fold the pad absorbs everything, exactly as before gem-agent ADR-0024
 // — the hold must stay disarmed.
 func TestBottomHoldDisarmedWhileScreenNotFull(t *testing.T) {
 	c := &capture{}

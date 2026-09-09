@@ -30,7 +30,7 @@ func runAsk(t *testing.T, reg *tools.Registry, args map[string]any) (string, err
 	return tool.Run(context.Background(), args)
 }
 
-// ADR-0036: the tool is read-only (a gate on a question would be a
+// gem-agent ADR-0036: the tool is read-only (a gate on a question would be a
 // dialog to permit a dialog), the choice comes back named, and a
 // decline is information, not an error.
 func TestAskUserTool(t *testing.T) {

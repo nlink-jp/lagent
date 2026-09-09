@@ -47,7 +47,7 @@ func TestImageAttachmentsSurviveToTheBackend(t *testing.T) {
 }
 
 // view_image: the function response carries metadata; the image itself
-// rides a user message appended right after the tool round (ADR-0012).
+// rides a user message appended right after the tool round (gem-agent ADR-0012).
 func TestViewImageAppendsAFollowUpUserMessage(t *testing.T) {
 	mb := &mockBackend{responses: []*llm.Response{
 		{ToolCalls: []llm.ToolCall{{ID: "c", Name: "view_image", Args: map[string]any{"path": "s.png"}}}},

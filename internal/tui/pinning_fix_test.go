@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// ADR-0021: tabs expand to 8-column stops before counting and printing,
+// gem-agent ADR-0021: tabs expand to 8-column stops before counting and printing,
 // so the pin arithmetic matches what the terminal draws.
 func TestExpandTabs(t *testing.T) {
 	cases := map[string]string{
@@ -49,7 +49,7 @@ func TestEmitCountsTabExpandedWidth(t *testing.T) {
 	}
 }
 
-// ADR-0021: the managed view never exceeds height-1 lines; the bottom
+// gem-agent ADR-0021: the managed view never exceeds height-1 lines; the bottom
 // (input + footer) survives, the top is dropped.
 func TestViewClampedToTerminalHeight(t *testing.T) {
 	c := &capture{}
@@ -71,7 +71,7 @@ func TestViewClampedToTerminalHeight(t *testing.T) {
 	}
 }
 
-// ADR-0021: a multi-line approval detail is budgeted with an explicit
+// gem-agent ADR-0021: a multi-line approval detail is budgeted with an explicit
 // hidden-line count — never silently, and the options stay visible.
 func TestApprovalDetailBudgeted(t *testing.T) {
 	c := &capture{}
@@ -85,7 +85,7 @@ func TestApprovalDetailBudgeted(t *testing.T) {
 	m = next.(Model)
 
 	view := m.View()
-	// Language-independent probes (ADR-0029): the hidden-line count and
+	// Language-independent probes (gem-agent ADR-0029): the hidden-line count and
 	// the first answer label from the model's own catalog.
 	if !strings.Contains(view, "+14") {
 		t.Errorf("hidden detail lines not disclosed:\n%s", view)

@@ -1,6 +1,6 @@
 // Package mcpfilter answers one question, in one place: is this MCP
 // server — or this function of it — excluded from the session's declared
-// tools (ADR-0077)?
+// tools (gem-agent ADR-0077)?
 //
 // The whole mechanism is a filter on names applied at two points: the
 // declarations the model is given, and the dispatch of a call. This
@@ -66,7 +66,7 @@ func Parse(raw string, scope Scope) (Entry, error) {
 	}
 	if strings.Contains(s, "*") {
 		// The two levels supply the grouping a wildcard was faking
-		// (ADR-0077 §2): naming a server already means all of it.
+		// (gem-agent ADR-0077 §2): naming a server already means all of it.
 		return Entry{}, fmt.Errorf("%q: no patterns — name a server, or %q", s, "server"+Separator+"function")
 	}
 	parts := strings.Split(s, Separator)
@@ -116,14 +116,14 @@ type Filter struct {
 	entries  []Entry // every entry that survived composition, for Unmatched
 	// shadowed are the entries a nearer scope overrode. They are kept
 	// because "a name that matches nothing is reported, not ignored"
-	// (ADR-0077 §2) covers a line that does nothing because another file
+	// (gem-agent ADR-0077 §2) covers a line that does nothing because another file
 	// speaks about the same server, not only a misspelled one — and
 	// `decided` widened the silent set to every server ever touched in
 	// the panel (pre-release re-review).
 	shadowed []Entry
 }
 
-// PolicyScope is the machine-owned file's word (ADR-0077 §2). Decided
+// PolicyScope is the machine-owned file's word (gem-agent ADR-0077 §2). Decided
 // names the servers it has an opinion about, and it is carried
 // separately from Entries on purpose: "this server has nothing
 // excluded" is an opinion that shadows config.toml, and inferring the
@@ -135,7 +135,7 @@ type PolicyScope struct {
 	Decided []string
 }
 
-// Build composes the three scopes into one filter (ADR-0077 §2).
+// Build composes the three scopes into one filter (gem-agent ADR-0077 §2).
 //
 // Per server, the nearest scope decides whole: if policy.toml says
 // anything about a server, config.toml's word about that server is not
@@ -144,7 +144,7 @@ type PolicyScope struct {
 // month, for that server and no other.
 //
 // The project file may only add. Union is the only composition it gets,
-// so ADR-0008 §4's direction rule holds by construction rather than by a
+// so gem-agent ADR-0008 §4's direction rule holds by construction rather than by a
 // trust check.
 func Build(configEntries []string, policy PolicyScope, projectEntries []string) (Filter, error) {
 	parseAll := func(raw []string, scope Scope) (map[string]*bucket, []Entry, error) {
@@ -274,7 +274,7 @@ func (f Filter) Knows(server string) bool { return f.byServer[server] != nil }
 // For returns one server's exclusions as full entries — "obsidian" when
 // the whole server is excluded, otherwise "obsidian/patch_vault_file"
 // for each excluded function, sorted. The settings panel writes a
-// server's whole state rather than a delta (ADR-0077 §2), and this is
+// server's whole state rather than a delta (gem-agent ADR-0077 §2), and this is
 // the state it starts from.
 func (f Filter) For(server string) []string {
 	b := f.byServer[server]
@@ -303,7 +303,7 @@ func (f Filter) For(server string) []string {
 // whether every server list was read this run: when it is false, a name
 // missing from configured proves nothing.
 //
-// A name that matches nothing is reported, not ignored (ADR-0037's
+// A name that matches nothing is reported, not ignored (gem-agent ADR-0037's
 // rule): a server or function renamed upstream must not leave a line
 // that quietly does nothing.
 func (f Filter) Unmatched(configured map[string]bool, listed map[string][]string, complete bool) []string {

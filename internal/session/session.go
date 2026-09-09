@@ -1,5 +1,5 @@
 // Package session appends session records to a JSONL log file and reads
-// them back to resume a conversation (ADR-0005).
+// them back to resume a conversation (gem-agent ADR-0005).
 //
 // The file is both the diagnostic log and the resume source of truth:
 // records that carry conversation state ("message", "compaction") are
@@ -36,7 +36,7 @@ import (
 // SchemaVersion is the transcript format version. It is written into
 // every session header so a file this build cannot replay is reported as
 // such rather than half-loaded. Version 2 added the "clear" record
-// (ADR-0021): an older build reading a cleared session would silently
+// (gem-agent ADR-0021): an older build reading a cleared session would silently
 // resurrect the discarded conversation, so it must refuse instead.
 const SchemaVersion = 2
 
@@ -51,10 +51,10 @@ const (
 )
 
 // KindUsage is the accounting record: one per model call, whatever
-// made it (ADR-0057). Diagnostic — Load skips it like the rest.
+// made it (gem-agent ADR-0057). Diagnostic — Load skips it like the rest.
 const KindUsage = "usage"
 
-// Usage sources (ADR-0057 §1). Every model call in the process names
+// Usage sources (gem-agent ADR-0057 §1). Every model call in the process names
 // itself with one of these, so a transcript can be summed by category
 // and priced per model without knowing which code path spent it.
 const (
@@ -116,7 +116,7 @@ type Header struct {
 	Project string `json:"project"`
 }
 
-// Compaction is the record written when history is compacted (ADR-0006).
+// Compaction is the record written when history is compacted (gem-agent ADR-0006).
 // Replaced counts the leading messages the summary stands in for, so a
 // loader can reproduce the compaction instead of re-inflating history.
 // lagent writes none (compaction is RFP Phase 2); the loader keeps
@@ -144,11 +144,11 @@ type Meta struct {
 }
 
 // EnvVar is the environment variable naming the running session's id.
-// Like the work directory (ADR-0058), it is exported at startup so that
+// Like the work directory (gem-agent ADR-0058), it is exported at startup so that
 // everything the session spawns — MCP servers above all — can be told
 // which session it serves without lagent knowing anything about the
 // server: `${LAGENT_SESSION_ID}` in an mcp.json args entry expands to
-// it (ADR-0069 addendum 2, for agent-board's MCP face).
+// it (gem-agent ADR-0069 addendum 2, for agent-board's MCP face).
 const EnvVar = "LAGENT_SESSION_ID"
 
 // Export publishes id under EnvVar for child processes.
@@ -176,7 +176,7 @@ type Logger struct {
 }
 
 // DefaultDir returns the state location for session logs — under the
-// shared state root, so LAGENT_STATE_DIR isolates it (ADR-0022).
+// shared state root, so LAGENT_STATE_DIR isolates it (gem-agent ADR-0022).
 func DefaultDir() (string, error) {
 	root, err := statedir.Root()
 	if err != nil {
@@ -185,18 +185,18 @@ func DefaultDir() (string, error) {
 	return filepath.Join(root, "sessions"), nil
 }
 
-// projectSubdir is where projectDir's sessions live (ADR-0022): the
+// projectSubdir is where projectDir's sessions live (gem-agent ADR-0022): the
 // same escaped-path + .project-marker convention as memory. Legacy
 // flat files directly under dir stay readable in place.
 func projectSubdir(dir, projectDir string) string {
 	return filepath.Join(dir, "projects", statedir.EscapeProject(projectDir))
 }
 
-// idPattern matches the ids Open generates — a UUID v4 since ADR-0071,
+// idPattern matches the ids Open generates — a UUID v4 since gem-agent ADR-0071,
 // the timestamp form before it — and nothing else. Resume accepts an
 // id, never a path: an id that cannot contain a separator cannot
 // escape the sessions directory, and cannot name a transcript somebody
-// else placed (ADR-0005).
+// else placed (gem-agent ADR-0005).
 var idPattern = regexp.MustCompile(`^(\d{8}-\d{6}(-\d+)?|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$`)
 
 // ValidID reports whether s is a well-formed session id.
@@ -206,7 +206,7 @@ func ValidID(s string) bool { return idPattern.MatchString(s) }
 // leading characters: hex and hyphens, four characters or more.
 var prefixPattern = regexp.MustCompile(`^[0-9a-f-]{4,}$`)
 
-// NewID returns a random UUID v4 (ADR-0071 §1): unique on the machine
+// NewID returns a random UUID v4 (gem-agent ADR-0071 §1): unique on the machine
 // and, for practical purposes, everywhere — the timestamp ids it
 // replaces were unique only within one project directory.
 func NewID() string {
@@ -229,7 +229,7 @@ func Short(id string) string {
 }
 
 // Open starts a new session file named by timestamp, inside the
-// project's own subdirectory (ADR-0022). A .project marker collision —
+// project's own subdirectory (gem-agent ADR-0022). A .project marker collision —
 // two projects escaping to the same name — refuses loudly rather than
 // mixing their transcripts.
 func Open(dir, projectDir string) (*Logger, error) {
@@ -266,7 +266,7 @@ func Open(dir, projectDir string) (*Logger, error) {
 // conversation however many processes it took, so a resumed session
 // continues its own transcript rather than starting a second one — in
 // whichever location it lives: the project subdirectory, or the legacy
-// flat layout (ADR-0022 §3: legacy files are read in place, never
+// flat layout (gem-agent ADR-0022 §3: legacy files are read in place, never
 // moved).
 func Reopen(dir, projectDir, id string) (*Logger, error) {
 	if !ValidID(id) {
@@ -285,7 +285,7 @@ func Reopen(dir, projectDir, id string) (*Logger, error) {
 	if err := lockSession(f, id); err != nil {
 		return nil, err
 	}
-	// Tail repair (ADR-0021): a crash's torn last line must cost one
+	// Tail repair (gem-agent ADR-0021): a crash's torn last line must cost one
 	// line, never the records appended after it. Without the newline,
 	// the first append glues onto the tear and the merged line — torn
 	// prefix plus valid record — is one invalid line, and everything
@@ -306,7 +306,7 @@ func Reopen(dir, projectDir, id string) (*Logger, error) {
 // lockSession takes a non-blocking exclusive advisory lock for the
 // logger's lifetime (released when the file closes). Two processes
 // appending to one transcript interleave into a conversation neither of
-// them had — refusing the second is the only honest answer (ADR-0021).
+// them had — refusing the second is the only honest answer (gem-agent ADR-0021).
 func lockSession(f *os.File, id string) error {
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		_ = f.Close()
@@ -376,7 +376,7 @@ type rawRecord struct {
 // token limit) and not json.Decoder (which cannot resynchronise after a
 // corrupt line). fn receives nil for a line that does not parse — a
 // torn write must cost at most itself, never the records after it
-// (ADR-0021; measured: the old decoder dropped everything after a glued
+// (gem-agent ADR-0021; measured: the old decoder dropped everything after a glued
 // tear). fn returning false stops the scan early.
 func forEachLine(f io.Reader, fn func(rec *rawRecord) (bool, error)) error {
 	r := bufio.NewReader(f)
@@ -406,7 +406,7 @@ func forEachLine(f io.Reader, fn func(rec *rawRecord) (bool, error)) error {
 }
 
 // Load reads a session file back into a conversation history, applying
-// recorded compactions and clears on the way (ADR-0006/0021): a session
+// recorded compactions and clears on the way (gem-agent ADR-0006/0021): a session
 // that was compacted resumes compacted, and one that was cleared
 // resumes cleared.
 //
@@ -483,7 +483,7 @@ func Load(path string) ([]llm.Message, Header, int, error) {
 
 // List returns the resumable sessions in dir, newest first. When
 // projectDir is non-empty only sessions recorded in that project are
-// returned — resuming into a different tree is refused (ADR-0005), so
+// returned — resuming into a different tree is refused (gem-agent ADR-0005), so
 // offering those in a list would only mislead.
 //
 // Transcripts with no conversation are left out for the same reason.
@@ -493,7 +493,7 @@ func Load(path string) ([]llm.Message, Header, int, error) {
 func List(dir, projectDir string) (metas []Meta, more bool, err error) {
 	note := func(m bool) { more = more || m }
 
-	// Project subdirectories (ADR-0022): one project's own subdir, or —
+	// Project subdirectories (gem-agent ADR-0022): one project's own subdir, or —
 	// for the all-projects listing — every subdir under projects/. A
 	// marker mismatch (escape collision) skips the directory: those
 	// files belong to another project, which lists them itself.
@@ -515,7 +515,7 @@ func List(dir, projectDir string) (metas []Meta, more bool, err error) {
 		}
 	}
 
-	// Legacy flat files, read in place (ADR-0022 §3), header-filtered
+	// Legacy flat files, read in place (gem-agent ADR-0022 §3), header-filtered
 	// exactly as before the layout change.
 	m, cut := listDir(dir, projectDir)
 	metas = append(metas, m...)
@@ -525,7 +525,7 @@ func List(dir, projectDir string) (metas []Meta, more bool, err error) {
 	return metas, more, nil
 }
 
-// ListCap bounds one directory listing of sessions (ADR-0073 §4: a
+// ListCap bounds one directory listing of sessions (gem-agent ADR-0073 §4: a
 // cap without a "more" is a new bug — the cut is reported to the
 // caller, who says so).
 const ListCap = 10000
@@ -544,7 +544,7 @@ func readDirCapped(dir string) ([]os.DirEntry, bool, error) {
 // Scan walks one transcript's records, decoding only the envelope and
 // handing each payload to fn undecoded. It is the read path for
 // consumers that want the diagnostic records Load discards — /learn
-// reads the operator's own gate decisions this way (ADR-0045 §2).
+// reads the operator's own gate decisions this way (gem-agent ADR-0045 §2).
 //
 // Unreadable lines are skipped rather than fatal, matching Load's
 // tolerance: a torn tail must not cost the whole file. fn stops the walk
@@ -614,7 +614,7 @@ func Find(dir, projectDir, id string) (Meta, error) {
 }
 
 // FindByPrefix resolves what an operator typed: a full id, or a prefix
-// of a UUID id that names exactly one session (ADR-0071 §1). The
+// of a UUID id that names exactly one session (gem-agent ADR-0071 §1). The
 // project's own sessions are searched first, then the legacy flat
 // layout, then every other project — the last so a prefix typed in the
 // wrong project still gets the informative refusal.
@@ -681,7 +681,7 @@ func FindByPrefix(dir, projectDir, typed string) (Meta, error) {
 func findSessionFile(dir, projectDir, id string) (string, error) {
 	candidates := []string{
 		filepath.Join(projectSubdir(dir, projectDir), id+".jsonl"),
-		filepath.Join(dir, id+".jsonl"), // legacy flat (ADR-0022 §3)
+		filepath.Join(dir, id+".jsonl"), // legacy flat (gem-agent ADR-0022 §3)
 	}
 	for _, p := range candidates {
 		if _, err := os.Stat(p); err == nil {
@@ -831,7 +831,7 @@ func firstLine(s string, limit int) string {
 // shared-flock probe answering EWOULDBLOCK means running. Advisory like
 // the lock it probes: a missing transcript, or a state root on a
 // filesystem without flock, reports not-in-use — callers must fail
-// toward a human reading a list, never toward silent action (ADR-0059).
+// toward a human reading a list, never toward silent action (gem-agent ADR-0059).
 func InUse(dir, projectDir, id string) bool {
 	if !ValidID(id) {
 		return false

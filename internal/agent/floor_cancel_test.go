@@ -12,7 +12,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/tools"
 )
 
-// ADR-0065 §2: the return-guaranteed floor. A tool that ignores its
+// gem-agent ADR-0065 §2: the return-guaranteed floor. A tool that ignores its
 // context must not wedge the turn; a tool that honours it inside the
 // grace keeps its (partial) result.
 
@@ -193,7 +193,7 @@ func TestFloorKeepsCooperativeResultReturnedWithinGrace(t *testing.T) {
 }
 
 // Without a cancel the floor is invisible: the result and the outcome
-// are exactly what they were before ADR-0065.
+// are exactly what they were before gem-agent ADR-0065.
 func TestFloorIsInvisibleOnAnOrdinaryCall(t *testing.T) {
 	quick := &tools.Tool{
 		Name: "quick", Description: "returns at once",
@@ -216,7 +216,7 @@ func TestFloorIsInvisibleOnAnOrdinaryCall(t *testing.T) {
 
 // The grace must outlast the shell's WaitDelay: a cancelled shell call
 // whose escapee held the pipe returns its output at the WaitDelay, and
-// the floor must still be waiting for it (ADR-0065 §2).
+// the floor must still be waiting for it (gem-agent ADR-0065 §2).
 func TestAbandonGraceOutlastsShellWaitDelay(t *testing.T) {
 	if abandonGrace <= tools.ShellWaitDelay {
 		t.Fatalf("abandonGrace %s must be longer than tools.ShellWaitDelay %s", abandonGrace, tools.ShellWaitDelay)

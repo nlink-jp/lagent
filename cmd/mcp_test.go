@@ -87,7 +87,7 @@ func TestRegisterMCPTools(t *testing.T) {
 	}
 }
 
-// ADR-0075 §1: a failed remote call reaches the executor as a typed
+// gem-agent ADR-0075 §1: a failed remote call reaches the executor as a typed
 // RemoteError whose kind is read from the error value — the server's
 // isError result, the server's JSON-RPC rejection carried inside the
 // client's CallError, or a cause of lagent's own — never from text.

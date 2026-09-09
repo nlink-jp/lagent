@@ -13,7 +13,7 @@ import (
 )
 
 // No pins yet and nobody at a prompt: nothing is recorded (recording
-// trust nobody confirmed is what ADR-0023 §5 refuses), the files load
+// trust nobody confirmed is what gem-agent ADR-0023 §5 refuses), the files load
 // as before and the note says so. Interactive, the note names the
 // pinned files.
 func TestCheckPinsWithoutPinsIsInteractiveOnly(t *testing.T) {

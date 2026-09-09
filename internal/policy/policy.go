@@ -1,4 +1,4 @@
-// Package policy resolves the per-tool approval policy of ADR-0008: for
+// Package policy resolves the per-tool approval policy of gem-agent ADR-0008: for
 // each tool, whether the human gate always applies, never applies, or is
 // left to the default behaviour.
 //
@@ -21,13 +21,13 @@ type Decision int
 
 const (
 	// Default keeps the built-in behaviour: mutating tools ask, and
-	// auto-approve (ADR-0004) may run them through its ladder.
+	// auto-approve (gem-agent ADR-0004) may run them through its ladder.
 	Default Decision = iota
 	// AlwaysAsk gates the tool in every mode — an operator-set floor,
 	// the counterpart of the rule tier's Block verdict.
 	AlwaysAsk
 	// NeverAsk runs the tool without the gate in every mode. It does not
-	// lift the rule tier's Block floor; see ADR-0008 §2.
+	// lift the rule tier's Block floor; see gem-agent ADR-0008 §2.
 	NeverAsk
 )
 
@@ -70,7 +70,7 @@ type rule struct {
 // Policy answers the approval question for a tool name.
 type Policy struct {
 	rules []rule // most specific first
-	// commands is the per-command table of ADR-0045 §4, keyed by
+	// commands is the per-command table of gem-agent ADR-0045 §4, keyed by
 	// CommandKey. It exists only in the project scope: `make build`
 	// being settled in one repository says nothing about another, and a
 	// global entry would auto-run inside the next hostile clone.
@@ -84,7 +84,7 @@ type Policy struct {
 type Note string
 
 // Build combines the two scopes. globalTools and projectTools map a tool
-// pattern to a config value; commands maps a CommandKey to one (ADR-0045
+// pattern to a config value; commands maps a CommandKey to one (gem-agent ADR-0045
 // §4); trusted says whether the project directory is listed in the
 // operator's global trusted_projects.
 //
@@ -147,10 +147,10 @@ func Build(globalTools, projectTools map[string]string, commands map[string]stri
 	if err != nil {
 		return Policy{}, nil, err
 	}
-	// Scope before specificity (ADR-0021 §6): the nearest scope wins,
+	// Scope before specificity (gem-agent ADR-0021 §6): the nearest scope wins,
 	// whatever the pattern shapes. A single cross-scope list sorted by
 	// specificity let a global exact rule beat a project wildcard
-	// TIGHTEN — breaking ADR-0008's "a project may tighten freely".
+	// TIGHTEN — breaking gem-agent ADR-0008's "a project may tighten freely".
 	p.rules = append(projectRules, globalRules...)
 
 	for _, key := range sortedKeys(commands) {
@@ -161,7 +161,7 @@ func Build(globalTools, projectTools map[string]string, commands map[string]stri
 		// A stored key that today's derivation would not produce can
 		// never match a live call, so accepting it would mean an entry
 		// the operator sees in /settings and that silently does
-		// nothing. Rejecting loudly is the ADR-0021 §6 discipline.
+		// nothing. Rejecting loudly is the gem-agent ADR-0021 §6 discipline.
 		if k, ok := CommandKey(key); !ok || k != key {
 			return Policy{}, nil, fmt.Errorf("[commands] %q is not a command key: entries are a command name, optionally with a subcommand (for example \"go test\")", key)
 		}
@@ -183,7 +183,7 @@ func Build(globalTools, projectTools map[string]string, commands map[string]stri
 // the one that means too much: a bare "*" would disarm every gate at
 // once, which must not be reachable by a one-character entry. label
 // names the entry's source in the error — a config table, or the
-// --allow flag (ADR-0053), which carries the same vocabulary.
+// --allow flag (gem-agent ADR-0053), which carries the same vocabulary.
 func ValidateEntry(label, pattern string) error {
 	switch {
 	case strings.TrimSpace(pattern) == "":
@@ -214,7 +214,7 @@ func (p Policy) For(tool string) Decision {
 
 // ForCall answers for one concrete call: the tool's policy, refined by
 // the per-command policy when the call is a shell command whose key is
-// known and listed (ADR-0045 §4).
+// known and listed (gem-agent ADR-0045 §4).
 //
 // Two rules combine them, in this order:
 //
@@ -223,7 +223,7 @@ func (p Policy) For(tool string) Decision {
 //     every shell call is theirs to see, and a learned rule — which
 //     only ever means "I approved this repeatedly" — must not take that
 //     back; while a learned `"always"` tightens a blanket
-//     `shell_exec = "never"`, and tightening is always free (ADR-0008).
+//     `shell_exec = "never"`, and tightening is always free (gem-agent ADR-0008).
 //  2. Otherwise the command entry answers, being the more specific
 //     statement about this call. An entry exists only because the
 //     operator confirmed it, so this is their decision either way.

@@ -57,7 +57,7 @@ func TestPhysicalRowsModelsWideRuneStraddle(t *testing.T) {
 	}
 }
 
-// ADR-0007 promises the operator sees what they type during a run; the
+// gem-agent ADR-0007 promises the operator sees what they type during a run; the
 // keys were routed but the box was never rendered.
 func TestRunningViewShowsTheInputBox(t *testing.T) {
 	c := &capture{}
@@ -71,7 +71,7 @@ func TestRunningViewShowsTheInputBox(t *testing.T) {
 	}
 	m.ta.SetValue("typed while running")
 	if !strings.Contains(m.View(), "typed while running") {
-		t.Error("text typed during a turn is not visible in the running view (ADR-0007 §1)")
+		t.Error("text typed during a turn is not visible in the running view (gem-agent ADR-0007 §1)")
 	}
 }
 
@@ -164,7 +164,7 @@ func TestShortTerminalApprovalKeepsTitleAndDiscloses(t *testing.T) {
 		t.Errorf("title (the tool being approved) missing at height 14:\n%s", v)
 	}
 	// budget = 14-13 = 1 shown, 19 hidden. The chrome grew by one row
-	// when the declared purpose (ADR-0047) took a fixed line of its own.
+	// when the declared purpose (gem-agent ADR-0047) took a fixed line of its own.
 	if !strings.Contains(v, "+19") {
 		t.Errorf("hidden count wrong (want +19):\n%s", v)
 	}

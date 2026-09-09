@@ -14,7 +14,7 @@ import (
 
 // ErrAskDeclined: the operator chose not to choose (Esc / EOF). A
 // distinct result, not an error result — declining is information
-// (ADR-0036 §2).
+// (gem-agent ADR-0036 §2).
 var errAskDeclined = errors.New("declined")
 
 // askFunc collects one choice from the operator: the selected index,
@@ -27,7 +27,7 @@ const (
 	maxAskOptionSize = 100
 )
 
-// registerAskTool adds ask_user (ADR-0036): a structured mid-turn
+// registerAskTool adds ask_user (gem-agent ADR-0036): a structured mid-turn
 // choice. Read-only and never approval-gated — a gate on a question
 // would be a dialog to permit a dialog.
 func registerAskTool(registry *tools.Registry, ask askFunc) error {
@@ -48,7 +48,7 @@ func registerAskTool(registry *tools.Registry, ask askFunc) error {
 		},
 		Mutating: false,
 		// The call returns when the operator answers, not when a
-		// filesystem does: the ADR-0065 floor leaves it alone.
+		// filesystem does: the gem-agent ADR-0065 floor leaves it alone.
 		WaitsOnOperator: true,
 		Run: func(ctx context.Context, args map[string]any) (string, error) {
 			question, _ := args["question"].(string)
@@ -93,7 +93,7 @@ func registerAskTool(registry *tools.Registry, ask askFunc) error {
 }
 
 // oneShotAsk is the -p mode asker: there is nobody to ask, and a
-// pipeline must not hang on a question (ADR-0036 §3).
+// pipeline must not hang on a question (gem-agent ADR-0036 §3).
 func oneShotAsk(context.Context, string, []string) (int, error) {
 	return 0, errors.New("no interactive operator in one-shot mode; decide yourself and state the choice you made")
 }

@@ -62,7 +62,7 @@ func TestGateAlwaysSkipsUI(t *testing.T) {
 	}
 }
 
-// ADR-0021 §5: mustPrompt (Block-tier / always-policy) skips the
+// gem-agent ADR-0021 §5: mustPrompt (Block-tier / always-policy) skips the
 // allowlist — an earlier 'a' may not answer it — while later ordinary
 // calls still benefit from the registration.
 func TestGateMustPromptSkipsAllowlist(t *testing.T) {
@@ -90,7 +90,7 @@ func TestGateMustPromptSkipsAllowlist(t *testing.T) {
 }
 
 // allowed drops the allowlist flag and deny reason for assertions that
-// only care about the verdict (ADR-0048 §1).
+// only care about the verdict (gem-agent ADR-0048 §1).
 func allowed(approved, _ bool, _ string) bool { return approved }
 
 // The gate reports an allowlist answer as such: the learner counts one
@@ -115,7 +115,7 @@ func (r *reasonResponder) Send(msg tea.Msg) {
 	}
 }
 
-// ADR-0060: the operator's typed reason rides back through the gate
+// gem-agent ADR-0060: the operator's typed reason rides back through the gate
 // verbatim, and only on denials.
 func TestGateRelaysDenyReason(t *testing.T) {
 	g := NewGate()

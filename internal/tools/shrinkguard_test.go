@@ -1,6 +1,6 @@
 package tools
 
-// The write_file shrink guard and annotation (ADR-0051): overwriting a
+// The write_file shrink guard and annotation (gem-agent ADR-0051): overwriting a
 // sizeable existing file with much smaller content is refused unless
 // the shrink is declared, and the approval annotation names what an
 // overwrite replaces.

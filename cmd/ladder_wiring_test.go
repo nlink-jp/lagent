@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Every turn outside the TUI must climb the ladder (ADR-0065 §3): a
+// Every turn outside the TUI must climb the ladder (gem-agent ADR-0065 §3): a
 // call site that used the bare runTurn would silently lose the second
 // and third press. Pinned by scanning the wiring, the way the shared
 // stdin reader is.

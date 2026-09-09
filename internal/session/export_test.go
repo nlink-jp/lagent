@@ -6,7 +6,7 @@ import (
 )
 
 // The session id is exported for children like the work directory is
-// (ADR-0069 addendum 2): an mcp.json args entry `${LAGENT_SESSION_ID}`
+// (gem-agent ADR-0069 addendum 2): an mcp.json args entry `${LAGENT_SESSION_ID}`
 // expands to it. An empty id exports nothing.
 func TestExport(t *testing.T) {
 	t.Setenv(EnvVar, "")

@@ -51,7 +51,7 @@ func shellRun(command string) *mockBackend {
 	}}
 }
 
-// ADR-0045 §4: a learned "never" takes one settled command off the gate.
+// gem-agent ADR-0045 §4: a learned "never" takes one settled command off the gate.
 func TestLearnedNeverSkipsTheGate(t *testing.T) {
 	gate := &denyAll{}
 	a := commandAgent(t, shellRun("go test ./..."), gate, nil,
@@ -79,7 +79,7 @@ func TestLearnedNeverIsScopedToItsKey(t *testing.T) {
 }
 
 // A learned "never" does not lift the rule tier's Block floor — the
-// ADR-0008 §2 promise, inherited by the new vocabulary.
+// gem-agent ADR-0008 §2 promise, inherited by the new vocabulary.
 func TestLearnedNeverDoesNotLiftTheBlockFloor(t *testing.T) {
 	gate := &denyAll{}
 	// Same key as the learned rule, but this call is Block-tier.
@@ -125,7 +125,7 @@ func TestLearnedAlwaysTightensAndMustPrompt(t *testing.T) {
 	}
 }
 
-// ADR-0045 §7: every gate answer leaves a record carrying the key the
+// gem-agent ADR-0045 §7: every gate answer leaves a record carrying the key the
 // learner aggregates by, so a decision never has to be paired back to
 // its call.
 func TestGateDecisionIsRecordedWithItsKey(t *testing.T) {
@@ -145,7 +145,7 @@ func TestGateDecisionIsRecordedWithItsKey(t *testing.T) {
 		t.Errorf("record does not name the tool: %v", rec)
 	}
 	// The detail is the evidence /learn shows the operator; the purpose
-	// is lagent's field and is not part of what ran (ADR-0047 §2).
+	// is lagent's field and is not part of what ran (gem-agent ADR-0047 §2).
 	detail, _ := rec["detail"].(string)
 	if detail != "[unverified:read] make build" {
 		t.Errorf("detail = %q, want the lane then the command line", detail)
@@ -181,7 +181,7 @@ func TestUnkeyableCommandRecordsNoKey(t *testing.T) {
 	}
 }
 
-// A non-shell call keys by tool name — the ADR-0008 vocabulary.
+// A non-shell call keys by tool name — the gem-agent ADR-0008 vocabulary.
 func TestNonShellCallKeysByToolName(t *testing.T) {
 	log := &capturingLog{}
 	mb := &mockBackend{responses: []*llm.Response{

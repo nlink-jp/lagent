@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// TestLanguageValidation pins [tui].language (ADR-0029): auto/ja/en
+// TestLanguageValidation pins [tui].language (gem-agent ADR-0029): auto/ja/en
 // load, anything else fails at startup with the key named, and the
 // default is auto with provenance tracked when the file sets it.
 func TestLanguageValidation(t *testing.T) {
@@ -36,4 +36,4 @@ func TestLanguageValidation(t *testing.T) {
 	}
 }
 
-// [telemetry] validation (ADR-0035): the gcp default needs nothing,
+// [telemetry] validation (gem-agent ADR-0035): the gcp default needs nothing,

@@ -1,6 +1,6 @@
 package agent
 
-// ADR-0051: the floors against summarizing overwrites that live at the
+// gem-agent ADR-0051: the floors against summarizing overwrites that live at the
 // agent layer — the approval detail carries write_file's replacement
 // annotation, and the compaction stand-in warns that file contents are
 // no longer verbatim.

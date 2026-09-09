@@ -97,7 +97,7 @@ func TestOverwriteThroughSymlinkDoesNotInheritTargetMode(t *testing.T) {
 	if got := modeOf(t, link); got&0o111 != 0 {
 		t.Errorf("replacement inherited the target's execute bit: %v", got)
 	}
-	// The link's target keeps its bytes and its mode (ADR-0073 R2).
+	// The link's target keeps its bytes and its mode (gem-agent ADR-0073 R2).
 	data, err := os.ReadFile(target)
 	if err != nil {
 		t.Fatal(err)

@@ -61,7 +61,7 @@ func TestFailedWholeWriteNeedsNoRepair(t *testing.T) {
 	}
 }
 
-// Review round 4: a legacy flat transcript (pre-ADR-0022) is resumed
+// Review round 4: a legacy flat transcript (before gem-agent ADR-0022) is resumed
 // in place and holds its lock there; InUse must look where Reopen
 // does, or a live legacy session reads as free and `workdirs clean`
 // deletes its directory.

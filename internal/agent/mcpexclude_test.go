@@ -32,7 +32,7 @@ func newExcludeAgent(t *testing.T, gate Approver, log SessionLog) *Agent {
 		}}})
 }
 
-// ADR-0077 §5: an excluded tool is not registered, so the executor
+// gem-agent ADR-0077 §5: an excluded tool is not registered, so the executor
 // refuses it exactly as it refuses any name it cannot resolve. The model
 // is told what it is told for a server that was never configured —
 // giving the exclusion its own wording would be "blocked by policy"
@@ -99,7 +99,7 @@ func TestUnrelatedUnknownNameIsNotRecordedAsExcluded(t *testing.T) {
 }
 
 // A Subset shares its parent's exclusions: a delegated child must not
-// reach what the operator removed from the session (ADR-0037 + ADR-0077).
+// reach what the operator removed from the session (gem-agent ADR-0037 + gem-agent ADR-0077).
 func TestSubsetInheritsExclusions(t *testing.T) {
 	reg, err := tools.New(t.TempDir(),
 		func(ctx context.Context, command string) *exec.Cmd {
@@ -156,7 +156,7 @@ func TestWholeServerExclusionIsRecordedByPrefix(t *testing.T) {
 
 // Resuming with a changed set: the history holds calls to tools that are
 // no longer declared. The turn must run, and a fresh call to the removed
-// name must be refused and recorded like any other (ADR-0077's
+// name must be refused and recorded like any other (gem-agent ADR-0077's
 // Consequences promised this test).
 func TestResumeWithAChangedSet(t *testing.T) {
 	log := &recordingLog{}

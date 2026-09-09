@@ -10,7 +10,7 @@ import (
 )
 
 // TestTUIOptionsWiring pins the runREPL → tui.New handoff at the AST
-// level. ADR-0029 shipped with the catalog resolved in cmd but never
+// level. gem-agent ADR-0029 shipped with the catalog resolved in cmd but never
 // passed to the TUI — the field existed, the tests passed it directly,
 // and the one production call site omitted it, so the entire chrome
 // silently fell back to English (review round 2). A behavioral test
@@ -24,7 +24,7 @@ func TestTUIOptionsWiring(t *testing.T) {
 		t.Fatal(err)
 	}
 	required := map[string]bool{
-		"Msgs":         false, // ADR-0029: the field this test exists for
+		"Msgs":         false, // gem-agent ADR-0029: the field this test exists for
 		"Theme":        false,
 		"Banner":       false,
 		"CompletePath": false,

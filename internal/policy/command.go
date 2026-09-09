@@ -6,7 +6,7 @@ import (
 )
 
 // CommandKey derives the aggregation-and-matching key for a shell
-// command (ADR-0045 §3). The key is a syntactic fact about what runs:
+// command (gem-agent ADR-0045 §3). The key is a syntactic fact about what runs:
 // the first token, extended by the second token only when that token has
 // subcommand shape. `go test`, `make build` and `git status` keep two
 // tokens; `ls -la` and `touch newfile.txt` reduce to their head.

@@ -46,7 +46,7 @@ func TestOpenRefusesALinkSwappedAfterTheCheck(t *testing.T) {
 		t.Fatal("the swapped link was opened for reading")
 	}
 	// A write replaces the name with a fresh file inside the root; the
-	// link's target outside is never opened (ADR-0073 final review R2:
+	// link's target outside is never opened (gem-agent ADR-0073 final review R2:
 	// writes never land in an inode reached through another name).
 	if err := r.replaceFile(abs, []byte("inside")); err != nil {
 		t.Fatalf("replace through the swapped link: %v", err)
@@ -380,7 +380,7 @@ func TestTruncateNoteNamesBytesShown(t *testing.T) {
 	}
 }
 
-// ADR-0072 §4.5: shell_exec holds one cap's worth of output however
+// gem-agent ADR-0072 §4.5: shell_exec holds one cap's worth of output however
 // much the command prints; the note names the real total.
 func TestShellExecOutputIsBoundedAsItArrives(t *testing.T) {
 	r := newRegistry(t)
@@ -459,7 +459,7 @@ func TestBoundedOutputKeepsRunesWhole(t *testing.T) {
 	}
 }
 
-// ADR-0072 §4.8: a cut line ends on a rune boundary for 2-, 3- and
+// gem-agent ADR-0072 §4.8: a cut line ends on a rune boundary for 2-, 3- and
 // 4-byte characters wherever the cap lands.
 func TestReadLineCappedKeepsRunesWhole(t *testing.T) {
 	for _, ch := range []string{"é", "あ", "😀"} {
@@ -480,7 +480,7 @@ func TestReadLineCappedKeepsRunesWhole(t *testing.T) {
 	}
 }
 
-// ADR-0072 §4.8: HEIC/HEIF is identified by its ftyp box; a forged
+// gem-agent ADR-0072 §4.8: HEIC/HEIF is identified by its ftyp box; a forged
 // extension, a truncated header and a bad box length are refused.
 func TestHEIFSniff(t *testing.T) {
 	ftyp := func(size int, brands ...string) []byte {

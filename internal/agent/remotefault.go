@@ -6,7 +6,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/tools"
 )
 
-// ADR-0075: a remote tool that answers different arguments with one
+// gem-agent ADR-0075: a remote tool that answers different arguments with one
 // error text is reporting its own state, and the loop guard — keyed on
 // identical arguments by design — cannot see it. The executor counts
 // consecutive identical failure texts per tool within a turn and, at
@@ -60,7 +60,7 @@ func (a *Agent) remoteFault(name string, remote *tools.RemoteError, ran bool, ro
 	return remoteFaultNote(name, remote, f.count)
 }
 
-// remoteFaultNote is the runtime's note (ADR-0075 §3): the tool by its
+// remoteFaultNote is the runtime's note (gem-agent ADR-0075 §3): the tool by its
 // registry name — the identifier the model already holds unwrapped in
 // every request, never the server-supplied one — what was measured, and
 // the action. It says nothing about whose fault it is: the runtime

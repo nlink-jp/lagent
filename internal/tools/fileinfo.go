@@ -1,6 +1,6 @@
 package tools
 
-// file_info (ADR-0016): the `file` command's judgement plus metadata and
+// file_info (gem-agent ADR-0016): the `file` command's judgement plus metadata and
 // the MD5/SHA1/SHA256 trio the org's malware-lookup MCP consumes — the
 // IR opening moves (identify, date, hash, look up) in one read-only call.
 
@@ -113,7 +113,7 @@ func (r *Registry) describeFile(p string) (string, error) {
 			// The PARENT must genuinely resolve inside the project:
 			// Lstat follows intermediate symlinks, so a lexically
 			// in-project path under a model-planted escaping link would
-			// report link targets of files wholly outside (ADR-0021).
+			// report link targets of files wholly outside (gem-agent ADR-0021).
 			parent, perr := filepath.EvalSymlinks(filepath.Dir(lex))
 			if perr == nil && withinAny(r.roots(), parent) {
 				entry := filepath.Join(parent, filepath.Base(lex))
@@ -138,7 +138,7 @@ func (r *Registry) describeFile(p string) (string, error) {
 		fmt.Fprintf(&b, "\n  symlink → %s", target)
 		real, err := filepath.EvalSymlinks(abs)
 		if err != nil || !withinAny(r.roots(), real) {
-			// Reported, never silently followed (ADR-0016 §4).
+			// Reported, never silently followed (gem-agent ADR-0016 §4).
 			b.WriteString("\n  target: outside the project — not inspected")
 			return b.String(), nil
 		}

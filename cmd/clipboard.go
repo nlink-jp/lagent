@@ -10,7 +10,7 @@ import (
 )
 
 // clipboardImage captures the clipboard image as PNG bytes via
-// osascript — the @clipboard route (ADR-0012). lagent is macOS-only
+// osascript — the @clipboard route (gem-agent ADR-0012). lagent is macOS-only
 // by design, so the platform dependency costs nothing that was
 // promised. The AppleScript writes to a temp file because «class PNGf»
 // data cannot cross stdout losslessly.
@@ -58,5 +58,5 @@ close access f`, path)
 }
 
 // clipboardImageCap bounds a clipboard capture: a screenshot, not a
-// disk image (ADR-0073 §4 — the read was unbounded).
+// disk image (gem-agent ADR-0073 §4 — the read was unbounded).
 const clipboardImageCap = 64 << 20

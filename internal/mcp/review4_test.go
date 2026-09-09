@@ -77,7 +77,7 @@ func TestExpandEnvDefaults(t *testing.T) {
 	}
 }
 
-// ADR-0072 §4.5: a server that repeats a cursor ends the listing with
+// gem-agent ADR-0072 §4.5: a server that repeats a cursor ends the listing with
 // an error naming it, not a wait for the timeout.
 func TestListToolsRefusesARepeatingCursor(t *testing.T) {
 	outR, outW := io.Pipe()
@@ -111,7 +111,7 @@ func TestListToolsRefusesARepeatingCursor(t *testing.T) {
 	}
 }
 
-// ADR-0072 §4.8: a response line over the frame cap is reported as
+// gem-agent ADR-0072 §4.8: a response line over the frame cap is reported as
 // that, not as "server exited".
 func TestOverlongLineIsNamedAsTheCause(t *testing.T) {
 	outR, outW := io.Pipe()

@@ -90,7 +90,11 @@ docs/en/, docs/ja/ INDEX + reference/ + adr/ + the RFP (en: no suffix; ja: .ja.m
 Every package under internal/ that came from gem-agent says so in its
 package doc comment, with the source commit (ADR-0001). `internal/llm`
 is written new (its type shapes follow gem-agent's, as its doc comment
-says); the others are ports minus the ADR-0002 features.
+says); the others are ports minus the ADR-0002 features. A ported
+comment keeps the source's design references, written `gem-agent
+ADR-NNNN`; a bare `ADR-NNNN` is one of this repository's records, and
+`internal/archtest` fails on a bare number no file under `docs/en/adr`
+answers.
 
 ## Gotchas
 
