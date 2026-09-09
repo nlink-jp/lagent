@@ -1,0 +1,29 @@
+# lagent configuration
+# Copy to ~/.config/lagent/config.toml and adjust values.
+#
+# Precedence: command-line flags > LAGENT_* > this file > built-in
+# defaults. Unknown keys are rejected, so a typo fails loudly at startup
+# instead of being silently ignored.
+
+[llm]
+# Which local server answers. Only selects where the context length is
+# detected from; every conversation goes through the OpenAI-compatible
+# chat/completions endpoint.
+#   lmstudio — LM Studio (context length from /api/v0/models)
+#   ollama   — Ollama (context length from /api/show)
+#   openai   — any other OpenAI-compatible server (set [model].context_window)
+provider = "lmstudio"
+
+# Base URL of the OpenAI-compatible API.
+base_url = "http://localhost:1234/v1"
+
+# Model id as the server lists it.
+model = "google/gemma-4-26b-a4b-qat"
+
+# Optional. Local servers need none; set it for a server that requires a
+# bearer token. Also settable via LAGENT_API_KEY.
+#api_key = ""
+
+[model]
+# Context window in tokens. 0 = detect from the provider at startup.
+context_window = 0
