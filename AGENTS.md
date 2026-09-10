@@ -4,7 +4,7 @@ Sandboxed CLI agent runtime on a local LLM served over an
 OpenAI-compatible API (LM Studio, Ollama). A separate product line from
 gem-agent built on the same design; gem-agent is the porting source
 (ADR-0001), and the features it has that lagent does not reproduce are
-listed in ADR-0002. Experimental, lab-series, unreleased; RFP Phase 1
+listed in ADR-0002. Experimental, lab-series; RFP Phase 1
 (the core loop, tools, sandbox, MCP, sessions, TUI) is in.
 
 - **Module:** `github.com/nlink-jp/lagent`
