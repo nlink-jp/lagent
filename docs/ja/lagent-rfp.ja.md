@@ -156,6 +156,17 @@ Phase 2 で計測してから採否を決める。
 強制、MCP 実往復、AGENTS.md 注入、`-p` 両経路、pty 経由 TUI）を lagent で全て通し、
 同じタスクを両者で走らせた usage レコードを gem-usage-lens で並べる。
 
+計測結果（2026-09-10）: E2E 側は全て通った。並べる側は比較にならなかった:
+同じ指示に対して Gemini はツールループで作業するのに、Gemma 4 は 1 ラウンドで
+答えるため、2 つの transcript は違う仕事を記録しており、トークン数を突き合わ
+せられない。この判定の互換性側は `gem-usage-lens verify --sessions-root
+<lagent sessions>` がチェックサム失敗を報告しないこと（transcript 11、
+レコード 37、NG 0）に縮める。この所見そのもの — ローカルモデルが多段のツール
+作業に入らない — が Phase 2 の判断材料となる実効性の結果で、コスト比較は
+その後になる。`verify` は lens の store を開かずに transcript を読む。
+`ingest` は開くので、lagent の transcript を操作者の実 store に向けることは
+しない。
+
 ### Phase 2: Features
 
 各項目は Phase 1 の計測結果を根拠に ADR で採否を決める。

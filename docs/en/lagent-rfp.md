@@ -170,6 +170,19 @@ AGENTS.md injection, both `-p` routes, TUI over a pty) passes on lagent,
 and the usage records of the same task on both runtimes are laid side by
 side in gem-usage-lens.
 
+Measured outcome (2026-09-10): the E2E half passed. The side-by-side
+half did not become a comparison: on the same instructions Gemma 4
+answers in one round where Gemini works through a tool loop, so the
+two transcripts record different work and their token counts cannot be
+read against each other. The compatibility half of that criterion is
+reduced to `gem-usage-lens verify --sessions-root <lagent sessions>`
+reporting no checksum failure (11 transcripts, 37 records, 0 NG). The
+finding itself — a local model that does not enter multi-step tool
+work — is the effectiveness result Phase 2 measures against; the
+cost comparison waits on it. `verify` reads transcripts without
+opening the lens store; `ingest` does not, so lagent transcripts are
+never pointed at the operator's live store.
+
 ### Phase 2: Features
 
 Each item is adopted or rejected by ADR on the strength of Phase 1

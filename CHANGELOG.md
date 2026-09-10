@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Measured
+
+- The RFP's side-by-side usage comparison with gem-agent did not become
+  one: Gemma 4 answers the same instructions in a single round where
+  Gemini runs a tool loop, so the transcripts record different work.
+  The compatibility check is `gem-usage-lens verify --sessions-root`
+  against lagent's sessions (no checksum failure); the single-round
+  behaviour is the Phase 1 effectiveness finding.
+
 ### Added
 
 - **Images reach the model** (ADR-0005). An image path dropped on the
