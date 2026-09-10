@@ -13,10 +13,13 @@ approval), the same drop-in reading of a project's AGENTS.md / CLAUDE.md /
 scale as gem-agent, how far a local model carries an agent runtime in cost
 (tokens, wall-clock time, turns) and effectiveness.
 
-> **Status: experimental (lab-series).** Not released. The Phase 1 core
-> of the [RFP](docs/en/lagent-rfp.md) is in: the loop, the tools, the
-> sandbox lanes, approval, MCP, sessions, the TUI. Measurements against
-> gem-agent are what comes next.
+> **Status: experimental (lab-series).** The Phase 1 core of the
+> [RFP](docs/en/lagent-rfp.md) is in: the loop, the tools, the sandbox
+> lanes, approval, MCP, sessions, the TUI. Releases carry a signed and
+> notarized darwin/arm64 archive. The side-by-side measurement against
+> gem-agent did not become a comparison (RFP §4): the local model answers
+> in one round where Gemini works through a tool loop, and that finding
+> is where Phase 2 starts.
 
 Japanese: [README.ja.md](README.ja.md)
 

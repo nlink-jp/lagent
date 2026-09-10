@@ -12,9 +12,12 @@ shell / MCP / 承認）、対象プロジェクトの AGENTS.md / CLAUDE.md / .m
 ランタイムをどこまで担えるかを、コスト（トークン数・壁時計時間・ターン数）と
 実効性の両面で、gem-agent と同じ物差しで測るために存在する。
 
-> **状態: 実験中（lab-series）。** 未リリース。[RFP](docs/ja/lagent-rfp.ja.md)
-> の Phase 1 コア — ループ、ツール、sandbox レーン、承認、MCP、セッション、
-> TUI — が入った。次は gem-agent との比較計測。
+> **状態: 実験中（lab-series）。** [RFP](docs/ja/lagent-rfp.ja.md) の
+> Phase 1 コア — ループ、ツール、sandbox レーン、承認、MCP、セッション、
+> TUI — が入った。リリースは署名・notarize 済みの darwin/arm64 アーカイブを
+> 伴う。gem-agent との並列計測は比較にならなかった（RFP §4）: Gemini が
+> ツールループで作業するところをローカルモデルは 1 ラウンドで答える。
+> その所見が Phase 2 の出発点。
 
 English: [README.md](README.md)
 
