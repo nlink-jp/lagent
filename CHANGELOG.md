@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Homebrew tap distribution: `brew install nlink-jp/tap/lagent` installs
+  the notarized release archive as-is; `make brew` generates the formula
+  from the built zip (the org's vendored `gen-brew.sh`).
+
 ## [0.1.0] - 2026-09-10
 
 ### Measured

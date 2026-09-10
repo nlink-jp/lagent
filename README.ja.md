@@ -87,6 +87,16 @@ lagent
 パスは `@` 無しでも添付され、エスケープ済みの空白も読む。読めない参照は
 操作者に警告され、モデルにも伝えられる。
 
+## インストール
+
+Apple Silicon Mac に nlink-jp の Homebrew tap から（署名・notarize 済みの
+リリースアーカイブをそのまま入れる）:
+
+```bash
+brew tap nlink-jp/tap
+brew install nlink-jp/tap/lagent
+```
+
 ## ビルド
 
 ```bash

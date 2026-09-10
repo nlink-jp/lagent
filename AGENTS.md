@@ -25,6 +25,7 @@ listed in ADR-0002. Experimental, lab-series; RFP Phase 1
 | Release binary | `make build-all` (darwin/arm64 only; signs the binary) |
 | Release archive | `make package` → `dist/lagent-vX.Y.Z-darwin-arm64.zip`, notarized |
 | Release gate | `make verify-release` — refuses a zip with no notarisation marker, one rebuilt after its marker, one that does not unpack, or one whose binary does not run or reports another tag's version |
+| Homebrew formula | `make brew` after `make package` — generates `Formula/lagent.rb` from the built zip into the local `nlink-jp/homebrew-tap` checkout and pushes it (`make brew-print` renders only) |
 
 Version is injected via `-X main.version` from `git describe` — never edit the
 `version` var default.

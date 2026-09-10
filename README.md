@@ -90,6 +90,16 @@ on the terminal attaches without the `@` — escaped spaces included.
 A reference that cannot be read is reported to you and told to the
 model.
 
+## Install
+
+Apple Silicon Mac, via the nlink-jp Homebrew tap (the signed and
+notarized release archive, installed as-is):
+
+```bash
+brew tap nlink-jp/tap
+brew install nlink-jp/tap/lagent
+```
+
 ## Build
 
 ```bash

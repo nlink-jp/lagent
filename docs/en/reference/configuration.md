@@ -5,8 +5,10 @@ updated in place as keys and commands are added.
 
 ## Install
 
-Build from source (`make build` → `dist/lagent`) and put the binary on
-your PATH. Release archives come with the first release (RFP Phase 3).
+Homebrew (Apple Silicon): `brew tap nlink-jp/tap` then
+`brew install nlink-jp/tap/lagent` — the signed and notarized release
+archive, installed as-is. Or build from source (`make build` →
+`dist/lagent`) and put the binary on your PATH.
 
 ## Config file
 

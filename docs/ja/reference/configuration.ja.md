@@ -5,8 +5,10 @@
 
 ## インストール
 
-ソースからビルドし（`make build` → `dist/lagent`）、バイナリを PATH に置く。
-リリースアーカイブは初回リリース（RFP Phase 3）から。
+Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
+`brew install nlink-jp/tap/lagent`。署名・notarize 済みのリリースアーカイブを
+そのまま入れる。またはソースからビルドし（`make build` → `dist/lagent`）、
+バイナリを PATH に置く。
 
 ## 設定ファイル
 
