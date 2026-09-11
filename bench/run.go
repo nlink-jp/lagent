@@ -118,9 +118,10 @@ func (r *runner) runOne(c cell) (result, error) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, r.Bin, "-p", c.Task.Prompt, "--auto", "--config", cfgPath)
 	cmd.Dir = absProject
-	cmd.Env = isolatedEnv(os.Environ(), map[string]string{
-		"HOME": absHome, r.Runtime.StateEnv: absState,
-	})
+	override := r.Runtime.passThroughEnv(os.Getenv("HOME"))
+	override["HOME"] = absHome
+	override[r.Runtime.StateEnv] = absState
+	cmd.Env = isolatedEnv(os.Environ(), override)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
 	stdout, err := os.Create(filepath.Join(dir, "stdout.txt"))

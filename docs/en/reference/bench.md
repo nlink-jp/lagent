@@ -114,4 +114,7 @@ A prompt revision, a thinking toggle or a tool-description change is
 one more configuration file, or one more `--bin`, on the same tasks. The
 reference runtime runs the same tasks with `--runtime gem-agent --bin
 $(which gem-agent) --configs mine=/path/to/your/gem-agent.toml`; its
-credentials stay in your file, never in this repository.
+credentials stay in your file, never in this repository. Its
+Application Default Credentials under `~/.config/gcloud` would vanish
+with the isolated `HOME`, so the profile passes the file through as
+`GOOGLE_APPLICATION_CREDENTIALS` when it exists.

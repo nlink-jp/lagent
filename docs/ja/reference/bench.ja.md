@@ -107,4 +107,6 @@ prompt トークン・壁時計秒の中央値。
 構成ファイル 1 つ、または `--bin` 1 つの追加。参照ランタイムは
 `--runtime gem-agent --bin $(which gem-agent) --configs mine=/path/to/your/gem-agent.toml`
 で同じタスクを走らせる。その資格情報はあなたのファイルに留まり、この
-リポジトリには決して入らない。
+リポジトリには決して入らない。`~/.config/gcloud` 下の Application Default
+Credentials は隔離 `HOME` で見えなくなるので、プロファイルはファイルが
+あれば `GOOGLE_APPLICATION_CREDENTIALS` としてそれを通す。

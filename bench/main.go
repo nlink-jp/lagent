@@ -68,11 +68,34 @@ type runtimeProfile struct {
 	Name      string
 	StateEnv  string // the state-root override the runtime honours
 	ConfigDir string // under HOME: config.toml and the global mcp.json
+	// PassThrough names files under the operator's real HOME that the
+	// runtime needs even in an isolated one, as environment variables
+	// pointing at them: the reference runtime authenticates through
+	// Application Default Credentials, which live under ~/.config/gcloud
+	// and would otherwise vanish with the HOME swap. Only set when the
+	// file exists.
+	PassThrough map[string]string
 }
 
 var runtimes = map[string]runtimeProfile{
-	"lagent":    {Name: "lagent", StateEnv: "LAGENT_STATE_DIR", ConfigDir: ".config/lagent"},
-	"gem-agent": {Name: "gem-agent", StateEnv: "GEMAGENT_STATE_DIR", ConfigDir: ".config/gem-agent"},
+	"lagent": {Name: "lagent", StateEnv: "LAGENT_STATE_DIR", ConfigDir: ".config/lagent"},
+	"gem-agent": {Name: "gem-agent", StateEnv: "GEMAGENT_STATE_DIR", ConfigDir: ".config/gem-agent",
+		PassThrough: map[string]string{
+			"GOOGLE_APPLICATION_CREDENTIALS": ".config/gcloud/application_default_credentials.json",
+		}},
+}
+
+// passThroughEnv resolves a profile's PassThrough files against the
+// operator's real HOME; a file that does not exist sets nothing.
+func (p runtimeProfile) passThroughEnv(realHome string) map[string]string {
+	env := map[string]string{}
+	for name, rel := range p.PassThrough {
+		path := filepath.Join(realHome, rel)
+		if _, err := os.Stat(path); err == nil {
+			env[name] = path
+		}
+	}
+	return env
 }
 
 // configRef names one configuration to measure: a label and the file

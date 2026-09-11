@@ -176,6 +176,22 @@ func TestReportMediansAndRates(t *testing.T) {
 	}
 }
 
+func TestPassThroughEnvNamesOnlyExistingFiles(t *testing.T) {
+	home := t.TempDir()
+	adc := filepath.Join(home, ".config", "gcloud", "application_default_credentials.json")
+	if env := runtimes["gem-agent"].passThroughEnv(home); len(env) != 0 {
+		t.Errorf("no file, no variable: %v", env)
+	}
+	writeFile(t, adc, "{}")
+	env := runtimes["gem-agent"].passThroughEnv(home)
+	if env["GOOGLE_APPLICATION_CREDENTIALS"] != adc {
+		t.Errorf("ADC must be passed through by path: %v", env)
+	}
+	if env := runtimes["lagent"].passThroughEnv(home); len(env) != 0 {
+		t.Errorf("lagent passes nothing through: %v", env)
+	}
+}
+
 func TestIsolatedEnvOverrides(t *testing.T) {
 	env := isolatedEnv([]string{"HOME=/real", "PATH=/bin", "LAGENT_STATE_DIR=/real-state"},
 		map[string]string{"HOME": "/iso", "LAGENT_STATE_DIR": "/iso-state"})
