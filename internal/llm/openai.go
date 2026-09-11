@@ -12,7 +12,10 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/nlink-jp/nlk/backoff"
@@ -35,7 +38,17 @@ type OpenAI struct {
 	// observer receives StreamEvents; nil = nobody watching. Set once
 	// at startup, before any turn — deliberately immutable.
 	observer func(StreamEvent)
+	// traceDir, when set (LAGENT_LLM_TRACE), receives every request
+	// body and the raw SSE reply as files: the only way to read an odd
+	// completion — an empty one, a swallowed tool call — as the server
+	// sent it. Off by default; a trace write failure is reported as the
+	// turn's error rather than silently dropping the trace.
+	traceDir string
+	traceSeq atomic.Int64
 }
+
+// TraceEnv names the directory that receives request/response traces.
+const TraceEnv = "LAGENT_LLM_TRACE"
 
 // Providers ContextWindow knows how to ask.
 const (
@@ -78,7 +91,30 @@ func NewOpenAI(baseURL, model, apiKey, provider string) (*OpenAI, error) {
 			DialContext:           (&net.Dialer{Timeout: 10 * time.Second}).DialContext,
 			ResponseHeaderTimeout: 10 * time.Minute,
 		}},
+		traceDir: os.Getenv(TraceEnv),
 	}, nil
+}
+
+// traceFiles opens the request and response trace files for one
+// attempt, or returns nils when tracing is off.
+func (o *OpenAI) traceFiles() (reqW, respW *os.File, err error) {
+	if o.traceDir == "" {
+		return nil, nil, nil
+	}
+	if err := os.MkdirAll(o.traceDir, 0o755); err != nil {
+		return nil, nil, fmt.Errorf("llm trace: %w", err)
+	}
+	stamp := fmt.Sprintf("%s-%03d", time.Now().Format("20060102-150405.000"), o.traceSeq.Add(1))
+	reqW, err = os.Create(filepath.Join(o.traceDir, stamp+"-request.json"))
+	if err != nil {
+		return nil, nil, fmt.Errorf("llm trace: %w", err)
+	}
+	respW, err = os.Create(filepath.Join(o.traceDir, stamp+"-response.sse"))
+	if err != nil {
+		_ = reqW.Close()
+		return nil, nil, fmt.Errorf("llm trace: %w", err)
+	}
+	return reqW, respW, nil
 }
 
 // SetObserver installs the turn-observability sink. Call before the
@@ -402,6 +438,25 @@ func (o *OpenAI) stream(ctx context.Context, body []byte, onText func(string)) (
 	if o.apiKey != "" {
 		req.Header.Set("Authorization", "Bearer "+o.apiKey)
 	}
+	reqTrace, respTrace, err := o.traceFiles()
+	if err != nil {
+		return nil, false, err
+	}
+	if reqTrace != nil {
+		_, werr := reqTrace.Write(body)
+		if cerr := reqTrace.Close(); werr == nil {
+			werr = cerr
+		}
+		if werr != nil {
+			_ = respTrace.Close()
+			return nil, false, fmt.Errorf("llm trace: %w", werr)
+		}
+		defer func() {
+			if cerr := respTrace.Close(); err == nil && cerr != nil {
+				err = fmt.Errorf("llm trace: %w", cerr)
+			}
+		}()
+	}
 	hr, err := o.http.Do(req)
 	if err != nil {
 		return nil, false, err
@@ -409,11 +464,18 @@ func (o *OpenAI) stream(ctx context.Context, body []byte, onText func(string)) (
 	defer func() { _ = hr.Body.Close() }()
 	if hr.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(io.LimitReader(hr.Body, 64<<10))
+		if respTrace != nil {
+			_, _ = respTrace.Write(b)
+		}
 		return nil, false, &APIError{Status: hr.StatusCode, Body: string(b)}
 	}
 
 	acc := newAccumulator()
-	sc := bufio.NewScanner(hr.Body)
+	var bodyReader io.Reader = hr.Body
+	if respTrace != nil {
+		bodyReader = io.TeeReader(hr.Body, respTrace)
+	}
+	sc := bufio.NewScanner(bodyReader)
 	sc.Buffer(make([]byte, 0, 64<<10), 16<<20) // a whole write_file argument can ride one line
 	for sc.Scan() {
 		line := sc.Text()

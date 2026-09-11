@@ -65,6 +65,7 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 |---|---|---|
 | `LAGENT_STATE_DIR` | 読む | 状態ルート（セッション、作業ディレクトリ、ピン）。既定は `~/.local/state` 下 |
 | `LAGENT_MCP_STDERR` | 読む | `1` で MCP サーバの stderr を端末に通す（デバッグ用。通常は捨てる） |
+| `LAGENT_LLM_TRACE` | 読む | ディレクトリ。モデルへの全リクエストを `<stamp>-<n>-request.json`、生の SSE 応答を `<stamp>-<n>-response.sse` として書き出す（デバッグとベンチの診断用。通常は off） |
 | `LAGENT_SESSION_ID` | export | セッション id。`shell_exec` の子プロセスと `.mcp.json` の `${LAGENT_SESSION_ID}` 向け |
 | `LAGENT_WORK_DIR` | export | セッション作業ディレクトリ。同じく `.mcp.json` で展開できる |
 | `LAGENT_PROJECT_DIR` | export | プロジェクトディレクトリ。それを知る必要がある子プロセス向け |

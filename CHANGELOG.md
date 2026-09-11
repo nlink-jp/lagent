@@ -12,6 +12,9 @@
   completion, no-tool answers and the medians of rounds, tool calls,
   prompt tokens and wall time per task and configuration. Phase 2
   changes are measured against it.
+- `LAGENT_LLM_TRACE=<dir>` writes every model request and its raw SSE
+  reply to files, so a bench run's odd completion can be read as the
+  server sent it. Off unless set.
 - Homebrew tap distribution: `brew install nlink-jp/tap/lagent` installs
   the notarized release archive as-is; `make brew` generates the formula
   from the built zip (the org's vendored `gen-brew.sh`).

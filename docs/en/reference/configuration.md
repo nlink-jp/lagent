@@ -66,6 +66,7 @@ Other environment variables the runtime reads or sets:
 |---|---|---|
 | `LAGENT_STATE_DIR` | read | the state root (sessions, work directories, pins) instead of the default under `~/.local/state` |
 | `LAGENT_MCP_STDERR` | read | `1` passes MCP servers' stderr through to the terminal (debugging; it is discarded otherwise) |
+| `LAGENT_LLM_TRACE` | read | a directory; every model request is written there as `<stamp>-<n>-request.json` and its raw SSE reply as `<stamp>-<n>-response.sse` (debugging and bench diagnosis; off otherwise) |
 | `LAGENT_SESSION_ID` | exported | the session id, for `shell_exec` children and `${LAGENT_SESSION_ID}` in `.mcp.json` |
 | `LAGENT_WORK_DIR` | exported | the per-session work directory, likewise expandable in `.mcp.json` |
 | `LAGENT_PROJECT_DIR` | exported | the project directory, for children that need to know it |
