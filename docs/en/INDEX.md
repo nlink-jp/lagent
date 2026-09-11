@@ -61,3 +61,7 @@ excepted).
   the runtime before Phase 2 changes it: fixture tasks, configuration
   files, isolated runs, the transcript as the measurement, the
   reference runtime on the same tasks
+- [`ADR-0007`](adr/0007-empty-completion-asked-again.md) — an empty
+  completion is asked again once: the raw stream showed one mis-sampled
+  tool-call opener routed into the reasoning channel, and the same
+  request re-sent answers normally

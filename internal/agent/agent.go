@@ -677,6 +677,9 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 	// verdict can lift (gem-agent ADR-0040 §3).
 	limit := a.maxTurns
 	roundCap := a.maxTurns * roundCapMultiplier
+	// emptyAsked counts the re-sends after an empty completion
+	// (ADR-0007): one per turn, never a loop.
+	emptyAsked := 0
 
 	for round := 0; ; round++ {
 		if round >= limit {
@@ -721,13 +724,23 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 
 		// A response with neither text nor tool calls carries nothing to
 		// replay; storing it would put an empty turn in every later
-		// request. Report it instead of recording it.
+		// request. It is asked again once with the identical request
+		// (ADR-0007: measured as one mis-sampled tool-call opener that
+		// the server routed into the reasoning channel; the same request
+		// re-sent answered normally), and reported the second time.
 		if resp.Content == "" && len(resp.ToolCalls) == 0 {
+			retry := emptyAsked < maxEmptyRetries && ctx.Err() == nil
 			a.logRecord("assistant_empty", map[string]any{
 				"round": round, "finish_reason": resp.FinishReason,
 				"thought_tokens": resp.ThoughtTokens,
 				"output_tokens":  resp.OutputTokens, "prompt_tokens": resp.PromptTokens,
+				"retried":        retry,
 			})
+			if retry {
+				emptyAsked++
+				a.notify(a.msgs.EmptyRetried)
+				continue
+			}
 			return "", emptyResponseError(resp)
 		}
 
@@ -846,6 +859,11 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 // conversation" — and consolidating one of them left the other two
 // (pre-release review).
 const roundStopFmt = "the %s (%d rounds) stopped this turn — progress so far is saved: say \"continue\" to resume where it left off, or raise [agent].max_turns"
+
+// maxEmptyRetries bounds the re-sends after an empty completion
+// (ADR-0007). One: the fault measured is a single mis-sampled token,
+// and two in a row is something the operator should see.
+const maxEmptyRetries = 1
 
 // emptyResponseError explains a response that carried nothing, naming
 // the cause the server reported. "The model returned nothing" is not

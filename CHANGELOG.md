@@ -12,6 +12,13 @@
   completion, no-tool answers and the medians of rounds, tool calls,
   prompt tokens and wall time per task and configuration. Phase 2
   changes are measured against it.
+- **An empty completion is asked again once** (ADR-0007). The bench's
+  read-edit task failed on a completion with no text and no tool call;
+  the raw stream showed one mis-sampled tool-call opener routed into
+  the reasoning channel, and the same request re-sent answered
+  normally. The runtime now re-sends once, notes it, and records both
+  attempts (`assistant_empty` carries `retried`); a second empty
+  completion ends the turn as before.
 - `LAGENT_LLM_TRACE=<dir>` writes every model request and its raw SSE
   reply to files, so a bench run's odd completion can be read as the
   server sent it. Off unless set.

@@ -289,14 +289,14 @@ func TestMaxTurnsCap(t *testing.T) {
 // behind, so the next message still works.
 func TestEmptyResponseDoesNotPoisonHistory(t *testing.T) {
 	mb := &mockBackend{responses: []*llm.Response{
-		{}, // empty: no content, no tool calls
+		{}, {}, // empty twice: the one retry (ADR-0007) is spent
 		{Content: "recovered"},
 	}}
 	a, _ := newAgent(t, mb, &approveAll{}, 5)
 
 	_, err := a.Run(context.Background(), "first", nil)
 	if err == nil {
-		t.Fatal("an empty response should be reported as an error")
+		t.Fatal("a second empty response should be reported as an error")
 	}
 	if !strings.Contains(err.Error(), "no usable response") {
 		t.Errorf("error should name the cause: %v", err)
@@ -311,6 +311,42 @@ func TestEmptyResponseDoesNotPoisonHistory(t *testing.T) {
 	out, err := a.Run(context.Background(), "second", nil)
 	if err != nil || out != "recovered" {
 		t.Fatalf("next turn failed after an empty response: %q %v", out, err)
+	}
+}
+
+// TestEmptyResponseIsAskedAgainOnce pins ADR-0007: an empty completion
+// re-sends the identical request once, notes it, and records both
+// attempts; the retry has the same history the failed request had.
+func TestEmptyResponseIsAskedAgainOnce(t *testing.T) {
+	mb := &mockBackend{responses: []*llm.Response{
+		{FinishReason: "stop", OutputTokens: 4, ThoughtTokens: 1},
+		{Content: "done"},
+	}}
+	var notices []string
+	log := &capturingLog{}
+	a := newLogAgent(t, log, func(m string) { notices = append(notices, m) })
+	a.backend = mb
+	a.maxTurns = 5
+
+	out, err := a.Run(context.Background(), "fix it", nil)
+	if err != nil || out != "done" {
+		t.Fatalf("the retry should carry the turn: %q %v", out, err)
+	}
+	if len(mb.calls) != 2 || len(mb.calls[0]) != len(mb.calls[1]) {
+		t.Fatalf("the re-sent request must be the failed one: %d calls, %d vs %d messages",
+			len(mb.calls), len(mb.calls[0]), len(mb.calls[len(mb.calls)-1]))
+	}
+	if len(notices) != 1 || !strings.Contains(notices[0], "empty") {
+		t.Errorf("one notice expected: %v", notices)
+	}
+	var empties []map[string]any
+	for i, kind := range log.kinds {
+		if kind == "assistant_empty" {
+			empties = append(empties, log.data[i].(map[string]any))
+		}
+	}
+	if len(empties) != 1 || empties[0]["retried"] != true {
+		t.Errorf("assistant_empty must record the retry: %v", empties)
 	}
 }
 

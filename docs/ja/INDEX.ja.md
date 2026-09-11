@@ -56,3 +56,7 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
 - [`ADR-0006`](adr/0006-measurement-bench.ja.md) — Phase 2 がランタイムを
   変える前にタスクベンチで計測する: フィクスチャのタスク、構成ファイル、
   隔離実行、計測値としての transcript、同じタスクでの参照ランタイム
+- [`ADR-0007`](adr/0007-empty-completion-asked-again.ja.md) — 空の
+  completion は 1 回だけ再送する: 生ストリームは誤サンプルされたツール
+  呼び出し開始トークン 1 つが reasoning チャネルへ流れたことを示し、同じ
+  リクエストの再送は正常に答える
