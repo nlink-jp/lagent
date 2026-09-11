@@ -23,3 +23,6 @@ dist/
 *.swp
 *.swo
 *~
+
+# Bench results (ADR-0006): runs, transcripts, isolated homes
+bench/results/

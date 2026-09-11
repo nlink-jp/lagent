@@ -1,0 +1,21 @@
+prompt = "Rename the constant MaxItems to MaxEntries everywhere in this project, so that the code still compiles."
+[expect]
+min_tool_calls = 3
+[[expect.file]]
+path = "limits.go"
+contains = "MaxEntries"
+[[expect.file]]
+path = "limits.go"
+not_contains = "MaxItems"
+[[expect.file]]
+path = "list.go"
+contains = "MaxEntries"
+[[expect.file]]
+path = "list.go"
+not_contains = "MaxItems"
+[[expect.file]]
+path = "report.go"
+contains = "MaxEntries"
+[[expect.file]]
+path = "report.go"
+not_contains = "MaxItems"

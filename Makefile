@@ -11,7 +11,7 @@ DIST_DIR := dist
 CODESIGN_IDENTITY ?= Developer ID Application
 NOTARY_PROFILE    ?= nlink-jp-notary
 
-.PHONY: build build-all package verify-release test vet lint docs-check gate-check check clean
+.PHONY: build build-all package verify-release test vet lint docs-check gate-check check clean bench-build
 
 build:
 	@mkdir -p $(DIST_DIR)
@@ -92,6 +92,12 @@ check: vet lint test docs-check gate-check build
 
 clean:
 	rm -rf $(DIST_DIR)
+
+## bench-build: the bench's MCP fixture server (ADR-0006). The bench
+## itself runs with `go run ./bench` and never in `make check`.
+bench-build:
+	@mkdir -p $(DIST_DIR)
+	go build -o $(DIST_DIR)/bench-mcp ./bench/mcpfixture
 
 # Homebrew tap generation (see scripts/release-brew.mk). After `make package`,
 # `make brew` generates this formula from the built darwin-arm64 zip into the

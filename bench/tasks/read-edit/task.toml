@@ -1,0 +1,9 @@
+prompt = "pager.go prints one line too many when asked for n lines. Fix the loop bound in pager.go and change nothing else."
+[expect]
+min_tool_calls = 2
+[[expect.file]]
+path = "pager.go"
+contains = "i < n"
+[[expect.file]]
+path = "pager.go"
+not_contains = "i <= n"

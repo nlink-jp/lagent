@@ -1,0 +1,5 @@
+prompt = "What color is the square in shape.png? Answer with the color name."
+[expect]
+min_tool_calls = 1
+[[expect.answer]]
+regex = '(?i)\bred\b'

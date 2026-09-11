@@ -1,0 +1,18 @@
+# bench baseline: the shipped defaults, the RFP's reference model, and
+# a standing "never ask" for the bench's own MCP server so a one-shot
+# run can call it without a --allow grant (a grant would preload the
+# server and hide whether the model loads it by itself).
+[llm]
+provider = "lmstudio"
+base_url = "http://localhost:1234/v1"
+model    = "google/gemma-4-26b-a4b-qat"
+
+[agent]
+max_turns = 30
+shell_timeout_sec = 60
+
+[mcp]
+call_timeout_sec = 30
+
+[approval.tools]
+"mcp__geo__*" = "never"

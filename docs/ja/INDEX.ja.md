@@ -24,6 +24,8 @@ lagent の保守者向けドキュメントの入口。利用者向けは
 - [`reference/architecture.ja.md`](reference/architecture.ja.md) —
   パッケージ配置、バックエンド、ターンループ、承認、ラウンド階梯、
   永続化、ここに無いもの
+- [`reference/bench.ja.md`](reference/bench.ja.md) — タスクベンチ:
+  実行方法、隔離、タスク、計測するもの、構成と参照ランタイムの比較
 
 機能リファレンス（interface、tools、approval、sessions、integration）は
 Phase 1 の計測で表面が落ち着くのに合わせて書く。
@@ -51,3 +53,6 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
 - [`ADR-0005`](adr/0005-images-reach-the-model.ja.md) — 画像はモデルに
   届く: ドロップされた画像パスは `@` 無しで添付（エスケープ済み空白を
   読む）、`view_image` 復帰、添付されなかった参照はモデルに伝える
+- [`ADR-0006`](adr/0006-measurement-bench.ja.md) — Phase 2 がランタイムを
+  変える前にタスクベンチで計測する: フィクスチャのタスク、構成ファイル、
+  隔離実行、計測値としての transcript、同じタスクでの参照ランタイム

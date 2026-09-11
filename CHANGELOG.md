@@ -4,6 +4,14 @@
 
 ### Added
 
+- **The task bench** (ADR-0006). `go run ./bench run` measures the
+  runtime on six fixture tasks (search then answer, read then edit, a
+  change across files, a shell count, an MCP lookup against the bench's
+  own fixture server, an image to look at) in isolated homes and state
+  roots, reads each run's transcript, and `bench report` prints
+  completion, no-tool answers and the medians of rounds, tool calls,
+  prompt tokens and wall time per task and configuration. Phase 2
+  changes are measured against it.
 - Homebrew tap distribution: `brew install nlink-jp/tap/lagent` installs
   the notarized release archive as-is; `make brew` generates the formula
   from the built zip (the org's vendored `gen-brew.sh`).

@@ -26,6 +26,7 @@ listed in ADR-0002. Experimental, lab-series; RFP Phase 1
 | Release archive | `make package` → `dist/lagent-vX.Y.Z-darwin-arm64.zip`, notarized |
 | Release gate | `make verify-release` — refuses a zip with no notarisation marker, one rebuilt after its marker, one that does not unpack, or one whose binary does not run or reports another tag's version |
 | Homebrew formula | `make brew` after `make package` — generates `Formula/lagent.rb` from the built zip into the local `nlink-jp/homebrew-tap` checkout and pushes it (`make brew-print` renders only) |
+| Task bench (ADR-0006) | `make bench-build` (→ `dist/bench-mcp`), then `go run ./bench run --bin dist/lagent --configs baseline` and `go run ./bench report <dir>` — minutes on the local server, never part of `make check` |
 
 Version is injected via `-X main.version` from `git describe` — never edit the
 `version` var default.
@@ -83,6 +84,9 @@ internal/session/  JSONL transcript: logger + resume loader; usage records in th
                    gem-usage-lens shape; LAGENT_SESSION_ID is exported at startup
 internal/repl/     paste-safe input reader (plain REPL, non-TTY fallback)
 internal/tui/      Bubble Tea inline TUI: model, approval gate, settings panel
+bench/             the task bench (ADR-0006): runner + report (package main), configs/<runtime>/*.toml,
+                   tasks/<name>/{task.toml,testdata/}, mcpfixture/ (the stdio MCP fixture server);
+                   results/ is ignored by git
 scripts/           codesign-darwin.sh / notarize-darwin.sh (org templates, verbatim),
                    docs-mirror-check.sh, verify-release-selftest.sh (make check)
 docs/en/, docs/ja/ INDEX + reference/ + adr/ + the RFP (en: no suffix; ja: .ja.md)
@@ -166,6 +170,13 @@ answers.
   error bodies and the probe, a 16 MiB scanner buffer on the stream —
   and `internal/archtest` allowlists them by name with the reason.
   A new read there needs the same.
+- **The bench is the evidence for Phase 2** (ADR-0006). A prompt,
+  tool-description or config change that is meant to change the model's
+  behaviour is measured as one more configuration on the same tasks
+  before and after. Fixtures live in `testdata/` so their `.go` files
+  are never built or linted; each run's project sits under the run's
+  own `HOME`, so this repository's `AGENTS.md` never reaches a run. A
+  task the model could answer without the files measures nothing.
 - **A new config key means updating `config.example.toml`** — strict
   decode makes a stale template a startup error, so the loader tests parse
   the shipped template against the built-in defaults.

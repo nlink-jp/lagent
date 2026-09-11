@@ -24,6 +24,9 @@ Current behaviour, updated in place as the code changes.
 - [`reference/architecture.md`](reference/architecture.md) — package
   layout, the backend, the turn loop, approval, the round ladder,
   persistence, and what is not here
+- [`reference/bench.md`](reference/bench.md) — the task bench: how to
+  run it, isolation, the tasks, what is measured, comparing
+  configurations and the reference runtime
 
 Feature references (interface, tools, approval, sessions, integration)
 follow as the Phase 1 measurements settle the surface.
@@ -54,3 +57,7 @@ excepted).
   model: a dropped image path attaches without an `@` (escaped spaces
   read), `view_image` returns, and a reference that did not attach is
   said to the model
+- [`ADR-0006`](adr/0006-measurement-bench.md) — a task bench measures
+  the runtime before Phase 2 changes it: fixture tasks, configuration
+  files, isolated runs, the transcript as the measurement, the
+  reference runtime on the same tasks

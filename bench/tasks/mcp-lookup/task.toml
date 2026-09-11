@@ -1,0 +1,6 @@
+prompt = "Which country is the IP address 203.0.113.9 located in? Use the geo MCP server and answer with the country name."
+mcp = true
+[expect]
+min_tool_calls = 2
+[[expect.answer]]
+regex = 'Iceland'

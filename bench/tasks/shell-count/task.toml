@@ -1,0 +1,5 @@
+prompt = "How many data rows, not counting the header line, does data.csv contain? Answer with the number only."
+[expect]
+min_tool_calls = 1
+[[expect.answer]]
+regex = '\b57\b'

@@ -1,0 +1,5 @@
+prompt = "In this project, which function writes the configuration file to disk? Reply with exactly `<file>:<function>` and nothing else."
+[expect]
+min_tool_calls = 1
+[[expect.answer]]
+regex = 'store\.go:SaveConfig'
