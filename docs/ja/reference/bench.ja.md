@@ -72,6 +72,35 @@ home、project が残る。
 no-tool answers（ツールを呼ばずに答えた実行）、ラウンド数・ツール呼び出し数・
 prompt トークン・壁時計秒の中央値。
 
+## 計測結果
+
+ベースライン、2026-09-12: lagent v0.1.0（`acd6c4c`）、LM Studio、
+`google/gemma-4-26b-a4b-qat`、3 反復、構成 1 つ。
+
+| task | config | runs | completed | no-tool answers | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |
+|---|---|---|---|---|---|---|---|---|
+| mcp-lookup | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12578 | 12 |
+| multi-file-rename | baseline | 3 | 3/3 | 0/3 | 11 | 11 | 57408 | 30 |
+| read-edit | baseline | 3 | 1/3 | 0/3 | 3 | 3 | 16271 | 10 |
+| search-answer | baseline | 3 | 3/3 | 0/3 | 3 | 3 | 16239 | 10 |
+| shell-count | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 11992 | 10 |
+| view-image | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12039 | 10 |
+
+読み取れること:
+
+- ツールを呼ばずに答えた実行は無い。ベースラインのプロンプトで全種別が
+  多段作業に入った。MCP lookup（モデルが自発的に `mcp_load` を呼んだ 3/3）
+  と画像（3/3 で `view_image`）を含む。Phase 1 で観察した単発応答はこれらの
+  タスクでは再現しない。それを示した操作者のセッションはスクリーンショット
+  と read レーンの事例で、どちらも対処済み。境界があるとすれば、これより
+  大きなタスクにある。
+- 唯一の失敗種別はモデルの計画ではなく出力の挙動: `read-edit` の 2/3 で、
+  `pager.go` を読んだ直後にモデルが空の completion（finish reason `stop`、
+  出力 3 トークン、本文もツール呼び出しも無し）を返し、one-shot 実行は
+  そこでエラー終了した。3 回目は 9 ラウンドでファイルを直した。
+- 複数ファイルの改名は 11 ラウンドで prompt 約 57k トークン。毎ラウンド
+  履歴を再送するので、30 秒に収まっているのは接頭辞キャッシュのおかげ。
+
 ## 比較
 
 プロンプト改訂、thinking トグル、ツール説明の変更は、同じタスクに対する

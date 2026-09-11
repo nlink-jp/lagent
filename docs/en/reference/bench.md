@@ -75,6 +75,39 @@ runs, completed, no-tool answers (the model replied without calling a
 tool), and the medians of rounds, tool calls, prompt tokens and wall
 seconds.
 
+## Measurements
+
+Baseline, 2026-09-12: lagent v0.1.0 (`acd6c4c`), LM Studio,
+`google/gemma-4-26b-a4b-qat`, three repetitions, one configuration.
+
+| task | config | runs | completed | no-tool answers | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |
+|---|---|---|---|---|---|---|---|---|
+| mcp-lookup | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12578 | 12 |
+| multi-file-rename | baseline | 3 | 3/3 | 0/3 | 11 | 11 | 57408 | 30 |
+| read-edit | baseline | 3 | 1/3 | 0/3 | 3 | 3 | 16271 | 10 |
+| search-answer | baseline | 3 | 3/3 | 0/3 | 3 | 3 | 16239 | 10 |
+| shell-count | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 11992 | 10 |
+| view-image | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12039 | 10 |
+
+What it says:
+
+- No run answered without a tool call. Every class entered multi-step
+  work under the baseline prompt, including the MCP lookup (the model
+  called `mcp_load` on its own in 3/3) and the image (3/3 `view_image`).
+  The single-round behaviour Phase 1 observed is not reproduced by
+  these tasks; the operator's sessions that showed it were screenshot
+  and read-lane cases, both since addressed. The boundary, if there is
+  one, lies in tasks larger than these.
+- The one failing class is not a behaviour of the model's plan but of
+  its output: in 2/3 `read-edit` runs the model returned an empty
+  completion (finish reason `stop`, 3 output tokens, no text, no tool
+  call) right after reading `pager.go`, and the one-shot run ended
+  there with an error. The third run edited the file after nine
+  rounds.
+- The multi-file rename costs about 57k prompt tokens over eleven
+  rounds — every round replays the history, so the prefix cache is
+  what keeps it at 30 s.
+
 ## Comparing
 
 A prompt revision, a thinking toggle or a tool-description change is
