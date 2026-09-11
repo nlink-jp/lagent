@@ -312,14 +312,14 @@ func TestMaxTurnsCap(t *testing.T) {
 // behind, so the next message still works.
 func TestEmptyResponseDoesNotPoisonHistory(t *testing.T) {
 	mb := &mockBackend{responses: []*llm.Response{
-		{}, {}, // empty twice: the one retry (ADR-0007) is spent
+		{}, {}, {}, // empty three times: both retries (ADR-0007) are spent
 		{Content: "recovered"},
 	}}
 	a, _ := newAgent(t, mb, &approveAll{}, 5)
 
 	_, err := a.Run(context.Background(), "first", nil)
 	if err == nil {
-		t.Fatal("a second empty response should be reported as an error")
+		t.Fatal("a third empty response should be reported as an error")
 	}
 	if !strings.Contains(err.Error(), "no usable response") {
 		t.Errorf("error should name the cause: %v", err)
@@ -337,11 +337,13 @@ func TestEmptyResponseDoesNotPoisonHistory(t *testing.T) {
 	}
 }
 
-// TestEmptyResponseIsAskedAgainOnce pins ADR-0007: an empty completion
-// re-sends the identical request once, notes it, and records both
-// attempts; the retry has the same history the failed request had.
-func TestEmptyResponseIsAskedAgainOnce(t *testing.T) {
+// TestEmptyResponseIsAskedAgain pins ADR-0007: an empty completion
+// re-sends the identical request, up to twice, notes each re-send,
+// and records every attempt; the retries have the same history the
+// failed request had.
+func TestEmptyResponseIsAskedAgain(t *testing.T) {
 	mb := &mockBackend{responses: []*llm.Response{
+		{FinishReason: "stop", OutputTokens: 4, ThoughtTokens: 1},
 		{FinishReason: "stop", OutputTokens: 4, ThoughtTokens: 1},
 		{Content: "done"},
 	}}
@@ -355,12 +357,12 @@ func TestEmptyResponseIsAskedAgainOnce(t *testing.T) {
 	if err != nil || out != "done" {
 		t.Fatalf("the retry should carry the turn: %q %v", out, err)
 	}
-	if len(mb.calls) != 2 || len(mb.calls[0]) != len(mb.calls[1]) {
-		t.Fatalf("the re-sent request must be the failed one: %d calls, %d vs %d messages",
+	if len(mb.calls) != 3 || len(mb.calls[0]) != len(mb.calls[2]) {
+		t.Fatalf("the re-sent requests must be the failed one: %d calls, %d vs %d messages",
 			len(mb.calls), len(mb.calls[0]), len(mb.calls[len(mb.calls)-1]))
 	}
-	if len(notices) != 1 || !strings.Contains(notices[0], "empty") {
-		t.Errorf("one notice expected: %v", notices)
+	if len(notices) != 2 || !strings.Contains(notices[0], "empty") {
+		t.Errorf("one notice per re-send expected: %v", notices)
 	}
 	var empties []map[string]any
 	for i, kind := range log.kinds {
@@ -368,8 +370,8 @@ func TestEmptyResponseIsAskedAgainOnce(t *testing.T) {
 			empties = append(empties, log.data[i].(map[string]any))
 		}
 	}
-	if len(empties) != 1 || empties[0]["retried"] != true {
-		t.Errorf("assistant_empty must record the retry: %v", empties)
+	if len(empties) != 2 || empties[0]["retried"] != true || empties[1]["retried"] != true {
+		t.Errorf("assistant_empty must record each retry: %v", empties)
 	}
 }
 

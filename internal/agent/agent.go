@@ -685,7 +685,7 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 	limit := a.maxTurns
 	roundCap := a.maxTurns * roundCapMultiplier
 	// emptyAsked counts the re-sends after an empty completion
-	// (ADR-0007): one per turn, never a loop.
+	// (ADR-0007): bounded per turn, never a loop.
 	emptyAsked := 0
 
 	for round := 0; ; round++ {
@@ -868,9 +868,11 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 const roundStopFmt = "the %s (%d rounds) stopped this turn — progress so far is saved: say \"continue\" to resume where it left off, or raise [agent].max_turns"
 
 // maxEmptyRetries bounds the re-sends after an empty completion
-// (ADR-0007). One: the fault measured is a single mis-sampled token,
-// and two in a row is something the operator should see.
-const maxEmptyRetries = 1
+// (ADR-0007). Two: the traced request replayed four times glitched
+// twice — the fault is a coin flip at the point it strikes, not a
+// one-off — so one retry left a quarter of the cases failing. Three
+// identical requests all empty is something the operator should see.
+const maxEmptyRetries = 2
 
 // emptyResponseError explains a response that carried nothing, naming
 // the cause the server reported. "The model returned nothing" is not

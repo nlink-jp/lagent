@@ -24,12 +24,13 @@
   they are and drops the "ask how to proceed" rule. Measured cause: a
   bench run that explained its fix in prose after the runtime's own
   chain of a failed cache write, an unattended denial and that rule.
-- **An empty completion is asked again once** (ADR-0007). The bench's
-  read-edit task failed on a completion with no text and no tool call;
-  the raw stream showed one mis-sampled tool-call opener routed into
-  the reasoning channel, and the same request re-sent answered
-  normally. The runtime now re-sends once, notes it, and records both
-  attempts (`assistant_empty` carries `retried`); a second empty
+- **An empty completion is asked again, twice at most** (ADR-0007).
+  The bench's read-edit task failed on a completion with no text and
+  no tool call; the raw stream showed a mis-sampled tool-call opener
+  routed into the reasoning channel, and the same request replayed
+  came back empty about half the time. The runtime now re-sends the
+  identical request up to twice, notes each re-send, and records every
+  attempt (`assistant_empty` carries `retried`); a third empty
   completion ends the turn as before.
 - `LAGENT_LLM_TRACE=<dir>` writes every model request and its raw SSE
   reply to files, so a bench run's odd completion can be read as the

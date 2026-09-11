@@ -1,4 +1,4 @@
-# ADR-0007: An empty completion is asked again once
+# ADR-0007: An empty completion is asked again, twice at most
 
 | Field | Value |
 |-------|-------|
@@ -34,18 +34,23 @@ error for a fault that a second request would not have.
 ## Decision
 
 An empty completion — no text, no tool call, whatever the finish
-reason — is **asked again once** with the identical request. The
-history is unchanged (nothing was stored), so the request is byte for
-byte the one that just failed and the server's prefix cache answers it
-in seconds. The retry is noted to the operator (`OnNotice`) and the
-transcript records both attempts as `assistant_empty`, the first with
-`retried: true`. A second empty completion ends the turn as before,
-with the same error and the same message.
+reason — is **asked again, up to twice**, with the identical request.
+The history is unchanged (nothing was stored), so the request is byte
+for byte the one that just failed and the server's prefix cache answers
+it in seconds. Each re-send is noted to the operator (`OnNotice`) and
+the transcript records every attempt as `assistant_empty`, the re-sent
+ones with `retried: true`. A third empty completion ends the turn as
+before, with the same error and the same message.
 
-Bounded on purpose: one retry, never a loop. The fault is a single
-mis-sampled token; if two requests in a row produce it, something else
-is wrong and the operator should see it. The retry consumes a round of
-the turn budget like any model call, and a cancelled context is not
+Bounded on purpose: two retries, never a loop. The bound was one when
+this record was written, on the reading that the fault is a one-off
+mis-sample; the same day a run hit two empties in a row, and the traced
+request replayed four times against the server came back empty twice —
+at the point it strikes, the fault is a coin flip, not a one-off. One
+retry then leaves a quarter of the cases failing; two leave an eighth,
+at the cost of a few cached seconds. Three identical requests all empty
+is something the operator should see. A retry consumes a round of the
+turn budget like any model call, and a cancelled context is not
 retried.
 
 ## Consequences
@@ -67,8 +72,12 @@ retried.
   re-send the same message, which is exactly what the runtime can do,
   and `-p` has no operator.
 - **Retry until something arrives.** Rejected: unbounded retries hide a
-  server that has stopped answering, and the fault measured is one
-  token, not a state.
+  server that has stopped answering; the bound is set from the measured
+  rate, not removed.
+- **Change the request on retry** (a nudge message, a different seed).
+  Not needed: the identical request re-sent succeeds half the time at
+  the worst point measured, and an identical request keeps the prefix
+  cache; a nudge would also have to be kept out of the history.
 - **Ask the server to stop routing stray tokens into reasoning.**
   Out of reach: the behaviour is the inference server's and the
   model's; the runtime sees only the result.

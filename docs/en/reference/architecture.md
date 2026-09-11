@@ -94,8 +94,8 @@ attachments beside it, and loops: send the history (tool results
 nonce-wrapped at send time), stream the answer, and for each tool call
 decide, gate, execute, and append the result. The loop ends on a text
 answer, a round limit, or a loop-guard stop. A completion that carries
-neither text nor a tool call is asked again once with the identical
-request before it is reported (ADR-0007). Every request replays the
+neither text nor a tool call is asked again with the identical
+request, twice at most, before it is reported (ADR-0007). Every request replays the
 whole history behind a session-scoped isolation tag, so the request
 prefix stays byte-identical across rounds and the server's prefix
 cache can hit — on a local model that cache is the difference between

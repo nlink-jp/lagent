@@ -419,7 +419,7 @@ keys:
 
 	TranscriptFailedFmt:    "session transcript write failed (%s) — recording stopped, so this session can no longer be resumed in full; restart lagent to record again",
 	TruncatedFmt:           "the response was cut off mid-generation (%s) — ask for the rest, or narrow the request",
-	EmptyRetried:           "the model returned an empty response — sending the same request once more",
+	EmptyRetried:           "the model returned an empty response — sending the same request again",
 	RemoteFaultFmt:         "MCP server %q: %s failed %d times in a row with the same error — /mcp reload, or fix the server",
 	RoundLimitContinuedFmt: "round limit reached at %d rounds — continued at your request",
 	RoundLoopContinuedFmt:  "the same call repeated (%s) — continued at your request",

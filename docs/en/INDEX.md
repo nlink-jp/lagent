@@ -62,9 +62,10 @@ excepted).
   files, isolated runs, the transcript as the measurement, the
   reference runtime on the same tasks
 - [`ADR-0007`](adr/0007-empty-completion-asked-again.md) — an empty
-  completion is asked again once: the raw stream showed one mis-sampled
-  tool-call opener routed into the reasoning channel, and the same
-  request re-sent answers normally
+  completion is asked again, twice at most: the raw stream showed a
+  mis-sampled tool-call opener routed into the reasoning channel, a
+  coin flip at the point it strikes, and the same request re-sent
+  answers normally
 - [`ADR-0008`](adr/0008-routes-not-rules.md) — the runtime supplies
   routes, not rules: toolchain caches ride the session scratch so builds
   run in the read lane, an unattended denial names the route,
