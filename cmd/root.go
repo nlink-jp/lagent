@@ -758,6 +758,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// The round limit is an intervention ladder on the main loop.
 		RoundReview:  true,
 		OnRoundLimit: onRoundLimit,
+		Unattended:   oneShot,
 		AutoApprove:  autoOn,
 		Ceiling:      ceiling,
 		OnAutoDecision: func(tc llm.ToolCall, d agent.AutoDecision) {
@@ -1683,18 +1684,40 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 	return func(ctx context.Context, command string, lane sandbox.Lane) *exec.Cmd {
 		argv := sandbox.Wrap(profiles[lane], shell, command)
 		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
-		if lane == sandbox.LaneRead {
-			// The read lane runs unasked: it does not get the operator's
-			// exported secrets to print (review F-07), and its
-			// temporary directory is the private scratch.
-			env := sandbox.ScrubEnv(os.Environ())
-			if scratch != "" {
-				env = append(env, "TMPDIR="+scratch, "TMP="+scratch, "TEMP="+scratch)
-			}
-			cmd.Env = env
-		}
+		cmd.Env = laneEnv(lane, scratch, os.Environ())
 		return cmd
 	}, enf, notes, nil
+}
+
+// laneEnv is the environment a shell command gets in a lane. The read
+// lane runs unasked: it does not get the operator's exported secrets to
+// print (review F-07), and its temporary directory is the private
+// scratch. Every lane gets the toolchain caches pointed into that
+// scratch (ADR-0008 §1): the sandbox denies every write outside the
+// project, the work directory and the scratch, so a cache under
+// ~/Library would fail a build in any lane — and the read lane must
+// not write a shared cache anyway.
+func laneEnv(lane sandbox.Lane, scratch string, parent []string) []string {
+	env := parent
+	if lane == sandbox.LaneRead {
+		env = sandbox.ScrubEnv(parent)
+		if scratch != "" {
+			env = append(env, "TMPDIR="+scratch, "TMP="+scratch, "TEMP="+scratch)
+		}
+	}
+	if scratch != "" {
+		env = append(env, toolchainCacheEnv(scratch)...)
+	}
+	return env
+}
+
+// toolchainCacheEnv is the one list of toolchain caches redirected into
+// the session scratch (ADR-0008 §1). Go alone today: its build cache
+// under ~/Library/Caches was measured failing in both lanes. Another
+// toolchain joins when a measurement shows the same failure; a cache
+// that is never redirected is a build that fails on a cold machine.
+func toolchainCacheEnv(scratch string) []string {
+	return []string{"GOCACHE=" + filepath.Join(scratch, "go-build")}
 }
 
 // readScratchDir creates the read lane's private scratch directory:

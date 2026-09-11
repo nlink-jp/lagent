@@ -1440,8 +1440,8 @@ func (r *Registry) shellExec() *Tool {
 		Name: ShellExecName,
 		Description: "Run a shell command (bash) with the project root as the working directory. " +
 			"The OS sandbox enforces the lane you declare with `access`. " +
-			"Declare \"read\" (default) for inspection — ls, cat, grep, git status/diff/log, jq — it runs without approval and can write only its own temporary directory ($TMPDIR): no project or work-directory writes, no network, no IPC or system settings. " +
-			"Declare \"write\" up front for anything that builds, tests, installs, commits, writes files or uses the network (build and test tools write their caches); it may write the project and $LAGENT_WORK_DIR and is approval-gated. " +
+			"Declare \"read\" (default) for inspection — ls, cat, grep, git status/diff/log, jq — and for builds, vets and tests: it runs without approval, the toolchain cache lives in its own temporary directory ($TMPDIR), and it can write nothing else — no project or work-directory writes, no network, no IPC or system settings. " +
+			"Declare \"write\" up front for anything that changes files, installs, commits or uses the network; it may write the project and $LAGENT_WORK_DIR and is approval-gated. " +
 			"Declare \"operator\" only when the command must change AGENTS.md/CLAUDE.md/.mcp.json/.claude/ or .git hooks/config (git init, clone, remote add), or read credential files; the user always decides. " +
 			"A command refused in a lane with 'Operation not permitted' needs the wider lane it names, not a retry. " +
 			"Output is truncated when large; the exit status is reported when non-zero.",

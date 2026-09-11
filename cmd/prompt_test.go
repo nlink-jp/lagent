@@ -149,6 +149,24 @@ func TestSystemPromptNamesOnlyRegisteredTools(t *testing.T) {
 	}
 }
 
+// ADR-0008 §4: the prompt states the lanes as they are — builds, vets
+// and tests run in the read lane — and leaves the denial route to the
+// runtime instead of a standing "ask how to proceed" rule, which sent
+// a one-shot run's model into prose.
+func TestSystemPromptStatesLanesAsTheyAre(t *testing.T) {
+	sys := buildSystemPrompt("/proj", "")
+	for _, want := range []string{"builds, vets and tests", "the read lane suffices"} {
+		if !strings.Contains(sys, want) {
+			t.Errorf("system prompt lost %q", want)
+		}
+	}
+	for _, gone := range []string{"a denial is a decision", "write their caches", "access: \"write\") and report"} {
+		if strings.Contains(sys, gone) {
+			t.Errorf("system prompt still says %q", gone)
+		}
+	}
+}
+
 // The system prompt says nothing about diagrams, on any surface
 // (gem-agent ADR-0063): no tool to call, no format to prefer, no prohibition to
 // over-generalize. Fence rendering is a view-layer concern, and the

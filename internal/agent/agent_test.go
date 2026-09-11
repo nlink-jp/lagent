@@ -175,6 +175,29 @@ func TestDeniedMutatingCall(t *testing.T) {
 	}
 }
 
+// TestUnattendedDenialNamesTheRoute pins ADR-0008 §2: in a one-shot
+// run a denial tells the model what it can still do, never to ask a
+// user who is not there; the interactive text is unchanged.
+func TestUnattendedDenialNamesTheRoute(t *testing.T) {
+	call := llm.ToolCall{ID: "c1", Name: "write_file", Args: map[string]any{"path": "x.txt", "content": "data"}}
+	for _, unattended := range []bool{false, true} {
+		mb := &mockBackend{responses: []*llm.Response{{ToolCalls: []llm.ToolCall{call}}, {Content: "ok"}}}
+		a, _ := newAgent(t, mb, &denyAll{}, 5)
+		a.unattended = unattended
+		if _, err := a.Run(context.Background(), "write x.txt", nil); err != nil {
+			t.Fatal(err)
+		}
+		got := mb.calls[1][2].Content
+		if unattended {
+			if strings.Contains(got, "ask the user") || !strings.Contains(got, "unattended") || !strings.Contains(got, "read lane") {
+				t.Errorf("unattended denial must name the route, not the user: %q", got)
+			}
+		} else if got != deniedResult {
+			t.Errorf("interactive denial changed: %q", got)
+		}
+	}
+}
+
 // denyWithReasonGate denies every call with the operator's typed
 // reason (gem-agent ADR-0060).
 type denyWithReasonGate struct{ reason string }

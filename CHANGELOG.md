@@ -12,6 +12,18 @@
   completion, no-tool answers and the medians of rounds, tool calls,
   prompt tokens and wall time per task and configuration. Phase 2
   changes are measured against it.
+- **The runtime supplies routes, not rules** (ADR-0008, the RFP's
+  local-oriented prompt revision). Every `shell_exec` runs with
+  `GOCACHE` in the session scratch, so `go build`, `go vet` and `go
+  test` run in the read lane without approval (they failed in both
+  lanes before: the sandbox denies the cache under `~/Library`); a
+  denied call in a one-shot run is told that nothing needing approval
+  can run there and what to continue with, instead of "ask the user";
+  `list_tree dirs_only` on a flat directory reports its files instead
+  of "(empty directory)"; and the system prompt states the lanes as
+  they are and drops the "ask how to proceed" rule. Measured cause: a
+  bench run that explained its fix in prose after the runtime's own
+  chain of a failed cache write, an unattended denial and that rule.
 - **An empty completion is asked again once** (ADR-0007). The bench's
   read-edit task failed on a completion with no text and no tool call;
   the raw stream showed one mis-sampled tool-call opener routed into

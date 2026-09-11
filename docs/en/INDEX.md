@@ -65,3 +65,8 @@ excepted).
   completion is asked again once: the raw stream showed one mis-sampled
   tool-call opener routed into the reasoning channel, and the same
   request re-sent answers normally
+- [`ADR-0008`](adr/0008-routes-not-rules.md) — the runtime supplies
+  routes, not rules: toolchain caches ride the session scratch so builds
+  run in the read lane, an unattended denial names the route,
+  `list_tree` says what it saw, and the prompt drops the rules those
+  replace (the local-oriented prompt revision)

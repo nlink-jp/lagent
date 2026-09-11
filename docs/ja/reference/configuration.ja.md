@@ -69,6 +69,7 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `LAGENT_SESSION_ID` | export | セッション id。`shell_exec` の子プロセスと `.mcp.json` の `${LAGENT_SESSION_ID}` 向け |
 | `LAGENT_WORK_DIR` | export | セッション作業ディレクトリ。同じく `.mcp.json` で展開できる |
 | `LAGENT_PROJECT_DIR` | export | プロジェクトディレクトリ。それを知る必要がある子プロセス向け |
+| `GOCACHE` | export | 全レーンの `shell_exec` 向け: セッション scratch 内の `go-build` ディレクトリ。Go のビルド・vet・テストが read レーンで走る（sandbox は `~/Library` 下のキャッシュを拒否する）。あなた自身のキャッシュには触れない |
 
 ## コマンド
 

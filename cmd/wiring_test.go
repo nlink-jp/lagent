@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/nlink-jp/lagent/internal/sandbox"
 )
 
 // TestTUIOptionsWiring pins the runREPL → tui.New handoff at the AST
@@ -77,5 +79,44 @@ func TestAdvertiseIsWiredIntoTheAgent(t *testing.T) {
 	}
 	if !strings.Contains(string(src), "Advertise:      adv.Advertise,") && !strings.Contains(string(src), "Advertise: adv.Advertise,") {
 		t.Fatal("agent.New is not given adv.Advertise")
+	}
+}
+
+// ADR-0008 §2: a one-shot run's agent must know it is unattended, or a
+// denial keeps telling the model to ask a user who is not there.
+func TestUnattendedIsWiredIntoTheAgent(t *testing.T) {
+	src, err := os.ReadFile("root.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(src), "Unattended:   oneShot,") && !strings.Contains(string(src), "Unattended: oneShot,") {
+		t.Fatal("agent.New is not given Unattended: oneShot")
+	}
+}
+
+// ADR-0008 §1: every lane's shell gets the toolchain caches in the
+// session scratch; the read lane additionally gets the scrubbed
+// environment and the scratch as its temporary directory.
+func TestLaneEnvRedirectsToolchainCachesInEveryLane(t *testing.T) {
+	parent := []string{"PATH=/bin", "GOCACHE=/Users/someone/Library/Caches/go-build", "AWS_SECRET_ACCESS_KEY=x"}
+	for _, lane := range []sandbox.Lane{sandbox.LaneRead, sandbox.LaneWrite, sandbox.LaneOperator} {
+		env := strings.Join(laneEnv(lane, "/scratch", parent), "\n")
+		if !strings.Contains(env, "GOCACHE=/scratch/go-build") {
+			t.Errorf("%s lane: GOCACHE not redirected:\n%s", lane, env)
+		}
+		if idx := strings.LastIndex(env, "GOCACHE="); !strings.HasPrefix(env[idx:], "GOCACHE=/scratch/go-build") {
+			t.Errorf("%s lane: the redirected GOCACHE must come last so it wins:\n%s", lane, env)
+		}
+	}
+	read := strings.Join(laneEnv(sandbox.LaneRead, "/scratch", parent), "\n")
+	if !strings.Contains(read, "TMPDIR=/scratch") || strings.Contains(read, "AWS_SECRET_ACCESS_KEY") {
+		t.Errorf("read lane must scrub secrets and point TMPDIR at the scratch:\n%s", read)
+	}
+	write := strings.Join(laneEnv(sandbox.LaneWrite, "/scratch", parent), "\n")
+	if strings.Contains(write, "TMPDIR=/scratch") {
+		t.Errorf("the write lane keeps its own TMPDIR:\n%s", write)
+	}
+	if env := laneEnv(sandbox.LaneWrite, "", parent); len(env) != len(parent) {
+		t.Errorf("no scratch, no redirect: %v", env)
 	}
 }

@@ -70,6 +70,7 @@ Other environment variables the runtime reads or sets:
 | `LAGENT_SESSION_ID` | exported | the session id, for `shell_exec` children and `${LAGENT_SESSION_ID}` in `.mcp.json` |
 | `LAGENT_WORK_DIR` | exported | the per-session work directory, likewise expandable in `.mcp.json` |
 | `LAGENT_PROJECT_DIR` | exported | the project directory, for children that need to know it |
+| `GOCACHE` | exported | for `shell_exec` in every lane: a `go-build` directory in the session scratch, so Go builds, vets and tests run in the read lane (the sandbox denies the cache under `~/Library`); your own cache is untouched |
 
 ## Commands
 

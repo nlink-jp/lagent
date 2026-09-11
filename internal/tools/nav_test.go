@@ -85,6 +85,32 @@ func TestListTreeIncludeIgnored(t *testing.T) {
 	}
 }
 
+// ADR-0008 §3: a flat directory is not an empty one. dirs_only on a
+// directory with files and no subdirectory says how many files it
+// hid and which tool lists them.
+func TestListTreeDirsOnlyFlatDirectorySaysSo(t *testing.T) {
+	r := newRegistry(t)
+	for _, name := range []string{"main.go", "pager.go"} {
+		if err := os.WriteFile(filepath.Join(r.ProjectDir(), name), []byte("package main\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out, err := run(t, r, "list_tree", map[string]any{"dirs_only": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "no subdirectories; 2 files at the top level") || !strings.Contains(out, "list_files") {
+		t.Errorf("flat directory reported as: %q", out)
+	}
+	if strings.Contains(out, "empty") {
+		t.Errorf("a directory with files is not empty: %q", out)
+	}
+	out, err = run(t, newRegistry(t), "list_tree", map[string]any{"dirs_only": true})
+	if err != nil || out != "(empty directory)" {
+		t.Errorf("a truly empty directory stays empty: %q %v", out, err)
+	}
+}
+
 func TestListTreeDirsOnly(t *testing.T) {
 	r := navProject(t)
 	out, err := run(t, r, "list_tree", map[string]any{"dirs_only": true})

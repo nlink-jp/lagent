@@ -71,7 +71,8 @@ lagent
   が操作者の調整点）。
 - **封じ込め:** ファイルツールはプロジェクト（とセッション作業ディレクトリ）
   の内側に留まる。`shell_exec` は宣言したレーンで `sandbox-exec` 下で走る —
-  read は尋ねずに、write と operator は尋ねてから。
+  read は尋ねずに（inspection と、キャッシュをセッション scratch に持つ Go の
+  ビルド・テスト）、write と operator は尋ねてから。
 - **セッション:** セッションごとの JSONL transcript。`--continue` と
   `--resume`。usage レコードは
   [gem-usage-lens](https://github.com/nlink-jp/gem-usage-lens) が両ランタイム

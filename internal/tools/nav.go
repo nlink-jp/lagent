@@ -132,6 +132,12 @@ func (r *Registry) listTree() *Tool {
 			entries := 0
 			truncated := ""
 			interrupted := false
+			// topFiles counts the files dirs_only hides at the start
+			// directory, so a directory with files and no subdirectory
+			// is reported as that, not as empty (ADR-0008 §3: the
+			// false "(empty directory)" cost every run a list_files
+			// round).
+			topFiles := 0
 			var walk func(dir string, level int, rules *ignore.Rules)
 			walk = func(dir string, level int, rules *ignore.Rules) {
 				if truncated != "" || interrupted {
@@ -176,6 +182,9 @@ func (r *Registry) listTree() *Tool {
 						tally.dir(e.Name())
 					}
 					if dirsOnly && !e.IsDir() {
+						if level == 0 {
+							topFiles++
+						}
 						continue
 					}
 					rows = append(rows, row{e, ignored})
@@ -229,6 +238,9 @@ func (r *Registry) listTree() *Tool {
 			out := b.String()
 			if out == "" && !interrupted {
 				out = "(empty directory)"
+				if dirsOnly && topFiles > 0 {
+					out = fmt.Sprintf("(no subdirectories; %d files at the top level — list_files shows them)", topFiles)
+				}
 			}
 			if truncated != "" {
 				out += truncated + "\n"

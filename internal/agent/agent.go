@@ -152,6 +152,7 @@ type Agent struct {
 	// signatures the intervention already blessed — polling).
 	roundReview  bool
 	onRoundLimit func(ctx context.Context, info RoundLimitInfo) bool
+	unattended   bool
 	noMentions   bool
 	onToolDone   func(tc llm.ToolCall)
 	turnCalls    []string
@@ -275,6 +276,11 @@ type Options struct {
 	// turn, fail-closed — there is no model review to decide in the
 	// operator's place here.
 	OnRoundLimit func(ctx context.Context, info RoundLimitInfo) bool
+	// Unattended says nobody can answer a gate in this run (one-shot).
+	// A denied call is then told the route that exists — continue
+	// with what needs no approval, or finish and say what remains —
+	// instead of "ask the user" (ADR-0008 §2).
+	Unattended bool
 	// NoMentions disables @-reference expansion on the turn input.
 	// The @ grammar grants out-of-project reads (images by absolute or
 	// ~ path) on the premise that an @ is always operator-typed; an
@@ -324,6 +330,7 @@ func New(opts Options) *Agent {
 		clipboard:    opts.ClipboardImage,
 		roundReview:  opts.RoundReview,
 		onRoundLimit: opts.OnRoundLimit,
+		unattended:   opts.Unattended,
 		noMentions:   opts.NoMentions,
 		onToolDone:   opts.OnToolDone,
 		tag:          guard.NewTagWithPrefix("tool_output"),
@@ -992,6 +999,20 @@ func wrapUntrusted(content string, tag guard.Tag) string {
 // misclassification.
 const deniedResult = "Tool execution denied by the user. Do not retry the same call; ask the user how to proceed instead."
 
+// deniedUnattended is the same denial in a run with nobody to ask
+// (ADR-0008 §2). "Ask the user" sent a one-shot run's model into prose
+// — it stopped acting and described the change it would have made —
+// so the route this text names is the one that exists.
+const deniedUnattended = "Tool execution denied: this run is unattended (one-shot), so nothing that needs approval can run in it. Do not retry the same call. Continue with the tools that need no approval — the file tools inside the project, and shell_exec in the read lane — or finish and state what remains undone."
+
+// deniedText picks the denial the run can act on.
+func (a *Agent) deniedText() string {
+	if a.unattended {
+		return deniedUnattended
+	}
+	return deniedResult
+}
+
 // deniedWithReason renders a denial that carries the operator's typed
 // reason (gem-agent ADR-0060 §2): guidance delivered in the denial function
 // response, the one slot the API leaves open mid-round.
@@ -1275,7 +1296,7 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 				if denyReason != "" {
 					return deniedWithReason(denyReason), true, floorRan, nil
 				}
-				return deniedResult, true, floorRan, nil
+				return a.deniedText(), true, floorRan, nil
 			}
 		}
 	}

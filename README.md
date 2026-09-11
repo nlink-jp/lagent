@@ -73,7 +73,8 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   `[mcp].advertise = "all"` are the operator's levers).
 - **Confinement:** file tools stay inside the project (and the session
   work directory); `shell_exec` runs under `sandbox-exec` in the lane it
-  declares — read runs unasked, write and operator ask.
+  declares — read runs unasked (inspection, and Go builds and tests,
+  whose cache lives in the session scratch), write and operator ask.
 - **Sessions:** a JSONL transcript per session; `--continue` and
   `--resume`; usage records in the shape
   [gem-usage-lens](https://github.com/nlink-jp/gem-usage-lens) reads for
