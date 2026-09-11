@@ -108,6 +108,44 @@ What it says:
   rounds — every round replays the history, so the prefix cache is
   what keeps it at 30 s.
 
+`read-edit`, eight repetitions with the raw stream traced
+(`LAGENT_LLM_TRACE`): 5/8 completed. Two runs ended on the empty
+completion, and the trace showed the same bytes both times — one delta
+with `reasoning_content` `<tool_call|>`, an empty delta, `finish_reason:
+stop`, four completion tokens: a broken tool-call opener the server
+routed into the reasoning channel (ADR-0007). One run explained the fix
+in prose with a code block and never called `edit_file` — the model
+narrating instead of acting, the shape the prompt revision measures
+against.
+
+`read-edit` after ADR-0007 (`4df8c4f`), eight repetitions: 8/8
+completed, median 6 rounds, 19 s. No empty completion occurred in these
+eight, so the retry itself did not fire in the field; its behaviour is
+pinned by the unit test, and the field rate of the fault is 2/8 before
+and 0/8 after on a sample that small.
+
+Reference runtime, 2026-09-12: gem-agent v0.76.0 on Vertex AI Gemini,
+one repetition, the operator's configuration minus its hooks and
+telemetry, `read_only_auto` off, the fixture server on a `"never"`
+policy.
+
+| task | config | runs | completed | no-tool answers | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |
+|---|---|---|---|---|---|---|---|---|
+| mcp-lookup | bench | 1 | 1/1 | 0/1 | 2 | 2 | 17570 | 23 |
+| multi-file-rename | bench | 1 | 1/1 | 0/1 | 23 | 23 | 193341 | 141 |
+| read-edit | bench | 1 | 1/1 | 0/1 | 15 | 15 | 119359 | 128 |
+| search-answer | bench | 1 | 1/1 | 0/1 | 2 | 2 | 17427 | 23 |
+| shell-count | bench | 1 | 1/1 | 0/1 | 4 | 4 | 29993 | 55 |
+| view-image | bench | 1 | 1/1 | 0/1 | 1 | 1 | 12369 | 11 |
+
+Every task completed on both runtimes. The reference does more
+verification per task (twenty-three rounds for the rename, fifteen for
+the edit, running the program before and after) and pays for it in
+prompt tokens and wall time; the local model reaches the same
+completion in a third of the rounds. The rounds a run takes are a
+property of each model's habit, not of the runtime, and are not a
+quality score.
+
 ## Comparing
 
 A prompt revision, a thinking toggle or a tool-description change is
