@@ -138,6 +138,37 @@ policy.
 | shell-count | bench | 1 | 1/1 | 0/1 | 4 | 4 | 29993 | 55 |
 | view-image | bench | 1 | 1/1 | 0/1 | 1 | 1 | 12369 | 11 |
 
+After ADR-0008 (routes, not rules) with ADR-0007 amended to two
+retries, 2026-09-12 (`a69160a`), three repetitions:
+
+| task | config | runs | completed | no-tool answers | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |
+|---|---|---|---|---|---|---|---|---|
+| mcp-lookup | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12623 | 12 |
+| multi-file-rename | baseline | 3 | 3/3 | 0/3 | 15 | 15 | 88664 | 42 |
+| read-edit | baseline | 3 | 3/3 | 0/3 | 6 | 6 | 35627 | 23 |
+| search-answer | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12131 | 9 |
+| shell-count | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 11980 | 10 |
+| view-image | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 11985 | 10 |
+
+Against the baseline: 18/18 completed (was 16/18), every run exited 0,
+no run ended in prose after a denial (no denial occurred: the
+verification `go run` succeeded in the read lane in every read-edit
+run), and the `list_files` round after `list_tree` is gone from 15 of
+18 runs (three multi-file-rename runs still listed). Four empty
+completions occurred and every one recovered on a re-send. Rounds
+rose for the two editing tasks (read-edit 3 → 6, rename 11 → 15)
+because the verification the prompt asks for now actually runs — the
+earlier medians counted runs that ended early on a failure.
+
+`read-edit`, eight repetitions on the same binary: 8/8 completed,
+median 6 rounds, 22 s. Nine empty completions fired the re-send across
+the eight runs; eight recovered, and one run hit three in a row at its
+final answer (the file was already fixed, so the task completed, but
+the run exited 1 with no answer text). The fault clusters at the
+final-answer point after a successful verification, more often than a
+coin flip there; a re-send that changes nothing may not be the whole
+answer at that point, and that is the next measurement.
+
 Every task completed on both runtimes. The reference does more
 verification per task (twenty-three rounds for the rename, fifteen for
 the edit, running the program before and after) and pays for it in
