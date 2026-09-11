@@ -155,7 +155,7 @@ func TestSystemPromptNamesOnlyRegisteredTools(t *testing.T) {
 // a one-shot run's model into prose.
 func TestSystemPromptStatesLanesAsTheyAre(t *testing.T) {
 	sys := buildSystemPrompt("/proj", "")
-	for _, want := range []string{"builds, vets and tests", "the read lane suffices"} {
+	for _, want := range []string{"compiling, vetting and testing", "the read lane suffices"} {
 		if !strings.Contains(sys, want) {
 			t.Errorf("system prompt lost %q", want)
 		}

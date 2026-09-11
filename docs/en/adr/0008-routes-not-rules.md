@@ -74,12 +74,17 @@ a fact it can, measured together on the bench.
    the read-lane shell — or finish and state what remains undone. The
    interactive text keeps "ask the user".
 3. **`list_tree` says what it saw.** With `dirs_only`, a directory that
-   has files but no subdirectories is reported as that, with the file
-   count and the tool that lists them, not as empty.
+   has files but no subdirectories lists those files (up to the
+   per-directory cap) instead of reading as empty. A first cut reported
+   the count and pointed at `list_files`; measured, the model followed
+   the pointer every time and the round was spent anyway — a route the
+   tool can walk itself is not a route to name.
 4. **The prompt says what is now true and drops the rules the runtime
    replaced.** The lane paragraph: the read lane runs inspection *and*
-   builds, vets and tests (the toolchain cache lives in the lane's
-   scratch); the write lane is for changing files, installing,
+   compiling, vetting and testing (the toolchain cache lives in the
+   lane's scratch; a build that writes its binary into the project
+   still needs the write lane — probed: `go build` of a single main
+   package does); the write lane is for changing files, installing,
    committing and the network. The verification bullet names the read
    lane. The bullet "a denial is a decision, not an obstacle — ask how
    to proceed" goes: the denial result carries the route now. The
