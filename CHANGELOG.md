@@ -44,7 +44,12 @@
   longer fires the operator-write hooks (it writes nothing; the pins
   are for writes); the unattended denial tells the model the read-only
   file tools continue on ordinary files; the `--allow` help and the
-  `/tools` policy marker say that credential reads still ask.
+  `/tools` policy marker say that credential reads still ask. ADR-0015
+  records as residue, for a record of their own, the two shell routes
+  the independent review measured and this release leaves open: the
+  read lane can read the config file (an `[llm].api_key` kept there)
+  and the transcripts under the state root, and the write lane can
+  rename a credential file and read it under its new name.
 
 ### Fixed
 

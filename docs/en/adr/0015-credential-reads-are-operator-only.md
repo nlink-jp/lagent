@@ -60,9 +60,13 @@ What the runtime already has for the answer:
 
 `@` attachments are the operator's own typing and reach the model
 without any gate; they are not the model's reach and are not in
-question here. Nor is the content of files the list does not name: a
-token inside `config.yaml` is read like any other file. The list is a
-finite set of names shared by every enforcer, not a detector.
+question here. `load_skill` reads files inside a discovered skill
+directory unasked (ADR-0011) and is not on the list either: a skill
+directory is the operator's own placement, pinned by content, and a
+credential file found there was put there by the operator. Nor is the
+content of files the list does not name: a token inside `config.yaml`
+is read like any other file. The list is a finite set of names shared
+by every enforcer, not a detector.
 
 ## Decision
 
@@ -100,8 +104,9 @@ finite set of names shared by every enforcer, not a detector.
 
 ## Consequences
 
-- A project's `.env` reaches the model only on the operator's yes,
-  each time, interactively. An unattended run is refused it, as it is
+- Through the file tools, a project's `.env` reaches the model only on
+  the operator's yes, each time, interactively; the residue below names
+  the two shell routes that remain. An unattended run is refused it, as it is
   refused the write lane — a one-shot workflow that needs `.env`
   content has no route by design, the ceiling ADR-0010 states for every
   Review call. The one-shot denial on stderr names the reason; the
@@ -123,6 +128,23 @@ finite set of names shared by every enforcer, not a detector.
   no settings row: a credential read with a toggle is a bypass.
 - Not a DLP: a secret in a file the list does not name is read like any
   file, as chapter 10 of the review says. Unchanged.
+- **Residue, recorded and not closed here** (independent review of
+  this record, measured under `sandbox-exec`). (1) The read lane can
+  read `~/.config/lagent/config.toml` — and with it an `[llm].api_key`
+  kept in the file rather than the environment — and the transcripts
+  under the state root, so an approved `read_file .env` of one session
+  is a line a later session's unasked `cat` can return; neither path
+  is on the credential list. Closing it means denying the config path
+  and the `sessions/` and `memory/` subtrees under the state root in
+  the read and write lanes while the work directory under the same
+  root stays writable, and deciding whether a key may live in the file
+  at all — a record of its own. (2) The write lane denies reading a
+  credential name but not renaming it: `mv .env notes.txt && cat
+  notes.txt` in one approved write-lane command reads it, and
+  `read_file notes.txt` afterwards is an ordinary read; the text floor
+  catches a literal `.env`, not `.en?`. Closing it is a `file-write*`
+  deny on the credential names in the write lane, which also stops
+  `cp .env.example .env` there, and is decided with that cost in view.
 
 ## Alternatives considered
 
