@@ -189,6 +189,12 @@ var credentialDirs = []string{
 	".ssh", ".aws", ".kube", ".gnupg", ".config/gcloud", ".config/gh",
 	// Agent and cloud token stores (review F-07, V5).
 	".gemini", ".codex", ".claude", ".azure", ".terraform.d", "Library/Keychains",
+	// mcp-bridge, the route to remote HTTP MCP servers (ADR-0002 makes
+	// MCP the only web access): config.json holds OAuth client secrets
+	// and static API-key headers, state/<server>/tokens.json the access
+	// tokens. Home-relative like .config/gcloud and .config/gh; a
+	// relocated XDG_CONFIG_HOME is outside the rule, as it is for them.
+	".config/mcp-bridge",
 }
 
 // homeOnlyDirs are credentialDirs names that also occur inside projects

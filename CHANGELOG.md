@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+
+- `~/.config/mcp-bridge` is a credential location. Its `config.json`
+  holds pre-registered OAuth client secrets and static API-key headers
+  in plain JSON, and `state/<server>/tokens.json` the access tokens;
+  remote HTTP MCP servers are reached through mcp-bridge, and ADR-0002
+  makes MCP the only route to the web, so the directory is part of the
+  runtime's expected deployment. It joins the credential list beside
+  `~/.config/gcloud` and `~/.config/gh`: the read and write lanes deny
+  the read at the kernel, the file tools refuse the path, and a shell
+  command that names it is Block for the operator to see. A sibling
+  entry such as `~/.config/lagent` is unaffected. A deliberate local
+  change (ADR-0001: the recorded gem-agent source commit is unchanged).
+
 ## [0.3.2] - 2026-09-12
 
 ### Fixed

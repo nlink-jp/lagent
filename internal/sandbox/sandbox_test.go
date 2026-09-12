@@ -102,7 +102,7 @@ func TestLaneProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"(deny network*)", "(deny mach-lookup)", "(deny appleevent-send)", "(deny ipc-posix*)", "(deny iokit-open)", "(deny user-preference-write)", "(deny lsopen)", "(deny signal)", "(deny process-exec", `/osascript"`, `(subpath "/Users/op/.ssh")`, `\.env`, "(allow file-write*\n    (subpath \"/private/tmp/work/scratch\")"} {
+	for _, want := range []string{"(deny network*)", "(deny mach-lookup)", "(deny appleevent-send)", "(deny ipc-posix*)", "(deny iokit-open)", "(deny user-preference-write)", "(deny lsopen)", "(deny signal)", "(deny process-exec", `/osascript"`, `(subpath "/Users/op/.ssh")`, `(subpath "/Users/op/.config/mcp-bridge")`, `\.env`, "(allow file-write*\n    (subpath \"/private/tmp/work/scratch\")"} {
 		if !strings.Contains(read, want) {
 			t.Errorf("read lane lacks %q:\n%s", want, read)
 		}
@@ -120,7 +120,7 @@ func TestLaneProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`(subpath "/private/tmp/proj")`, `(subpath "/private/tmp/work")`, `AGENTS|AGENT|CLAUDE|GEMINI`, `\.git/(hooks|info)`, `(subpath "/Users/op/.ssh")`} {
+	for _, want := range []string{`(subpath "/private/tmp/proj")`, `(subpath "/private/tmp/work")`, `AGENTS|AGENT|CLAUDE|GEMINI`, `\.git/(hooks|info)`, `(subpath "/Users/op/.ssh")`, `(subpath "/Users/op/.config/mcp-bridge")`} {
 		if !strings.Contains(write, want) {
 			t.Errorf("write lane lacks %q:\n%s", want, write)
 		}
@@ -132,7 +132,7 @@ func TestLaneProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(op, "AGENTS") || strings.Contains(op, ".ssh") {
+	if strings.Contains(op, "AGENTS") || strings.Contains(op, ".ssh") || strings.Contains(op, "mcp-bridge") {
 		t.Error("operator lane must allow persistent files and credential reads")
 	}
 	if _, err := ParseLane("root"); err == nil {
@@ -154,12 +154,12 @@ func TestPersistentAndCredentialRulesAgree(t *testing.T) {
 			t.Errorf("%q wrongly persistent", rel)
 		}
 	}
-	for _, p := range []string{"~/.ssh/id_rsa", ".env", ".env.local", "/x/credentials.json", "~/.aws/credentials", "sa-service-account.json", "~/.netrc", "~/.gemini/oauth_creds.json", "~/.claude/.credentials.json", "~/.claude.json", "~/Library/Keychains/login.keychain-db"} {
+	for _, p := range []string{"~/.ssh/id_rsa", ".env", ".env.local", "/x/credentials.json", "~/.aws/credentials", "sa-service-account.json", "~/.netrc", "~/.gemini/oauth_creds.json", "~/.claude/.credentials.json", "~/.claude.json", "~/Library/Keychains/login.keychain-db", "~/.config/mcp-bridge/config.json", "/Users/op/.config/mcp-bridge/state/github/tokens.json", "~/.config/mcp-bridge"} {
 		if !CredentialPath(p) {
 			t.Errorf("%q not credential", p)
 		}
 	}
-	for _, p := range []string{".env.example", "environment.go", "README.md", "src/main.go", ".envrc-notes.md", ".claude/skills/x/SKILL.md", "docs/.gemini/notes.md"} {
+	for _, p := range []string{".env.example", "environment.go", "README.md", "src/main.go", ".envrc-notes.md", ".claude/skills/x/SKILL.md", "docs/.gemini/notes.md", "docs/mcp-bridge/notes.md", "~/.config/mcp-bridge-docs/README.md", "~/.config/lagent/config.toml"} {
 		if CredentialPath(p) {
 			t.Errorf("%q wrongly credential", p)
 		}
@@ -196,12 +196,12 @@ func TestLaneEnforcement(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, d := range []string{"home/Library/Cookies", "home/Library/Caches", "home/.gemini"} {
+	for _, d := range []string{"home/Library/Cookies", "home/Library/Caches", "home/.gemini", "home/.config/mcp-bridge/state/github", "home/.config/lagent"} {
 		if err := os.MkdirAll(filepath.Join(proj, d), 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for name, body := range map[string]string{"AGENTS.md": "rules\n", ".git/config": "cfg\n", "home/.ssh/id_rsa": "secret\n", ".env": "K=v\n", ".env.example": "K=\n", "home/Library/Cookies/x": "c\n", "home/Library/Caches/x": "c\n", "home/.gemini/oauth_creds.json": "{}\n"} {
+	for name, body := range map[string]string{"AGENTS.md": "rules\n", ".git/config": "cfg\n", "home/.ssh/id_rsa": "secret\n", ".env": "K=v\n", ".env.example": "K=\n", "home/Library/Cookies/x": "c\n", "home/Library/Caches/x": "c\n", "home/.gemini/oauth_creds.json": "{}\n", "home/.config/mcp-bridge/config.json": "{}\n", "home/.config/mcp-bridge/state/github/tokens.json": "{}\n", "home/.config/lagent/config.toml": "\n"} {
 		if err := os.WriteFile(filepath.Join(proj, name), []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -258,6 +258,11 @@ func TestLaneEnforcement(t *testing.T) {
 		{LaneRead, "cat " + shellQuote(filepath.Join(fakeHome, "Library/Cookies/x")), false, "read lane denies the user's Library (design review V2)"},
 		{LaneRead, "cat " + shellQuote(filepath.Join(fakeHome, "Library/Caches/x")), true, "read lane allows toolchain caches under Library"},
 		{LaneRead, "cat " + shellQuote(filepath.Join(fakeHome, ".gemini/oauth_creds.json")), false, "read lane denies agent token stores (review F-07)"},
+		{LaneRead, "cat " + shellQuote(filepath.Join(fakeHome, ".config/mcp-bridge/config.json")), false, "read lane denies the mcp-bridge configuration (OAuth client secrets, API-key headers)"},
+		{LaneRead, "cat " + shellQuote(filepath.Join(fakeHome, ".config/mcp-bridge/state/github/tokens.json")), false, "read lane denies the mcp-bridge token store"},
+		{LaneRead, "cat " + shellQuote(filepath.Join(fakeHome, ".config/lagent/config.toml")), true, "read lane still reads a sibling .config entry that is not a credential home"},
+		{LaneWrite, "cat " + shellQuote(filepath.Join(fakeHome, ".config/mcp-bridge/config.json")), false, "write lane denies the mcp-bridge configuration"},
+		{LaneOperator, "cat " + shellQuote(filepath.Join(fakeHome, ".config/mcp-bridge/config.json")), true, "operator lane allows the mcp-bridge configuration"},
 		{LaneOperator, "cd " + shellQuote(proj) + " && git init -q . && test -f .git/config", true, "operator lane allows git init"},
 		{LaneOperator, "cat " + filepath.Join(fakeHome, ".ssh/id_rsa"), true, "operator lane allows a credential read"},
 		{LaneOperator, "echo ok > " + agents, true, "operator lane allows AGENTS.md"},

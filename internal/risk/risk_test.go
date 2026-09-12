@@ -56,6 +56,8 @@ func TestShellBlockFloorInEveryLane(t *testing.T) {
 		"cat \"~/.aws/credentials\"",
 		"cat .env",
 		"cp ~/.aws/credentials /tmp/x",
+		"cat ~/.config/mcp-bridge/config.json",
+		"jq .headers /Users/op/.config/mcp-bridge/state/github/tokens.json",
 		"gpg --export-secret-keys",
 		"ls\nrm -rf x",
 		"osascript -e 'do shell script \"id\" with administrator privileges'",
@@ -113,6 +115,7 @@ func TestBenignReadsAreNotFloors(t *testing.T) {
 		"cat .env.example", "git log -- .git", "git diff AGENTS.md",
 		"grep -n rules AGENTS.md", "sed -n 1,5p .mcp.json", "uniq a b",
 		"date -s", "ls ~/.ssh-keys-doc", "cat environment.md",
+		"cat ~/.config/lagent/config.toml", "ls docs/mcp-bridge",
 	} {
 		if v := shell(cmd, "read", false); v.Tier == Block {
 			t.Errorf("%q hit the floor: %s", cmd, v.Reason)
