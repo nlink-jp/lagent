@@ -1065,7 +1065,7 @@ const deniedResult = "Tool execution denied by the user. Do not retry the same c
 // (ADR-0008 §2). "Ask the user" sent a one-shot run's model into prose
 // — it stopped acting and described the change it would have made —
 // so the route this text names is the one that exists.
-const deniedUnattended = "Tool execution denied: this run is unattended (one-shot), so no one can approve this call. Do not retry it. Continue with what runs without approval — the read-only file tools, and shell_exec in the read lane — or finish and state what remains undone."
+const deniedUnattended = "Tool execution denied: this run is unattended (one-shot), so no one can approve this call. Do not retry it. Continue with what runs without approval — the read-only file tools on ordinary files, and shell_exec in the read lane — or finish and state what remains undone."
 
 // deniedText picks the denial the run can act on.
 func (a *Agent) deniedText() string {
@@ -1341,7 +1341,10 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 			if fromAllowlist {
 				source = "allowlist"
 			}
-			operatorWrite = ok && d.Verdict.OperatorOnly && !fromAllowlist
+			// A read the operator approved (a credential path, ADR-0015)
+			// is operator-only too, but it writes nothing: the pin
+			// hooks are for writes (independent review).
+			operatorWrite = ok && d.Verdict.OperatorOnly && d.Mutating && !fromAllowlist
 			// The transcript record (gem-agent ADR-0045 §7) is a local
 			// record of the operator's own decisions — inferring them
 			// from what ran cannot tell a typed 'y' from a policy that

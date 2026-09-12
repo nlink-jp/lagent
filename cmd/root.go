@@ -104,7 +104,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&flagNoSandbox, "no-sandbox", false, "disable the sandbox-exec wrapper for shell_exec (debugging only, unsafe)")
 	rootCmd.Flags().StringVarP(&flagPrompt, "prompt", "p", "", "one-shot: run this prompt and exit; mutating tools are denied unless listed in --allow or --auto is set")
 	rootCmd.Flags().BoolVar(&flagAuto, "auto", false, "start in auto-approve mode (required for auto-approve in -p, where [agent].auto_approve is ignored)")
-	rootCmd.Flags().StringSliceVar(&flagAllow, "allow", nil, `tools that never ask this run: tool names or mcp__server__* prefixes (repeatable or comma-separated); blocked commands still ask`)
+	rootCmd.Flags().StringSliceVar(&flagAllow, "allow", nil, `tools that never ask this run: tool names or mcp__server__* prefixes (repeatable or comma-separated); blocked commands and credential reads still ask`)
 	rootCmd.Flags().BoolVar(&flagWritable, "writable", false, "no lane ceiling — the default, stated; use it to step out of a configured [agent].read_only")
 	rootCmd.Flags().BoolVar(&flagReadOnly, "read-only", false, "cap the session at the read lane: nothing outside the session scratch may change")
 	rootCmd.Flags().BoolVarP(&flagContinue, "continue", "c", false, "resume this project's most recent session")
@@ -2089,7 +2089,7 @@ func slashOutput(input string, ag *agent.Agent, registry *tools.Registry, mcpSum
 			case policy.NeverAsk:
 				marker = "never asks (policy)"
 				if t.Mutating {
-					marker = "never asks (policy; blocked commands still ask)"
+					marker = "never asks (policy; blocked commands and credential reads still ask)"
 				}
 			}
 			fmt.Fprintf(&b, "  %-12s %s (%s)\n", t.Name, firstSentence(t.Description), marker)

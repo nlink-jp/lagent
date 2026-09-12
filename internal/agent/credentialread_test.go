@@ -11,6 +11,7 @@ import (
 
 	"github.com/nlink-jp/lagent/internal/llm"
 	"github.com/nlink-jp/lagent/internal/policy"
+	"github.com/nlink-jp/lagent/internal/risk"
 	"github.com/nlink-jp/lagent/internal/tools"
 )
 
@@ -61,6 +62,7 @@ func TestCredentialReadIsMustPrompt(t *testing.T) {
 		{"read_file", map[string]any{"path": ".env"}, true},
 		{"read_file", map[string]any{"path": "notes.txt"}, true},
 		{"file_info", map[string]any{"paths": []any{"README.md", ".env"}}, true},
+		{"file_info", map[string]any{"paths": []any{"README.md", "notes.txt"}}, true}, // the link inside the batch is resolved too
 		{"view_image", map[string]any{"path": ".env"}, true},
 		{"read_file", map[string]any{"path": ".env.example"}, false},
 		{"read_file", map[string]any{"path": "README.md"}, false},
@@ -113,5 +115,54 @@ func TestCredentialReadIsDeniedUnattendedAndNotByNever(t *testing.T) {
 	out, denied, _, _ = b.execCall(ctx, credCall("read_file", map[string]any{"path": ".env"}))
 	if !denied || len(gate.calls) != 1 || !gate.calls[0] || strings.Contains(out, "sk-test-marker") {
 		t.Errorf("never policy: read_file .env: denied=%v calls=%v out=%q — a never row must not answer a credential read", denied, gate.calls, out)
+	}
+}
+
+// ADR-0015 §1 under --auto: the ladder escalates a credential read
+// (Review, operator-only — never approved by the rule tier) and the
+// gate is asked with mustPrompt; an ordinary read runs unasked.
+func TestCredentialReadEscalatesUnderAuto(t *testing.T) {
+	gate := &floorGate{}
+	var autos []AutoDecision
+	a := New(Options{Registry: credentialProject(t), Gate: gate, AutoApprove: true,
+		OnAutoDecision: func(tc llm.ToolCall, d AutoDecision) { autos = append(autos, d) }})
+	ctx := context.Background()
+	out, denied, _, _ := a.execCall(ctx, credCall("read_file", map[string]any{"path": ".env"}))
+	if !denied || strings.Contains(out, "sk-test-marker") {
+		t.Errorf("--auto read_file .env: denied=%v out=%q", denied, out)
+	}
+	if len(autos) != 1 || autos[0].Approved || autos[0].Tier != risk.Review {
+		t.Errorf("auto decisions = %+v, want one escalated Review", autos)
+	}
+	if len(gate.calls) != 1 || !gate.calls[0] {
+		t.Errorf("gate calls = %v, want one with mustPrompt=true", gate.calls)
+	}
+	out, denied, _, _ = a.execCall(ctx, credCall("read_file", map[string]any{"path": "README.md"}))
+	if denied || !strings.Contains(out, "# readme") || len(gate.calls) != 1 {
+		t.Errorf("--auto read_file README.md: denied=%v out=%q gate=%v", denied, out, gate.calls)
+	}
+}
+
+// An operator-approved credential read is operator-only but writes
+// nothing: the pin hooks around operator writes stay quiet for it and
+// still fire for an operator-only write.
+func TestApprovedCredentialReadIsNotAnOperatorWrite(t *testing.T) {
+	var before, after []string
+	a := New(Options{Registry: credentialProject(t), Gate: &approveAll{},
+		BeforeOperatorWrite: func(tc llm.ToolCall) { before = append(before, tc.Name) },
+		OnOperatorWrite:     func(tc llm.ToolCall) { after = append(after, tc.Name) }})
+	ctx := context.Background()
+	out, denied, _, _ := a.execCall(ctx, credCall("read_file", map[string]any{"path": ".env"}))
+	if denied || !strings.Contains(out, "sk-test-marker") {
+		t.Fatalf("approved read: denied=%v out=%q", denied, out)
+	}
+	if len(before) != 0 || len(after) != 0 {
+		t.Errorf("an approved read fired the operator-write hooks: %v %v", before, after)
+	}
+	if _, denied, _, _ := a.execCall(ctx, credCall("write_file", map[string]any{"path": "AGENTS.md", "content": "# agents\n"})); denied {
+		t.Fatal("approved operator-only write was denied")
+	}
+	if len(before) != 1 || before[0] != "write_file" || len(after) != 1 {
+		t.Errorf("operator-write hooks after an operator-only write: before=%v after=%v", before, after)
 	}
 }

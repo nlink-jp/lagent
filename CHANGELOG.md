@@ -40,7 +40,11 @@
   enumeration tools (independent review). The skip footer, the ignore
   tally and the cut lines of `search_files` and `list_tree` ride after
   the output cap, so a capped result still says what it skipped; the
-  footer's names are sorted.
+  footer's names are sorted. An operator-approved credential read no
+  longer fires the operator-write hooks (it writes nothing; the pins
+  are for writes); the unattended denial tells the model the read-only
+  file tools continue on ordinary files; the `--allow` help and the
+  `/tools` policy marker say that credential reads still ask.
 
 ### Fixed
 
