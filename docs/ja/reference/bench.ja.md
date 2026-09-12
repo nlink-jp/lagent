@@ -52,12 +52,17 @@ go run ./bench report bench/_results/<timestamp>
 | `shell-count` | 数を出すシェルコマンド | 回答が `57` を含む。ツール呼び出し 1 回以上 |
 | `mcp-lookup` | MCP lookup | 回答が `Iceland` を含む。ツール呼び出し 2 回以上（`mcp_load`、次に lookup） |
 | `view-image` | 見るべき画像 | 回答が `red` を含む。ツール呼び出し 1 回以上 |
+| `pointer-small`、`pointer-mid`、`pointer-large` | プロジェクトの `AGENTS.md`（0.6 KB、13 KB、32 KB — 最後はファイル上限の直下）にある `PROCEDURE.md` を指す常置の指示 | `read-edit` と同じく `pager.go` を直し、`CHANGES.log` が `pager.go` を含む（手順の唯一の動作）。ツール呼び出し 2 回以上 |
+| `pointer-facts` | 同じ指示を runtime-facts メッセージのスキル一覧 1 行にしたもの。指示を含まない 32 KB の `AGENTS.md` を併置 | 同上 |
 | `skill-follow` | 読み込んで従うべきスキル | 回答がスキルの固定形式行そのもの（`BRIEF: <n> rows, <n> columns, first id <n>, last id <n>`）。ツール呼び出し 2 回以上（`load_skill`、次に数える） |
 
 タスクは `bench/tasks/<name>/task.toml`（プロンプト、期待、フィクスチャ
 サーバが要るなら `mcp = true`）と `testdata/`、スキルのインストールが
 要るタスクなら `skills/` ディレクトリ — ランナーが実行の隔離 global スキル
-ディレクトリへ複製する。期待は `min_tool_calls`、
+ディレクトリへ複製する。`trust = true` は実行のプロジェクトを信頼済みに
+する（構成の `[approval].trusted_projects` がそれを名指し、実行前にピンを
+記録する）ので、フィクスチャ自身の `AGENTS.md` が読み込まれる。既定は off
+で、未信頼のプロジェクトがベースラインである。期待は `min_tool_calls`、
 `[[expect.file]]`（`path` と `contains` / `not_contains`）、
 `[[expect.answer]]`（`regex`）。ファイル無しで答えられるタスクはここに
 置かない。
@@ -216,6 +221,30 @@ head -n 1`）、1 回はヘッダを数えた（`wc -l` を引かず）。これ
 このタスクが示すのは機構: facts の 1 行で名指されたスキルを、このモデルは
 プロンプト規則無しに読み込んで従う。その後シェルで何をするかはモデル自身の
 問題である。
+
+`pointer-*`、2026-09-12（`384cd2c`、skills と hooks 導入後）、各 3 反復。
+memory 設計が依存する問い: 常置の指示はどこに置けばこのモデルは行動するか。
+
+| task | config | runs | completed | no-tool answers | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |
+|---|---|---|---|---|---|---|---|---|
+| pointer-small | baseline | 3 | 0/3 | 0/3 | 3 | 3 | 23172 | 15 |
+| pointer-mid | baseline | 3 | 0/3 | 0/3 | 8 | 8 | 71879 | 32 |
+| pointer-large | baseline | 3 | 0/3 | 0/3 | 6 | 6 | 84398 | 37 |
+| pointer-facts | baseline | 3 | 2/3 | 0/3 | 8 | 8 | 124739 | 44 |
+
+全実行が `pager.go` を直した。`AGENTS.md` の 9 実行でモデルは `PROCEDURE.md`
+を一度も読まなかった — 0.6 KB でも 32 KB でも同じで、トレースしたリクエスト
+は指示がシステムプロンプトのプロジェクト指示節に入っていたことを確認して
+いる。ファイルの大きさは変数ではない: その節の常置の指示にこのモデルは
+まったく行動しない。`pointer-facts` ではモデルが一覧 1 行から自発的に
+`load_skill` を呼んだのが 2/3 で、どちらもログを書いた。3 回目は空 completion
+にも当たり、ファイル全体を書き直して読み込まずに終えた。同じタスクの最初の
+系列は手順がシェルの追記（`>> CHANGES.log`）を求めており、スキルは 3/3 で
+読み込まれたが完了は 0/3: write レーンのシェルは無人では拒否されるので、
+計測器を `write_file` に直してから上の系列を走らせた。両系列を通して、facts
+メッセージの行は 6 実行中 5 で行動され、指示ファイルの指示は 18 実行中 0。
+呼ぶべきツールを添えて runtime-facts メッセージに乗ったものは従われ、指示節
+に置かれたものは大きさによらず従われない。
 
 ## 比較
 

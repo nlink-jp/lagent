@@ -217,7 +217,8 @@ func TestRunOneIsolatesAndMeasures(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "fake-runtime")
 	script := `#!/bin/sh
-printf '%s\n' "$*" > "$HOME/argv.txt"
+printf '%s\n' "$*" >> "$HOME/argv.txt"
+case "$1" in trust) echo "trust: granted"; exit 0;; esac
 printf '%s\n' "$HOME" > "$LAGENT_STATE_DIR/home.txt"
 mkdir -p "$LAGENT_STATE_DIR/sessions/projects/p"
 cat > "$LAGENT_STATE_DIR/sessions/projects/p/s.jsonl" <<'EOF'
@@ -259,6 +260,40 @@ echo fixed
 	homeSeen, _ := os.ReadFile(filepath.Join(runDir, "state", "home.txt"))
 	if !strings.HasSuffix(strings.TrimSpace(string(homeSeen)), filepath.Join("rep1", "home")) {
 		t.Errorf("HOME was not the run's own: %q", homeSeen)
+	}
+	if strings.Contains(string(argv), "trust --accept") {
+		t.Errorf("an untrusted task must not record pins: %q", argv)
+	}
+	runCfg, _ := os.ReadFile(filepath.Join(runDir, "home", ".config", "lagent", "config.toml"))
+	if strings.Contains(string(runCfg), "trusted_projects") {
+		t.Errorf("an untrusted task's configuration must not name the project: %q", runCfg)
+	}
+
+	// trust = true: the configuration names the project and the pins
+	// are recorded (trust --accept) before the run.
+	trustedDir := filepath.Join(dir, "tasks", "trusted")
+	writeFile(t, filepath.Join(trustedDir, "task.toml"), "prompt = \"fix it\"\ntrust = true\n[expect]\nmin_tool_calls = 1\n")
+	writeFile(t, filepath.Join(trustedDir, "testdata", "AGENTS.md"), "# rules\n")
+	tasks, err = loadTasks(filepath.Join(dir, "tasks"), []string{"trusted"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r2 := *r
+	r2.OutDir = filepath.Join(dir, "results-trusted")
+	if _, err := r2.runOne(cell{Task: tasks[0], Config: configRef{Name: "baseline", Path: cfg}, Rep: 1}); err != nil {
+		t.Fatal(err)
+	}
+	trustedRun := filepath.Join(r2.OutDir, "trusted", "baseline", "rep1")
+	argv, _ = os.ReadFile(filepath.Join(trustedRun, "home", "argv.txt"))
+	if !strings.Contains(string(argv), "trust --accept --config ") || !strings.Contains(string(argv), "-p fix it") {
+		t.Errorf("a trusted task records pins before the run: %q", argv)
+	}
+	runCfg, _ = os.ReadFile(filepath.Join(trustedRun, "home", ".config", "lagent", "config.toml"))
+	if !strings.Contains(string(runCfg), "[approval]\ntrusted_projects = [\"") || !strings.Contains(string(runCfg), filepath.Join("rep1", "home", "project")) {
+		t.Errorf("the run's configuration must name the project as trusted: %q", runCfg)
+	}
+	if _, err := os.Stat(filepath.Join(trustedRun, "trust.txt")); err != nil {
+		t.Error("trust output was not kept beside the run")
 	}
 	if _, err := os.Stat(filepath.Join(runDir, "home", ".config", "lagent", "mcp.json")); err != nil {
 		t.Error("an mcp task must get a global mcp.json in its HOME")

@@ -19,6 +19,13 @@ type task struct {
 	Dir    string `toml:"-"`
 	Prompt string `toml:"prompt"`
 	MCP    bool   `toml:"mcp"` // needs the bench MCP fixture server
+	// Trust marks the run's project as trusted (the configuration's
+	// [approval].trusted_projects names it, and the runtime's pins are
+	// recorded before the run), so the fixture's own AGENTS.md and
+	// project skills load. Off by default: an untrusted project is the
+	// bench's baseline, and most tasks measure nothing about
+	// instruction files.
+	Trust  bool   `toml:"trust"`
 	Expect expect `toml:"expect"`
 	// Fixture is <Dir>/testdata: the name Go tooling ignores, so the
 	// fixture's own .go files are never built, vetted or linted as

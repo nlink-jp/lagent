@@ -54,12 +54,18 @@ preload the server and hide whether the model loads it).
 | `shell-count` | a shell command for a number | the answer contains `57`; at least one tool call |
 | `mcp-lookup` | MCP lookup | the answer contains `Iceland`; at least two tool calls (`mcp_load`, then the lookup) |
 | `view-image` | an image to look at | the answer contains `red`; at least one tool call |
+| `pointer-small`, `pointer-mid`, `pointer-large` | a standing directive in the project's `AGENTS.md` (0.6 KB, 13 KB, 32 KB — the last just under the per-file cap), pointing at `PROCEDURE.md` | `pager.go` fixed as in `read-edit` and `CHANGES.log` names `pager.go` (the procedure's one action); at least two tool calls |
+| `pointer-facts` | the same directive as one skill catalog line in the runtime-facts message, beside a 32 KB `AGENTS.md` without it | as above |
 | `skill-follow` | a skill to load and follow | the answer is exactly the skill's fixed-format line (`BRIEF: <n> rows, <n> columns, first id <n>, last id <n>`); at least two tool calls (`load_skill`, then the count) |
 
 A task is `bench/tasks/<name>/task.toml` (prompt, expectations, `mcp =
 true` when it needs the fixture server) plus `testdata/`, and a
 `skills/` directory when the task needs skills installed — the runner
-copies it into the run's isolated global skill directory. Expectations
+copies it into the run's isolated global skill directory. `trust =
+true` marks the run's project trusted (the configuration names it in
+`[approval].trusted_projects` and the pins are recorded before the
+run), so the fixture's own `AGENTS.md` loads; off by default, since an
+untrusted project is the baseline. Expectations
 are `min_tool_calls`, `[[expect.file]]` (`path` with `contains` /
 `not_contains`) and `[[expect.answer]]` (`regex`). A task the model
 could answer without the files does not belong here.
@@ -240,6 +246,34 @@ on that criterion:
 again in 1/3. What the task shows is the mechanism: a skill named in
 one facts line is loaded and followed by this model without a prompt
 rule; what it does with the shell afterwards is the model's own.
+
+`pointer-*`, 2026-09-12 (`384cd2c`, skills and hooks in), three
+repetitions each, on the question the memory design turns on: where
+does a standing directive have to sit for this model to act on it?
+
+| task | config | runs | completed | no-tool answers | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |
+|---|---|---|---|---|---|---|---|---|
+| pointer-small | baseline | 3 | 0/3 | 0/3 | 3 | 3 | 23172 | 15 |
+| pointer-mid | baseline | 3 | 0/3 | 0/3 | 8 | 8 | 71879 | 32 |
+| pointer-large | baseline | 3 | 0/3 | 0/3 | 6 | 6 | 84398 | 37 |
+| pointer-facts | baseline | 3 | 2/3 | 0/3 | 8 | 8 | 124739 | 44 |
+
+Every run fixed `pager.go`. In the nine `AGENTS.md` runs the model
+never read `PROCEDURE.md` — not once, at 0.6 KB any more than at 32
+KB — although a traced request confirmed the directive was in the
+system prompt's project-instructions section. The size of the file is
+not the variable: a standing directive in that section is not acted on
+by this model at all. In `pointer-facts` the model called `load_skill`
+on its own from the one catalog line in 2/3 and wrote the log both
+times; the third run, which also hit an empty completion, rewrote the
+whole file and finished without loading. A first series on the same
+tasks, whose procedure asked for a shell append (`>> CHANGES.log`),
+loaded the skill in 3/3 and completed 0/3: the write-lane shell is
+denied unattended, so the instrument was corrected to `write_file`
+before the series above. Over both series, the facts-message line was
+acted on in 5/6 runs and the instruction-file directive in 0/18. What
+rides the runtime-facts message with a tool to call is followed; what
+sits in the instruction section is not, whatever its size.
 
 ## Comparing
 

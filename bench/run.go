@@ -98,6 +98,18 @@ func (r *runner) runOne(c cell) (result, error) {
 			return result{}, err
 		}
 	}
+	absProjectForTrust, err := filepath.Abs(project)
+	if err != nil {
+		return result{}, err
+	}
+	if c.Task.Trust {
+		// The strong, hand-written grant both runtimes honour
+		// ([approval].trusted_projects); a super-table after its
+		// sub-table is valid TOML, so this appends to any configuration.
+		if err := appendTrustedProject(cfgPath, absProjectForTrust); err != nil {
+			return result{}, err
+		}
+	}
 	if c.Task.SkillsDir != "" {
 		if err := copyTree(c.Task.SkillsDir, filepath.Join(cfgDir, "skills")); err != nil {
 			return result{}, fmt.Errorf("task %s skills: %w", c.Task.Name, err)
@@ -121,11 +133,23 @@ func (r *runner) runOne(c cell) (result, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), r.Timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, r.Bin, "-p", c.Task.Prompt, "--auto", "--config", cfgPath)
-	cmd.Dir = absProject
 	override := r.Runtime.passThroughEnv(os.Getenv("HOME"))
 	override["HOME"] = absHome
 	override[r.Runtime.StateEnv] = absState
+	if c.Task.Trust {
+		// Record the pins the way the operator would (`trust --accept`),
+		// so a trusted project's files load under pin_trusted_files.
+		pin := exec.CommandContext(ctx, r.Bin, "trust", "--accept", "--config", cfgPath)
+		pin.Dir = absProject
+		pin.Env = isolatedEnv(os.Environ(), override)
+		pinOut, pinErr := pin.CombinedOutput()
+		_ = os.WriteFile(filepath.Join(dir, "trust.txt"), pinOut, 0o644)
+		if pinErr != nil {
+			return result{}, fmt.Errorf("task %s: trust --accept: %w\n%s", c.Task.Name, pinErr, pinOut)
+		}
+	}
+	cmd := exec.CommandContext(ctx, r.Bin, "-p", c.Task.Prompt, "--auto", "--config", cfgPath)
+	cmd.Dir = absProject
 	cmd.Env = isolatedEnv(os.Environ(), override)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
@@ -276,4 +300,17 @@ func loadResults(dir string) ([]result, error) {
 		out = append(out, r)
 	}
 	return out, nil
+}
+
+// appendTrustedProject adds the run's project to the configuration's
+// [approval].trusted_projects, the grant that lets the fixture's own
+// instruction files and project skills load.
+func appendTrustedProject(cfgPath, project string) error {
+	f, err := os.OpenFile(cfgPath, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = fmt.Fprintf(f, "\n[approval]\ntrusted_projects = [%q]\n", project)
+	return err
 }
