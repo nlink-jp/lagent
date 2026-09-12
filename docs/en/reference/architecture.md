@@ -139,7 +139,7 @@ callbacks and the agent never imports a UI package:
 The rule tier (`internal/risk`) classifies every call: Safe runs under
 `--auto` without asking, Block always asks, Review asks the operator.
 There is no model tier here: gem-agent's second model call judging the
-proposed call is a Phase 2 measurement. The session ceiling
+proposed call was measured and not adopted (ADR-0010). The session ceiling
 (`--read-only`) caps the lane a call may reach; lifting it is the
 operator's act. Operator-only files — the instruction files, `.mcp.json`,
 `.lagent.toml`, and the sibling runtime's `.gem-agent.toml` — are never

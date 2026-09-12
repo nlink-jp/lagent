@@ -10,6 +10,15 @@
   (ADR-0009): thinking on completed 18/18 against 17/18 with no empty
   completion, at twice the wall time; the default stays unset.
 
+### Decided
+
+- **The model tier of auto-approval is not adopted** (ADR-0010). Over
+  36 bench runs the rule tier's Review calls were four to five
+  write-lane verification shells the read lane now runs unasked; a
+  verdict would cost seconds per call on the one local model, judging
+  its own proposal. The ladder stays Safe / Review / Block, and the
+  RFP's Phase 2 item closes as rejected on measurement.
+
 ### Fixed
 
 - A re-send after an empty completion now carries one transient line

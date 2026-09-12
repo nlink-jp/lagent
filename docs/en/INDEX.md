@@ -75,3 +75,8 @@ excepted).
   an operator key: `[llm].reasoning_effort` is sent verbatim, the
   default stays unset until the bench decides, reasoning content is
   never stored
+- [`ADR-0010`](adr/0010-no-model-tier.md) — the model tier of
+  auto-approval is not adopted: the bench's Review-tier calls were
+  write-lane verifications the read lane now runs, a verdict would cost
+  seconds per call on one local model that would be judging itself,
+  and the operator's rows and lanes already cover them

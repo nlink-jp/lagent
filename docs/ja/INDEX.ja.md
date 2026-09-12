@@ -68,3 +68,7 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
 - [`ADR-0009`](adr/0009-thinking-is-an-operator-key.ja.md) — thinking は
   操作者のキー: `[llm].reasoning_effort` をそのまま送り、既定はベンチが
   決めるまで未設定、reasoning の内容は保存しない
+- [`ADR-0010`](adr/0010-no-model-tier.ja.md) — 自動承認のモデル層は
+  採らない: ベンチの Review 呼び出しは今や read レーンが走らせる write
+  レーンの検証で、判定はローカルモデル 1 つが自分を裁いて呼び出しごとに
+  数秒かかり、操作者の行とレーンが既に覆っている

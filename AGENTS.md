@@ -162,10 +162,10 @@ answers.
   still digest `.claude/skills` for change detection (the sibling runtime
   reads them, and a changed one is a fact worth a line), but nothing here
   loads a skill: skills are RFP Phase 2. The trust prompt says so.
-- **There is no model tier.** `agent.AutoDecision.ModelConsulted` is
-  always false and stays for record-shape parity; the round checkpoint
-  asks the operator or stops. Adding a model review is a Phase 2 ADR,
-  not a flag.
+- **There is no model tier, by decision** (ADR-0010).
+  `agent.AutoDecision.ModelConsulted` is always false and stays for
+  record-shape parity; the round checkpoint asks the operator or stops.
+  Reopening it takes the measurement ADR-0010 names, not a flag.
 - **The OpenAI client reads are bounded by hand** — `io.LimitReader` on
   error bodies and the probe, a 16 MiB scanner buffer on the stream —
   and `internal/archtest` allowlists them by name with the reason.

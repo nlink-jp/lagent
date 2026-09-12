@@ -189,7 +189,7 @@ Each item is adopted or rejected by ADR on the strength of Phase 1
 measurements.
 
 - history compaction (designed after measuring the KV-cache discard cost)
-- the model tier of auto-approval
+- the model tier of auto-approval — measured and not adopted (ADR-0010)
 - skills, agent memory, hooks
 - a local-oriented prompt revision
 - Gemma 4's thinking toggle
