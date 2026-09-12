@@ -8,6 +8,7 @@
 | Decision makers | nlink-jp maintainers |
 | Triggered by | System risk review of 2026-09-13, finding R02 (high): the shell lanes deny the credential list at the kernel and the write tools refuse it, but `read_file .env` inside the project was Safe — the value went to the model and into the transcript as an ordinary tool result |
 | Relates to | ADR-0001 (a deliberate local change; gem-agent makes the same change independently, in the same shape), gem-agent ADR-0073 (the lanes: only the operator lane reads credentials), gem-agent ADR-0072 §4 (an operator-only Review), ADR-0008 (a skip names the route), ADR-0010 (no model tier: the operator is the only judge) |
+| Amended by | as built, 2026-09-13: the residue under Consequences is accepted, not scheduled — the operator's decision; closing it would reopen the rule-growth gem-agent ADR-0076 measured and withdrew |
 
 ## Context
 
@@ -128,8 +129,14 @@ by every enforcer, not a detector.
   no settings row: a credential read with a toggle is a bypass.
 - Not a DLP: a secret in a file the list does not name is read like any
   file, as chapter 10 of the review says. Unchanged.
-- **Residue, recorded and not closed here** (independent review of
-  this record, measured under `sandbox-exec`). (1) The read lane can
+- **Residue, recorded and accepted** (independent review of this
+  record, measured under `sandbox-exec`; the operator's decision,
+  2026-09-13). Closing either route means growing rules over a
+  directory that mixes secrets and ordinary settings — the class
+  gem-agent ADR-0076 measured and withdrew, and the knowledge base
+  records as "do not split such a directory with a deny" — so neither
+  is scheduled; both stay named here so that nobody reads the file
+  tools' gate as covering them. (1) The read lane can
   read `~/.config/lagent/config.toml` — and with it an `[llm].api_key`
   kept in the file rather than the environment — and the transcripts
   under the state root, so an approved `read_file .env` of one session
@@ -138,13 +145,15 @@ by every enforcer, not a detector.
   and the `sessions/` and `memory/` subtrees under the state root in
   the read and write lanes while the work directory under the same
   root stays writable, and deciding whether a key may live in the file
-  at all — a record of its own. (2) The write lane denies reading a
+  at all. (2) The write lane denies reading a
   credential name but not renaming it: `mv .env notes.txt && cat
   notes.txt` in one approved write-lane command reads it, and
   `read_file notes.txt` afterwards is an ordinary read; the text floor
   catches a literal `.env`, not `.en?`. Closing it is a `file-write*`
   deny on the credential names in the write lane, which also stops
-  `cp .env.example .env` there, and is decided with that cost in view.
+  `cp .env.example .env` there. Keep secrets out of the working copy
+  and off the state root's machine account, as chapter 10 of the
+  review recommends; that is the control for both.
 
 ## Alternatives considered
 
