@@ -52,7 +52,7 @@ go run ./bench report bench/_results/<timestamp>
 | `shell-count` | 数を出すシェルコマンド | 回答が `57` を含む。ツール呼び出し 1 回以上 |
 | `mcp-lookup` | MCP lookup | 回答が `Iceland` を含む。ツール呼び出し 2 回以上（`mcp_load`、次に lookup） |
 | `view-image` | 見るべき画像 | 回答が `red` を含む。ツール呼び出し 1 回以上 |
-| `skill-follow` | 読み込んで従うべきスキル | 回答がスキルの固定形式行 `BRIEF: 57 rows, 3 columns, first id 1, last id 57`。ツール呼び出し 2 回以上（`load_skill`、次に数える） |
+| `skill-follow` | 読み込んで従うべきスキル | 回答がスキルの固定形式行そのもの（`BRIEF: <n> rows, <n> columns, first id <n>, last id <n>`）。ツール呼び出し 2 回以上（`load_skill`、次に数える） |
 
 タスクは `bench/tasks/<name>/task.toml`（プロンプト、期待、フィクスチャ
 サーバが要るなら `mcp = true`）と `testdata/`、スキルのインストールが
@@ -198,6 +198,24 @@ LM Studio が Gemma 4 の thinking on に丸める。ベースラインは何も
 トークンと壁時計時間で払う。ローカルモデルは 3 分の 1 のラウンドで同じ完了に
 達する。実行が要するラウンド数は各モデルの癖の性質であってランタイムの
 性質ではなく、品質の点数でもない。
+
+`skill-follow`、2026-09-12（`7806818`、skills 導入、ADR-0011）、3 反復:
+モデルは facts メッセージの一覧 1 行から促されずに 3/3 で最初に
+`load_skill` を呼び、3/3 でスキルの固定形式で答えた — 2 ラウンド、約 14
+秒、prompt 13〜18k トークン。最初に書いたタスクは数値の一致も要求し、
+それを満たしたのは 1/3: 1 回は最後から 2 行目を最終行と取り（`tail -n 2 |
+head -n 1`）、1 回はヘッダを数えた（`wc -l` を引かず）。これはシェルの
+算術で `shell-count` が計測するものなので、期待は数値を自由にした形式行に
+改めた。その基準でさらに 3 反復:
+
+| task | config | runs | completed | no-tool answers | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |
+|---|---|---|---|---|---|---|---|---|
+| skill-follow | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 18144 | 13 |
+
+再び 3/3 で `load_skill` が最初、形式は 3/3、数値の一致はやはり 1/3。
+このタスクが示すのは機構: facts の 1 行で名指されたスキルを、このモデルは
+プロンプト規則無しに読み込んで従う。その後シェルで何をするかはモデル自身の
+問題である。
 
 ## 比較
 

@@ -54,7 +54,7 @@ preload the server and hide whether the model loads it).
 | `shell-count` | a shell command for a number | the answer contains `57`; at least one tool call |
 | `mcp-lookup` | MCP lookup | the answer contains `Iceland`; at least two tool calls (`mcp_load`, then the lookup) |
 | `view-image` | an image to look at | the answer contains `red`; at least one tool call |
-| `skill-follow` | a skill to load and follow | the answer is the skill's fixed-format line `BRIEF: 57 rows, 3 columns, first id 1, last id 57`; at least two tool calls (`load_skill`, then the count) |
+| `skill-follow` | a skill to load and follow | the answer is exactly the skill's fixed-format line (`BRIEF: <n> rows, <n> columns, first id <n>, last id <n>`); at least two tool calls (`load_skill`, then the count) |
 
 A task is `bench/tasks/<name>/task.toml` (prompt, expectations, `mcp =
 true` when it needs the fixture server) plus `testdata/`, and a
@@ -220,6 +220,26 @@ prompt tokens and wall time; the local model reaches the same
 completion in a third of the rounds. The rounds a run takes are a
 property of each model's habit, not of the runtime, and are not a
 quality score.
+
+`skill-follow`, 2026-09-12 (`7806818`, skills in, ADR-0011), three
+repetitions: the model called `load_skill` first in 3/3, unprompted,
+from the one catalog line in the facts message, and answered in the
+skill's fixed format in 3/3 — 2 rounds, about 14 s, 13–18k prompt
+tokens. The task as first written also required the exact numbers, and
+1/3 had them: one run took the second-to-last line as the last (`tail
+-n 2 | head -n 1`), one counted the header (`wc -l` unsubtracted). That
+is shell arithmetic, which `shell-count` measures, so the expectation
+became the format line with the numbers free. Three more repetitions
+on that criterion:
+
+| task | config | runs | completed | no-tool answers | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |
+|---|---|---|---|---|---|---|---|---|
+| skill-follow | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 18144 | 13 |
+
+`load_skill` first in 3/3 again, the format in 3/3, the exact numbers
+again in 1/3. What the task shows is the mechanism: a skill named in
+one facts line is loaded and followed by this model without a prompt
+rule; what it does with the shell afterwards is the model's own.
 
 ## Comparing
 

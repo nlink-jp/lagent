@@ -2,4 +2,7 @@ prompt = "Use the csv-brief skill to describe data.csv."
 [expect]
 min_tool_calls = 2
 [[expect.answer]]
-regex = 'BRIEF: 57 rows, 3 columns, first id 1, last id 57'
+# The skill's fixed-format line: only reachable by loading the skill
+# and following it. The numbers are free — whether the model's shell
+# arithmetic is right is what shell-count measures, not this task.
+regex = '^BRIEF: \d+ rows, \d+ columns, first id \d+, last id \d+$'
