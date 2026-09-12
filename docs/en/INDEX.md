@@ -116,7 +116,8 @@ excepted).
   withdrawn: `credentialTally` and the enumeration tools' credential
   code are deleted, and the walks' spelling defect dissolves with them
 - [`ADR-0017`](adr/0017-the-runtime-hides-only-its-own.md) —
-  the runtime hides only its own: the environment scrub covered one
+  the runtime hides only its own (**Accepted**, implemented): the
+  environment scrub covered one
   child of six and passed `OPENAI_KEY` while catching `NPM_TOKEN`, and
   an allowlist would only move the unbounded list, so it is deleted and
   the operator's environment is not touched. The one bounded set is

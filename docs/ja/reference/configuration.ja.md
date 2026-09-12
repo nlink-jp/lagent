@@ -195,12 +195,21 @@ command     = "/Users/you/hooks/session-end.sh"
 | `LAGENT_PROJECT_DIR` | export | プロジェクトディレクトリ。それを知る必要がある子プロセス向け |
 | `GOCACHE`（と `[sandbox.scratch_caches]` の全行） | export | 全レーンの `shell_exec` 向け: セッション scratch 内のディレクトリ。Go のコンパイル・vet・テストが read レーンで走る（sandbox は `~/Library` 下のキャッシュを拒否する）。あなた自身のキャッシュには触れない |
 
-read レーンの `shell_exec` は尋ねずに走り、その出力はモデルへ届くので、
-あなたが export した秘密は継承しない: 名前がトークン・キー・パスワード・
-資格情報に見える変数は環境から落とされ、`LAGENT_API_KEY` も含む。
-ランタイム自身の変数のうち残るのは上の 3 つの export —
-`LAGENT_SESSION_ID`、`LAGENT_WORK_DIR`、`LAGENT_PROJECT_DIR` — だけで、
-名前で残す。write と operator レーンは環境をそのまま継承する。
+**あなたが export した変数は絞り込みません**（ADR-0017）。コマンドが動かす
+プログラムにどれが必要かは lagent が答えられる問いではないので、lagent が
+起動された環境は、それが起こす全ての子に届きます。3 つのレーンのシェルも、
+MCP サーバも、フックも同じです。read レーンの素の `env` はそれを印字します。
+モデルに届いてほしくない変数があるなら、それを持たないシェルから lagent を
+起動するか、起動時に落としてください（`env -u NAME lagent`）。
+
+どの子にも渡らないのは lagent **自身の**設定変数です —
+`LAGENT_API_KEY`・`LAGENT_PROVIDER`・`LAGENT_BASE_URL`・`LAGENT_MODEL`・
+`LAGENT_REASONING_EFFORT`・`LAGENT_STATE_DIR`・`LAGENT_LLM_TRACE`・
+`LAGENT_MCP_STDERR`。ランタイムが自分のために読む変数であり、その全部を
+名前で知っているからです。上の 3 つの export（`LAGENT_SESSION_ID`・
+`LAGENT_WORK_DIR`・`LAGENT_PROJECT_DIR`）は子のために在るので通ります。
+外れた値のどれかを必要とするサーバは、自分の `.mcp.json` エントリの `env`
+ブロックから受け取ります。
 
 ## コマンド
 

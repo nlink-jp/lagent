@@ -222,15 +222,21 @@ answers.
   are never built or linted; each run's project sits under the run's
   own `HOME`, so this repository's `AGENTS.md` never reaches a run. A
   task the model could answer without the files measures nothing.
-- **The read lane's environment keeps the runtime's exports by name,
-  never by prefix.** `sandbox.ScrubEnv` drops every variable whose
-  name looks like a secret and keeps exactly `readLaneExports` —
-  `LAGENT_SESSION_ID`, `LAGENT_WORK_DIR`, `LAGENT_PROJECT_DIR`, pinned
-  to the export sites' constants by a test. A `LAGENT_` prefix
-  exemption once let `LAGENT_API_KEY` through to every read-lane
-  command (system risk review R01). A new export with a secret-looking
-  name is added to that list with its reason; a new config variable
-  never is.
+- **The operator's environment is not filtered; the runtime's own
+  namespace reaches no child** (ADR-0017). `sandbox.ChildEnv` removes
+  `runtimeOwnEnv` and keeps `childExportEnv` (`LAGENT_SESSION_ID`,
+  `LAGENT_WORK_DIR`, `LAGENT_PROJECT_DIR`, pinned to the export sites'
+  constants), and it is applied at every spawn site: `laneEnv` for all
+  three lanes, `internal/mcp`'s server spawn, `internal/hooks`. The two
+  halves partition `LAGENT_`, and `internal/archtest`
+  `TestRuntimeEnvNamespaceIsPartitioned` fails on a `LAGENT_` literal
+  in neither half or a listed name the tree no longer uses — which is
+  what closes R01: `LAGENT_API_KEY` is in the removed half because the
+  runtime reads it for itself, not because anything recognises the word
+  `key`. The withdrawn scrub guessed at the operator's names, covered
+  one child of six, and passed `OPENAI_KEY` while catching
+  `NPM_TOKEN`. Apply `ChildEnv` at any new spawn site; never re-add a
+  rule over names the runtime does not own.
 - **A credential path is the operator's question in every file tool**
   (ADR-0015). `read_file`, `file_info` and `view_image` on a path
   `sandbox.CredentialPath` names are Review with `OperatorOnly` —

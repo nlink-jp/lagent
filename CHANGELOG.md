@@ -1,5 +1,38 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The operator's environment is no longer filtered, and the runtime's
+  own variables no longer reach any child** (ADR-0017). The read lane's
+  environment scrub is deleted: it covered one child of six — the write
+  and operator lane shells, the `!` shell, MCP servers and hooks all
+  received the environment whole — and the one it covered passed
+  `OPENAI_KEY`, `GH_PAT` and `GPG_PASSPHRASE` while catching
+  `NPM_TOKEN`. Which variable the program a command runs needs is not a
+  question lagent can answer, and an allowlist would move the unbounded
+  list rather than remove it. **A bare `env` in the read lane now
+  prints what you exported**, as it already did in every other lane;
+  the remedy is the operator's: launch lagent from a shell that does
+  not hold what you would not give the model, or `env -u NAME lagent`.
+  In exchange, the one set the runtime knows exhaustively — its own
+  `LAGENT_` namespace — is handled in the other direction.
+  `sandbox.ChildEnv` removes `LAGENT_API_KEY`, `LAGENT_PROVIDER`,
+  `LAGENT_BASE_URL`, `LAGENT_MODEL`, `LAGENT_REASONING_EFFORT`,
+  `LAGENT_STATE_DIR`, `LAGENT_LLM_TRACE` and `LAGENT_MCP_STDERR` from
+  every child, while the three exported for children
+  (`LAGENT_SESSION_ID`, `LAGENT_WORK_DIR`, `LAGENT_PROJECT_DIR`) pass.
+  The two halves partition the namespace and an architecture test
+  refuses a `LAGENT_` literal in neither, so R01's own variable is
+  removed by what it is rather than by a regex recognising the word
+  `key`. This closes the environment route only: the key also lives in
+  `.lagent.toml`, which the read lane can read, and ADR-0015 records
+  that residue as accepted. A nested `lagent` in a shell lane now reads
+  its own configuration file instead of inheriting the parent's; an MCP
+  server wanting a `LAGENT_` value takes it from the `env` block of its
+  `.mcp.json` entry.
+
 ## [0.4.0] - 2026-09-13
 
 ### Security

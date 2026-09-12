@@ -563,21 +563,9 @@ func TestReadLaneDeniesAWorkDirUnderASharedRoot(t *testing.T) {
 	}
 }
 
-// Review F-07 / F-10: the read lane's environment carries no exported
-// secrets, and the denial hint reads the tail of the output only.
-func TestScrubEnvAndHintTail(t *testing.T) {
-	env := ScrubEnv([]string{"PATH=/bin", "HOME=/Users/x", "GITHUB_TOKEN=abc", "AWS_SECRET_ACCESS_KEY=k", "LAGENT_SESSION_ID=s", "MY_API_KEY=z", "GOFLAGS=-mod=mod", "OPENAI_api_key=q"})
-	got := strings.Join(env, " ")
-	for _, gone := range []string{"GITHUB_TOKEN", "AWS_SECRET", "MY_API_KEY", "OPENAI_api_key"} {
-		if strings.Contains(got, gone) {
-			t.Errorf("%s survived the scrub: %v", gone, env)
-		}
-	}
-	for _, kept := range []string{"PATH=", "HOME=", "LAGENT_SESSION_ID", "GOFLAGS"} {
-		if !strings.Contains(got, kept) {
-			t.Errorf("%s was scrubbed: %v", kept, env)
-		}
-	}
+// The denial hint reads the tail of the output only (review F-10): a
+// refusal quoted early in a long log is not the lane refusing.
+func TestDeniedHintReadsTheTail(t *testing.T) {
 	if DeniedHint("grep: permission denied appears in this log line\n" + strings.Repeat("ok\n", 300) + "[exit status 1]") {
 		t.Error("a denial quoted early in a long output must not read as the lane's refusal")
 	}

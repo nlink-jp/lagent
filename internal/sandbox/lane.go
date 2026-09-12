@@ -711,42 +711,75 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// secretEnvRe names environment variables a read-lane command does not
-// inherit: the operator's exported tokens, keys and passwords. The
-// read lane runs unasked and its output reaches the model, so what a
-// bare `env` prints is bounded here (review F-07). Everything else —
-// PATH, HOME, LANG, the toolchain variables — passes through.
-var secretEnvRe = regexp.MustCompile(`(?i)(token|secret|passw|api[_-]?key|credential|private[_-]?key|access[_-]?key|auth)`)
+// runtimeOwnEnv are the variables lagent reads for itself: its
+// configuration inputs, its diagnostic switches and its state root.
+// Nobody else reads this namespace, so this is the one set of
+// environment names the runtime knows exhaustively — and the one set
+// it may act on (ADR-0017). They are removed from every child it
+// spawns, LAGENT_API_KEY among them.
+//
+// The operator's own environment is not touched. Which variable the
+// program a read-lane command runs needs is not a question this
+// runtime can answer, and the scrub that used to guess at it covered
+// one child of six while passing OPENAI_KEY and GH_PAT.
+var runtimeOwnEnv = map[string]bool{
+	"LAGENT_STATE_DIR":        true,
+	"LAGENT_PROVIDER":         true,
+	"LAGENT_BASE_URL":         true,
+	"LAGENT_MODEL":            true,
+	"LAGENT_API_KEY":          true,
+	"LAGENT_REASONING_EFFORT": true,
+	"LAGENT_LLM_TRACE":        true,
+	"LAGENT_MCP_STDERR":       true,
+}
 
-// readLaneExports are the runtime's own exports a read-lane command
-// keeps whatever their names look like: the session id, the work
-// directory and the project directory (session.EnvVar, workdir.EnvVar,
-// workdir.ProjectEnvVar; a test pins the spellings to those
-// constants). They are kept by name, not by prefix: the LAGENT_
-// namespace was once exempted whole, when it held only these, and
-// LAGENT_API_KEY — the config's bearer token — later joined it and
-// rode the exemption into every read-lane command's environment, from
-// where a bare `env` puts it in front of the model and into the
-// transcript (system risk review, R01). A variable the runtime reads
-// rather than exports (LAGENT_STATE_DIR, LAGENT_LLM_TRACE) is not
-// listed: a command has no use for it, and the regex decides it like
-// any other name.
-var readLaneExports = map[string]bool{
+// childExportEnv are the variables the runtime puts in FRONT of its
+// children — the session id, the work directory and the project
+// directory (session.EnvVar, workdir.EnvVar, workdir.ProjectEnvVar; a
+// test pins the spellings to those constants). They exist for
+// children, so they pass.
+//
+// Together with runtimeOwnEnv this is a partition of the LAGENT_
+// namespace, and an architecture test requires every LAGENT_ literal
+// in the tree to sit in exactly one half. That is what closes R01: the
+// namespace was once exempted whole, when it held only the exports,
+// and LAGENT_API_KEY later joined it and rode the exemption into every
+// read-lane command. The prefix was the right domain read in the wrong
+// direction — it kept all of LAGENT_ and guessed about the rest.
+var childExportEnv = map[string]bool{
 	"LAGENT_SESSION_ID":  true,
 	"LAGENT_WORK_DIR":    true,
 	"LAGENT_PROJECT_DIR": true,
 }
 
-// ScrubEnv returns env without the variables secretEnvRe names,
-// readLaneExports excepted.
-func ScrubEnv(env []string) []string {
+// OwnEnvNames and ChildExportNames return the two halves, sorted, for
+// the architecture test that pins the partition.
+func OwnEnvNames() []string { return sortedEnvKeys(runtimeOwnEnv) }
+
+// ChildExportNames is OwnEnvNames' other half.
+func ChildExportNames() []string { return sortedEnvKeys(childExportEnv) }
+
+func sortedEnvKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// ChildEnv returns env without the runtime's own configuration
+// variables (ADR-0017 §2). Every other variable passes untouched,
+// including the exports of childExportEnv, which the runtime set for
+// children in the first place.
+func ChildEnv(env []string) []string {
 	out := make([]string, 0, len(env))
 	for _, kv := range env {
 		name := kv
 		if i := strings.IndexByte(kv, '='); i >= 0 {
 			name = kv[:i]
 		}
-		if readLaneExports[name] || !secretEnvRe.MatchString(name) {
+		if !runtimeOwnEnv[name] {
 			out = append(out, kv)
 		}
 	}

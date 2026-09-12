@@ -158,7 +158,7 @@ type Agent struct {
 	// preToolHook: the operator's floor before the ladder (Options.PreToolHook).
 	preToolHook func(ctx context.Context, name string, args map[string]any) (bool, string)
 	// promptHook: the operator's prompt-submit hooks (Options.PromptHook).
-	promptHook PromptHook
+	promptHook  PromptHook
 	noMentions  bool
 	onToolDone  func(tc llm.ToolCall)
 	turnCalls   []string

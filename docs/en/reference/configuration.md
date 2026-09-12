@@ -206,13 +206,22 @@ Other environment variables the runtime reads or sets:
 | `LAGENT_PROJECT_DIR` | exported | the project directory, for children that need to know it |
 | `GOCACHE` (and every `[sandbox.scratch_caches]` row) | exported | for `shell_exec` in every lane: a directory in the session scratch, so Go compiles, vets and tests run in the read lane (the sandbox denies the cache under `~/Library`); your own cache is untouched |
 
-A read-lane `shell_exec` runs unasked and its output reaches the model,
-so it does not inherit your exported secrets: a variable whose name
-looks like a token, key, password or credential is dropped from its
-environment, `LAGENT_API_KEY` included. Of the runtime's own variables
-only the three exports above — `LAGENT_SESSION_ID`, `LAGENT_WORK_DIR`,
-`LAGENT_PROJECT_DIR` — are kept by name. The write and operator lanes
-inherit the environment as it is.
+**Your exported variables are not filtered** (ADR-0017). Which one the
+program a command runs needs is not a question lagent can answer, so
+the environment lagent is launched with reaches every child it spawns:
+the shells of all three lanes, MCP servers and hooks alike. A bare
+`env` in the read lane prints it. If a variable must not reach the
+model, launch lagent from a shell that does not hold it, or drop it at
+launch (`env -u NAME lagent`).
+
+What no child gets is lagent's **own** configuration variables —
+`LAGENT_API_KEY`, `LAGENT_PROVIDER`, `LAGENT_BASE_URL`, `LAGENT_MODEL`,
+`LAGENT_REASONING_EFFORT`, `LAGENT_STATE_DIR`, `LAGENT_LLM_TRACE`,
+`LAGENT_MCP_STDERR` — because the runtime reads those for itself and
+knows every one of them by name. The three exports above
+(`LAGENT_SESSION_ID`, `LAGENT_WORK_DIR`, `LAGENT_PROJECT_DIR`) exist
+for children and pass. A server that wants one of the removed values
+takes it from the `env` block of its own `.mcp.json` entry.
 
 ## Commands
 

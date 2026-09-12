@@ -112,7 +112,7 @@ func TestReasoningEffortIsWiredIntoTheBackend(t *testing.T) {
 // additionally scrubs the operator's secrets and points its temporary
 // directory at the scratch.
 func TestLaneEnvRedirectsToolchainCachesInEveryLane(t *testing.T) {
-	parent := []string{"PATH=/bin", "GOCACHE=/Users/someone/Library/Caches/go-build", "AWS_SECRET_ACCESS_KEY=x"}
+	parent := []string{"PATH=/bin", "GOCACHE=/Users/someone/Library/Caches/go-build", "AWS_SECRET_ACCESS_KEY=x", "LAGENT_API_KEY=sk"}
 	caches := map[string]string{"GOCACHE": "go-build", "PIP_CACHE_DIR": "pip"}
 	for _, lane := range []sandbox.Lane{sandbox.LaneRead, sandbox.LaneWrite, sandbox.LaneOperator} {
 		env := strings.Join(laneEnv(lane, "/scratch", caches, parent), "\n")
@@ -132,16 +132,23 @@ func TestLaneEnvRedirectsToolchainCachesInEveryLane(t *testing.T) {
 			t.Errorf("%s lane: the redirected GOCACHE must come last so it wins:\n%s", lane, env)
 		}
 	}
+	// ADR-0017: no lane filters the operator's environment; every lane
+	// loses the runtime's own configuration variables.
 	read := strings.Join(laneEnv(sandbox.LaneRead, "/scratch", caches, parent), "\n")
-	if !strings.Contains(read, "TMPDIR=/scratch") || strings.Contains(read, "AWS_SECRET_ACCESS_KEY") {
-		t.Errorf("read lane must scrub secrets and point TMPDIR at the scratch:\n%s", read)
+	if !strings.Contains(read, "TMPDIR=/scratch") || !strings.Contains(read, "AWS_SECRET_ACCESS_KEY") {
+		t.Errorf("the read lane keeps the operator's environment and points TMPDIR at the scratch:\n%s", read)
+	}
+	for _, lane := range []sandbox.Lane{sandbox.LaneRead, sandbox.LaneWrite, sandbox.LaneOperator} {
+		if env := strings.Join(laneEnv(lane, "/scratch", caches, parent), "\n"); strings.Contains(env, "LAGENT_API_KEY") {
+			t.Errorf("%s lane: the runtime's own key reached the child:\n%s", lane, env)
+		}
 	}
 	write := strings.Join(laneEnv(sandbox.LaneWrite, "/scratch", caches, parent), "\n")
 	if strings.Contains(write, "TMPDIR=/scratch") {
 		t.Errorf("the write lane keeps its own TMPDIR:\n%s", write)
 	}
-	if env := laneEnv(sandbox.LaneWrite, "", caches, parent); len(env) != len(parent) {
-		t.Errorf("no scratch, no redirect: %v", env)
+	if env := laneEnv(sandbox.LaneWrite, "", caches, parent); len(env) != len(parent)-1 {
+		t.Errorf("no scratch, no redirect — only the runtime's own removed: %v", env)
 	}
 	// The table renders in name order, so the environment is stable
 	// across runs; an empty table renders nothing.

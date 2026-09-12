@@ -18,6 +18,8 @@ package hooks
 
 import (
 	"github.com/nlink-jp/lagent/internal/bounded"
+	"github.com/nlink-jp/lagent/internal/sandbox"
+	"os"
 
 	"bytes"
 	"context"
@@ -206,6 +208,10 @@ func (r *Runner) exec(ctx context.Context, h Hook, cwd string, payload any) (out
 		return outcome{}, false
 	}
 	cmd := exec.CommandContext(cctx, "/bin/sh", "-c", h.Command)
+	// The runtime's own configuration variables reach no child
+	// (ADR-0017 §2); everything the operator exported passes, because
+	// a hook is the operator's own program.
+	cmd.Env = sandbox.ChildEnv(os.Environ())
 	// The hook runs in its own process group and the timeout kills the
 	// group, so a child the hook started does not outlive it as an
 	// orphan (shell_exec's hardening does the same). WaitDelay bounds

@@ -238,6 +238,7 @@ func TestHookOutputIsBounded(t *testing.T) {
 		t.Fatalf("stdout held %d bytes without a cut note; the cap is %d", len(out.stdout), hookStdoutCap)
 	}
 }
+
 // --- context hooks (ADR-0014) ---------------------------------------
 
 func contextRunner(t *testing.T, hs Hooks) (*Runner, *[]string, Session) {

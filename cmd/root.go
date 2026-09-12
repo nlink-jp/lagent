@@ -1826,9 +1826,10 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 // ~/Library would fail a build in any lane — and the read lane must
 // not write a shared cache anyway.
 func laneEnv(lane sandbox.Lane, scratch string, caches map[string]string, parent []string) []string {
-	env := parent
+	// The runtime's own configuration variables go to no child
+	// (ADR-0017 §2); the operator's environment is not touched.
+	env := sandbox.ChildEnv(parent)
 	if lane == sandbox.LaneRead {
-		env = sandbox.ScrubEnv(parent)
 		if scratch != "" {
 			env = append(env, "TMPDIR="+scratch, "TMP="+scratch, "TEMP="+scratch)
 		}
