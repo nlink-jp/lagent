@@ -154,6 +154,42 @@ read-edit 実行で read レーンで成功）、`list_tree` 後の `list_files`
 コイン投げより頻繁である。何も変えない再送はその地点では答えの全部ではない
 かもしれず、それが次の計測項目。
 
+thinking off 対 on（ADR-0009）、2026-09-12（`bea19b7`）、3 反復、交互実行。
+`reasoning-on` はベースラインに `reasoning_effort = "low"` を足したもので、
+LM Studio が Gemma 4 の thinking on に丸める。ベースラインは何も送らず、
+それが off。
+
+| task | config | runs | completed | no-tool answers | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |
+|---|---|---|---|---|---|---|---|---|
+| mcp-lookup | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12619 | 12 |
+| mcp-lookup | reasoning-on | 3 | 3/3 | 0/3 | 2 | 2 | 12630 | 14 |
+| multi-file-rename | baseline | 3 | 2/3 | 0/3 | 10 | 10 | 51828 | 30 |
+| multi-file-rename | reasoning-on | 3 | 3/3 | 0/3 | 11 | 11 | 58866 | 70 |
+| read-edit | baseline | 3 | 3/3 | 0/3 | 3 | 3 | 20813 | 14 |
+| read-edit | reasoning-on | 3 | 3/3 | 0/3 | 6 | 6 | 30396 | 40 |
+| search-answer | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12061 | 10 |
+| search-answer | reasoning-on | 3 | 3/3 | 0/3 | 2 | 2 | 12151 | 13 |
+| shell-count | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12037 | 10 |
+| shell-count | reasoning-on | 3 | 3/3 | 0/3 | 3 | 3 | 16320 | 17 |
+| view-image | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12018 | 10 |
+| view-image | reasoning-on | 3 | 3/3 | 0/3 | 2 | 2 | 12055 | 12 |
+
+各 18 実行の合計: ベースラインは 17/18 完了、壁時計 252 秒、prompt 357k
+トークン、reasoning 53 トークン、空 completion 3 回（すべて行付き再送で
+回復）。thinking on は 18/18、526 秒、prompt 463k トークン、reasoning
+12,398 トークン、空 completion ゼロ。ベースラインの 1 失敗は空の不具合では
+なくループ: 回復した空の後、モデルは `limits.go` を 2 回編集してから 3 回
+読み、ループガードがターンを止めた。thinking on は空の不具合を消し 18 中
+1 タスクを得たが、代価は壁時計 2 倍と prompt トークン 3 割増。編集系が
+最も払い（read-edit 14 秒 → 40 秒、改名 30 秒 → 70 秒）、lookup 系はほぼ
+払わない。したがって既定は未設定のまま: 再送の行が不具合をごく小さな代価で
+覆い、難しいタスクでは操作者が `reasoning_effort` を設定する。
+
+再送に一時的な行を付けた `read-edit`（ADR-0007 第 2 改訂）、8 反復: 8/8
+完了、全実行 exit 0、中央値 6 ラウンド、22 秒。空 completion は 2 回起き、
+どちらも促し付きの最初の再送で回復した。行を付ける前の同じ系統のバイナリ
+では、8/8 完了だが 1 実行が 3 連続の空で exit 1 だった。
+
 全タスクが両ランタイムで完了した。参照側はタスクごとの検証が多く（改名に
 23 ラウンド、編集に 15 ラウンド、前後でプログラムを実行）、その分を prompt
 トークンと壁時計時間で払う。ローカルモデルは 3 分の 1 のラウンドで同じ完了に

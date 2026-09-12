@@ -6,7 +6,9 @@
 
 - `[llm].reasoning_effort` (and `LAGENT_REASONING_EFFORT`) rides every
   request verbatim when set; the OpenAI vocabulary, which LM Studio
-  maps to the model's thinking on/off. The bench measures it (ADR-0009).
+  maps to the model's thinking on/off. Measured on the bench
+  (ADR-0009): thinking on completed 18/18 against 17/18 with no empty
+  completion, at twice the wall time; the default stays unset.
 
 ### Fixed
 

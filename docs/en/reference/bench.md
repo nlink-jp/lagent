@@ -169,6 +169,47 @@ final-answer point after a successful verification, more often than a
 coin flip there; a re-send that changes nothing may not be the whole
 answer at that point, and that is the next measurement.
 
+Thinking off against on (ADR-0009), 2026-09-12 (`bea19b7`), three
+repetitions, interleaved. `reasoning-on` is the baseline plus
+`reasoning_effort = "low"`, which LM Studio maps to Gemma 4's thinking
+on; the baseline sends nothing, which is off.
+
+| task | config | runs | completed | no-tool answers | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |
+|---|---|---|---|---|---|---|---|---|
+| mcp-lookup | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12619 | 12 |
+| mcp-lookup | reasoning-on | 3 | 3/3 | 0/3 | 2 | 2 | 12630 | 14 |
+| multi-file-rename | baseline | 3 | 2/3 | 0/3 | 10 | 10 | 51828 | 30 |
+| multi-file-rename | reasoning-on | 3 | 3/3 | 0/3 | 11 | 11 | 58866 | 70 |
+| read-edit | baseline | 3 | 3/3 | 0/3 | 3 | 3 | 20813 | 14 |
+| read-edit | reasoning-on | 3 | 3/3 | 0/3 | 6 | 6 | 30396 | 40 |
+| search-answer | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12061 | 10 |
+| search-answer | reasoning-on | 3 | 3/3 | 0/3 | 2 | 2 | 12151 | 13 |
+| shell-count | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12037 | 10 |
+| shell-count | reasoning-on | 3 | 3/3 | 0/3 | 3 | 3 | 16320 | 17 |
+| view-image | baseline | 3 | 3/3 | 0/3 | 2 | 2 | 12018 | 10 |
+| view-image | reasoning-on | 3 | 3/3 | 0/3 | 2 | 2 | 12055 | 12 |
+
+Totals over the eighteen runs of each: baseline 17/18 completed, 252 s
+of wall time, 357k prompt tokens, 53 reasoning tokens, three empty
+completions (every one recovered by the re-send with its line);
+thinking on 18/18, 526 s, 463k prompt tokens, 12,398 reasoning tokens,
+no empty completion at all. The one baseline failure was a loop, not
+the empty fault: after a recovered empty the model edited `limits.go`
+twice and then read it three times, and the loop guard stopped the
+turn. Thinking on removes the empty fault and gained one task in
+eighteen, at twice the wall time and a third more prompt tokens; the
+editing tasks pay most (read-edit 14 s → 40 s, the rename 30 s → 70 s),
+the lookups almost nothing. The default therefore stays unset: the
+re-send's line covers the fault at a fraction of the cost, and the
+operator sets `reasoning_effort` for a harder task.
+
+`read-edit` with the re-send's transient line (ADR-0007, second
+amendment), eight repetitions: 8/8 completed, every run exited 0,
+median 6 rounds, 22 s; two empty completions occurred and both
+recovered on the first nudged re-send. Before the line, on the same
+binary lineage: 8/8 completed but one run exited 1 after three empties
+in a row.
+
 Every task completed on both runtimes. The reference does more
 verification per task (twenty-three rounds for the rename, fifteen for
 the edit, running the program before and after) and pays for it in

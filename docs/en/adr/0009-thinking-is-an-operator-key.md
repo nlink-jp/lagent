@@ -65,7 +65,18 @@ own that table.
 - The empty-completion fault does not occur with thinking on at the
   point measured; ADR-0007's line covers the same point at a fraction
   of the cost, so the key is not a remedy for that fault.
-- Bench measurement, 2026-09-12: see `reference/bench.md`.
+- Bench measurement, 2026-09-12 (`reference/bench.md`): over the six
+  tasks, three repetitions each, thinking on completed 18/18 against
+  the baseline's 17/18 (the one failure a loop the guard stopped, not
+  the empty fault), produced no empty completion against three (all
+  recovered by ADR-0007's re-send), and cost 526 s of wall time
+  against 252 s, 463k prompt tokens against 357k, and 12,398 reasoning
+  tokens against 53. The editing tasks pay most (read-edit 14 s →
+  40 s, the rename 30 s → 70 s); the lookups almost nothing. **The
+  default stays unset**: one task in eighteen at twice the time is not
+  a default, and the fault it removes is covered. The key is the
+  operator's for a harder task, and a project of harder tasks is the
+  measurement that would change this line.
 
 ## Alternatives considered
 
