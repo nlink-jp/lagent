@@ -34,7 +34,8 @@ tools パッケージはプロジェクトディレクトリだけを要する 9
 `internal/mention`（`@` 参照: ファイル、ディレクトリ、画像 — および `@`
 無しでドロップされた画像パス、ADR-0005）、
 `internal/instructions`（`AGENTS.md` の発見）、`internal/hooks`（Claude
-Code の計測済み契約による操作者の pre-tool フック、ADR-0012）、`internal/memory`
+Code の計測済み契約による操作者のフック: pre-tool、session start、prompt
+submit、session end — ADR-0012/0014）、`internal/memory`
 （セッションをまたいで想起する事実、状態ルート下の 2 スコープ、ADR-0013）、`internal/skills`（Claude
 Code 形式のスキルの発見と閉じ込めた読み込み、ADR-0011）、`internal/ignore`（ignore
 対応の列挙: 組込ディレクトリ一覧 + gitignore マッチャ）、
@@ -127,6 +128,9 @@ user ロールのメッセージとして会話を開く（`Agent.AnnounceSessio
   ツールへの呼び出しはどのゲートにも達する前に拒否される。
 - `PreToolHook` — 操作者の pre-tool フック（ADR-0012）。広告チェックの後、
   梯子の前に問われ、拒否は床でその理由がツール結果になる。
+- `PromptHook` — 操作者の prompt-submit フック（ADR-0014）。ターンが記録
+  される前に見て、block はプロンプトを消し、文脈は引用データの `hook` 添付
+  としてターンに乗る。
 
 ## 承認
 

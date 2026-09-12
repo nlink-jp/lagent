@@ -445,17 +445,23 @@ func applyEnv(cfg *Config) {
 	}
 }
 
-// HooksConfig holds the operator's pre-tool hooks (ADR-0012). Global
-// config only: a project-level hook would let a cloned repository
-// execute an arbitrary command on every tool call (ADR-0012 §1).
+// HooksConfig holds the operator's hooks: pre-tool (ADR-0012) and the
+// context and end events (ADR-0014). Global config only: a
+// project-level hook would let a cloned repository execute an
+// arbitrary command on every tool call or turn (ADR-0012 §1).
 type HooksConfig struct {
-	PreToolUse []HookEntry `toml:"pre_tool_use"`
+	PreToolUse       []HookEntry `toml:"pre_tool_use"`
+	SessionStart     []HookEntry `toml:"session_start"`
+	UserPromptSubmit []HookEntry `toml:"user_prompt_submit"`
+	SessionEnd       []HookEntry `toml:"session_end"`
 }
 
-// HookEntry is one configured hook. Matcher is an exact tool name, an
-// "a|b" alternation, or "*", matched against both lagent's and Claude
-// Code's vocabulary. Command runs via sh -c with the Claude Code
-// PreToolUse JSON payload on stdin.
+// HookEntry is one configured hook. For pre_tool_use, Matcher is an
+// exact tool name, an "a|b" alternation, or "*", matched against both
+// lagent's and Claude Code's vocabulary; for session_start it selects
+// the source (startup, resume, clear) and may be omitted;
+// user_prompt_submit and session_end take none. Command runs via sh -c
+// with the Claude Code JSON payload of its event on stdin.
 type HookEntry struct {
 	Matcher    string `toml:"matcher"`
 	Command    string `toml:"command"`
@@ -488,6 +494,36 @@ func (c *Config) validate() error {
 		}
 		if h.TimeoutSec < 0 {
 			return fmt.Errorf("hooks.pre_tool_use[%d]: timeout_sec must be >= 0", i)
+		}
+	}
+	for i, h := range c.Hooks.SessionStart {
+		if strings.TrimSpace(h.Command) == "" {
+			return fmt.Errorf("hooks.session_start[%d]: command is required", i)
+		}
+		if h.TimeoutSec < 0 {
+			return fmt.Errorf("hooks.session_start[%d]: timeout_sec must be >= 0", i)
+		}
+	}
+	for i, h := range c.Hooks.UserPromptSubmit {
+		if strings.TrimSpace(h.Matcher) != "" {
+			return fmt.Errorf("hooks.user_prompt_submit[%d]: takes no matcher — every prompt runs it", i)
+		}
+		if strings.TrimSpace(h.Command) == "" {
+			return fmt.Errorf("hooks.user_prompt_submit[%d]: command is required", i)
+		}
+		if h.TimeoutSec < 0 {
+			return fmt.Errorf("hooks.user_prompt_submit[%d]: timeout_sec must be >= 0", i)
+		}
+	}
+	for i, h := range c.Hooks.SessionEnd {
+		if strings.TrimSpace(h.Matcher) != "" {
+			return fmt.Errorf("hooks.session_end[%d]: takes no matcher — every session end runs it", i)
+		}
+		if strings.TrimSpace(h.Command) == "" {
+			return fmt.Errorf("hooks.session_end[%d]: command is required", i)
+		}
+		if h.TimeoutSec < 0 {
+			return fmt.Errorf("hooks.session_end[%d]: timeout_sec must be >= 0", i)
 		}
 	}
 	var missing []string

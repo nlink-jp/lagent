@@ -191,7 +191,7 @@ measurements.
 - history compaction (designed after measuring the KV-cache discard cost)
 - the model tier of auto-approval — measured and not adopted (ADR-0010)
 - skills — adopted, in Claude Code's format from lagent's own directory (ADR-0011)
-- pre-tool hooks — adopted, one event on Claude Code's measured contract (ADR-0012)
+- hooks — adopted: pre-tool (ADR-0012), session start, prompt submit and session end (ADR-0014), on Claude Code's measured contracts
 - agent memory — adopted; recall rides the runtime-facts message, measured (ADR-0013)
 - a local-oriented prompt revision
 - Gemma 4's thinking toggle

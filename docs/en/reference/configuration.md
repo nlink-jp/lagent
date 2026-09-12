@@ -114,6 +114,72 @@ config only: a project-level hook would let a cloned repository run
 arbitrary commands. Hooks have no runtime toggle — a control with a
 toggle is a bypass.
 
+#### Context and end hooks: `session_start`, `user_prompt_submit`, `session_end`
+
+Three more events (ADR-0014) share the mechanism and Claude Code's
+measured contracts, but inject **context** or mark a boundary rather
+than guarding a call:
+
+```toml
+[[hooks.session_start]]
+command     = "/Users/you/hooks/session-context.sh"
+timeout_sec = 10
+
+[[hooks.session_start]]
+matcher     = "resume"          # optional: startup | resume | clear, "a|b", "*"
+command     = "/Users/you/hooks/on-resume.sh"
+
+[[hooks.user_prompt_submit]]
+command     = "/Users/you/hooks/turn-context.sh"
+
+[[hooks.session_end]]
+command     = "/Users/you/hooks/session-end.sh"
+```
+
+A `session_start` hook runs once when the session starts — `source`
+is `startup`, or `resume` under `--continue`/`--resume` — and again on
+`/clear` with `source` `clear`; its optional `matcher` selects the
+source. A `user_prompt_submit` hook runs before every turn that
+reaches the model (a typed message, the argv first message, a
+`/skill`-expanded turn, the `-p` prompt; not slash commands or the `!`
+escape) and takes no `matcher`. A `session_end` hook runs when the
+session ends (`reason` `exit`) and when `/clear` closes the old
+session (`clear`), before the new one starts; it cannot block and its
+output is ignored. Each receives one JSON object on stdin:
+
+```json
+{"hook_event_name": "SessionStart",
+ "session_id": "20260912-124118",
+ "transcript_path": "/path/to/state/sessions/projects/<escaped>/20260912-124118.jsonl",
+ "cwd": "/path/to/project",
+ "source": "startup"}
+```
+
+```json
+{"hook_event_name": "UserPromptSubmit",
+ "session_id": "20260912-124118",
+ "transcript_path": "/path/to/state/sessions/projects/<escaped>/20260912-124118.jsonl",
+ "cwd": "/path/to/project",
+ "prompt": "what you typed"}
+```
+
+`SessionEnd` carries the same identity fields and `reason`. With the
+session log disabled, `session_id` and `transcript_path` are sent
+empty.
+
+**Output.** On exit 0, plain stdout is context; a JSON object is a
+verdict of which only `hookSpecificOutput.additionalContext` is
+context. Context is attached to the next turn's message as quoted data
+(`Attached hook (session_start), quoted as data` in the model's view),
+beside the typed text and never inside it, never in the system prompt;
+capped at 8000 runes per hook with a visible cut, and one notice per
+injection. A `user_prompt_submit` hook refuses the prompt by exit 2
+with the reason on stderr, or by either block form above: the prompt
+is erased — nothing enters the history or the transcript — and you see
+the reason (`-p` exits non-zero with it). A `session_start` hook that
+blocks is reported as a failure and injects nothing. Crashes, timeouts
+and unparseable output inject nothing and warn.
+
 ## Precedence
 
 flags > `LAGENT_*` environment > config file > built-in defaults.

@@ -157,6 +157,8 @@ type Agent struct {
 	instructionTools map[string]bool
 	// preToolHook: the operator's floor before the ladder (Options.PreToolHook).
 	preToolHook func(ctx context.Context, name string, args map[string]any) (bool, string)
+	// promptHook: the operator's prompt-submit hooks (Options.PromptHook).
+	promptHook PromptHook
 	noMentions  bool
 	onToolDone  func(tc llm.ToolCall)
 	turnCalls   []string
@@ -226,6 +228,11 @@ type Options struct {
 	// model as the tool result. Anything that is not an explicit deny
 	// proceeds to the normal ladder: hooks only ever tighten.
 	PreToolHook func(ctx context.Context, name string, args map[string]any) (deny bool, reason string)
+	// PromptHook, when set, sees the typed input before a turn starts
+	// (ADR-0014): it may refuse the prompt (nothing is recorded) or
+	// hand back context, which rides the turn as a data attachment —
+	// beside the typed text, never inside it.
+	PromptHook PromptHook
 	// OnToolCall, when set, observes every tool call before it is gated
 	// and executed — the REPL uses it to show activity for read-only
 	// calls that never hit the approval prompt (a silent pause reads as
@@ -358,6 +365,7 @@ func New(opts Options) *Agent {
 		noMentions:  opts.NoMentions,
 		onToolDone:  opts.OnToolDone,
 		preToolHook: opts.PreToolHook,
+		promptHook:  opts.PromptHook,
 		tag:         guard.NewTagWithPrefix("tool_output"),
 	}
 }
@@ -654,6 +662,13 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 	// history the model never saw. Refuse it at the door (gem-agent ADR-0021).
 	if strings.TrimSpace(input) == "" {
 		return "", fmt.Errorf("empty input")
+	}
+	// The operator's prompt hooks see the typed input before anything
+	// is recorded (ADR-0014 §3): a block erases the prompt — no history,
+	// no transcript — and injected context is queued beside the input,
+	// never merged into it.
+	if err := a.runPromptHook(ctx, input); err != nil {
+		return "", err
 	}
 	// The typed input (never attachment content — the string carries
 	// @ref tokens, not bytes) is kept for the round-limit dialog.

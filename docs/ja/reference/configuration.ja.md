@@ -108,6 +108,68 @@ timeout_sec = 10
 プロジェクト側のフックはクローンしたリポジトリに任意のコマンドを走らせる
 ことになる。フックに実行時のトグルは無い — トグルのある制御はバイパスである。
 
+#### 文脈と終了のフック: `session_start`、`user_prompt_submit`、`session_end`
+
+さらに 3 イベント（ADR-0014）が同じ機構と Claude Code の計測済み契約を
+共有するが、呼び出しを守るのではなく**文脈**を注入するか境界を印す:
+
+```toml
+[[hooks.session_start]]
+command     = "/Users/you/hooks/session-context.sh"
+timeout_sec = 10
+
+[[hooks.session_start]]
+matcher     = "resume"          # 任意: startup | resume | clear、"a|b"、"*"
+command     = "/Users/you/hooks/on-resume.sh"
+
+[[hooks.user_prompt_submit]]
+command     = "/Users/you/hooks/turn-context.sh"
+
+[[hooks.session_end]]
+command     = "/Users/you/hooks/session-end.sh"
+```
+
+`session_start` フックはセッション開始時に 1 回 — `source` は `startup`、
+`--continue`/`--resume` 下では `resume` — と `/clear` で `source` `clear`
+として走る。任意の `matcher` が source を選ぶ。`user_prompt_submit` フック
+はモデルに届く全ターン（打ち込んだメッセージ、argv の最初のメッセージ、
+`/skill` 展開ターン、`-p` のプロンプト。スラッシュコマンドと `!` エスケープ
+は除く）の前に走り、`matcher` を取らない。`session_end` フックはセッション
+終了時（`reason` `exit`）と `/clear` が旧セッションを閉じるとき（`clear`）、
+新セッションの開始前に走る。block できず、出力は無視される。それぞれ stdin
+で JSON オブジェクト 1 つを受け取る:
+
+```json
+{"hook_event_name": "SessionStart",
+ "session_id": "20260912-124118",
+ "transcript_path": "/path/to/state/sessions/projects/<escaped>/20260912-124118.jsonl",
+ "cwd": "/path/to/project",
+ "source": "startup"}
+```
+
+```json
+{"hook_event_name": "UserPromptSubmit",
+ "session_id": "20260912-124118",
+ "transcript_path": "/path/to/state/sessions/projects/<escaped>/20260912-124118.jsonl",
+ "cwd": "/path/to/project",
+ "prompt": "what you typed"}
+```
+
+`SessionEnd` は同じ識別フィールドと `reason` を運ぶ。セッションログが無効
+なら `session_id` と `transcript_path` は空で送る。
+
+**出力。** exit 0 の平文 stdout は文脈。JSON オブジェクトは判定で、その
+`hookSpecificOutput.additionalContext` だけが文脈。文脈は次のターンの
+メッセージに引用データとして添付され（モデルには `Attached hook
+(session_start), quoted as data` と見える）、打ち込んだ本文の隣で決して
+その中には入らず、システムプロンプトにも入らない。フックごと 8000 ルーンで
+可視の切断、注入ごとに注記 1 行。`user_prompt_submit` フックは stderr を
+理由とする exit 2、または上の block 形式でプロンプトを拒む: プロンプトは
+消え — 履歴にも transcript にも入らない — 理由が表示される（`-p` はそれを
+添えて非ゼロ終了）。block する `session_start` フックは失敗として報告され
+何も注入しない。クラッシュ、タイムアウト、解釈不能な出力は何も注入せず
+警告する。
+
 ## 優先順位
 
 フラグ > `LAGENT_*` 環境変数 > 設定ファイル > 組み込み既定値。

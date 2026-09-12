@@ -80,8 +80,9 @@ internal/instructions/ AGENTS.md / AGENT.md / CLAUDE.md / GEMINI.md discovery
                    (ancestor walk, stops at $HOME)
 internal/memory/   facts recalled across sessions (ADR-0013): global + project scope under
                    the state root, budgeted, FactsLines for the runtime-facts message
-internal/hooks/    operator pre-tool hooks on Claude Code's measured contract (ADR-0012):
-                   PreToolUse payload on stdin, deny by JSON or exit 2, fail-open otherwise
+internal/hooks/    operator hooks on Claude Code's measured contracts (ADR-0012/0014):
+                   PreToolUse / SessionStart / UserPromptSubmit / SessionEnd payloads on stdin,
+                   deny by JSON or exit 2, context via stdout, fail-open otherwise
 internal/skills/   Claude Code SKILL.md discovery (global ~/.config/lagent/skills +
                    project .claude/skills), confined Body/File reads, the catalog lines
 internal/trustpin/ content pins for the agent-facing files and the persistent-file
@@ -183,7 +184,12 @@ answers.
   and before `decide`; `hookDenied` is provenance the wrap layer and
   the attach branches read, never inferred from the result text. Never
   add an "allow" bypass: hooks tighten, the ladder decides. No settings
-  row, no runtime toggle. One event; more take an ADR each.
+  row, no runtime toggle. The other three events (ADR-0014) share the
+  runner: session-start output and prompt-hook context ride the next
+  turn as `hook` attachments through `AttachData` / `pendingAtts`,
+  never the system prompt and never the typed input; `/clear` fires
+  the old session's end hook before `ag.Restart` and the new one's
+  start hook after the facts message.
 - **A standing directive belongs in the facts message, not the
   instruction files** (ADR-0013, measured on the `pointer-*` bench
   tasks: 0/18 from `AGENTS.md` at any size, 5/6 from one facts line).

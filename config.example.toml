@@ -176,6 +176,33 @@ show_thoughts = true
 #command = "python3 /Users/you/.claude/hooks/guard-recursive-write.py"
 #timeout_sec = 10
 
+# Context hooks (ADR-0014) — the same contract as Claude Code's
+# SessionStart and UserPromptSubmit hooks, measured. A session_start
+# hook runs when a session starts (source "startup" or "resume") and on
+# /clear (source "clear"); `matcher` is optional and selects the source.
+# A user_prompt_submit hook runs before every turn that reaches the
+# model, with the typed text in the payload's "prompt"; it takes no
+# matcher. Both receive the event's JSON on stdin. Plain stdout on exit
+# 0 is context for the model — attached to the next turn as quoted
+# data, never merged into the prompt and never into the system prompt;
+# a JSON verdict's hookSpecificOutput.additionalContext is context too.
+# A user_prompt_submit hook refuses the prompt by exit 2 (stderr is the
+# reason) or a block verdict; a session start cannot be refused. Output
+# is capped at 8000 runes per hook; crashes and timeouts inject nothing
+# and warn. Global config only, like pre_tool_use.
+#[[hooks.session_start]]
+#command = "/Users/you/hooks/session-context.sh"
+#timeout_sec = 10
+#[[hooks.user_prompt_submit]]
+#command = "/Users/you/hooks/turn-context.sh"
+#timeout_sec = 10
+# A session_end hook runs when the session ends (reason "exit") and when
+# /clear closes the old session (reason "clear"); it cannot block and its
+# output is ignored.
+#[[hooks.session_end]]
+#command = "/Users/you/hooks/session-end.sh"
+#timeout_sec = 10
+
 # Project directories you trust completely. This is NOT approval-only:
 # a listed project's .lagent.toml may REMOVE approvals, AND its
 # .mcp.json servers are spawned and its instruction files are read.

@@ -699,13 +699,37 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	if sessionID != "" {
 		hookSession.TranscriptPath = sessionPath
 	}
+	var hookRunner *hooks.Runner
+	if len(cfg.Hooks.PreToolUse)+len(cfg.Hooks.SessionStart)+len(cfg.Hooks.UserPromptSubmit)+len(cfg.Hooks.SessionEnd) > 0 {
+		hookRunner = hooks.New(hooks.Hooks{
+			PreToolUse:       hookEntries(cfg.Hooks.PreToolUse),
+			SessionStart:     hookEntries(cfg.Hooks.SessionStart),
+			UserPromptSubmit: hookEntries(cfg.Hooks.UserPromptSubmit),
+			SessionEnd:       hookEntries(cfg.Hooks.SessionEnd),
+		}, notice)
+	}
 	var preToolHook func(ctx context.Context, name string, args map[string]any) (bool, string)
-	if len(cfg.Hooks.PreToolUse) > 0 {
-		hookRunner := hooks.New(hooks.Hooks{PreToolUse: hookEntries(cfg.Hooks.PreToolUse)}, notice)
+	if hookRunner != nil && hookRunner.HasPreToolUse() {
 		preToolHook = func(ctx context.Context, name string, args map[string]any) (bool, string) {
 			return hookRunner.Pre(ctx, hookSession, name, args)
 		}
 	}
+	// The context hooks (ADR-0014): a prompt hook sees the typed input
+	// before the turn starts; session-start output rides the next turn
+	// as a data attachment; session end runs on exit and on /clear.
+	var promptHook agent.PromptHook
+	if hookRunner != nil && hookRunner.HasPromptSubmit() {
+		promptHook = func(ctx context.Context, input string) (string, bool, string) {
+			return hookRunner.PromptSubmit(ctx, hookSession, input)
+		}
+	}
+	sessionEndHooks := func(reason string) {
+		if hookRunner == nil || !hookRunner.HasSessionEnd() {
+			return
+		}
+		hookRunner.SessionEnd(ctx, hookSession, reason)
+	}
+	defer sessionEndHooks("exit")
 	ag = agent.New(agent.Options{
 		// The operator's language for the notices the agent writes
 		// mid-turn (gem-agent ADR-0029 §3: they are chrome, not error chains).
@@ -722,6 +746,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		Policy:         approvalPolicy,
 		Advertise:      adv.Advertise,
 		PreToolHook:    preToolHook,
+		PromptHook:     promptHook,
 		ClipboardImage: clipboardImage,
 		BeforeOperatorWrite: func(tc llm.ToolCall) {
 			if name := pinNameForWrite(projectDir, tc); name != "" {
@@ -837,6 +862,25 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// isolation tag is fresh, and the restored history's own opening
 	// message named the old one). The MCP catalog rides with them.
 	ag.AnnounceSession(sessionFacts(workDir, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
+	// Session-start hooks (ADR-0014 §4): the output rides the next
+	// turn's user message as a data attachment — never the system
+	// prompt (ADR-0003), never the typed input.
+	sessionStartHooks := func(source string) {
+		if hookRunner == nil || !hookRunner.HasSessionStart() {
+			return
+		}
+		out := hookRunner.SessionStart(ctx, hookSession, source)
+		if out == "" {
+			return
+		}
+		ag.AttachData("session_start", agent.HookAttachmentKind, out)
+		notice(fmt.Sprintf("session_start hook (%s) attached %d bytes of context as data for the next turn", source, len(out)))
+	}
+	if resumedID != "" {
+		sessionStartHooks("resume")
+	} else {
+		sessionStartHooks("startup")
+	}
 
 	// Exit summary (operator request): every interactive exit route —
 	// /quit, Ctrl+C, Ctrl+D — ends with the resume hint and the cost
@@ -1053,6 +1097,9 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			note("history cleared; a new session could not be started (%v) — the conversation continues in this session", err)
 			return render()
 		}
+		// The old session's end hook runs before the new transcript
+		// takes over (ADR-0014 §5), then the audit event under the old id.
+		sessionEndHooks("clear")
 		reportPersistent("clear", func(kind string, data any) error { return curLog.Log(kind, data) })
 		ag.Restart(newLog)
 		// The new session re-checks the pins: a file that changed during
@@ -1107,6 +1154,9 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// Told last, once everything it names is in place: the work
 		// directory and the catalog ride one fresh facts message.
 		ag.AnnounceSession(sessionFacts(workDir, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
+		// A cleared conversation is a fresh start to the operator's
+		// scripts (ADR-0014 §2): its output rides the first new turn.
+		sessionStartHooks("clear")
 		return render()
 	}
 

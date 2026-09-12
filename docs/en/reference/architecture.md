@@ -36,8 +36,8 @@ operator has typed anything, and the rule that decides which ones),
 `internal/mention` (`@`-references: files, directories, images — and a
 dropped image path without the `@`, ADR-0005),
 `internal/instructions` (`AGENTS.md` discovery), `internal/hooks`
-(the operator's pre-tool hooks on Claude Code's measured contract,
-ADR-0012), `internal/memory` (facts recalled across sessions, two
+(the operator's hooks on Claude Code's measured contracts: pre-tool,
+session start, prompt submit, session end — ADR-0012/0014), `internal/memory` (facts recalled across sessions, two
 scopes under the state root, ADR-0013), `internal/skills`
 (skill discovery and confined loading in Claude Code's format,
 ADR-0011), `internal/ignore`
@@ -141,6 +141,9 @@ callbacks and the agent never imports a UI package:
 - `PreToolHook` — the operator's pre-tool hooks (ADR-0012), consulted
   after the advertise check and before the ladder; a deny is a floor
   and its reason is the tool result.
+- `PromptHook` — the operator's prompt-submit hooks (ADR-0014), seen
+  before a turn is recorded; a block erases the prompt, context rides
+  the turn as a `hook` attachment quoted as data.
 
 ## Approval
 

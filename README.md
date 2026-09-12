@@ -75,11 +75,13 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   work directory); `shell_exec` runs under `sandbox-exec` in the lane it
   declares — read runs unasked (inspection, and Go builds and tests,
   whose cache lives in the session scratch), write and operator ask.
-- **Pre-tool hooks:** `[[hooks.pre_tool_use]]` runs your guard script
-  before a model tool call, on Claude Code's contract, so the same
-  script that guards Claude Code guards this runtime. A deny is final,
-  whatever the approval mode; the reason goes back to the model
-  (ADR-0012).
+- **Hooks:** `[[hooks.pre_tool_use]]` runs your guard script before a
+  model tool call, on Claude Code's contract, so the same script that
+  guards Claude Code guards this runtime; a deny is final, whatever the
+  approval mode, and the reason goes back to the model (ADR-0012).
+  `session_start`, `user_prompt_submit` and `session_end` hooks share
+  the mechanism: their output reaches the model as quoted data, and a
+  prompt hook can refuse a prompt (ADR-0014).
 - **Memory:** `/remember <name> <fact>` keeps a short fact for every
   later session in this project (`global` for every project); the model
   can propose one with `save_memory`, which asks you. Memories are

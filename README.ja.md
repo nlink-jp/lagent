@@ -73,10 +73,12 @@ lagent
   の内側に留まる。`shell_exec` は宣言したレーンで `sandbox-exec` 下で走る —
   read は尋ねずに（inspection と、キャッシュをセッション scratch に持つ Go の
   ビルド・テスト）、write と operator は尋ねてから。
-- **pre-tool フック:** `[[hooks.pre_tool_use]]` がモデルのツール呼び出しの
-  前にあなたのガードスクリプトを Claude Code の契約で走らせる。Claude Code
-  を守る同じスクリプトがこのランタイムも守る。拒否は承認モードによらず
-  最終で、理由はモデルへ返る（ADR-0012）。
+- **フック:** `[[hooks.pre_tool_use]]` がモデルのツール呼び出しの前に
+  あなたのガードスクリプトを Claude Code の契約で走らせる。Claude Code を
+  守る同じスクリプトがこのランタイムも守り、拒否は承認モードによらず最終で、
+  理由はモデルへ返る（ADR-0012）。`session_start`、`user_prompt_submit`、
+  `session_end` フックは同じ機構を共有し、その出力は引用データとしてモデル
+  に届き、prompt フックはプロンプトを拒める（ADR-0014）。
 - **メモリ:** `/remember <name> <fact>` で短い事実をこのプロジェクトの
   以後のセッションに残す（`global` で全プロジェクト）。モデルは `save_memory`
   で提案でき、あなたに尋ねる。メモリはこのモデルが行動する場所である

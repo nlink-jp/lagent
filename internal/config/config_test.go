@@ -412,3 +412,40 @@ timeout_sec = 3
 		t.Errorf("no hooks: %+v %v", empty.Hooks, err)
 	}
 }
+
+// The context and end events (ADR-0014) load and validate: a command
+// is required, session_start may carry a source matcher, the other two
+// refuse one.
+func TestContextHooksLoadAndValidate(t *testing.T) {
+	clearEnv(t)
+	cfg, err := Load(writeConfig(t, `
+[llm]
+model = "m"
+[[hooks.session_start]]
+matcher = "resume|clear"
+command = "/path/to/start.sh"
+[[hooks.user_prompt_submit]]
+command = "/path/to/turn.sh"
+timeout_sec = 2
+[[hooks.session_end]]
+command = "/path/to/end.sh"
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Hooks.SessionStart) != 1 || cfg.Hooks.SessionStart[0].Matcher != "resume|clear" ||
+		len(cfg.Hooks.UserPromptSubmit) != 1 || cfg.Hooks.UserPromptSubmit[0].TimeoutSec != 2 ||
+		len(cfg.Hooks.SessionEnd) != 1 {
+		t.Fatalf("hooks = %+v", cfg.Hooks)
+	}
+	for name, body := range map[string]string{
+		"start without command": "[[hooks.session_start]]\nmatcher = \"*\"\n",
+		"prompt with matcher":   "[[hooks.user_prompt_submit]]\nmatcher = \"*\"\ncommand = \"x\"\n",
+		"end with matcher":      "[[hooks.session_end]]\nmatcher = \"*\"\ncommand = \"x\"\n",
+		"end negative timeout":  "[[hooks.session_end]]\ncommand = \"x\"\ntimeout_sec = -1\n",
+	} {
+		if _, err := Load(writeConfig(t, "[llm]\nmodel = \"m\"\n"+body)); err == nil || !strings.Contains(err.Error(), "hooks.") {
+			t.Errorf("%s: err = %v", name, err)
+		}
+	}
+}

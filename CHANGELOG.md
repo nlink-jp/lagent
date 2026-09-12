@@ -18,6 +18,12 @@
   exit 2). A deny is a floor before the approval ladder and the reason
   is returned to the model; anything else fails open with a warning.
   Global config only; `hook_denied` in the transcript.
+- Session-start, prompt-submit and session-end hooks (ADR-0014):
+  `[[hooks.session_start]]`, `[[hooks.user_prompt_submit]]` and
+  `[[hooks.session_end]]` on Claude Code's measured contracts. Context
+  a hook prints rides the next turn as a `hook` attachment quoted as
+  data; a prompt hook can refuse the prompt (erased, reason shown); a
+  start or end cannot. `/clear` fires end then start.
 - Skills (ADR-0011): Claude Code's `SKILL.md` format read as-is from
   `~/.config/lagent/skills/<name>/` and a trusted project's
   `.claude/skills/<name>/` (pinned; a changed one stays out until
