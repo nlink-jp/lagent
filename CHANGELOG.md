@@ -13,17 +13,20 @@
   prompt tokens and wall time per task and configuration. Phase 2
   changes are measured against it.
 - **The runtime supplies routes, not rules** (ADR-0008, the RFP's
-  local-oriented prompt revision). Every `shell_exec` runs with
-  `GOCACHE` in the session scratch, so `go build`, `go vet` and `go
-  test` run in the read lane without approval (they failed in both
-  lanes before: the sandbox denies the cache under `~/Library`); a
-  denied call in a one-shot run is told that nothing needing approval
-  can run there and what to continue with, instead of "ask the user";
-  `list_tree dirs_only` on a flat directory reports its files instead
-  of "(empty directory)"; and the system prompt states the lanes as
-  they are and drops the "ask how to proceed" rule. Measured cause: a
-  bench run that explained its fix in prose after the runtime's own
-  chain of a failed cache write, an unattended denial and that rule.
+  local-oriented prompt revision). Every `shell_exec` runs with the
+  `[sandbox.scratch_caches]` table pointed into the session scratch
+  (shipped row: `GOCACHE = "go-build"`; the read lane and the approved
+  lanes get separate directories), so `go run`, `go vet` and `go test`
+  run in the read lane without approval (they failed in both lanes
+  before: the sandbox denies the cache under `~/Library`); a denied
+  call in a one-shot run is told that no one can approve it and what
+  runs without approval, instead of "ask the user"; `list_tree
+  dirs_only` on a flat directory lists its files instead of "(empty
+  directory)"; and the system prompt states the lanes as they are and
+  drops the "ask how to proceed" rule. Measured cause: a bench run that
+  explained its fix in prose after the runtime's own chain of a failed
+  cache write, an unattended denial and that rule. The table and the
+  per-lane split follow gem-agent ADR-0084's review of the same design.
 - **An empty completion is asked again, twice at most** (ADR-0007).
   The bench's read-edit task failed on a completion with no text and
   no tool call; the raw stream showed a mis-sampled tool-call opener

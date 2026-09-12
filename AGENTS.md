@@ -177,6 +177,14 @@ answers.
   are never built or linted; each run's project sits under the run's
   own `HOME`, so this repository's `AGENTS.md` never reaches a run. A
   task the model could answer without the files measures nothing.
+- **Toolchain caches are the operator's table, not a list in code**
+  (ADR-0008 §1). `[sandbox].scratch_caches` maps a variable to a
+  directory under the session scratch; `laneEnv` renders it with the
+  read lane and the approved lanes apart (`go-build` /
+  `go-build-approved`) because a build cache is trusted on read. The
+  loader refuses loader variables and the ones the lane decides; a
+  project file cannot set it. Do not add a toolchain in code — add the
+  row to the example config.
 - **A new config key means updating `config.example.toml`** — strict
   decode makes a stale template a startup error, so the loader tests parse
   the shipped template against the built-in defaults.

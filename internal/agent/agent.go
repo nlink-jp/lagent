@@ -1005,7 +1005,7 @@ const deniedResult = "Tool execution denied by the user. Do not retry the same c
 // (ADR-0008 §2). "Ask the user" sent a one-shot run's model into prose
 // — it stopped acting and described the change it would have made —
 // so the route this text names is the one that exists.
-const deniedUnattended = "Tool execution denied: this run is unattended (one-shot), so nothing that needs approval can run in it. Do not retry the same call. Continue with the tools that need no approval — the file tools inside the project, and shell_exec in the read lane — or finish and state what remains undone."
+const deniedUnattended = "Tool execution denied: this run is unattended (one-shot), so no one can approve this call. Do not retry it. Continue with what runs without approval — the read-only file tools, and shell_exec in the read lane — or finish and state what remains undone."
 
 // deniedText picks the denial the run can act on.
 func (a *Agent) deniedText() string {

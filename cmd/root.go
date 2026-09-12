@@ -17,6 +17,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -465,7 +466,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("the sandbox cannot be applied here (%v); every shell command would run unconfined — pass --no-sandbox to accept that explicitly", err)
 		}
 	}
-	execFn, enforcement, laneNotes, err := buildExecFn(sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, trustpin.Parents(projectDir, persistentSnap))
+	execFn, enforcement, laneNotes, err := buildExecFn(sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.Caches(), trustpin.Parents(projectDir, persistentSnap))
 	if err != nil {
 		return err
 	}
@@ -1041,7 +1042,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// runtime-facts message, never through the system prompt, which
 		// stays byte-identical so the server's prefix cache survives
 		// the clear.
-		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap))...)
+		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.Caches(), cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap))...)
 		// The MCP servers — spawned at startup with the old id in their
 		// environment and arguments — are reconnected the way /mcp
 		// reload does, so a server keeping per-session state sees the
@@ -1615,7 +1616,7 @@ func runTurnWith(parent context.Context, ladder *interruptLadder, fn func(ctx co
 // this machine (notes say why when it did not); with the sandbox off,
 // direct bash and Confined=false — the unconfined mode the agent gates
 // as the operator's alone.
-func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, persistentParents []string) (tools.LaneExecFunc, sandbox.Enforcement, []string, error) {
+func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, caches map[string]string, persistentParents []string) (tools.LaneExecFunc, sandbox.Enforcement, []string, error) {
 	if !sandboxOn {
 		return func(ctx context.Context, command string, _ sandbox.Lane) *exec.Cmd {
 			return exec.CommandContext(ctx, shell, "-c", command)
@@ -1684,7 +1685,7 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 	return func(ctx context.Context, command string, lane sandbox.Lane) *exec.Cmd {
 		argv := sandbox.Wrap(profiles[lane], shell, command)
 		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
-		cmd.Env = laneEnv(lane, scratch, os.Environ())
+		cmd.Env = laneEnv(lane, scratch, caches, os.Environ())
 		return cmd
 	}, enf, notes, nil
 }
@@ -1697,7 +1698,7 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 // project, the work directory and the scratch, so a cache under
 // ~/Library would fail a build in any lane — and the read lane must
 // not write a shared cache anyway.
-func laneEnv(lane sandbox.Lane, scratch string, parent []string) []string {
+func laneEnv(lane sandbox.Lane, scratch string, caches map[string]string, parent []string) []string {
 	env := parent
 	if lane == sandbox.LaneRead {
 		env = sandbox.ScrubEnv(parent)
@@ -1706,18 +1707,38 @@ func laneEnv(lane sandbox.Lane, scratch string, parent []string) []string {
 		}
 	}
 	if scratch != "" {
-		env = append(env, toolchainCacheEnv(scratch)...)
+		env = append(env, toolchainCacheEnv(scratch, lane, caches)...)
 	}
 	return env
 }
 
-// toolchainCacheEnv is the one list of toolchain caches redirected into
-// the session scratch (ADR-0008 §1). Go alone today: its build cache
-// under ~/Library/Caches was measured failing in both lanes. Another
-// toolchain joins when a measurement shows the same failure; a cache
-// that is never redirected is a build that fails on a cold machine.
-func toolchainCacheEnv(scratch string) []string {
-	return []string{"GOCACHE=" + filepath.Join(scratch, "go-build")}
+// toolchainCacheEnv renders the scratch-cache table (ADR-0008 §1,
+// `[sandbox].scratch_caches`) as environment assignments: each
+// variable points at its directory under the session scratch. The
+// table is the operator's; Go's build cache is the shipped row.
+//
+// The unasked lane and the approved lanes get separate directories. A
+// build cache is content-addressed and trusted on read, so one shared
+// directory would let a read-lane command — which runs unasked, and
+// can be steered by what it read — plant an object that an approved
+// build later links and the operator then runs (gem-agent ADR-0084's
+// review). The read lane's directory is the table's name; write and
+// operator share "<name>-approved".
+func toolchainCacheEnv(scratch string, lane sandbox.Lane, caches map[string]string) []string {
+	names := make([]string, 0, len(caches))
+	for name := range caches {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	env := make([]string, 0, len(names))
+	for _, name := range names {
+		dir := caches[name]
+		if lane != sandbox.LaneRead {
+			dir += "-approved"
+		}
+		env = append(env, name+"="+filepath.Join(scratch, dir))
+	}
+	return env
 }
 
 // readScratchDir creates the read lane's private scratch directory:
@@ -2084,12 +2105,12 @@ func (l liveLog) Log(kind string, data any) error {
 // the model is told by the caller, through the runtime-facts message,
 // once everything that message names is in place. Returns operator
 // notes for what could not follow.
-func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool, projectDir, dir string, denyExec []string, readLanePrompts bool, persistentParents []string) []string {
+func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool, projectDir, dir string, denyExec []string, caches map[string]string, readLanePrompts bool, persistentParents []string) []string {
 	var notes []string
 	if err := registry.UseWorkDir(dir); err != nil {
 		notes = append(notes, fmt.Sprintf("file tools keep the previous work directory: %v", err))
 	}
-	if fn, enf, laneNotes, err := buildExecFn(sandboxOn, projectDir, dir, denyExec, persistentParents); err != nil {
+	if fn, enf, laneNotes, err := buildExecFn(sandboxOn, projectDir, dir, denyExec, caches, persistentParents); err != nil {
 		notes = append(notes, fmt.Sprintf("shell commands keep the previous sandbox profile: %v", err))
 	} else {
 		shellExec.set(fn)

@@ -55,24 +55,50 @@ else to write.
 Four changes, each replacing a sentence the model could not act on with
 a fact it can, measured together on the bench.
 
-1. **Toolchain caches ride the session scratch.** Every `shell_exec`,
-   in every lane, runs with `GOCACHE` pointing at a `go-build` directory
-   under the session's private scratch (the read lane's writable
-   directory, which the write lane may write too). Builds, vets and
-   tests then run in the read lane without approval, as inspection
-   does; the cache is cold once per session and warm after. It is not
-   the operator's shared cache on purpose: the read lane runs unasked,
-   and a shared content-addressed cache is a place an unasked command
-   could plant an object a later build outside the sandbox would trust.
-   The list of cache variables is one function (`toolchainCacheEnv`)
-   with Go alone in it; another toolchain joins when a measurement
-   shows the same failure.
+1. **Toolchain caches ride the session scratch, in every lane, from
+   one operator-owned table.** `[sandbox].scratch_caches` maps an
+   environment variable to a directory name; every `shell_exec` runs
+   with each variable pointing at that directory under the session's
+   private scratch (the read lane's writable directory, which the write
+   and operator lanes may write too). The shipped row is Go's,
+   `GOCACHE = "go-build"`; an operator whose projects use another
+   toolchain adds its row (`PIP_CACHE_DIR`, `UV_CACHE_DIR`,
+   `npm_config_cache`) without a code change, and an empty value
+   removes a row. Compiles, vets and tests then run in the read lane
+   without approval, as inspection does; the cache is cold once per
+   session and warm after. It is not the operator's shared cache on
+   purpose: the read lane runs unasked, and a shared content-addressed
+   cache is a place an unasked command could plant an object a later
+   build outside the sandbox would trust. The same edge exists inside
+   the session, so the unasked lane and the approved lanes get
+   separate directories, for every row: the read lane's is the
+   table's name (`go-build`), the write and operator lanes share
+   `<name>-approved` — a read-lane command steered by what it read
+   cannot seed an object that an approved build links and the operator
+   then runs. The table is bounded by what it is for: a row must name
+   a regenerable cache, so the variables the lane decides (`TMPDIR`,
+   `PATH`, `HOME`) and the loader variables (`DYLD_*`, `LD_*`) are
+   refused — a directory the read lane writes must never become code
+   the approved lanes load — and a value is one directory name, never
+   a path. It is global config only: the project file carries
+   `[approval.tools]` and `[mcp].exclude` and nothing else, so a cloned
+   repository cannot add a row. Module and registry stores
+   (`GOMODCACHE`, `CARGO_HOME`) are not caches in this sense and do not
+   belong in it. *(Revised 2026-09-12, same day: the first cut was a
+   hard-coded list with Go alone; gem-agent ADR-0084's review moved the
+   table to the operator's config and split the lanes' directories, and
+   this record adopts both — the runtime has no reason to know a
+   machine's toolchains, and the rule that applies to every row is
+   what it owns.)*
 2. **An unattended denial names the route.** In a one-shot run the
    agent knows it is unattended (`Options.Unattended`), and a denied
-   call's result says so: nothing that needs approval can run here;
-   continue with what needs none — the file tools inside the project,
-   the read-lane shell — or finish and state what remains undone. The
-   interactive text keeps "ask the user".
+   call's result says so: no one can approve this call; continue with
+   what runs without approval — the read-only file tools, the
+   read-lane shell — or finish and state what remains undone. It does
+   not name the write tools: without `--auto` or `--allow` they are
+   exactly what was denied, and a route into a second denial is the
+   pathology this section removes. The interactive text keeps "ask the
+   user".
 3. **`list_tree` says what it saw.** With `dirs_only`, a directory that
    has files but no subdirectories lists those files (up to the
    per-directory cap) instead of reading as empty. A first cut reported
@@ -103,9 +129,16 @@ and unchanged; the prompt stays byte-identical across sessions
   verification step succeeds in the read lane; every task loses the
   `list_files` round after `list_tree`; no run ends in prose after a
   denial.
-- A Go build inside the sandbox compiles cold once per session. On a
-  large project that is the price of building at all; the operator's
-  own cache is untouched.
+- A Go build inside the sandbox compiles cold once per session per
+  trust class (the read lane's cache and the approved lanes' cache are
+  separate). On a large project that is the price of building at all;
+  the operator's own cache is untouched. The cache lives and dies with
+  the work directory; `lagent workdirs clean` is the remedy for the
+  space it takes.
+- Without a scratch (the read lane disabled, or its directory could
+  not be created) nothing is redirected and the cache stays under
+  `~/Library`, unwritable in every lane — the state before this
+  record, not a new one.
 - Module downloads are not covered: `~/go/pkg/mod` is readable and not
   writable in any lane, so a project whose modules are not already
   cached cannot fetch them from inside a run. Recorded as a gap, not
@@ -125,6 +158,15 @@ and unchanged; the prompt stays byte-identical across sessions
   cache is a poisoning route) and therefore for the write lane too,
   since the point is that a build works in the read lane; one cache
   location for both lanes keeps the compile warm across a session.
+- **A hard-coded list, one toolchain per code change.** The first cut;
+  replaced the same day (gem-agent ADR-0084's review): the runtime has
+  no reason to know which toolchains a machine runs, and every addition
+  would have cost a release. The table is the operator's; the runtime
+  owns the rule that applies to every row.
+- **One cache directory for every lane.** Rejected on the same review:
+  Go trusts a cache entry on read, so the unasked lane could plant an
+  object an approved build consumes. Two directories cost one extra
+  cold compile per session.
 - **Auto-approve write-lane builds in one-shot.** Rejected: the write
   lane reaches the network and the project; "build" is a word in a
   command line, not a lane, and the rule tier does not read command
