@@ -7,6 +7,7 @@
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
 | Triggered by | Operator: hooks belong here too — when the model runs wild they are, with the sandbox, the defence that does not depend on the model listening |
+| Amended by | ADR-0014 (§1: the other three events join on the same mechanism) |
 
 ## Context
 

@@ -85,3 +85,8 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   memory は runtime-facts メッセージに乗る: 指示節の指示は 0/18、facts
   メッセージの行は 5/6 で行動されたので想起はそこへ。状態ルート下の 2
   スコープ、操作者は `/remember` で書き、モデルはゲート付きツールで提案する
+- [`ADR-0014`](adr/0014-context-and-end-hooks.ja.md) — フックの集合は
+  gem-agent のもの: `session_start`、`user_prompt_submit`、`session_end` が
+  Claude Code の計測済み契約で `pre_tool_use` に加わる。注入文脈は `hook`
+  添付としてデータレーンに乗り、プロンプトは拒めるが開始と終了は拒めない
+  （ADR-0012 §1 を改訂）

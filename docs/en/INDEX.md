@@ -94,3 +94,8 @@ excepted).
   instruction section was acted on 0/18 and a facts-message line 5/6,
   so recall goes there; two scopes under the state root, the operator
   writes with `/remember`, the model proposes through gated tools
+- [`ADR-0014`](adr/0014-context-and-end-hooks.md) — the hook set is
+  gem-agent's: `session_start`, `user_prompt_submit` and `session_end`
+  join `pre_tool_use` on Claude Code's measured contracts; injected
+  context rides the data lane as a `hook` attachment, a prompt can be
+  refused, a start or end cannot (amends ADR-0012 §1)
