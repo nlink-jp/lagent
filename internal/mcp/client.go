@@ -114,9 +114,11 @@ type Tool struct {
 type spawnFunc func() (io.WriteCloser, io.ReadCloser, func(), error)
 
 // Client is a stdio MCP client for one server. Calls are synchronous; a
-// timed-out or cancelled call kills the child (MCP has no cancel
-// notification — kill-and-respawn is the only interruption mechanism)
-// and the next call respawns it lazily.
+// timed-out or cancelled call kills the child and the next call respawns
+// it lazily. MCP does define `notifications/cancelled` (requestId, reason;
+// in the spec since 2024-11-05), but this client does not send it: the
+// receiver may ignore it, so kill-and-respawn is the interruption that
+// always unblocks the reader.
 type Client struct {
 	name    string
 	spawn   spawnFunc
@@ -478,7 +480,9 @@ func (c *Client) rawCall(ctx context.Context, method string, params any) (json.R
 		c.pmu.Lock()
 		delete(c.pending, id)
 		c.pmu.Unlock()
-		// No cancel notification exists in MCP: kill and respawn lazily.
+		// MCP's notifications/cancelled is not sent here: the server may
+		// ignore it, and the blocked reader is unblocked only by the kill.
+		// Kill now; the next call respawns the server lazily.
 		c.shutdown()
 		return nil, fmt.Errorf("%s timed out after %s (server killed; it restarts on the next call)", method, c.timeout)
 	}
