@@ -357,9 +357,22 @@ func TestEmptyResponseIsAskedAgain(t *testing.T) {
 	if err != nil || out != "done" {
 		t.Fatalf("the retry should carry the turn: %q %v", out, err)
 	}
-	if len(mb.calls) != 3 || len(mb.calls[0]) != len(mb.calls[2]) {
-		t.Fatalf("the re-sent requests must be the failed one: %d calls, %d vs %d messages",
-			len(mb.calls), len(mb.calls[0]), len(mb.calls[len(mb.calls)-1]))
+	if len(mb.calls) != 3 {
+		t.Fatalf("expected the request and two re-sends, got %d calls", len(mb.calls))
+	}
+	// Each re-send is the failed request plus one transient nudge at
+	// the end; the history itself must not grow.
+	for i := 1; i < 3; i++ {
+		got := mb.calls[i]
+		if len(got) != len(mb.calls[0])+1 || got[len(got)-1].Role != llm.RoleUser || got[len(got)-1].Content != emptyNudge {
+			t.Errorf("re-send %d must be the failed request plus the nudge: %d vs %d messages, last %+v",
+				i, len(got), len(mb.calls[0]), got[len(got)-1])
+		}
+	}
+	for _, m := range a.history {
+		if m.Content == emptyNudge {
+			t.Error("the nudge must never be stored in the history")
+		}
 	}
 	if len(notices) != 2 || !strings.Contains(notices[0], "empty") {
 		t.Errorf("one notice per re-send expected: %v", notices)

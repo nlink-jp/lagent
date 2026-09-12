@@ -34,13 +34,27 @@ error for a fault that a second request would not have.
 ## Decision
 
 An empty completion — no text, no tool call, whatever the finish
-reason — is **asked again, up to twice**, with the identical request.
-The history is unchanged (nothing was stored), so the request is byte
-for byte the one that just failed and the server's prefix cache answers
-it in seconds. Each re-send is noted to the operator (`OnNotice`) and
-the transcript records every attempt as `assistant_empty`, the re-sent
+reason — is **asked again, up to twice**, with the same history and
+**one transient line appended**: "Reply now: give your final answer as
+text, or call a tool." The history is unchanged (nothing was stored,
+and the line is sent, never kept), so the request is the one that just
+failed plus that line, and the server's prefix cache still answers it
+in seconds. Each re-send is noted to the operator (`OnNotice`) and the
+transcript records every attempt as `assistant_empty`, the re-sent
 ones with `retried: true`. A third empty completion ends the turn as
 before, with the same error and the same message.
+
+The line is there because the identical request is not always enough
+(second amendment, 2026-09-12). Traced with `LAGENT_LLM_TRACE` and
+replayed ten times each: at the point after `read_file` the identical
+request came back empty 4/10; at the point after a compile error from
+the verification run it came back empty **10/10** — deterministic, so
+no number of identical re-sends would recover it — and with the one
+line appended, 0/10 at both points. Thinking on (`reasoning_effort`)
+also gave 0/10 at that point, at three times the latency per call;
+that is ADR-0009's measurement, not this record's remedy. The line
+names both routes a turn can take and prefers neither, so it steers
+the token path, not the answer.
 
 Bounded on purpose: two retries, never a loop. The bound was one when
 this record was written, on the reading that the fault is a one-off
@@ -74,10 +88,13 @@ retried.
 - **Retry until something arrives.** Rejected: unbounded retries hide a
   server that has stopped answering; the bound is set from the measured
   rate, not removed.
-- **Change the request on retry** (a nudge message, a different seed).
-  Not needed: the identical request re-sent succeeds half the time at
-  the worst point measured, and an identical request keeps the prefix
-  cache; a nudge would also have to be kept out of the history.
+- **Re-send the identical request only.** The first two versions of
+  this record; replaced by the second amendment when a point was
+  measured at which the identical request is empty every time. The
+  transient line keeps the prefix cache (it is appended after the
+  history) and is kept out of the history and the transcript.
+- **A different seed on retry.** Not measured; the line was, and it
+  also covers the deterministic point where a seed change is a guess.
 - **Ask the server to stop routing stray tokens into reasoning.**
   Out of reach: the behaviour is the inference server's and the
   model's; the runtime sees only the result.

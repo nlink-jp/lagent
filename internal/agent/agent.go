@@ -710,7 +710,17 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 		// caching can hit. Reuse is sound because guard.Wrap refuses
 		// content containing the tag name — a leaked tag cannot escape
 		// the wrapper, only get its carrier withheld.
-		resp, err := a.backend.ChatStream(ctx, a.tag.Expand(a.system), wrapToolMessages(a.history, a.tag), a.toolDefs, onText)
+		msgs := wrapToolMessages(a.history, a.tag)
+		if emptyAsked > 0 {
+			// A re-send after an empty completion carries a transient
+			// nudge (ADR-0007, second amendment): at the point the fault
+			// strikes hardest — a compile error just returned — the
+			// identical request came back empty 10/10 on replay, and
+			// with this one line appended 0/10. The line is sent, never
+			// stored: the history and the transcript stay what they were.
+			msgs = append(msgs, llm.Message{Role: llm.RoleUser, Content: emptyNudge})
+		}
+		resp, err := a.backend.ChatStream(ctx, a.tag.Expand(a.system), msgs, a.toolDefs, onText)
 		if err != nil {
 			return "", err
 		}
@@ -731,10 +741,11 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 
 		// A response with neither text nor tool calls carries nothing to
 		// replay; storing it would put an empty turn in every later
-		// request. It is asked again once with the identical request
-		// (ADR-0007: measured as one mis-sampled tool-call opener that
-		// the server routed into the reasoning channel; the same request
-		// re-sent answered normally), and reported the second time.
+		// request. It is asked again, up to twice, with the same history
+		// and a transient nudge (ADR-0007: measured as one mis-sampled
+		// tool-call opener that the server routed into the reasoning
+		// channel — a coin flip at some points, deterministic at others,
+		// and answered normally once nudged), and reported after that.
 		if resp.Content == "" && len(resp.ToolCalls) == 0 {
 			retry := emptyAsked < maxEmptyRetries && ctx.Err() == nil
 			a.logRecord("assistant_empty", map[string]any{
@@ -871,8 +882,14 @@ const roundStopFmt = "the %s (%d rounds) stopped this turn — progress so far i
 // (ADR-0007). Two: the traced request replayed four times glitched
 // twice — the fault is a coin flip at the point it strikes, not a
 // one-off — so one retry left a quarter of the cases failing. Three
-// identical requests all empty is something the operator should see.
+// requests all empty is something the operator should see.
 const maxEmptyRetries = 2
+
+// emptyNudge is the one line a re-send appends after the history. The
+// wording is the measured one (replayed 10/10 → 0/10 at the compile-
+// error point, 4/10 → 0/10 after a read_file); it names both routes a
+// turn can take and prefers neither.
+const emptyNudge = "Reply now: give your final answer as text, or call a tool."
 
 // emptyResponseError explains a response that carried nothing, naming
 // the cause the server reported. "The model returned nothing" is not
