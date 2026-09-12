@@ -89,3 +89,8 @@ excepted).
   operator's control outside the model: `[[hooks.pre_tool_use]]` on
   Claude Code's measured contract, a deny is a floor before the ladder,
   anything else fails open with a notice, global config only
+- [`ADR-0013`](adr/0013-memory-rides-the-facts-message.md) — agent
+  memory rides the runtime-facts message: a directive in the
+  instruction section was acted on 0/18 and a facts-message line 5/6,
+  so recall goes there; two scopes under the state root, the operator
+  writes with `/remember`, the model proposes through gated tools

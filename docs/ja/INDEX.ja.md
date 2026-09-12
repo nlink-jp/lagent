@@ -81,3 +81,7 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   モデルの外にある操作者の制御: Claude Code の計測済み契約による
   `[[hooks.pre_tool_use]]`、拒否は梯子の前の床、それ以外は注記付きで
   fail open、global 設定のみ
+- [`ADR-0013`](adr/0013-memory-rides-the-facts-message.ja.md) — agent
+  memory は runtime-facts メッセージに乗る: 指示節の指示は 0/18、facts
+  メッセージの行は 5/6 で行動されたので想起はそこへ。状態ルート下の 2
+  スコープ、操作者は `/remember` で書き、モデルはゲート付きツールで提案する
