@@ -245,13 +245,12 @@ func CredentialPath(p string) bool {
 			}
 			continue
 		}
-		d = strings.ToLower(d)
-		if strings.Contains(lower, d+"/") || strings.HasSuffix(lower, d) {
+		if hasPathComponent(lower, strings.ToLower(d)) {
 			return true
 		}
 	}
 	for _, f := range credentialFiles {
-		if strings.HasSuffix(lower, strings.ToLower(f)) {
+		if hasPathComponent(lower, strings.ToLower(f)) {
 			return true
 		}
 	}
@@ -267,6 +266,18 @@ func CredentialPath(p string) bool {
 		return true
 	}
 	return false
+}
+
+// hasPathComponent reports whether the slash path lower contains the
+// (possibly multi-segment) relative path d on segment boundaries:
+// `.aws/credentials`, `sub/.aws` and `~/.netrc` do; `deploy.aws`,
+// `keys.ssh/x` and `foo.netrc` do not. A suffix match once took those
+// for credentials, which cost a false Block on a write; once the read
+// tools and the enumeration skip read the same rule (ADR-0015) it
+// would have hidden ordinary files (independent review).
+func hasPathComponent(lower, d string) bool {
+	return lower == d || strings.HasPrefix(lower, d+"/") ||
+		strings.HasSuffix(lower, "/"+d) || strings.Contains(lower, "/"+d+"/")
 }
 
 func envTemplate(base string) bool {

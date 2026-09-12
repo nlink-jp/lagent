@@ -159,9 +159,17 @@ func TestPersistentAndCredentialRulesAgree(t *testing.T) {
 			t.Errorf("%q not credential", p)
 		}
 	}
-	for _, p := range []string{".env.example", "environment.go", "README.md", "src/main.go", ".envrc-notes.md", ".claude/skills/x/SKILL.md", "docs/.gemini/notes.md", "docs/mcp-bridge/notes.md", "~/.config/mcp-bridge-docs/README.md", "~/.config/lagent/config.toml"} {
+	for _, p := range []string{".env.example", "environment.go", "README.md", "src/main.go", ".envrc-notes.md", ".claude/skills/x/SKILL.md", "docs/.gemini/notes.md", "docs/mcp-bridge/notes.md", "~/.config/mcp-bridge-docs/README.md", "~/.config/lagent/config.toml",
+		// A name that merely ends in a credential directory's or file's
+		// spelling is on a segment boundary or it is nothing.
+		"deploy.aws", "keys.ssh/id", "backup.ssh/notes", "x.kube", "foo.npmrc", "docs/my.netrc", "data.docker/config.json"} {
 		if CredentialPath(p) {
 			t.Errorf("%q wrongly credential", p)
+		}
+	}
+	for _, p := range []string{".aws", ".aws/credentials", "sub/.ssh/id_rsa", "~/.ssh", ".kube/config", "~/.npmrc", ".netrc", "x/.docker/config.json", "~/.config/gh/hosts.yml"} {
+		if !CredentialPath(p) {
+			t.Errorf("%q not credential (segment-anchored spelling)", p)
 		}
 	}
 }

@@ -286,7 +286,8 @@ func TestMemoryWritesStayReview(t *testing.T) {
 func TestCredentialReadsAreOperatorOnly(t *testing.T) {
 	credential := []string{".env", ".env.local", "config/.env.production", "keys/id_rsa", "sub/credentials.json",
 		proj + "/.env", "~/.ssh/id_rsa", "/Users/op/.config/mcp-bridge/config.json", "/state/work/sess-1/service-account.json"}
-	ordinary := []string{".env.example", ".env.sample", "src/main.go", "environment.go", "README.md", "/etc/passwd", "docs/.gemini/notes.md"}
+	ordinary := []string{".env.example", ".env.sample", "src/main.go", "environment.go", "README.md", "/etc/passwd", "docs/.gemini/notes.md",
+		"deploy.aws", "keys.ssh/id", "x.kube", "foo.npmrc"} // a credential spelling on no segment boundary
 	for _, name := range []string{"read_file", "view_image", "file_info"} {
 		for _, p := range credential {
 			v := Classify(name, false, map[string]any{"path": p}, proj, "")

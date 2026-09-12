@@ -32,7 +32,12 @@
   credential-named entry and report the count and names with the
   route. `@` attachments are unchanged. One list, in `internal/sandbox`;
   a deliberate local change (ADR-0001), made in the same shape in
-  gem-agent independently.
+  gem-agent independently. The list's directory and file entries now
+  match on a path segment: `.aws/credentials` and `~/.netrc` are
+  credentials, `deploy.aws`, `keys.ssh/x` and `foo.netrc` are ordinary
+  files — a suffix match once took them for credentials, which cost a
+  false Block on a write and would have hidden them from the
+  enumeration tools (independent review).
 
 ### Fixed
 
