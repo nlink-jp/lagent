@@ -42,7 +42,10 @@ type OpenAI struct {
 	// body and the raw SSE reply as files: the only way to read an odd
 	// completion — an empty one, a swallowed tool call — as the server
 	// sent it. Off by default; a trace write failure is reported as the
-	// turn's error rather than silently dropping the trace.
+	// turn's error rather than silently dropping the trace. The files
+	// are the whole conversation as sent, reasoning deltas included
+	// (ADR-0009 keeps those out of everything else), so the directory
+	// is 0700 and each file 0600, as the transcript is.
 	traceDir string
 	traceSeq atomic.Int64
 	// reasoningEffort rides every request as `reasoning_effort` when
@@ -56,6 +59,17 @@ func (o *OpenAI) SetReasoningEffort(effort string) { o.reasoningEffort = effort 
 
 // TraceEnv names the directory that receives request/response traces.
 const TraceEnv = "LAGENT_LLM_TRACE"
+
+// A trace is private to the operator: the same modes the transcript
+// uses (internal/session), because the trace holds strictly more — the
+// system prompt with the instruction files, every tool result, and the
+// reasoning deltas no other file keeps. An existing directory or file
+// keeps its mode; these apply to what the runtime creates.
+const (
+	traceDirMode   = 0o700
+	traceFileMode  = 0o600
+	traceFileFlags = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+)
 
 // Providers ContextWindow knows how to ask.
 const (
@@ -108,15 +122,15 @@ func (o *OpenAI) traceFiles() (reqW, respW *os.File, err error) {
 	if o.traceDir == "" {
 		return nil, nil, nil
 	}
-	if err := os.MkdirAll(o.traceDir, 0o755); err != nil {
+	if err := os.MkdirAll(o.traceDir, traceDirMode); err != nil {
 		return nil, nil, fmt.Errorf("llm trace: %w", err)
 	}
 	stamp := fmt.Sprintf("%s-%03d", time.Now().Format("20060102-150405.000"), o.traceSeq.Add(1))
-	reqW, err = os.Create(filepath.Join(o.traceDir, stamp+"-request.json"))
+	reqW, err = os.OpenFile(filepath.Join(o.traceDir, stamp+"-request.json"), traceFileFlags, traceFileMode)
 	if err != nil {
 		return nil, nil, fmt.Errorf("llm trace: %w", err)
 	}
-	respW, err = os.Create(filepath.Join(o.traceDir, stamp+"-response.sse"))
+	respW, err = os.OpenFile(filepath.Join(o.traceDir, stamp+"-response.sse"), traceFileFlags, traceFileMode)
 	if err != nil {
 		_ = reqW.Close()
 		return nil, nil, fmt.Errorf("llm trace: %w", err)

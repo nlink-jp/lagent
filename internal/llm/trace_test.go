@@ -87,6 +87,50 @@ func TestReasoningEffortRidesTheRequestWhenSet(t *testing.T) {
 	}
 }
 
+// The trace is the whole conversation as sent, reasoning deltas
+// included (ADR-0009 §3 keeps them out of everything else), and the
+// operator points it anywhere — so the runtime creates the directory
+// 0700 and the files 0600, as the transcript is.
+func TestTraceFilesArePrivate(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sse(w, `{"choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}`)
+	}))
+	defer srv.Close()
+	parent := filepath.Join(t.TempDir(), "trace")
+	dir := filepath.Join(parent, "nested")
+	t.Setenv(TraceEnv, dir)
+	o := newTestBackend(t, srv, ProviderLMStudio)
+	if _, err := o.ChatStream(context.Background(), "sys", []Message{{Role: RoleUser, Content: "hi"}}, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	// Every directory MkdirAll created, not only the leaf.
+	for _, d := range []string{parent, dir} {
+		st, err := os.Stat(d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := st.Mode().Perm(); got != 0o700 {
+			t.Errorf("%s: directory mode %04o, want 0700", d, got)
+		}
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("one attempt leaves two files, got %d", len(entries))
+	}
+	for _, e := range entries {
+		st, err := e.Info()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := st.Mode().Perm(); got != 0o600 {
+			t.Errorf("%s: file mode %04o, want 0600", e.Name(), got)
+		}
+	}
+}
+
 func TestTraceOffLeavesNothing(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sse(w, `{"choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}`)

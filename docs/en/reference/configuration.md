@@ -198,7 +198,7 @@ Other environment variables the runtime reads or sets:
 |---|---|---|
 | `LAGENT_STATE_DIR` | read | the state root (sessions, work directories, pins) instead of the default under `~/.local/state` |
 | `LAGENT_MCP_STDERR` | read | `1` passes MCP servers' stderr through to the terminal (debugging; it is discarded otherwise) |
-| `LAGENT_LLM_TRACE` | read | a directory; every model request is written there as `<stamp>-<n>-request.json` and its raw SSE reply as `<stamp>-<n>-response.sse` (debugging and bench diagnosis; off otherwise) |
+| `LAGENT_LLM_TRACE` | read | a directory; every model request is written there as `<yyyymmdd-hhmmss.mmm>-<nnn>-request.json` and its raw SSE reply as `<yyyymmdd-hhmmss.mmm>-<nnn>-response.sse`, one pair per attempt (`<nnn>` counts up within the process; a re-send under ADR-0007 is its own pair). The request file is the body as sent — the system prompt with the instruction files, the tool schemas, the runtime-facts message and the whole history, tool results included; the response file is the stream byte for byte, so it holds the `reasoning_content` deltas that ADR-0009 keeps out of the history and the transcript (a non-200 reply's body lands there too). The directory is created `0700` and the files `0600`, as the transcript is; a write failure ends the turn with an error. Nothing removes the files — delete them once the diagnosis is done (debugging and bench diagnosis; off otherwise) |
 | `LAGENT_SESSION_ID` | exported | the session id, for `shell_exec` children and `${LAGENT_SESSION_ID}` in `.mcp.json` |
 | `LAGENT_WORK_DIR` | exported | the per-session work directory, likewise expandable in `.mcp.json` |
 | `LAGENT_PROJECT_DIR` | exported | the project directory, for children that need to know it |

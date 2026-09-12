@@ -188,7 +188,7 @@ command     = "/Users/you/hooks/session-end.sh"
 |---|---|---|
 | `LAGENT_STATE_DIR` | 読む | 状態ルート（セッション、作業ディレクトリ、ピン）。既定は `~/.local/state` 下 |
 | `LAGENT_MCP_STDERR` | 読む | `1` で MCP サーバの stderr を端末に通す（デバッグ用。通常は捨てる） |
-| `LAGENT_LLM_TRACE` | 読む | ディレクトリ。モデルへの全リクエストを `<stamp>-<n>-request.json`、生の SSE 応答を `<stamp>-<n>-response.sse` として書き出す（デバッグとベンチの診断用。通常は off） |
+| `LAGENT_LLM_TRACE` | 読む | ディレクトリ。モデルへの全リクエストを `<yyyymmdd-hhmmss.mmm>-<nnn>-request.json`、生の SSE 応答を `<yyyymmdd-hhmmss.mmm>-<nnn>-response.sse` として書き出す。試行ごとに 1 対（`<nnn>` はプロセス内の連番。ADR-0007 の再送も独自の 1 対）。リクエスト側は送った本文そのもの — 指示ファイルを含むシステムプロンプト、ツールスキーマ、ランタイム事実メッセージ、ツール結果を含む全履歴。応答側はストリームをバイト単位でそのまま保存するので、ADR-0009 が履歴にも transcript にも残さない `reasoning_content` の差分も含む（200 以外の応答本文もここに入る）。ディレクトリは `0700`、ファイルは `0600` で作る（transcript と同じ）。書き込みに失敗するとそのターンはエラーで終わる。ファイルは何も消さない — 診断が済んだら削除すること（デバッグとベンチの診断用。通常は off） |
 | `LAGENT_SESSION_ID` | export | セッション id。`shell_exec` の子プロセスと `.mcp.json` の `${LAGENT_SESSION_ID}` 向け |
 | `LAGENT_WORK_DIR` | export | セッション作業ディレクトリ。同じく `.mcp.json` で展開できる |
 | `LAGENT_PROJECT_DIR` | export | プロジェクトディレクトリ。それを知る必要がある子プロセス向け |

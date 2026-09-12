@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- `LAGENT_LLM_TRACE` files are private: the trace directory is created
+  `0700` and each request/response pair `0600`, as the transcript is.
+  The trace is the whole request body and the raw stream — the
+  instruction files, every tool result, and the `reasoning_content`
+  deltas nothing else stores (ADR-0009) — and the operator points it
+  anywhere, so the earlier `0755` directory and umask-default files
+  left all of it readable by every local user. A directory or file
+  that already exists keeps its mode. The configuration reference now
+  says what the trace holds and that deleting it is the operator's job.
+
 ## [0.3.1] - 2026-09-12
 
 ### Fixed

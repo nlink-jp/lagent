@@ -208,6 +208,13 @@ answers.
   error bodies and the probe, a 16 MiB scanner buffer on the stream —
   and `internal/archtest` allowlists them by name with the reason.
   A new read there needs the same.
+- **`LAGENT_LLM_TRACE` is the one file where reasoning content lands.**
+  The trace is the request body and the raw stream as sent — the
+  instruction files, the nonce-wrapped tool results, the
+  `reasoning_content` deltas ADR-0009 keeps out of the transcript — so
+  `traceFiles` creates the directory `0700` and the files `0600` like
+  the transcript (`TestTraceFilesArePrivate` pins it). Nothing deletes
+  a trace; a bench or debugging note that sets it says so.
 - **The bench is the evidence for Phase 2** (ADR-0006). A prompt,
   tool-description or config change that is meant to change the model's
   behaviour is measured as one more configuration on the same tasks
