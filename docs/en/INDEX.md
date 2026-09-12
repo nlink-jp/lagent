@@ -85,3 +85,7 @@ excepted).
   and the project's `.claude/skills` (trusted and pinned), one catalog
   line per skill in the facts message, `load_skill` results sent
   unwrapped and confined, `/skill` and `/skills`, `allowed-tools` ignored
+- [`ADR-0012`](adr/0012-pre-tool-hooks.md) — pre-tool hooks are the
+  operator's control outside the model: `[[hooks.pre_tool_use]]` on
+  Claude Code's measured contract, a deny is a floor before the ladder,
+  anything else fails open with a notice, global config only

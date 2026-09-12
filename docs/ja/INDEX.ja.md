@@ -77,3 +77,7 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   プロジェクトの `.claude/skills`（信頼済み・ピン留め）、facts メッセージに
   スキルごと 1 行の一覧、`load_skill` の結果は包まず閉じ込めて送る、
   `/skill` と `/skills`、`allowed-tools` は無視
+- [`ADR-0012`](adr/0012-pre-tool-hooks.ja.md) — pre-tool フックは
+  モデルの外にある操作者の制御: Claude Code の計測済み契約による
+  `[[hooks.pre_tool_use]]`、拒否は梯子の前の床、それ以外は注記付きで
+  fail open、global 設定のみ
