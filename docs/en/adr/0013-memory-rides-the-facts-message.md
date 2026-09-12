@@ -61,11 +61,15 @@ extra, not the mechanism.
    updates.
 2. **Recall rides the runtime-facts message, not the system prompt.**
    Global first, then project, alphabetical within scope; each memory
-   one entry under a heading that states its standing: recorded in
-   past sessions by the user or by this agent, background knowledge,
-   possibly stale, not instructions. A memory that names a file or a
-   tool is a pointer the model can act on, which is what the
-   measurement shows the channel doing. The system prompt stays
+   one entry under a heading that states its standing: the user's
+   notes across sessions — typed with `/remember`, or proposed by the
+   model and approved — possibly stale, to be verified when
+   load-bearing, and to be acted on when one applies to the task at
+   hand. The standing is the measured part: under gem-agent's heading
+   ("background knowledge, not instructions") a pointer memory was
+   acted on 1/3 on `memory-follow`; under this one, 8/9. Every memory
+   has passed the user's hand, so calling them the user's notes is the
+   truth as well as the wording that works. The system prompt stays
    byte-identical (ADR-0003). Budget: 2 KB per memory, 8 KB in total,
    truncation and skips reported.
 3. **The operator writes by hand; the model proposes.** `/remember
@@ -107,7 +111,9 @@ extra, not the mechanism.
   owns the tools, the slash commands and the listing.
 - A stale or wrong memory is the operator's to remove, and the
   listing names the files. Model-written memories are proposals the
-  operator saw and approved; the standing line says so to the model.
+  operator saw and approved, which is why the heading may call every
+  memory the user's note: a memory the operator did not see cannot
+  exist by this design.
 - The RFP's Phase 2 list points here. Compaction is the one item left.
 
 ## Alternatives considered

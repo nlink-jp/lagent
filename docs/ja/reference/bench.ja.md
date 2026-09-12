@@ -54,12 +54,14 @@ go run ./bench report bench/_results/<timestamp>
 | `view-image` | 見るべき画像 | 回答が `red` を含む。ツール呼び出し 1 回以上 |
 | `pointer-small`、`pointer-mid`、`pointer-large` | プロジェクトの `AGENTS.md`（0.6 KB、13 KB、32 KB — 最後はファイル上限の直下）にある `PROCEDURE.md` を指す常置の指示 | `read-edit` と同じく `pager.go` を直し、`CHANGES.log` が `pager.go` を含む（手順の唯一の動作）。ツール呼び出し 2 回以上 |
 | `pointer-facts` | 同じ指示を runtime-facts メッセージのスキル一覧 1 行にしたもの。指示を含まない 32 KB の `AGENTS.md` を併置 | 同上 |
+| `memory-follow` | `pointer-*` の指示を実行の状態ルートに global memory としてインストール — facts メッセージ内のツール名を含まない素のポインタ行。指示を含まない 32 KB の `AGENTS.md` を併置 | `pointer-*` と同じ |
 | `skill-follow` | 読み込んで従うべきスキル | 回答がスキルの固定形式行そのもの（`BRIEF: <n> rows, <n> columns, first id <n>, last id <n>`）。ツール呼び出し 2 回以上（`load_skill`、次に数える） |
 
 タスクは `bench/tasks/<name>/task.toml`（プロンプト、期待、フィクスチャ
 サーバが要るなら `mcp = true`）と `testdata/`、スキルのインストールが
 要るタスクなら `skills/` ディレクトリ — ランナーが実行の隔離 global スキル
-ディレクトリへ複製する。`trust = true` は実行のプロジェクトを信頼済みに
+ディレクトリへ複製する。`memory/` ディレクトリ（`global/<name>.md`）は
+ランナーが実行の状態ルートの memory としてインストールする。`trust = true` は実行のプロジェクトを信頼済みに
 する（構成の `[approval].trusted_projects` がそれを名指し、実行前にピンを
 記録する）ので、フィクスチャ自身の `AGENTS.md` が読み込まれる。既定は off
 で、未信頼のプロジェクトがベースラインである。期待は `min_tool_calls`、
@@ -245,6 +247,27 @@ memory 設計が依存する問い: 常置の指示はどこに置けばこの�
 メッセージの行は 6 実行中 5 で行動され、指示ファイルの指示は 18 実行中 0。
 呼ぶべきツールを添えて runtime-facts メッセージに乗ったものは従われ、指示節
 に置かれたものは大きさによらず従われない。
+
+`memory-follow`、2026-09-12（`72a4788`、memory 導入、ADR-0013）: 同じ指示を
+facts メッセージで想起される memory にしたもので、行にツール名は無い。
+移植した見出し（「背景知識、古い可能性あり、指示ではない」）の下では 1/3:
+モデルが手順ファイルを読んで編集を記録したのは 1 回。そこで見出しを、
+memory は利用者の常置メモ — どれも利用者の手を経ている、打ち込んだか承認
+したか — と呼び、いまの作業に当てはまるメモには従えと言うものに変えた。
+その見出しの下で 3 + 6 反復:
+
+| task | config | runs | completed | no-tool answers | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |
+|---|---|---|---|---|---|---|---|---|
+| memory-follow | baseline | 3 | 2/3 | 0/3 | 10 | 10 | 145674 | 45 |
+| memory-follow | baseline | 6 | 6/6 | 0/6 | 7 | 7 | 104286 | 39 |
+
+8/9: 1 回を除く全実行でモデルは `PROCEDURE.md` を読みログを書いた。チャネルは
+`pointer-facts` と同じで、1/3 と 8/9 の間で変わったのは見出しの立場である。
+「指示ではない」と言う行をこのモデルは言葉どおりに受け取り、その下の
+ポインタは背景になる。同じポインタが「利用者のメモ — 当てはまるものには
+従え」の下にあれば、スキル行と同じ率で従われる。代価はラウンド数: 手順を
+読んでログを書くのは素の修正より 2〜3 回多いツール呼び出し（中央値 7 対
+`pointer-small` の 3）。
 
 ## 比較
 

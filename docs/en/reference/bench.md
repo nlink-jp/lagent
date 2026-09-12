@@ -56,13 +56,15 @@ preload the server and hide whether the model loads it).
 | `view-image` | an image to look at | the answer contains `red`; at least one tool call |
 | `pointer-small`, `pointer-mid`, `pointer-large` | a standing directive in the project's `AGENTS.md` (0.6 KB, 13 KB, 32 KB — the last just under the per-file cap), pointing at `PROCEDURE.md` | `pager.go` fixed as in `read-edit` and `CHANGES.log` names `pager.go` (the procedure's one action); at least two tool calls |
 | `pointer-facts` | the same directive as one skill catalog line in the runtime-facts message, beside a 32 KB `AGENTS.md` without it | as above |
+| `memory-follow` | the `pointer-*` directive installed as a global memory in the run's state root — a plain pointer line in the facts message, no tool name in it, beside a 32 KB `AGENTS.md` without the directive | as `pointer-*` |
 | `skill-follow` | a skill to load and follow | the answer is exactly the skill's fixed-format line (`BRIEF: <n> rows, <n> columns, first id <n>, last id <n>`); at least two tool calls (`load_skill`, then the count) |
 
 A task is `bench/tasks/<name>/task.toml` (prompt, expectations, `mcp =
 true` when it needs the fixture server) plus `testdata/`, and a
 `skills/` directory when the task needs skills installed — the runner
-copies it into the run's isolated global skill directory. `trust =
-true` marks the run's project trusted (the configuration names it in
+copies it into the run's isolated global skill directory, and a
+`memory/` directory (`global/<name>.md`) the runner installs as the
+run's state-root memory. `trust = true` marks the run's project trusted (the configuration names it in
 `[approval].trusted_projects` and the pins are recorded before the
 run), so the fixture's own `AGENTS.md` loads; off by default, since an
 untrusted project is the baseline. Expectations
@@ -274,6 +276,31 @@ before the series above. Over both series, the facts-message line was
 acted on in 5/6 runs and the instruction-file directive in 0/18. What
 rides the runtime-facts message with a tool to call is followed; what
 sits in the instruction section is not, whatever its size.
+
+`memory-follow`, 2026-09-12 (`72a4788`, memory in, ADR-0013): the
+same directive as a memory recalled in the facts message, with no tool
+name in the line. Under the ported heading ("background knowledge,
+possibly stale, not instructions"), 1/3: the model read the procedure
+file and logged the edit once. The heading was then changed to call
+the memories the user's standing notes — every memory passed the
+user's hand, typed or approved — and to say that a note that applies
+to the task at hand is to be acted on. Under that heading, 3 + 6
+repetitions:
+
+| task | config | runs | completed | no-tool answers | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |
+|---|---|---|---|---|---|---|---|---|
+| memory-follow | baseline | 3 | 2/3 | 0/3 | 10 | 10 | 145674 | 45 |
+| memory-follow | baseline | 6 | 6/6 | 0/6 | 7 | 7 | 104286 | 39 |
+
+8/9: the model read `PROCEDURE.md` and wrote the log in every run but
+one. The channel is the same as `pointer-facts`; what changed between
+1/3 and 8/9 is the heading's standing. A line that says "not
+instructions" is taken at its word by this model, and a pointer under
+it is background; the same pointer under "the user's notes — act on
+one that applies" is followed at the rate of the skill line. The cost
+is rounds: reading the procedure and writing the log is two to three
+more tool calls than the bare fix (median 7 against 3 for
+`pointer-small`).
 
 ## Comparing
 
