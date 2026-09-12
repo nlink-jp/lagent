@@ -384,6 +384,9 @@ var en = Messages{
   /settings  view and edit settings, with provenance
   /skills    list installed skills
   /skill <name> [args]   invoke a skill directly
+  /memory    list memories (facts recalled in every session)
+  /remember [global] <name> <fact>   save a memory (project scope unless global)
+  /forget [global] <name>            remove a memory
   /usage     token statement for this session
   /version   version and platform
   /clear     reset the conversation
@@ -535,6 +538,9 @@ var ja = Messages{
   /settings  設定の表示と編集（出所つき）
   /skills    インストール済みスキル一覧
   /skill <name> [args]   スキルを直接起動
+  /memory    メモリ一覧（毎セッション想起される事実）
+  /remember [global] <name> <fact>   メモリを保存（global 指定が無ければ project）
+  /forget [global] <name>            メモリを削除
   /usage     このセッションのトークン明細
   /version   バージョンとプラットフォーム
   /clear     会話履歴をリセット

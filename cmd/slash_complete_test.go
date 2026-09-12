@@ -24,7 +24,7 @@ func TestSlashCompletionsSource(t *testing.T) {
 	if !strings.Contains(joined, "/settings") {
 		t.Errorf("/s missing /settings: %v", got)
 	}
-	for _, gone := range []string{"/compact", "/riskbook", "/memory"} {
+	for _, gone := range []string{"/compact", "/riskbook"} {
 		if strings.Contains(strings.Join(complete("/"), " "), gone) {
 			t.Errorf("completion offers %s, which this runtime does not have", gone)
 		}

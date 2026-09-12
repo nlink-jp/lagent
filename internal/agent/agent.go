@@ -157,12 +157,12 @@ type Agent struct {
 	instructionTools map[string]bool
 	// preToolHook: the operator's floor before the ladder (Options.PreToolHook).
 	preToolHook func(ctx context.Context, name string, args map[string]any) (bool, string)
-	noMentions       bool
-	onToolDone       func(tc llm.ToolCall)
-	turnCalls        []string
-	loopPrevSig      string
-	loopStreak       int
-	loopOK           map[string]bool
+	noMentions  bool
+	onToolDone  func(tc llm.ToolCall)
+	turnCalls   []string
+	loopPrevSig string
+	loopStreak  int
+	loopOK      map[string]bool
 	// mcpFaults is the per-turn ledger of remote tools answering with
 	// one identical error text (gem-agent ADR-0075 §2), keyed by registry tool
 	// name; it starts fresh with the loop guard's state.
@@ -358,7 +358,7 @@ func New(opts Options) *Agent {
 		noMentions:  opts.NoMentions,
 		onToolDone:  opts.OnToolDone,
 		preToolHook: opts.PreToolHook,
-		tag:        guard.NewTagWithPrefix("tool_output"),
+		tag:         guard.NewTagWithPrefix("tool_output"),
 	}
 }
 

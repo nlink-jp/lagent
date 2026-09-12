@@ -80,6 +80,11 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   script that guards Claude Code guards this runtime. A deny is final,
   whatever the approval mode; the reason goes back to the model
   (ADR-0012).
+- **Memory:** `/remember <name> <fact>` keeps a short fact for every
+  later session in this project (`global` for every project); the model
+  can propose one with `save_memory`, which asks you. Memories are
+  recalled in the runtime facts, the place this model acts on, so a
+  memory that names a file or a command works as a pointer (ADR-0013).
 - **Sessions:** a JSONL transcript per session; `--continue` and
   `--resume`; usage records in the shape
   [gem-usage-lens](https://github.com/nlink-jp/gem-usage-lens) reads for
@@ -90,7 +95,7 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   each is for; it loads one with `load_skill`, and you invoke one by
   hand with `/skill <name>` (ADR-0011).
 - **Not here:** web search and fetch, media uploads, audit-log export,
-  history compaction, agent memory — see the RFP and
+  history compaction — see the RFP and
   [ADR-0002](docs/en/adr/0002-features-not-reproduced.md).
 
 ## Attachments

@@ -4,6 +4,14 @@
 
 ### Added
 
+- Agent memory (ADR-0013): short facts at a global and a project scope
+  under the state root, recalled in the runtime-facts message — the
+  bench measured a standing directive acted on 0/18 from the
+  instruction files at any size and 5/6 from one facts-message line.
+  `/remember [global] <name> <fact>`, `/forget`, `/memory`; the model
+  proposes with `save_memory` / `delete_memory`, which the rule tier
+  keeps at Review so every save asks. The bench gains `pointer-*`,
+  `memory-follow` and `trust = true`.
 - Pre-tool hooks (ADR-0012): `[[hooks.pre_tool_use]]` runs the
   operator's guard before a model tool call on Claude Code's measured
   PreToolUse contract (stdin JSON; deny by `permissionDecision` or

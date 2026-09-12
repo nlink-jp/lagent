@@ -34,7 +34,8 @@ tools パッケージはプロジェクトディレクトリだけを要する 9
 `internal/mention`（`@` 参照: ファイル、ディレクトリ、画像 — および `@`
 無しでドロップされた画像パス、ADR-0005）、
 `internal/instructions`（`AGENTS.md` の発見）、`internal/hooks`（Claude
-Code の計測済み契約による操作者の pre-tool フック、ADR-0012）、`internal/skills`（Claude
+Code の計測済み契約による操作者の pre-tool フック、ADR-0012）、`internal/memory`
+（セッションをまたいで想起する事実、状態ルート下の 2 スコープ、ADR-0013）、`internal/skills`（Claude
 Code 形式のスキルの発見と閉じ込めた読み込み、ADR-0011）、`internal/ignore`（ignore
 対応の列挙: 組込ディレクトリ一覧 + gitignore マッチャ）、
 `internal/session`（transcript: ロガー + 再開ローダ、usage レコード）、
@@ -173,9 +174,9 @@ MCP の除外だけを持ち、他は何も持たない。
 
 `web_search`、`web_fetch`、メディアアップロード、Cloud Logging、thought
 signature、safety 設定、要約モデル、委任ファイル探索は Vertex AI に
-縛られた gem-agent の機能（ADR-0002）。履歴圧縮と agent memory は Phase 2
-（RFP §4）。モデル層は計測のうえ採らず（ADR-0010）、skills（ADR-0011）と
-pre-tool hooks（ADR-0012）は入った。
+縛られた gem-agent の機能（ADR-0002）。Phase 2 の残りは履歴圧縮のみ
+（RFP §4）。モデル層は計測のうえ採らず（ADR-0010）、skills（ADR-0011）、
+pre-tool hooks（ADR-0012）、memory（ADR-0013）は入った。
 
 ## スキル
 
@@ -189,3 +190,15 @@ pre-tool hooks（ADR-0012）は入った。
 プロンプトへ入る唯一のツール: 中身は操作者自身の指示で、ツールは発見済み
 スキルのディレクトリ外を読めない。`/skill <name>` はスキル本文を手で
 ターンとして送り、`/skills` は読み込み済みのものを列挙する。
+
+## メモリ
+
+毎セッション想起される短い事実（ADR-0013）: global
+（`<state>/memory/global/<name>.md`）と project
+（`<state>/memory/projects/<escaped>/<name>.md>`）、リポジトリ外の平文
+markdown。想起はシステムプロンプトではなく runtime-facts メッセージに乗る —
+計測: 指示節の常置の指示は 18 実行中 0 で行動され、facts メッセージの 1 行は
+6 実行中 5 — ので、ファイルやコマンドを名指すメモリはモデルが行動する
+ポインタになる。操作者は `/remember` で書き `/forget` で消す。モデルは
+`save_memory` / `delete_memory` で提案し、規則層はそれを Review に留めるので
+保存は毎回尋ねる。開始時と `/clear` で 1 回読み、`/memory` はディスクを読む。

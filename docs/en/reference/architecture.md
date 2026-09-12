@@ -37,7 +37,8 @@ operator has typed anything, and the rule that decides which ones),
 dropped image path without the `@`, ADR-0005),
 `internal/instructions` (`AGENTS.md` discovery), `internal/hooks`
 (the operator's pre-tool hooks on Claude Code's measured contract,
-ADR-0012), `internal/skills`
+ADR-0012), `internal/memory` (facts recalled across sessions, two
+scopes under the state root, ADR-0013), `internal/skills`
 (skill discovery and confined loading in Claude Code's format,
 ADR-0011), `internal/ignore`
 (ignore-aware enumeration: builtin dir list + gitignore matcher),
@@ -190,9 +191,9 @@ policy and MCP exclusions, nothing else.
 `web_search`, `web_fetch`, media uploads, Cloud Logging, thought
 signatures, safety settings, the summary model and the delegated file
 search are gem-agent features bound to Vertex AI (ADR-0002). History
-compaction and agent memory are Phase 2 (RFP §4); the model tier was
-measured and not adopted (ADR-0010); skills (ADR-0011) and pre-tool
-hooks (ADR-0012) are in.
+compaction is the one Phase 2 item left (RFP §4); the model tier was
+measured and not adopted (ADR-0010); skills (ADR-0011), pre-tool hooks
+(ADR-0012) and memory (ADR-0013) are in.
 
 ## Skills
 
@@ -207,3 +208,17 @@ catalog, so the system prompt stays byte-identical (ADR-0003).
 they are the operator's own instructions, and the tool cannot read
 outside a discovered skill's directory. `/skill <name>` sends a skill's
 body as the turn by hand; `/skills` lists what is loaded.
+
+## Memory
+
+Short facts recalled in every session (ADR-0013): global
+(`<state>/memory/global/<name>.md`) and project
+(`<state>/memory/projects/<escaped>/<name>.md`), plain markdown outside
+the repository. Recall rides the runtime-facts message, not the system
+prompt — measured: a standing directive in the instruction section was
+acted on in 0/18 runs, one line in the facts message in 5/6 — so a
+memory that names a file or a command is a pointer the model acts on.
+The operator writes with `/remember` and removes with `/forget`; the
+model proposes through `save_memory` / `delete_memory`, which the rule
+tier keeps at Review so every save asks. Read once at start and on
+`/clear`; `/memory` reads the disk.

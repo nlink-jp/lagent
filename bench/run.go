@@ -98,6 +98,11 @@ func (r *runner) runOne(c cell) (result, error) {
 			return result{}, err
 		}
 	}
+	if c.Task.MemoryDir != "" {
+		if err := copyTree(c.Task.MemoryDir, filepath.Join(state, "memory")); err != nil {
+			return result{}, fmt.Errorf("task %s memory: %w", c.Task.Name, err)
+		}
+	}
 	absProjectForTrust, err := filepath.Abs(project)
 	if err != nil {
 		return result{}, err
@@ -310,7 +315,9 @@ func appendTrustedProject(cfgPath, project string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	_, err = fmt.Fprintf(f, "\n[approval]\ntrusted_projects = [%q]\n", project)
-	return err
+	if _, err := fmt.Fprintf(f, "\n[approval]\ntrusted_projects = [%q]\n", project); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
 }

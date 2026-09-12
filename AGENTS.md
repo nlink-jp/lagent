@@ -43,7 +43,8 @@ cmd/               cobra root command, REPL loop, wiring, system prompt; `versio
                    `sessions`, `trust`, `workdirs` subcommands; ask_user, MCP intake,
                    the MCP advertiser and mcp_load (cmd/mcpload.go, ADR-0004); skill
                    discovery, load_skill, /skill and /skills (cmd/skills.go, ADR-0011);
-                   hook config → runner (cmd/hooks.go, ADR-0012)
+                   hook config → runner (cmd/hooks.go, ADR-0012); save_memory / delete_memory,
+                   /memory, /remember, /forget (cmd/memory.go, ADR-0013)
 internal/config/   strict-decode TOML + env/flag precedence ([llm], [model], [sandbox],
                    [agent], [mcp], [tui], [approval]); the policy file
 internal/llm/      Backend interface + the OpenAI-compatible client (stdlib net/http,
@@ -77,6 +78,8 @@ internal/mention/  @-reference parsing (files, directories, images), project-con
                    resolution, completion
 internal/instructions/ AGENTS.md / AGENT.md / CLAUDE.md / GEMINI.md discovery
                    (ancestor walk, stops at $HOME)
+internal/memory/   facts recalled across sessions (ADR-0013): global + project scope under
+                   the state root, budgeted, FactsLines for the runtime-facts message
 internal/hooks/    operator pre-tool hooks on Claude Code's measured contract (ADR-0012):
                    PreToolUse payload on stdin, deny by JSON or exit 2, fail-open otherwise
 internal/skills/   Claude Code SKILL.md discovery (global ~/.config/lagent/skills +
@@ -124,7 +127,7 @@ answers.
   bare; extend `mention.bareImageRefs`, never widen it to text files.
 - **No string for a feature this runtime does not have.** The catalog,
   `/help`, tool descriptions, notes and error text name only what is
-  here; a leftover from the porting source (`/readonly auto`, `/memory`,
+  here; a leftover from the porting source (`/readonly auto`, `/compact`,
   "the model tier") is a seam ADR-0001 forbids. Before a
   release, grep every string literal in cmd/ and internal/ for the
   ADR-0002 and Phase 2 feature names, and grep the `uitext.Messages`
@@ -181,6 +184,16 @@ answers.
   the attach branches read, never inferred from the result text. Never
   add an "allow" bypass: hooks tighten, the ladder decides. No settings
   row, no runtime toggle. One event; more take an ADR each.
+- **A standing directive belongs in the facts message, not the
+  instruction files** (ADR-0013, measured on the `pointer-*` bench
+  tasks: 0/18 from `AGENTS.md` at any size, 5/6 from one facts line).
+  Memory recall is `memory.FactsLines` appended to `sessionFacts` at
+  every `AnnounceSession` (startup, `/clear`, `/mcp reload`); nothing
+  about memory goes into `buildSystemPrompt`. `save_memory` /
+  `delete_memory` are Review in `risk.Classify`, never Safe, and the
+  operator's `/remember` bypasses no gate because the operator is the
+  gate. A memory that is meant to drive behaviour is written as a
+  pointer (a file, a command, a tool), the shape that measured.
 - **There is no model tier, by decision** (ADR-0010).
   `agent.AutoDecision.ModelConsulted` is always false and stays for
   record-shape parity; the round checkpoint asks the operator or stops.

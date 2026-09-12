@@ -37,6 +37,11 @@ type task struct {
 	// measure whether the model loads and follows a skill (ADR-0011).
 	// Global, not project scope: the bench's project is untrusted.
 	SkillsDir string `toml:"-"`
+	// MemoryDir is <Dir>/memory when it exists: the memory root the
+	// runner installs as the run's state-root memory (global/<name>.md
+	// under it), so a task can measure whether the model acts on a
+	// memory recalled in the facts message (ADR-0013).
+	MemoryDir string `toml:"-"`
 }
 
 type expect struct {
@@ -120,6 +125,9 @@ func loadTask(dir string) (*task, error) {
 	}
 	if st, err := os.Stat(filepath.Join(dir, "skills")); err == nil && st.IsDir() {
 		t.SkillsDir = filepath.Join(dir, "skills")
+	}
+	if st, err := os.Stat(filepath.Join(dir, "memory")); err == nil && st.IsDir() {
+		t.MemoryDir = filepath.Join(dir, "memory")
 	}
 	return t, nil
 }

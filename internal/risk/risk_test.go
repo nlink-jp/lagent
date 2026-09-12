@@ -264,3 +264,14 @@ func TestTmpAliasIsTheProject(t *testing.T) {
 		t.Errorf("aliased AGENTS.md = %v (%s), want operator-only", v.Tier, v.Reason)
 	}
 }
+
+// Memory writes are Review, never Safe, in every mode (ADR-0013 §3): a
+// persisted memory reappears in every later session.
+func TestMemoryWritesStayReview(t *testing.T) {
+	for _, name := range []string{"save_memory", "delete_memory"} {
+		v := Classify(name, true, map[string]any{"scope": "project", "name": "x"}, proj, "")
+		if v.Tier != Review || v.OperatorOnly {
+			t.Errorf("%s = %+v, want Review and not operator-only", name, v)
+		}
+	}
+}

@@ -142,6 +142,14 @@ func Classify(toolName string, mutating bool, args map[string]any, projectDir, w
 
 	}
 
+	// A persisted memory reappears in every later session's facts, so a
+	// write is a persistence vector for injection: Review, never Safe,
+	// whatever the mode (ADR-0013 §3). A "never" policy row is the
+	// operator's deliberate relaxation.
+	if toolName == "save_memory" || toolName == "delete_memory" {
+		return Verdict{Tier: Review, Reason: "memory write — recalled in every later session"}
+	}
+
 	if strings.HasPrefix(toolName, "mcp__") {
 		// External server: effects are unknown to this classifier.
 		return Verdict{Tier: Review, Reason: "external MCP tool — effects unknown to the rule tier"}

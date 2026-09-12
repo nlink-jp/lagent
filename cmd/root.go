@@ -27,15 +27,16 @@ import (
 	"github.com/nlink-jp/lagent/internal/approve"
 	"github.com/nlink-jp/lagent/internal/banner"
 	"github.com/nlink-jp/lagent/internal/config"
+	"github.com/nlink-jp/lagent/internal/hooks"
 	"github.com/nlink-jp/lagent/internal/llm"
 	"github.com/nlink-jp/lagent/internal/mcp"
 	"github.com/nlink-jp/lagent/internal/mcpfilter"
+	"github.com/nlink-jp/lagent/internal/memory"
 	"github.com/nlink-jp/lagent/internal/mention"
 	"github.com/nlink-jp/lagent/internal/policy"
 	"github.com/nlink-jp/lagent/internal/repl"
 	"github.com/nlink-jp/lagent/internal/sandbox"
 	"github.com/nlink-jp/lagent/internal/session"
-	"github.com/nlink-jp/lagent/internal/hooks"
 	"github.com/nlink-jp/lagent/internal/skills"
 	"github.com/nlink-jp/lagent/internal/tools"
 	"github.com/nlink-jp/lagent/internal/tui"
@@ -525,6 +526,23 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	if err := registerSkillTool(registry, func() []skills.Skill { return skillsList }); err != nil {
 		return err
 	}
+	// --- memory (ADR-0013): two scopes under the state root; recall
+	// rides the facts message, the operator writes with /remember, the
+	// model proposes through gated tools ---
+	memStore := memoryStore{Project: projectDir}
+	if base, err := memory.DefaultDir(); err == nil {
+		memStore.Base = base
+	} else {
+		fmt.Fprintf(stderr, "warning: memory is off: %v\n", err)
+	}
+	if err := registerMemoryTools(registry, memStore); err != nil {
+		return err
+	}
+	if _, memNotes := memStore.load(); len(memNotes) > 0 {
+		for _, n := range memNotes {
+			fmt.Fprintf(stderr, "warning: memory: %s\n", n)
+		}
+	}
 
 	// --- MCP servers from the project's .mcp.json (drop-in) ---
 	mcpClients, mcpSummary, mcpInv := connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, stderr, grant, mcpFilter)
@@ -818,7 +836,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// The per-session facts open the conversation (after SetHistory: the
 	// isolation tag is fresh, and the restored history's own opening
 	// message named the old one). The MCP catalog rides with them.
-	ag.AnnounceSession(sessionFacts(workDir, append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...)))
+	ag.AnnounceSession(sessionFacts(workDir, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
 
 	// Exit summary (operator request): every interactive exit route —
 	// /quit, Ctrl+C, Ctrl+D — ends with the resume hint and the cost
@@ -902,7 +920,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// The catalog changed with the server set: the model is told
 		// through a fresh facts message (ADR-0003's lane), never through
 		// the system prompt.
-		ag.AnnounceSession(sessionFacts(workDir, append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...)))
+		ag.AnnounceSession(sessionFacts(workDir, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
 		return out
 	}
 	loadMCP := func(server string) (string, bool) {
@@ -1088,7 +1106,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 		// Told last, once everything it names is in place: the work
 		// directory and the catalog ride one fresh facts message.
-		ag.AnnounceSession(sessionFacts(workDir, append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...)))
+		ag.AnnounceSession(sessionFacts(workDir, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
 		return render()
 	}
 
@@ -1246,6 +1264,9 @@ func runREPL(cmd *cobra.Command, args []string) error {
 				}()
 			},
 			Slash: func(in string) (string, bool, bool) {
+				if out, isErr, handled := memorySlash(in, memStore); handled {
+					return out, isErr, false
+				}
 				return slashOutput(in, ag, registry, mcpStatus(), skillsList,
 					slashReloads{mcp: reloadMCP, load: loadMCP},
 					func() string { return usageReport(ag, cfg.LLM.Model) },
@@ -1327,6 +1348,10 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			continue
 		}
 		if strings.HasPrefix(input, "/") {
+			if out, _, handled := memorySlash(input, memStore); handled {
+				fmt.Fprint(stderr, out)
+				continue
+			}
 			out, _, quit := slashOutput(input, ag, registry, mcpStatus(), skillsList,
 				slashReloads{mcp: reloadMCP, load: loadMCP},
 				func() string { return usageReport(ag, cfg.LLM.Model) },
@@ -1881,7 +1906,7 @@ func runDirectShell(ctx context.Context, registry *tools.Registry, ag *agent.Age
 func slashCompletions(getSkills func() []skills.Skill) func(string) []string {
 	commands := []string{
 		"/auto", "/clear", "/exit", "/help", "/mcp",
-		"/quit", "/readonly", "/settings", "/skill", "/skills",
+		"/forget", "/memory", "/quit", "/readonly", "/remember", "/settings", "/skill", "/skills",
 		"/tools", "/usage", "/version",
 	}
 	return func(prefix string) []string {

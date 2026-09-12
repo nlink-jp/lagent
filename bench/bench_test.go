@@ -274,6 +274,7 @@ echo fixed
 	trustedDir := filepath.Join(dir, "tasks", "trusted")
 	writeFile(t, filepath.Join(trustedDir, "task.toml"), "prompt = \"fix it\"\ntrust = true\n[expect]\nmin_tool_calls = 1\n")
 	writeFile(t, filepath.Join(trustedDir, "testdata", "AGENTS.md"), "# rules\n")
+	writeFile(t, filepath.Join(trustedDir, "memory", "global", "note.md"), "a fact\n")
 	tasks, err = loadTasks(filepath.Join(dir, "tasks"), []string{"trusted"})
 	if err != nil {
 		t.Fatal(err)
@@ -294,6 +295,9 @@ echo fixed
 	}
 	if _, err := os.Stat(filepath.Join(trustedRun, "trust.txt")); err != nil {
 		t.Error("trust output was not kept beside the run")
+	}
+	if data, err := os.ReadFile(filepath.Join(trustedRun, "state", "memory", "global", "note.md")); err != nil || string(data) != "a fact\n" {
+		t.Errorf("a task's memory/ must be installed under the run's state root: %v %q", err, data)
 	}
 	if _, err := os.Stat(filepath.Join(runDir, "home", ".config", "lagent", "mcp.json")); err != nil {
 		t.Error("an mcp task must get a global mcp.json in its HOME")

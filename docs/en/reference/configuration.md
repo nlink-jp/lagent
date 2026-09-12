@@ -158,6 +158,9 @@ In a session:
 | `/mcp`, `/mcp load <server>`, `/mcp reload` | list the servers with their loaded state; advertise one server's tools by hand; reconnect |
 | `/skills` | list the loaded skills and where the two skill directories are |
 | `/skill <name> [args]` | send a skill's instructions as this turn, with `args` appended (ADR-0011) |
+| `/memory` | list the memories on disk, both scopes, with where they live |
+| `/remember [global] <name> <fact>` | save a memory: project scope, or global with the keyword; the same name updates (ADR-0013) |
+| `/forget [global] <name>` | remove a memory |
 | `/auto on|off` | switch auto-approve for the session (shift+tab does the same) |
 | `/readonly on|off` | switch the lane ceiling for the session |
 | `/settings` | view and edit settings, with provenance |

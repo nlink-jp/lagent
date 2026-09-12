@@ -77,6 +77,11 @@ lagent
   前にあなたのガードスクリプトを Claude Code の契約で走らせる。Claude Code
   を守る同じスクリプトがこのランタイムも守る。拒否は承認モードによらず
   最終で、理由はモデルへ返る（ADR-0012）。
+- **メモリ:** `/remember <name> <fact>` で短い事実をこのプロジェクトの
+  以後のセッションに残す（`global` で全プロジェクト）。モデルは `save_memory`
+  で提案でき、あなたに尋ねる。メモリはこのモデルが行動する場所である
+  runtime facts で想起されるので、ファイルやコマンドを名指すメモリは
+  ポインタとして働く（ADR-0013）。
 - **セッション:** セッションごとの JSONL transcript。`--continue` と
   `--resume`。usage レコードは
   [gem-usage-lens](https://github.com/nlink-jp/gem-usage-lens) が両ランタイム
@@ -87,7 +92,7 @@ lagent
   モデルに伝え、モデルは `load_skill` で読み込み、操作者は `/skill <name>`
   で手で呼ぶ（ADR-0011）。
 - **無いもの:** web 検索と取得、メディアアップロード、監査ログ出力、
-  履歴圧縮、agent memory — RFP と
+  履歴圧縮 — RFP と
   [ADR-0002](docs/ja/adr/0002-features-not-reproduced.ja.md) を参照。
 
 ## 添付
