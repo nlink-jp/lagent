@@ -96,3 +96,19 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   操作者だけが答える Review で、`-p` は拒否する。`search_files`、
   `list_files`、`list_tree` はそのファイルを飛ばし、飛ばしたと言う。一覧は
   `internal/sandbox` に 1 つ
+- [`ADR-0016`](adr/0016-the-kernel-reads-the-file.ja.md) —
+  ファイルを読むのはカーネル: file ツールの読取を `sandbox-exec` 下の子で
+  走らせ、資格情報の open はカーネルが拒み、Go の照合器は境界であることを
+  やめる。拒否が操作者への確認になり、承認後にインプロセスで再発行する。
+  実測: `.env` への `cat` と `stat` は拒否、`.env.example` は読め、`grep -r`
+  はその 1 ファイルだけ飛ばし、`ls -a` は名前を出す。起動は 1 回 18.8 ms。
+  名前は出て内容は拒まれるので ADR-0015 §2 を撤回する。`credentialTally` と
+  列挙ツールの資格情報コードを削除し、walk の綴りの欠陥もそれと共に溶ける
+- [`ADR-0017`](adr/0017-the-runtime-hides-only-its-own.ja.md) —
+  ランタイムは自分のものだけを隠す: 環境変数の scrub は 6 つの子のうち 1 つ
+  しか覆わず、`NPM_TOKEN` を捕まえながら `OPENAI_KEY` を通していた。許可
+  リストは無限の一覧を移すだけなので、削除して操作者の環境には触れない。
+  有限な集合は lagent 自身の名前空間だけなので接頭辞規則を反転し、3 つの
+  export を除く `LAGENT_*` を全ての子から外す。分割はテストが閉じる。R01 が
+  名指した `LAGENT_API_KEY` は外れる側にある。設定ファイル経由は ADR-0015 が
+  受容した残余のまま

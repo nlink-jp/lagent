@@ -105,3 +105,23 @@ excepted).
   a Review only the operator answers, on the real path, in every mode,
   and `-p` denies them; `search_files`, `list_files` and `list_tree`
   skip such a file and say so; one list, in `internal/sandbox`
+- [`ADR-0016`](adr/0016-the-kernel-reads-the-file.md) —
+  the kernel reads the file: the file tools' reads run in a child under
+  `sandbox-exec`, so a credential open is refused by the kernel and the
+  Go matcher stops being the boundary; a refusal becomes the operator's
+  prompt and the read is re-issued in process on approval. Measured:
+  `cat` and `stat` on `.env` refused, `.env.example` read, `grep -r`
+  skips the one file, `ls -a` still lists the name, 18.8 ms per spawn.
+  Because names are listed and content is refused, ADR-0015 §2 is
+  withdrawn: `credentialTally` and the enumeration tools' credential
+  code are deleted, and the walks' spelling defect dissolves with them
+- [`ADR-0017`](adr/0017-the-runtime-hides-only-its-own.md) —
+  the runtime hides only its own: the environment scrub covered one
+  child of six and passed `OPENAI_KEY` while catching `NPM_TOKEN`, and
+  an allowlist would only move the unbounded list, so it is deleted and
+  the operator's environment is not touched. The one bounded set is
+  lagent's own namespace, so the prefix rule is inverted — every
+  `LAGENT_*` is removed from every child except the three exports, a
+  partition a test closes. `LAGENT_API_KEY`, the variable R01 named, is
+  in the removed half; the configuration-file route stays the residue
+  ADR-0015 accepted
