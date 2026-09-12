@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `[llm].reasoning_effort` (and `LAGENT_REASONING_EFFORT`) rides every
+  request verbatim when set; the OpenAI vocabulary, which LM Studio
+  maps to the model's thinking on/off. The bench measures it (ADR-0009).
+
+### Fixed
+
+- A re-send after an empty completion now carries one transient line
+  ("Reply now: give your final answer as text, or call a tool."),
+  never stored: replayed ten times, the identical request came back
+  empty 10/10 right after a compile error from the verification run
+  and 0/10 with the line (ADR-0007, second amendment).
+
 ## [0.2.0] - 2026-09-12
 
 ### Added

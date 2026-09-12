@@ -45,7 +45,14 @@ type OpenAI struct {
 	// turn's error rather than silently dropping the trace.
 	traceDir string
 	traceSeq atomic.Int64
+	// reasoningEffort rides every request as `reasoning_effort` when
+	// set (ADR-0009); the vocabulary is the server's.
+	reasoningEffort string
 }
+
+// SetReasoningEffort sets the `reasoning_effort` every request carries;
+// empty sends nothing. Call before the first turn.
+func (o *OpenAI) SetReasoningEffort(effort string) { o.reasoningEffort = effort }
 
 // TraceEnv names the directory that receives request/response traces.
 const TraceEnv = "LAGENT_LLM_TRACE"
@@ -157,6 +164,9 @@ type wireRequest struct {
 	Tools         []wireTool         `json:"tools,omitempty"`
 	Stream        bool               `json:"stream"`
 	StreamOptions *wireStreamOptions `json:"stream_options,omitempty"`
+	// ReasoningEffort is the operator's `[llm].reasoning_effort`,
+	// verbatim; absent when unset (ADR-0009).
+	ReasoningEffort string `json:"reasoning_effort,omitempty"`
 }
 
 type wireStreamOptions struct {
@@ -389,11 +399,12 @@ func (o *OpenAI) ChatStream(ctx context.Context, system string, messages []Messa
 		return nil, err
 	}
 	body, err := json.Marshal(wireRequest{
-		Model:         o.model,
-		Messages:      msgs,
-		Tools:         buildTools(tools),
-		Stream:        true,
-		StreamOptions: &wireStreamOptions{IncludeUsage: true},
+		Model:           o.model,
+		Messages:        msgs,
+		Tools:           buildTools(tools),
+		Stream:          true,
+		StreamOptions:   &wireStreamOptions{IncludeUsage: true},
+		ReasoningEffort: o.reasoningEffort,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("llm: marshal request: %w", err)

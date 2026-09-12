@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -57,6 +58,32 @@ func TestTraceWritesRequestAndRawReply(t *testing.T) {
 	}
 	if len(entries) != 2 {
 		t.Errorf("one attempt leaves two files, got %d", len(entries))
+	}
+}
+
+// ADR-0009: the operator's reasoning_effort rides the request verbatim
+// and only when set.
+func TestReasoningEffortRidesTheRequestWhenSet(t *testing.T) {
+	var bodies []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(b))
+		sse(w, `{"choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}`)
+	}))
+	defer srv.Close()
+	o := newTestBackend(t, srv, ProviderLMStudio)
+	if _, err := o.ChatStream(context.Background(), "s", []Message{{Role: RoleUser, Content: "hi"}}, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	o.SetReasoningEffort("on")
+	if _, err := o.ChatStream(context.Background(), "s", []Message{{Role: RoleUser, Content: "hi"}}, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(bodies[0], "reasoning_effort") {
+		t.Errorf("unset effort must send nothing: %s", bodies[0])
+	}
+	if !strings.Contains(bodies[1], `"reasoning_effort":"on"`) {
+		t.Errorf("set effort must ride the request verbatim: %s", bodies[1])
 	}
 }
 

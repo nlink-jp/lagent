@@ -94,6 +94,18 @@ func TestUnattendedIsWiredIntoTheAgent(t *testing.T) {
 	}
 }
 
+// ADR-0009: the operator's reasoning_effort must reach the backend, or
+// the config key is decoration.
+func TestReasoningEffortIsWiredIntoTheBackend(t *testing.T) {
+	src, err := os.ReadFile("root.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(src), "backend.SetReasoningEffort(cfg.LLM.ReasoningEffort)") {
+		t.Fatal("the backend is not given cfg.LLM.ReasoningEffort")
+	}
+}
+
 // ADR-0008 §1: every lane's shell runs with the scratch-cache table
 // pointed into the session scratch — the read lane at the table's
 // directory, the approved lanes at a separate one — and the read lane

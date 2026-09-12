@@ -223,6 +223,15 @@ type LLMConfig struct {
 	// APIKey is sent as a bearer token when set. Local servers need
 	// none; the field exists for another OpenAI-compatible server.
 	APIKey string `toml:"api_key"`
+	// ReasoningEffort is sent verbatim as the request's
+	// `reasoning_effort` when set; empty sends nothing (the server's
+	// default). The vocabulary is the server's: the OpenAI one (none,
+	// minimal, low, medium, high, xhigh) at LM Studio's endpoint, which
+	// then maps it to what the model supports — for Gemma 4 "none" is
+	// off and everything else is on, with a warning in its log about
+	// the mapping. Measured on the bench before it is set by default
+	// (ADR-0009).
+	ReasoningEffort string `toml:"reasoning_effort"`
 }
 
 // ModelConfig holds what is known about the model itself.
@@ -426,6 +435,7 @@ func applyEnv(cfg *Config) {
 		{"LAGENT_BASE_URL", "llm.base_url", func(v string) { cfg.LLM.BaseURL = v }},
 		{"LAGENT_MODEL", "llm.model", func(v string) { cfg.LLM.Model = v }},
 		{"LAGENT_API_KEY", "llm.api_key", func(v string) { cfg.LLM.APIKey = v }},
+		{"LAGENT_REASONING_EFFORT", "llm.reasoning_effort", func(v string) { cfg.LLM.ReasoningEffort = v }},
 	} {
 		if v := os.Getenv(e.env); v != "" {
 			e.set(v)
@@ -436,7 +446,7 @@ func applyEnv(cfg *Config) {
 
 // trackedKeys are the settings /settings displays with provenance.
 var trackedKeys = []string{
-	"llm.provider", "llm.base_url", "llm.model", "llm.api_key",
+	"llm.provider", "llm.base_url", "llm.model", "llm.api_key", "llm.reasoning_effort",
 	"model.context_window",
 	"sandbox.enabled", "sandbox.read_lane_deny_exec", "sandbox.read_lane_prompts",
 	"sandbox.scratch_caches",

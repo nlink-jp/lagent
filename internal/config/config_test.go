@@ -18,7 +18,7 @@ func writeConfig(t *testing.T, content string) string {
 
 func clearEnv(t *testing.T) {
 	t.Helper()
-	for _, k := range []string{"LAGENT_PROVIDER", "LAGENT_BASE_URL", "LAGENT_MODEL", "LAGENT_API_KEY"} {
+	for _, k := range []string{"LAGENT_PROVIDER", "LAGENT_BASE_URL", "LAGENT_MODEL", "LAGENT_API_KEY", "LAGENT_REASONING_EFFORT"} {
 		t.Setenv(k, "")
 		_ = os.Unsetenv(k)
 	}

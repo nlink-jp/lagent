@@ -136,6 +136,8 @@ func (s *settingsStore) data() tui.SettingsData {
 	ro("backend", "llm.base_url", s.cfg.LLM.BaseURL, "llm.base_url", needsRestart)
 	ro("backend", "llm.model", s.cfg.LLM.Model, "llm.model", needsRestart)
 	ro("backend", "llm.api_key", apiKeyLabel(s.cfg.LLM.APIKey), "llm.api_key", needsRestart)
+	ro("backend", "llm.reasoning_effort", unsetLabel(s.cfg.LLM.ReasoningEffort), "llm.reasoning_effort",
+		"sent verbatim as reasoning_effort (none/minimal/low/medium/high/xhigh; LM Studio maps it to the model's on/off) — "+needsRestart)
 	ro("backend", "model.context_window", contextWindowLabel(s.cfg.Model.ContextWindow),
 		"model.context_window", "asked of the provider when unset")
 	// The measured state, not the configured one: --no-sandbox is never
@@ -585,6 +587,14 @@ func scratchCachesLabel(caches map[string]string) string {
 		parts[i] = name + "→" + caches[name]
 	}
 	return strings.Join(parts, ", ")
+}
+
+// unsetLabel renders an empty optional string as what it means.
+func unsetLabel(s string) string {
+	if s == "" {
+		return "(unset)"
+	}
+	return s
 }
 
 func apiKeyLabel(s string) string {

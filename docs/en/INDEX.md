@@ -71,3 +71,7 @@ excepted).
   run in the read lane, an unattended denial names the route,
   `list_tree` says what it saw, and the prompt drops the rules those
   replace (the local-oriented prompt revision)
+- [`ADR-0009`](adr/0009-thinking-is-an-operator-key.md) — thinking is
+  an operator key: `[llm].reasoning_effort` is sent verbatim, the
+  default stays unset until the bench decides, reasoning content is
+  never stored

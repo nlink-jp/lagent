@@ -23,6 +23,7 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `[llm].base_url` | `http://localhost:1234/v1` | OpenAI 互換 API のベース URL |
 | `[llm].model` | （必須） | サーバが一覧に出すモデル ID。既定は無く、無ければ起動に失敗する（`LAGENT_MODEL` / `--model` でも可） |
 | `[llm].api_key` | （未設定） | bearer トークンを要求するサーバ向け。ローカルサーバには不要 |
+| `[llm].reasoning_effort` | （未設定） | リクエストの `reasoning_effort` としてそのまま送る。未設定なら送らない。語彙は OpenAI のもの（`none`、`minimal`、`low`、`medium`、`high`、`xhigh`）。LM Studio はこれを検証してからモデル対応の値へ丸める — Gemma 4 では `none` が thinking off、それ以外は on（ログに丸めの警告が出る） |
 | `[model].context_window` | `0` | コンテキスト窓（トークン）。`0` は起動時に provider から検出（LM Studio は `/api/v0/models`、Ollama は `/api/show`。`openai` は明示が必要） |
 | `[sandbox].enabled` | `true` | `shell_exec` を sandbox-exec で包む。モデルが宣言したレーンをカーネルが強制。off だと全シェル呼び出しが操作者の承認待ち |
 | `[sandbox].read_lane_deny_exec` | （未設定） | read レーンが起動してはならないプログラム。組込一覧に追加 |
@@ -59,6 +60,7 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `LAGENT_BASE_URL` | `[llm].base_url` |
 | `LAGENT_MODEL` | `[llm].model` |
 | `LAGENT_API_KEY` | `[llm].api_key` |
+| `LAGENT_REASONING_EFFORT` | `[llm].reasoning_effort` |
 
 ランタイムが読む・設定するその他の環境変数:
 

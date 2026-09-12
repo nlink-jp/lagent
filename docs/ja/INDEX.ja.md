@@ -65,3 +65,6 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   乗せてビルドを read レーンで走らせ、無人の拒否は経路を名指し、
   `list_tree` は見たものを言い、プロンプトはそれらが置き換えた規則を落とす
   （ローカル向けプロンプト改訂）
+- [`ADR-0009`](adr/0009-thinking-is-an-operator-key.ja.md) — thinking は
+  操作者のキー: `[llm].reasoning_effort` をそのまま送り、既定はベンチが
+  決めるまで未設定、reasoning の内容は保存しない

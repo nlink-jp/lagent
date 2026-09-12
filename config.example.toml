@@ -27,6 +27,13 @@ model = "google/gemma-4-26b-a4b-qat"
 # Optional. Local servers need none; set it for a server that requires a
 # bearer token. Also settable via LAGENT_API_KEY.
 #api_key = ""
+# Optional. Sent verbatim as the request's reasoning_effort when set;
+# unset sends nothing (the server's default). The vocabulary is the
+# OpenAI one — none, minimal, low, medium, high, xhigh — which LM Studio
+# validates and then maps to what the model supports: for Gemma 4,
+# "none" is thinking off and anything else is on (its log notes the
+# mapping). Also settable via LAGENT_REASONING_EFFORT.
+#reasoning_effort = ""
 
 [model]
 # Context window in tokens, shown in the status line. 0 asks the

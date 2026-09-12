@@ -23,6 +23,7 @@ Unknown keys are errors (strict decode).
 | `[llm].base_url` | `http://localhost:1234/v1` | base URL of the OpenAI-compatible API |
 | `[llm].model` | (required) | model id as the server lists it; there is no default — startup fails without it (or `LAGENT_MODEL` / `--model`) |
 | `[llm].api_key` | (unset) | bearer token for a server that requires one; local servers need none |
+| `[llm].reasoning_effort` | (unset) | sent verbatim as the request's `reasoning_effort`; unset sends nothing. The OpenAI vocabulary (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`); LM Studio validates it and maps it to the model — for Gemma 4, `none` is thinking off and anything else is on (its log notes the mapping) |
 | `[model].context_window` | `0` | context window in tokens; `0` detects it from the provider at startup (LM Studio `/api/v0/models`, Ollama `/api/show`; `openai` needs an explicit value) |
 | `[sandbox].enabled` | `true` | wrap `shell_exec` in sandbox-exec; the lane the model declares is enforced by the kernel. Off, every shell call is yours to approve |
 | `[sandbox].read_lane_deny_exec` | (unset) | programs the read lane may not launch, added to the built-in list |
@@ -60,6 +61,7 @@ flags > `LAGENT_*` environment > config file > built-in defaults.
 | `LAGENT_BASE_URL` | `[llm].base_url` |
 | `LAGENT_MODEL` | `[llm].model` |
 | `LAGENT_API_KEY` | `[llm].api_key` |
+| `LAGENT_REASONING_EFFORT` | `[llm].reasoning_effort` |
 
 Other environment variables the runtime reads or sets:
 

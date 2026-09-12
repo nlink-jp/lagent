@@ -532,6 +532,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	backend.SetReasoningEffort(cfg.LLM.ReasoningEffort)
 
 	// The TUI needs a real terminal on both ends (gem-agent ADR-0002); piped use
 	// falls back to the plain line REPL so scripts and smoke pipelines
