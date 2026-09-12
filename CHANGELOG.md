@@ -16,6 +16,17 @@
   unchanged. A deliberate local change (ADR-0001: the recorded
   gem-agent source commit is unchanged).
 
+### Fixed
+
+- A pre-tool hook that exits 0 with output that is not a verdict is
+  reported. ADR-0012 §3 promises a warning for unparseable output, and
+  the runner emitted one for a crash, a non-zero exit and a timeout,
+  but plain text (or JSON that does not parse) on exit 0 let the call
+  through in silence — the shape of a guard that meant to deny and
+  printed the wrong form (system risk review R06). The call still
+  proceeds, as hooks only tighten; the notice names the hook and quotes
+  the first line of what it printed. Empty stdout stays silent.
+
 ## [0.3.3] - 2026-09-13
 
 ### Security

@@ -285,13 +285,38 @@ func (r *Runner) Pre(ctx context.Context, s Session, name string, args map[strin
 			r.notify(fmt.Sprintf("hook %q failed (%v) — the call proceeds", h.Command, out.err))
 			continue
 		}
-		if v, isJSON := parseVerdict(out.stdout); isJSON {
-			if blocked, why := v.denies(); blocked {
-				return true, orDefault(why, "blocked by a pre-tool hook")
+		v, isJSON := parseVerdict(out.stdout)
+		if !isJSON {
+			// Exit 0 with output that is not a verdict: a guard that
+			// meant to deny and printed the wrong shape looks exactly
+			// like this, and it used to pass in silence — the one
+			// fail-open path §3's notice did not cover (system risk
+			// review R06). The call still proceeds; the operator hears
+			// what the hook said. Empty stdout is the ordinary pass
+			// and stays silent.
+			if raw := strings.TrimSpace(out.stdout); raw != "" {
+				r.notify(fmt.Sprintf("hook %q printed output that is not a verdict (%s) — the call proceeds", h.Command, firstLine(raw)))
 			}
+			continue
+		}
+		if blocked, why := v.denies(); blocked {
+			return true, orDefault(why, "blocked by a pre-tool hook")
 		}
 	}
 	return false, ""
+}
+
+// firstLine is the first line of a hook's stray output, clipped, for
+// the notice: enough to recognise the script, never the whole stream.
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = s[:i] + " …"
+	}
+	const max = 80
+	if rs := []rune(s); len(rs) > max {
+		return string(rs[:max]) + "…"
+	}
+	return s
 }
 
 // SessionStart runs the session-start hooks whose matcher covers source

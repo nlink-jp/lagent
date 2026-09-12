@@ -79,15 +79,59 @@ func TestFailOpenWithNotice(t *testing.T) {
 			t.Errorf("%s: expected one warning, got %v", name, notes)
 		}
 	}
-	// Plain informational output is not a failure and not a verdict.
+	// Plain output on exit 0 is not a verdict: the call proceeds, and
+	// the operator is told (TestNonVerdictOutputIsReported).
 	deny, _, notes := run(t, Hook{Matcher: "*", Command: `echo checked`}, "shell_exec", nil)
-	if deny || len(notes) != 0 {
+	if deny || len(notes) != 1 {
 		t.Errorf("informational output: deny=%v notes=%v", deny, notes)
 	}
-	// An explicit allow decision is pass-through, not a bypass.
-	deny, _, _ = run(t, Hook{Matcher: "*", Command: `echo '{"hookSpecificOutput":{"permissionDecision":"allow"}}'`}, "shell_exec", nil)
+	// An explicit allow decision is pass-through, not a bypass — and
+	// not a stray line either: a verdict draws no notice.
+	deny, _, notes = run(t, Hook{Matcher: "*", Command: `echo '{"hookSpecificOutput":{"permissionDecision":"allow"}}'`}, "shell_exec", nil)
+	if deny || len(notes) != 0 {
+		t.Errorf("allow verdict: deny=%v notes=%v", deny, notes)
+	}
+}
+
+// A hook that exits 0 with output that is not a verdict is reported:
+// a guard that meant to deny and printed the wrong shape looks exactly
+// like this, and it used to pass in silence (system risk review R06).
+// Fail-open holds — the call proceeds — and the notice names the hook
+// and quotes the first line, clipped. Empty stdout stays silent.
+func TestNonVerdictOutputIsReported(t *testing.T) {
+	// The notice names the hook's command too, so what the hook prints
+	// is built at run time (`line%d`, `seq`) and never spelled in the
+	// command: an assertion on the quoted output must not match the
+	// quoted command.
+	deny, _, notes := run(t, Hook{Matcher: "*", Command: `printf 'DENY: relative path\nline%d\n' 2`}, "shell_exec", map[string]any{"command": "sed -i x y"})
 	if deny {
-		t.Error("allow denied")
+		t.Fatal("non-verdict output denied the call — hooks deny by JSON or exit 2 only")
+	}
+	if len(notes) != 1 {
+		t.Fatalf("notes = %v, want one", notes)
+	}
+	for _, want := range []string{"not a verdict", "DENY: relative path", "the call proceeds"} {
+		if !strings.Contains(notes[0], want) {
+			t.Errorf("notice %q lacks %q", notes[0], want)
+		}
+	}
+	if strings.Contains(notes[0], "line2") {
+		t.Errorf("notice quotes more than the first line: %q", notes[0])
+	}
+	// The ordinary pass: nothing printed, nothing said.
+	deny, _, notes = run(t, Hook{Matcher: "*", Command: `exit 0`}, "shell_exec", nil)
+	if deny || len(notes) != 0 {
+		t.Errorf("silent pass: deny=%v notes=%v", deny, notes)
+	}
+	// Whitespace-only output is the ordinary pass too.
+	deny, _, notes = run(t, Hook{Matcher: "*", Command: `printf '\n  \n'`}, "shell_exec", nil)
+	if deny || len(notes) != 0 {
+		t.Errorf("whitespace output: deny=%v notes=%v", deny, notes)
+	}
+	// A long first line is clipped, never the whole stream.
+	_, _, notes = run(t, Hook{Matcher: "*", Command: `printf 'x%.0s' $(seq 1 300); echo`}, "shell_exec", nil)
+	if len(notes) != 1 || strings.Contains(notes[0], strings.Repeat("x", 300)) || !strings.Contains(notes[0], strings.Repeat("x", 80)+"…") {
+		t.Errorf("long output not clipped: %v", notes)
 	}
 }
 
