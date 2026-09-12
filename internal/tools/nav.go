@@ -117,7 +117,11 @@ func (t *credentialTally) summary() string {
 	if t.n == 0 {
 		return ""
 	}
-	names := strings.Join(t.names, ", ")
+	// Sorted: list_files reads its directory in disk order, and a
+	// footer whose order changes between runs reads as a change.
+	sorted := append([]string(nil), t.names...)
+	sort.Strings(sorted)
+	names := strings.Join(sorted, ", ")
 	if t.n > len(t.names) {
 		names += ", …"
 	}
@@ -277,38 +281,46 @@ func (r *Registry) listTree() *Tool {
 				}
 			}
 			walk(abs, 0, rules)
-			out := b.String()
-			if out == "" && !interrupted {
-				out = "(empty directory)"
+			body := b.String()
+			if body == "" && !interrupted {
+				body = "(empty directory)"
 				if dirsOnly && len(topFiles) > 0 {
 					shown := topFiles
 					if len(shown) > treePerDirCap {
 						shown = shown[:treePerDirCap]
 					}
-					out = fmt.Sprintf("(no subdirectories; %d files)\n%s\n", len(topFiles), strings.Join(shown, "\n"))
+					body = fmt.Sprintf("(no subdirectories; %d files)\n%s\n", len(topFiles), strings.Join(shown, "\n"))
 					if len(topFiles) > len(shown) {
-						out += fmt.Sprintf("[+%d more files — list_files shows them]\n", len(topFiles)-len(shown))
+						body += fmt.Sprintf("[+%d more files — list_files shows them]\n", len(topFiles)-len(shown))
 					}
 				}
 			}
+			// The cut lines and the skip footers ride after the byte cap
+			// (independent review after ADR-0015): a footer inside the
+			// capped text is the silent skip it exists to prevent.
+			var foot strings.Builder
 			if truncated != "" {
-				out += truncated + "\n"
+				foot.WriteString(truncated + "\n")
 			}
 			if interrupted {
 				// A partial tree is a result, never silently a whole
 				// one (gem-agent ADR-0052's rule applied to gem-agent ADR-0065's cut).
-				out += "[interrupted — the tree above is partial]\n"
+				foot.WriteString("[interrupted — the tree above is partial]\n")
 			}
 			if s := tally.summary(); s != "" {
-				out += s + "\n"
+				foot.WriteString(s + "\n")
 			}
 			if s := creds.summary(); s != "" {
-				out += s + "\n"
+				foot.WriteString(s + "\n")
+			}
+			out := truncate(strings.TrimRight(body, "\n"), OutputCap)
+			if f := strings.TrimRight(foot.String(), "\n"); f != "" {
+				out += "\n" + f
 			}
 			if n := rules.Note(); n != "" {
 				out = n + "\n" + out
 			}
-			return truncate(strings.TrimRight(out, "\n"), OutputCap), nil
+			return out, nil
 		},
 	}
 }
@@ -517,34 +529,40 @@ func (r *Registry) searchFiles() *Tool {
 			if filteredOut > 0 {
 				extra = fmt.Sprintf(", %d filtered by include", filteredOut)
 			}
-			var out string
+			// The tally, the cut lines and the skip footers ride after
+			// the byte cap (independent review after ADR-0015): a
+			// footer inside the capped text is the silent skip it
+			// exists to prevent.
+			var body string
+			var foot strings.Builder
 			if totalMatches == 0 {
-				out = fmt.Sprintf("no matches (%d files scanned%s)", filesScanned, extra)
+				body = fmt.Sprintf("no matches (%d files scanned%s)", filesScanned, extra)
 			} else {
-				out = b.String()
-				out += fmt.Sprintf("\n%d matches in %d files (%d scanned%s)", totalMatches, filesHit, filesScanned, extra)
+				body = b.String()
+				fmt.Fprintf(&foot, "\n%d matches in %d files (%d scanned%s)", totalMatches, filesHit, filesScanned, extra)
 				if capped {
-					out += fmt.Sprintf(" — stopped at the %d-line cap; narrow with path or include, or use mode=\"files\"", searchMatchCap)
+					fmt.Fprintf(&foot, " — stopped at the %d-line cap; narrow with path or include, or use mode=\"files\"", searchMatchCap)
 				}
 			}
 			if interrupted {
 				// What was found stays a result (the transcript keeps
 				// it for a resume); the cut is named, never silent.
-				out += fmt.Sprintf("\n[interrupted after %d files scanned — results above are partial]", filesScanned)
+				fmt.Fprintf(&foot, "\n[interrupted after %d files scanned — results above are partial]", filesScanned)
 			}
 			if unwalked > 0 {
-				out += fmt.Sprintf("\n[%d director%s had more than %d entries — the rest of each was not searched]", unwalked, plural(unwalked, "y", "ies"), DirEntryCap)
+				fmt.Fprintf(&foot, "\n[%d director%s had more than %d entries — the rest of each was not searched]", unwalked, plural(unwalked, "y", "ies"), DirEntryCap)
 			}
 			if s := tally.summary(); s != "" {
-				out += "\n" + s
+				foot.WriteString("\n" + s)
 			}
 			if s := creds.summary(); s != "" {
-				out += "\n" + s
+				foot.WriteString("\n" + s)
 			}
+			out := truncate(body, OutputCap) + foot.String()
 			if n := rules.Note(); n != "" {
 				out = n + "\n" + out
 			}
-			return truncate(out, OutputCap), nil
+			return out, nil
 		},
 	}
 }

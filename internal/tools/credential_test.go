@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -127,8 +128,8 @@ func TestListFilesSkipsCredentialFilesAndSaysSo(t *testing.T) {
 			t.Errorf("list_files lacks %q:\n%s", want, out)
 		}
 	}
-	if !strings.Contains(footer, "2 skipped (.aws/, .env)") && !strings.Contains(footer, "2 skipped (.env, .aws/)") {
-		t.Errorf("footer: %s", footer)
+	if !strings.Contains(footer, "2 skipped (.aws/, .env)") {
+		t.Errorf("footer (names sorted): %s", footer)
 	}
 	out, err = run(t, r, "list_files", map[string]any{"path": "keys"})
 	if err != nil {
@@ -136,5 +137,54 @@ func TestListFilesSkipsCredentialFilesAndSaysSo(t *testing.T) {
 	}
 	if strings.Contains(out, "empty directory") || !strings.HasPrefix(out, "[credential files: 1 skipped (keys/id_rsa)") {
 		t.Errorf("list_files keys/:\n%s", out)
+	}
+}
+
+// The footers ride after the output cap: a capped search or tree still
+// says what it skipped (independent review after ADR-0015 — a footer
+// inside the capped text is the silent skip it exists to prevent).
+func TestFootersSurviveTheOutputCap(t *testing.T) {
+	r := credentialProject(t)
+	dir := r.ProjectDir()
+	line := "needle " + strings.Repeat("x", 230) + "\n"
+	for i := 0; i < 60; i++ {
+		if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("hay%02d.txt", i)), []byte(strings.Repeat(line, 6)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out, err := run(t, r, "search_files", map[string]any{"pattern": "needle"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "[output truncated:") {
+		t.Fatalf("the fixture did not pass the byte cap (%d bytes)", len(out))
+	}
+	for _, want := range []string{"matches in", "stopped at the 200-line cap", "[credential files:", ".env"} {
+		if !strings.Contains(out[strings.Index(out, "[output truncated:"):], want) {
+			t.Errorf("search footer lost %q after the cap:\n…%s", want, out[len(out)-600:])
+		}
+	}
+	for d := 0; d < 18; d++ {
+		sub := filepath.Join(dir, fmt.Sprintf("bulk%02d", d))
+		if err := os.MkdirAll(sub, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for f := 0; f < 50; f++ {
+			if err := os.WriteFile(filepath.Join(sub, fmt.Sprintf("%s-%02d.txt", strings.Repeat("n", 60), f)), []byte("x"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	out, err = run(t, r, "list_tree", map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "[output truncated:") {
+		t.Fatalf("the tree fixture did not pass the byte cap (%d bytes)", len(out))
+	}
+	for _, want := range []string{"[stopped at 800 entries", "[credential files:", ".aws/", ".env"} {
+		if !strings.Contains(out[strings.Index(out, "[output truncated:"):], want) {
+			t.Errorf("tree footer lost %q after the cap:\n…%s", want, out[len(out)-600:])
+		}
 	}
 }

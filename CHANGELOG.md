@@ -37,7 +37,10 @@
   credentials, `deploy.aws`, `keys.ssh/x` and `foo.netrc` are ordinary
   files — a suffix match once took them for credentials, which cost a
   false Block on a write and would have hidden them from the
-  enumeration tools (independent review).
+  enumeration tools (independent review). The skip footer, the ignore
+  tally and the cut lines of `search_files` and `list_tree` ride after
+  the output cap, so a capped result still says what it skipped; the
+  footer's names are sorted.
 
 ### Fixed
 
