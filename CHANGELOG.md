@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+
+- The read lane keeps the runtime's own exports by name, not by
+  prefix. `sandbox.ScrubEnv` exempted every `LAGENT_*` variable from
+  the secret-name rule, so `LAGENT_API_KEY` — the config's bearer token
+  — reached every read-lane command's environment, from where a bare
+  `env` puts it in front of the model and into the transcript (system
+  risk review R01). The exemption is now an explicit list of the three
+  variables the runtime exports for children, `LAGENT_SESSION_ID`,
+  `LAGENT_WORK_DIR` and `LAGENT_PROJECT_DIR`; every other name goes
+  through the secret-name rule. The write and operator lanes are
+  unchanged. A deliberate local change (ADR-0001: the recorded
+  gem-agent source commit is unchanged).
+
 ## [0.3.3] - 2026-09-13
 
 ### Security

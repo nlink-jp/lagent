@@ -222,6 +222,15 @@ answers.
   are never built or linted; each run's project sits under the run's
   own `HOME`, so this repository's `AGENTS.md` never reaches a run. A
   task the model could answer without the files measures nothing.
+- **The read lane's environment keeps the runtime's exports by name,
+  never by prefix.** `sandbox.ScrubEnv` drops every variable whose
+  name looks like a secret and keeps exactly `readLaneExports` —
+  `LAGENT_SESSION_ID`, `LAGENT_WORK_DIR`, `LAGENT_PROJECT_DIR`, pinned
+  to the export sites' constants by a test. A `LAGENT_` prefix
+  exemption once let `LAGENT_API_KEY` through to every read-lane
+  command (system risk review R01). A new export with a secret-looking
+  name is added to that list with its reason; a new config variable
+  never is.
 - **Toolchain caches are the operator's table, not a list in code**
   (ADR-0008 §1). `[sandbox].scratch_caches` maps a variable to a
   directory under the session scratch; `laneEnv` renders it with the

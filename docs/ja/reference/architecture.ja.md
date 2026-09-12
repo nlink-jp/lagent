@@ -162,7 +162,9 @@ transcript は状態ルート下のセッションごとの JSONL ファイル�
 常に 0）で書かれる。セッション作業ディレクトリは同じ状態ルート下の
 プロジェクト別ディレクトリにあり（ルートは `LAGENT_STATE_DIR` で上書き）、
 子プロセスへ `LAGENT_WORK_DIR` として、`LAGENT_SESSION_ID` と
-`LAGENT_PROJECT_DIR` と並んで export される。
+`LAGENT_PROJECT_DIR` と並んで export される。read レーンの `shell_exec`
+が名前で残す `LAGENT_*` はこの 3 つだけで、名前が秘密に見える他の変数は
+`LAGENT_API_KEY` も含めてそのレーンの環境から落とされる。
 
 ## 設定と drop-in の挙動
 

@@ -178,6 +178,9 @@ with `tool_prompt` always zero here). The per-session work directory
 lives under the same state root in a per-project directory of its own
 (`LAGENT_STATE_DIR` overrides the root) and is exported to children as
 `LAGENT_WORK_DIR`, beside `LAGENT_SESSION_ID` and `LAGENT_PROJECT_DIR`.
+Those three are the only `LAGENT_*` names a read-lane `shell_exec`
+keeps by name; every other variable whose name looks like a secret,
+`LAGENT_API_KEY` included, is dropped from that lane's environment.
 
 ## Configuration and drop-in behaviour
 

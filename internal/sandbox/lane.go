@@ -707,7 +707,27 @@ func shellQuote(s string) string {
 // PATH, HOME, LANG, the toolchain variables — passes through.
 var secretEnvRe = regexp.MustCompile(`(?i)(token|secret|passw|api[_-]?key|credential|private[_-]?key|access[_-]?key|auth)`)
 
-// ScrubEnv returns env without the variables secretEnvRe names.
+// readLaneExports are the runtime's own exports a read-lane command
+// keeps whatever their names look like: the session id, the work
+// directory and the project directory (session.EnvVar, workdir.EnvVar,
+// workdir.ProjectEnvVar; a test pins the spellings to those
+// constants). They are kept by name, not by prefix: the LAGENT_
+// namespace was once exempted whole, when it held only these, and
+// LAGENT_API_KEY — the config's bearer token — later joined it and
+// rode the exemption into every read-lane command's environment, from
+// where a bare `env` puts it in front of the model and into the
+// transcript (system risk review, R01). A variable the runtime reads
+// rather than exports (LAGENT_STATE_DIR, LAGENT_LLM_TRACE) is not
+// listed: a command has no use for it, and the regex decides it like
+// any other name.
+var readLaneExports = map[string]bool{
+	"LAGENT_SESSION_ID":  true,
+	"LAGENT_WORK_DIR":    true,
+	"LAGENT_PROJECT_DIR": true,
+}
+
+// ScrubEnv returns env without the variables secretEnvRe names,
+// readLaneExports excepted.
 func ScrubEnv(env []string) []string {
 	out := make([]string, 0, len(env))
 	for _, kv := range env {
@@ -715,7 +735,7 @@ func ScrubEnv(env []string) []string {
 		if i := strings.IndexByte(kv, '='); i >= 0 {
 			name = kv[:i]
 		}
-		if strings.HasPrefix(name, "LAGENT_") || !secretEnvRe.MatchString(name) {
+		if readLaneExports[name] || !secretEnvRe.MatchString(name) {
 			out = append(out, kv)
 		}
 	}

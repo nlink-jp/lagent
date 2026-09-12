@@ -194,6 +194,13 @@ command     = "/Users/you/hooks/session-end.sh"
 | `LAGENT_PROJECT_DIR` | export | プロジェクトディレクトリ。それを知る必要がある子プロセス向け |
 | `GOCACHE`（と `[sandbox.scratch_caches]` の全行） | export | 全レーンの `shell_exec` 向け: セッション scratch 内のディレクトリ。Go のコンパイル・vet・テストが read レーンで走る（sandbox は `~/Library` 下のキャッシュを拒否する）。あなた自身のキャッシュには触れない |
 
+read レーンの `shell_exec` は尋ねずに走り、その出力はモデルへ届くので、
+あなたが export した秘密は継承しない: 名前がトークン・キー・パスワード・
+資格情報に見える変数は環境から落とされ、`LAGENT_API_KEY` も含む。
+ランタイム自身の変数のうち残るのは上の 3 つの export —
+`LAGENT_SESSION_ID`、`LAGENT_WORK_DIR`、`LAGENT_PROJECT_DIR` — だけで、
+名前で残す。write と operator レーンは環境をそのまま継承する。
+
 ## コマンド
 
 | コマンド | 意味 |
