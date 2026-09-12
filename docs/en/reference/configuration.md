@@ -42,7 +42,7 @@ Unknown keys are errors (strict decode).
 | `[tui].language` | `auto` | `auto` (from `LC_ALL` / `LC_MESSAGES` / `LANG`), `ja`, or `en` |
 | `[tui].show_thoughts` | `true` | show the server's reasoning deltas in the live area; display-only |
 | `[approval].pin_trusted_files` | `true` | trust is given to content: a trusted project's agent-facing files are pinned by digest and a changed one asks again |
-| `[approval].tools` | (unset) | per-tool policy: `"always"` (always ask; a floor auto-approve cannot lift) or `"never"` (never ask; blocked shell patterns still ask). `--allow` does the same for one run |
+| `[approval].tools` | (unset) | per-tool policy: `"always"` (always ask; a floor auto-approve cannot lift) or `"never"` (never ask; blocked shell patterns and credential reads still ask). `--allow` does the same for one run |
 | `[approval].trusted_projects` | (unset) | projects whose own `.lagent.toml` may remove approvals (`"never"` entries). The startup trust prompt only loads a project's files; nothing but this list lets a project loosen the gate |
 
 The two session modes are independent axes: `auto_approve` decides who
@@ -247,9 +247,9 @@ In a session:
 | Flag | Meaning |
 |---|---|
 | `--version` | print the version and exit |
-| `-p`, `--prompt` | one-shot: run this prompt and exit; mutating tools are denied unless listed in `--allow` or `--auto` is set |
+| `-p`, `--prompt` | one-shot: run this prompt and exit; mutating tools are denied unless listed in `--allow` or `--auto` is set; a credential read is denied always |
 | `--auto` | start in auto-approve mode: rule-tier Safe calls run unasked |
-| `--allow` | tools that never ask this run: names or `mcp__server__*` prefixes |
+| `--allow` | tools that never ask this run: names or `mcp__server__*` prefixes; a credential read still asks |
 | `--read-only` / `--writable` | cap the session at the read lane, or state that it is not capped |
 | `-c`, `--continue` | resume this project's most recent session |
 | `--resume` | resume a specific session id |

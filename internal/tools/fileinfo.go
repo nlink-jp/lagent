@@ -39,7 +39,8 @@ func (r *Registry) fileInfo() *Tool {
 			"(the `file` command's job — executables, archives, scripts, text/binary; the extension " +
 			"is shown but never trusted), size, mode, modified and created times, and MD5/SHA1/SHA256 " +
 			"hashes — the trio hash-lookup tools take. Pass paths (array) for a batch. Symlinks are " +
-			"reported with their target, not silently followed; directories get entry counts, no hashes.",
+			"reported with their target, not silently followed; directories get entry counts, no hashes. " +
+			"A credential file (.env, a private key, a token store) asks the operator first.",
 		Parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

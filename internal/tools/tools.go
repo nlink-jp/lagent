@@ -1143,7 +1143,8 @@ func (r *Registry) listFiles() *Tool {
 		Name: "list_files",
 		Description: "List directory entries inside the project. Directories are " +
 			"suffixed with '/'; dependency/build directories and .gitignore'd entries are " +
-			"marked [ignored] — prefer not to descend into those. Use this to explore the " +
+			"marked [ignored] — prefer not to descend into those. Credential files (.env, private " +
+			"keys, token stores) are left out and counted. Use this to explore the " +
 			"project structure before reading or editing.",
 		Parameters: map[string]any{
 			"type": "object",
@@ -1168,8 +1169,15 @@ func (r *Registry) listFiles() *Tool {
 				return "", err
 			}
 			rules := ignore.RootWith(r.projectDir, dir, false, r.gitignoreReader)
+			creds := &credentialTally{}
 			var names []string
 			for _, e := range entries {
+				// Credential material is left out and counted (ADR-0015
+				// §2), the one entry a listing does not show by name.
+				if p := relOrDot(r.projectDir, filepath.Join(dir, e.Name())); sandbox.CredentialPath(p) {
+					creds.skip(p, e.IsDir())
+					continue
+				}
 				n := e.Name()
 				if e.IsDir() {
 					n += "/"
@@ -1192,6 +1200,11 @@ func (r *Registry) listFiles() *Tool {
 			if more {
 				names = append(names, fmt.Sprintf("[the directory has more than %d entries — the listing stopped there]", DirEntryCap))
 			}
+			// A directory holding only credential files lists as its
+			// footer, never as "empty".
+			if s := creds.summary(); s != "" {
+				names = append(names, s)
+			}
 			if len(names) == 0 {
 				return "(empty directory)", nil
 			}
@@ -1206,7 +1219,9 @@ func (r *Registry) readFile() *Tool {
 		Description: "Read a file inside the project and return its content. " +
 			"Pass start_line/end_line (1-based, inclusive) to read a window instead of the whole " +
 			"file — pair with search_files results (path:line) and prefer windows for large files: " +
-			"everything read here is replayed on every later round. Large reads are truncated.",
+			"everything read here is replayed on every later round. Large reads are truncated. " +
+			"A credential file (.env, a private key, a token store) is read only with the operator's " +
+			"approval, every time.",
 		Parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

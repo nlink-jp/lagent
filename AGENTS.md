@@ -62,9 +62,9 @@ internal/mcp/      .mcp.json parsing + stdio JSON-RPC client (kill-and-respawn)
 internal/mcpfilter/ the one predicate behind `[mcp] exclude`
 internal/ignore/   ignore-aware enumeration: builtin dir list + full gitignore matcher
 internal/risk/     rule tier of the auto-approve ladder (pure, no model); exact for
-                   file-tool paths (persistent files OperatorOnly), a Block floor only
-                   for shell text — the lane decides the rest; the shared lists come
-                   from internal/sandbox
+                   file-tool paths (persistent-file writes and credential reads
+                   OperatorOnly, ADR-0015), a Block floor only for shell text — the
+                   lane decides the rest; the shared lists come from internal/sandbox
 internal/policy/   per-tool approval policy, pure resolver
 internal/uitext/   ja/en UI string catalogs: completeness enforced by test —
                    new operator-facing strings go in BOTH catalogs or make check fails
@@ -231,6 +231,20 @@ answers.
   command (system risk review R01). A new export with a secret-looking
   name is added to that list with its reason; a new config variable
   never is.
+- **A credential path is the operator's question in every file tool**
+  (ADR-0015). `read_file`, `file_info` and `view_image` on a path
+  `sandbox.CredentialPath` names are Review with `OperatorOnly` —
+  must-prompt: no session allowlist, `"never"` row or `--allow`
+  answers it, `--auto` escalates it, `-p` denies it — judged on the
+  real path `Agent.decide` resolves (`risk.PathJudged` names the tools
+  it resolves for; a new path-judged tool goes on that list, never on a
+  second one). `search_files`, `list_files` and `list_tree` never
+  prompt: they skip a credential-named entry and report the count and
+  names with the route. One list in `internal/sandbox`, read by the
+  profile, the write tools' Block, the shell floor, the read tools'
+  Review and the enumeration skip; a new credential location goes
+  there and nowhere else. `@` attachments are the operator's and pass
+  no gate.
 - **Toolchain caches are the operator's table, not a list in code**
   (ADR-0008 §1). `[sandbox].scratch_caches` maps a variable to a
   directory under the session scratch; `laneEnv` renders it with the

@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/nlink-jp/lagent/internal/ignore"
+	"github.com/nlink-jp/lagent/internal/sandbox"
 )
 
 const (
@@ -91,6 +92,38 @@ func (t *ignoreTally) summary() string {
 	return fmt.Sprintf("[ignored: %s — pass include_ignored=true to include them]", strings.Join(parts, ", "))
 }
 
+// credentialTally counts the credential-named entries a walk or a
+// listing left out (ADR-0015 §2): the read and write lanes deny them at
+// the kernel and a single-file read tool asks the operator, so the
+// enumeration tools neither read nor list them — and say so, as every
+// skip is said (gem-agent ADR-0052), with the route. Judged by the
+// project-relative path against the one list the sandbox keeps.
+type credentialTally struct {
+	n     int
+	names []string
+}
+
+func (t *credentialTally) skip(display string, dir bool) {
+	t.n++
+	if dir {
+		display += "/"
+	}
+	if len(t.names) < 5 {
+		t.names = append(t.names, display)
+	}
+}
+
+func (t *credentialTally) summary() string {
+	if t.n == 0 {
+		return ""
+	}
+	names := strings.Join(t.names, ", ")
+	if t.n > len(t.names) {
+		names += ", …"
+	}
+	return fmt.Sprintf("[credential files: %d skipped (%s) — read_file on one asks the operator]", t.n, names)
+}
+
 func (r *Registry) listTree() *Tool {
 	return &Tool{
 		Name: "list_tree",
@@ -98,7 +131,8 @@ func (r *Registry) listTree() *Tool {
 			"an optional subdirectory. Dependency and build directories (node_modules, vendor, dist, " +
 			"target, …) and .gitignore'd entries are skipped — ignored directories still appear, " +
 			"marked [ignored], and every skip is reported; pass include_ignored=true to include them. " +
-			"VCS internals (.git and friends) are skipped; symlinks are shown but not followed. Big " +
+			"VCS internals (.git and friends) and credential files (.env, private keys, token stores) " +
+			"are skipped and counted; symlinks are shown but not followed. Big " +
 			"directories are elided at a reported per-directory cap. To orient in a large project, " +
 			"start with dirs_only=true, then descend. Prefer this over repeated list_files calls.",
 		Parameters: map[string]any{
@@ -127,6 +161,7 @@ func (r *Registry) listTree() *Tool {
 			includeIgnored, _ := args["include_ignored"].(bool)
 			rules := ignore.RootWith(r.projectDir, abs, includeIgnored, r.gitignoreReader)
 			tally := &ignoreTally{}
+			creds := &credentialTally{}
 
 			var b strings.Builder
 			entries := 0
@@ -171,6 +206,13 @@ func (r *Registry) listTree() *Tool {
 					// A submodule's .git is a file, not a directory —
 					// VCS plumbing is skipped by name either way.
 					if vcsDirs[e.Name()] {
+						continue
+					}
+					// Credential material is left out and counted
+					// (ADR-0015 §2): a walk neither lists nor descends
+					// into what the lanes deny and read_file asks about.
+					if p := relOrDot(r.projectDir, filepath.Join(dir, e.Name())); sandbox.CredentialPath(p) {
+						creds.skip(p, e.IsDir())
 						continue
 					}
 					ignored := rules.Ignored(e.Name(), e.IsDir())
@@ -260,6 +302,9 @@ func (r *Registry) listTree() *Tool {
 			if s := tally.summary(); s != "" {
 				out += s + "\n"
 			}
+			if s := creds.summary(); s != "" {
+				out += s + "\n"
+			}
 			if n := rules.Note(); n != "" {
 				out = n + "\n" + out
 			}
@@ -294,8 +339,9 @@ func (r *Registry) searchFiles() *Tool {
 			"skipped and reported — pass include_ignored=true to search them too. For a broad " +
 			"\"where does this live\" question, start with mode=\"files\" (per-file counts only) " +
 			"and narrow with include (gitignore-style file pattern, e.g. \"*.go\" or \"src/**\") " +
-			"or path. Binary files, VCS internals, symlinks, and files over 2MB are skipped; caps " +
-			"are reported when hit. Prefer this over reading files wholesale to locate something.",
+			"or path. Binary files, VCS internals, symlinks, credential files (.env, private keys, " +
+			"token stores) and files over 2MB are skipped; caps and credential skips are reported. " +
+			"Prefer this over reading files wholesale to locate something.",
 		Parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -341,6 +387,7 @@ func (r *Registry) searchFiles() *Tool {
 			includeIgnored, _ := args["include_ignored"].(bool)
 			rules := ignore.RootWith(r.projectDir, abs, includeIgnored, r.gitignoreReader)
 			tally := &ignoreTally{}
+			creds := &credentialTally{}
 
 			var b strings.Builder
 			totalMatches, filesHit, filesScanned, filteredOut, shownLines := 0, 0, 0, 0, 0
@@ -383,6 +430,13 @@ func (r *Registry) searchFiles() *Tool {
 						continue // a submodule's .git is a file — skip by name either way
 					}
 					full := filepath.Join(dir, e.Name())
+					// Credential material is never read here (ADR-0015
+					// §2): the walk leaves it out, counted, before any
+					// open — include_ignored does not unlock it.
+					if p := relOrDot(r.projectDir, full); sandbox.CredentialPath(p) {
+						creds.skip(p, e.IsDir())
+						continue
+					}
 					if e.IsDir() {
 						if rules.Ignored(e.Name(), true) {
 							tally.dir(e.Name())
@@ -482,6 +536,9 @@ func (r *Registry) searchFiles() *Tool {
 				out += fmt.Sprintf("\n[%d director%s had more than %d entries — the rest of each was not searched]", unwalked, plural(unwalked, "y", "ies"), DirEntryCap)
 			}
 			if s := tally.summary(); s != "" {
+				out += "\n" + s
+			}
+			if s := creds.summary(); s != "" {
 				out += "\n" + s
 			}
 			if n := rules.Note(); n != "" {

@@ -90,3 +90,9 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   Claude Code の計測済み契約で `pre_tool_use` に加わる。注入文脈は `hook`
   添付としてデータレーンに乗り、プロンプトは拒めるが開始と終了は拒めない
   （ADR-0012 §1 を改訂）
+- [`ADR-0015`](adr/0015-credential-reads-are-operator-only.ja.md) —
+  資格情報のパスは read ツールでも操作者専用: レーンが拒むパスへの
+  `read_file`、`file_info`、`view_image` は実パスで判定され、どのモードでも
+  操作者だけが答える Review で、`-p` は拒否する。`search_files`、
+  `list_files`、`list_tree` はそのファイルを飛ばし、飛ばしたと言う。一覧は
+  `internal/sandbox` に 1 つ

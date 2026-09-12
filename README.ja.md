@@ -70,7 +70,9 @@ lagent
   243 スキーマを読む余裕がない。`[mcp].preload` と `[mcp].advertise = "all"`
   が操作者の調整点）。
 - **封じ込め:** ファイルツールはプロジェクト（とセッション作業ディレクトリ）
-  の内側に留まる。`shell_exec` は宣言したレーンで `sandbox-exec` 下で走る —
+  の内側に留まり、資格情報ファイル — `.env`、秘密鍵、トークン保存先 — は
+  あなたが毎回承認した時だけ読まれ、無人では決して読まれない。`shell_exec`
+  は宣言したレーンで `sandbox-exec` 下で走る —
   read は尋ねずに（inspection と、キャッシュをセッション scratch に持つ Go の
   ビルド・テスト）、write と operator は尋ねてから。
 - **フック:** `[[hooks.pre_tool_use]]` がモデルのツール呼び出しの前に

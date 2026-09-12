@@ -99,20 +99,13 @@ func (a *Agent) decide(tc llm.ToolCall) Decision {
 	}
 	mutating := tool.MutatesFor(tc.Args)
 	args := tc.Args
-	if tc.Name == "write_file" || tc.Name == "edit_file" {
+	if risk.PathJudged(tc.Name) {
 		// Judge what the file IS by its real name: a link named
 		// `notes.md` pointing at `AGENTS.md` is an AGENTS.md write
-		// (final review R2). An unresolvable path keeps its spelling
-		// and fails at the open as before.
-		if p, ok := tc.Args["path"].(string); ok {
-			if real, err := a.registry.RealPath(p); err == nil && real != "" {
-				args = make(map[string]any, len(tc.Args))
-				for k, v := range tc.Args {
-					args[k] = v
-				}
-				args["path"] = real
-			}
-		}
+		// (final review R2), a link named `notes.txt` pointing at
+		// `.env` is a credential read (ADR-0015). An unresolvable path
+		// keeps its spelling and fails at the open as before.
+		args = a.realPathArgs(tc.Args)
 	}
 	v := risk.Classify(tc.Name, mutating, args, a.registry.ProjectDir(), a.registry.WorkDir())
 	if tc.Name == tools.ShellExecName && !a.registry.Confined() && v.Tier != risk.Block {
@@ -130,6 +123,35 @@ func (a *Agent) decide(tc llm.ToolCall) Decision {
 	}
 	d.CeilingUnbounded = ceiling < sandbox.LaneOperator && strings.HasPrefix(tc.Name, mcpPrefix)
 	return d
+}
+
+// realPathArgs returns a copy of args with `path` and each entry of
+// `paths` replaced by the real path the file tools will open, where it
+// resolves. The copy leaves tc.Args — what the model said, what the
+// prompt shows and the transcript records — untouched.
+func (a *Agent) realPathArgs(in map[string]any) map[string]any {
+	out := make(map[string]any, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	if p, ok := in["path"].(string); ok {
+		if real, err := a.registry.RealPath(p); err == nil && real != "" {
+			out["path"] = real
+		}
+	}
+	if raw, ok := in["paths"].([]any); ok {
+		resolved := make([]any, len(raw))
+		for i, v := range raw {
+			resolved[i] = v
+			if p, ok := v.(string); ok {
+				if real, err := a.registry.RealPath(p); err == nil && real != "" {
+					resolved[i] = real
+				}
+			}
+		}
+		out["paths"] = resolved
+	}
+	return out
 }
 
 // mcpPrefix names a tool that belongs to an MCP server. One spelling,

@@ -278,3 +278,51 @@ func TestMemoryWritesStayReview(t *testing.T) {
 		}
 	}
 }
+
+// A single-file read tool on credential material is a Review only the
+// operator answers (ADR-0015 §1); the enumeration tools never prompt
+// (§2: they skip and say so); the template re-allow holds; PathJudged
+// names exactly the tools whose paths Agent.decide resolves first.
+func TestCredentialReadsAreOperatorOnly(t *testing.T) {
+	credential := []string{".env", ".env.local", "config/.env.production", "keys/id_rsa", "sub/credentials.json",
+		proj + "/.env", "~/.ssh/id_rsa", "/Users/op/.config/mcp-bridge/config.json", "/state/work/sess-1/service-account.json"}
+	ordinary := []string{".env.example", ".env.sample", "src/main.go", "environment.go", "README.md", "/etc/passwd", "docs/.gemini/notes.md"}
+	for _, name := range []string{"read_file", "view_image", "file_info"} {
+		for _, p := range credential {
+			v := Classify(name, false, map[string]any{"path": p}, proj, "")
+			if v.Tier != Review || !v.OperatorOnly {
+				t.Errorf("%s(%q) = %v operatorOnly=%v (%s), want operator-only review", name, p, v.Tier, v.OperatorOnly, v.Reason)
+			}
+		}
+		for _, p := range ordinary {
+			if v := Classify(name, false, map[string]any{"path": p}, proj, ""); v.Tier != Safe {
+				t.Errorf("%s(%q) = %v (%s), want safe", name, p, v.Tier, v.Reason)
+			}
+		}
+	}
+	// file_info's batch form: one credential among ordinary paths is a
+	// credential read; none is an ordinary call.
+	if v := Classify("file_info", false, map[string]any{"paths": []any{"README.md", ".env", "go.mod"}}, proj, ""); v.Tier != Review || !v.OperatorOnly {
+		t.Errorf("file_info batch with .env = %+v, want operator-only review", v)
+	}
+	if v := Classify("file_info", false, map[string]any{"paths": []any{"README.md", "go.mod"}}, proj, ""); v.Tier != Safe {
+		t.Errorf("file_info batch without credentials = %+v, want safe", v)
+	}
+	// The enumeration tools never prompt: they skip and report
+	// (internal/tools), so a credential-named path argument is Safe.
+	for _, name := range []string{"list_files", "list_tree", "search_files"} {
+		if v := Classify(name, false, map[string]any{"path": ".env", "pattern": "x"}, proj, ""); v.Tier != Safe {
+			t.Errorf("%s on a credential path = %v (%s), want safe — the tool skips and reports", name, v.Tier, v.Reason)
+		}
+	}
+	for _, name := range []string{"write_file", "edit_file", "read_file", "view_image", "file_info"} {
+		if !PathJudged(name) {
+			t.Errorf("PathJudged(%s) = false — decide would judge its spelling, not its real path", name)
+		}
+	}
+	for _, name := range []string{"list_files", "list_tree", "search_files", "shell_exec", "mcp__x__y", "save_memory"} {
+		if PathJudged(name) {
+			t.Errorf("PathJudged(%s) = true", name)
+		}
+	}
+}

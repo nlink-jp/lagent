@@ -13,7 +13,9 @@
 // verdict; a spelling the patterns miss costs a prompt the cage would
 // have caught anyway, never a hole. For the file tools, whose
 // arguments are structured paths, the tier is exact: where the path
-// lies and what the file is decide the verdict.
+// lies and what the file is decide the verdict — for a write, whether
+// it lands in what later sessions trust; for a read, whether the file
+// is credential material (ADR-0015).
 //
 // Ported from gem-agent internal/risk at be7609980022e38314268c58ca94a6517e6f5d28 (v0.74.0), ADR-0001.
 package risk
@@ -116,6 +118,12 @@ func Classify(toolName string, mutating bool, args map[string]any, projectDir, w
 		return classifyShell(args, mutating)
 	}
 	if !mutating {
+		// A single-file read tool naming credential material is the
+		// operator's question (ADR-0015), judged before the read-only
+		// shortcut as the shell floor is judged before the lane.
+		if v, ok := credentialRead(toolName, args); ok {
+			return v
+		}
 		return Verdict{Tier: Safe, Reason: "read-only tool"}
 	}
 
@@ -286,6 +294,62 @@ func persistentTarget(rel string) (Verdict, bool) {
 			Reason: "changes the instructions or configuration later sessions trust — the operator decides"}, true
 	}
 	return Verdict{}, false
+}
+
+// pathJudgedTools are the built-ins whose verdict is taken on a path
+// argument: the write tools by what the file is (persistentTarget),
+// the single-file read tools by whether it is credential material
+// (credentialRead, ADR-0015). Agent.decide resolves the real path for
+// exactly these before asking, so a link's target is judged rather
+// than its name. The enumeration tools (list_files, list_tree,
+// search_files) are not here: they skip a credential-named entry and
+// say so (internal/tools), never prompting.
+var pathJudgedTools = map[string]bool{
+	"write_file": true, "edit_file": true,
+	"read_file": true, "view_image": true, "file_info": true,
+}
+
+// PathJudged reports whether toolName's verdict is taken on its path
+// arguments (`path`, and file_info's `paths`), so the caller resolves
+// them to the real paths the tool will open before classifying.
+func PathJudged(toolName string) bool { return pathJudgedTools[toolName] }
+
+// credentialRead judges a non-mutating path-judged tool's paths by the
+// one rule the sandbox profile enforces (sandbox.CredentialPath, the
+// `.env.example` re-allow included): a credential path is a Review
+// only the operator may answer, the verdict the operator lane carries
+// — the read and write lanes deny the same list at the kernel, and the
+// operator lane, which may read it, is approved by the operator alone
+// (ADR-0015 §1). file_info's batch form is judged path by path: one
+// credential among twenty is a credential read.
+func credentialRead(toolName string, args map[string]any) (Verdict, bool) {
+	if !pathJudgedTools[toolName] {
+		return Verdict{}, false
+	}
+	for _, p := range readPaths(args) {
+		if sandbox.CredentialPath(p) {
+			return Verdict{Tier: Review, OperatorOnly: true,
+				Reason: "reads credential material — the operator decides"}, true
+		}
+	}
+	return Verdict{}, false
+}
+
+// readPaths returns the path arguments of a call: `path`, and the
+// entries of `paths` (file_info's batch form), as the model sent them.
+func readPaths(args map[string]any) []string {
+	var out []string
+	if p, ok := args["path"].(string); ok && p != "" {
+		out = append(out, p)
+	}
+	if raw, ok := args["paths"].([]any); ok {
+		for _, v := range raw {
+			if p, ok := v.(string); ok && p != "" {
+				out = append(out, p)
+			}
+		}
+	}
+	return out
 }
 
 // segmentSplit separates the simple commands of a shell text: pipes,

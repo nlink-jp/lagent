@@ -15,6 +15,24 @@
   through the secret-name rule. The write and operator lanes are
   unchanged. A deliberate local change (ADR-0001: the recorded
   gem-agent source commit is unchanged).
+- Credential paths are operator-only for the read tools too
+  (ADR-0015). The credential list — `.env` and its variants, private
+  keys, `credentials.json`, the token stores under home — was denied
+  to the read and write lanes at the kernel, refused by `write_file`
+  and `edit_file`, and put in front of the operator when a shell
+  command named it, but `read_file .env` inside the project was Safe:
+  the value went to the model and into the transcript as an ordinary
+  tool result (system risk review R02). Now `read_file`, `file_info`
+  (each path of its batch) and `view_image` on such a path, resolved
+  to the real path the tool will open, are a Review only the operator
+  answers, every time: the session allowlist, a `"never"` row and
+  `--allow` do not answer it, `--auto` escalates it, `-p` denies it.
+  `.env.example` and its siblings stay ordinary files. `search_files`,
+  `list_files` and `list_tree` do not prompt: they skip a
+  credential-named entry and report the count and names with the
+  route. `@` attachments are unchanged. One list, in `internal/sandbox`;
+  a deliberate local change (ADR-0001), made in the same shape in
+  gem-agent independently.
 
 ### Fixed
 

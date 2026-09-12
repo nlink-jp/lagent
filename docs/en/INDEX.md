@@ -99,3 +99,9 @@ excepted).
   join `pre_tool_use` on Claude Code's measured contracts; injected
   context rides the data lane as a `hook` attachment, a prompt can be
   refused, a start or end cannot (amends ADR-0012 §1)
+- [`ADR-0015`](adr/0015-credential-reads-are-operator-only.md) —
+  credential paths are operator-only for the read tools too:
+  `read_file`, `file_info` and `view_image` on a path the lanes deny are
+  a Review only the operator answers, on the real path, in every mode,
+  and `-p` denies them; `search_files`, `list_files` and `list_tree`
+  skip such a file and say so; one list, in `internal/sandbox`

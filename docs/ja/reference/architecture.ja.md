@@ -143,7 +143,14 @@ user ロールのメッセージとして会話を開く（`Agent.AnnounceSessio
 計測のうえ採らなかった（ADR-0010）。セッション天井（`--read-only`）は呼び出しが
 届けるレーンを上限で抑え、解除は操作者の行為。操作者専用ファイル —
 指示ファイル、`.mcp.json`、`.lagent.toml`、同居ランタイムの
-`.gem-agent.toml` — は常置の承認では決して答えられない。
+`.gem-agent.toml` — は常置の承認では決して答えられない。資格情報は read
+ツールでも同じ問い（ADR-0015）: レーンが拒むパス — `.env` とその変種、
+秘密鍵、`credentials.json`、home 下のトークン保存先。`internal/sandbox` が
+持つ唯一の一覧で、`.env.example` とその同類は通常のファイル — への
+`read_file`、`file_info`、`view_image` は実パスで判定され、どのモードでも
+操作者だけが答える Review で、`-p` は拒否する。`search_files`、
+`list_files`、`list_tree` は尋ねない: その項目を飛ばし、件数と名前を
+報告する。
 
 ## ラウンド階梯
 
