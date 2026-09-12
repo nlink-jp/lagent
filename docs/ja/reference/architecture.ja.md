@@ -148,9 +148,12 @@ user ロールのメッセージとして会話を開く（`Agent.AnnounceSessio
 秘密鍵、`credentials.json`、home 下のトークン保存先。`internal/sandbox` が
 持つ唯一の一覧で、`.env.example` とその同類は通常のファイル — への
 `read_file`、`file_info`、`view_image` は実パスで判定され、どのモードでも
-操作者だけが答える Review で、`-p` は拒否する。`search_files`、
-`list_files`、`list_tree` は尋ねない: その項目を飛ばし、件数と名前を
-報告する。
+操作者だけが答える Review で、`-p` は拒否する。これらの読取は同じ一覧を
+カーネルで拒むプロファイルの子で走るので（ADR-0016）、一覧は確認を上げ、境界は
+カーネルである。一覧が認識しないパスも open で拒まれ、その拒否が同じ問いとして
+操作者に届く。`search_files`、`list_files`、`list_tree` は尋ねず、何も隠さない
+— カーネルは名前を出して内容を拒む — そして `search_files` は読めなかった
+ファイルを名指す。
 
 ## ラウンド階梯
 

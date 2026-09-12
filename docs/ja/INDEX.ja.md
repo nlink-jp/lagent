@@ -97,7 +97,8 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   `list_files`、`list_tree` はそのファイルを飛ばし、飛ばしたと言う。一覧は
   `internal/sandbox` に 1 つ
 - [`ADR-0016`](adr/0016-the-kernel-reads-the-file.ja.md) —
-  ファイルを読むのはカーネル: file ツールの読取を `sandbox-exec` 下の子で
+  ファイルを読むのはカーネル（**Accepted**、実装済み）: file ツールの読取を
+  `sandbox-exec` 下の子で
   走らせ、資格情報の open はカーネルが拒み、Go の照合器は境界であることを
   やめる。拒否が操作者への確認になり、承認後にインプロセスで再発行する。
   実測: `.env` への `cat` と `stat` は拒否、`.env.example` は読め、`grep -r`

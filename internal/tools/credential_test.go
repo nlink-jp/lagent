@@ -4,15 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 )
 
 // credentialProject adds credential-named entries to the navigation
-// fixture (ADR-0015 §2): a .env and a nested .env.local holding the
-// needle, a template that is not a secret, a private key, and a
-// directory the list names whole.
+// fixture: a .env and a nested .env.local holding the needle, a
+// template that is not a secret, a private key, and a directory the
+// credential list names whole.
 func credentialProject(t *testing.T) *Registry {
 	t.Helper()
 	r := navProject(t)
@@ -35,114 +34,62 @@ func credentialProject(t *testing.T) *Registry {
 	return r
 }
 
-// splitFooter separates a tool result from its credential footer.
-func splitFooter(t *testing.T, out string) (body, footer string) {
-	t.Helper()
-	i := strings.Index(out, "[credential files:")
-	if i < 0 {
-		t.Fatalf("no credential footer:\n%s", out)
-	}
-	return out[:i], out[i:]
-}
-
-// search_files never reads a credential file — no line of it is
-// returned — and says how many it skipped, by name, with the route;
-// include_ignored does not unlock them; the template is searched.
-func TestSearchFilesSkipsCredentialFilesAndSaysSo(t *testing.T) {
+// ADR-0016 §3: the walks list a credential-named entry like any other.
+// The kernel lists names and refuses content, so a name was never the
+// secret, and withholding it was a second rule over the same unbounded
+// spelling domain. What a walk cannot read, it names.
+func TestWalksListNamesAndNameWhatTheyCannotRead(t *testing.T) {
 	r := credentialProject(t)
-	for _, args := range []map[string]any{
-		{"pattern": "maxRetries"},
-		{"pattern": "maxRetries", "include_ignored": true},
-	} {
-		out, err := run(t, r, "search_files", args)
-		if err != nil {
-			t.Fatal(err)
-		}
-		body, footer := splitFooter(t, out)
-		for _, leaked := range []string{"sk-test-marker", ".env:1", ".env.local:1", "id_rsa:1", "credentials:1", "PRIVATE"} {
-			if strings.Contains(body, leaked) {
-				t.Errorf("%v: search read a credential file (%q):\n%s", args, leaked, out)
-			}
-		}
-		if !strings.Contains(body, ".env.example:1") {
-			t.Errorf("%v: the template was not searched:\n%s", args, out)
-		}
-		for _, want := range []string{"4 skipped", ".env", "config/.env.local", "keys/id_rsa", ".aws/", "read_file on one asks the operator"} {
-			if !strings.Contains(footer, want) {
-				t.Errorf("%v: footer lacks %q: %s", args, want, footer)
-			}
-		}
-	}
-	// A search rooted at a directory of credential files finds nothing
-	// and says why, rather than reporting an empty scan.
-	out, err := run(t, r, "search_files", map[string]any{"pattern": "maxRetries", "path": "keys"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(out, "PRIVATE") || !strings.Contains(out, "no matches") || !strings.Contains(out, "1 skipped (keys/id_rsa)") {
-		t.Errorf("search rooted at keys/:\n%s", out)
-	}
-}
+	dir := r.ProjectDir()
 
-// list_tree leaves credential entries out — a file, a nested file, and
-// a directory the list names whole — and reports them; the template
-// and the parent directories stay.
-func TestListTreeSkipsCredentialFilesAndSaysSo(t *testing.T) {
-	out, err := run(t, credentialProject(t), "list_tree", map[string]any{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	body, footer := splitFooter(t, out)
-	for _, absent := range []string{`(?m)^\.env$`, `id_rsa`, `(?m)^\.aws/`, `credentials`, `(?m)^  \.env\.local$`} {
-		if regexp.MustCompile(absent).MatchString(body) {
-			t.Errorf("tree lists a credential entry %q:\n%s", absent, out)
-		}
-	}
-	for _, present := range []string{`(?m)^\.env\.example$`, `(?m)^config/$`, `(?m)^keys/$`, `(?m)^main\.go$`} {
-		if !regexp.MustCompile(present).MatchString(body) {
-			t.Errorf("tree lacks %q:\n%s", present, out)
-		}
-	}
-	for _, want := range []string{"4 skipped", ".env", "config/.env.local", "keys/id_rsa", ".aws/", "read_file on one asks the operator"} {
-		if !strings.Contains(footer, want) {
-			t.Errorf("footer lacks %q: %s", want, footer)
-		}
-	}
-}
-
-// list_files leaves credential entries out and reports them; a
-// directory holding only credential files lists as its footer, never
-// as empty.
-func TestListFilesSkipsCredentialFilesAndSaysSo(t *testing.T) {
-	r := credentialProject(t)
 	out, err := run(t, r, "list_files", map[string]any{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, footer := splitFooter(t, out)
-	if regexp.MustCompile(`(?m)^\.env$`).MatchString(body) || strings.Contains(body, ".aws/") {
-		t.Errorf("list_files listed a credential entry:\n%s", out)
-	}
-	for _, want := range []string{".env.example", "config/", "keys/", "main.go"} {
-		if !strings.Contains(body, want) {
-			t.Errorf("list_files lacks %q:\n%s", want, out)
+	for _, want := range []string{".env", ".aws/", ".env.example"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("list_files hid %q:\n%s", want, out)
 		}
 	}
-	if !strings.Contains(footer, "2 skipped (.aws/, .env)") {
-		t.Errorf("footer (names sorted): %s", footer)
+	if strings.Contains(out, "[credential files:") {
+		t.Errorf("list_files still carries the withholding footer:\n%s", out)
 	}
-	out, err = run(t, r, "list_files", map[string]any{"path": "keys"})
+
+	out, err = run(t, r, "list_tree", map[string]any{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out, "empty directory") || !strings.HasPrefix(out, "[credential files: 1 skipped (keys/id_rsa)") {
-		t.Errorf("list_files keys/:\n%s", out)
+	for _, want := range []string{".env", "id_rsa", "credentials"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("list_tree hid %q:\n%s", want, out)
+		}
+	}
+
+	// A file the walk cannot open is named, not silently absent — the
+	// shape `grep -r` has. In production the refusal comes from the
+	// sandbox; here an unreadable mode produces the same error.
+	blocked := filepath.Join(dir, "unreadable.txt")
+	if err := os.WriteFile(blocked, []byte("maxRetries here\n"), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	out, err = run(t, r, "search_files", map[string]any{"pattern": "maxRetries"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "[not read: unreadable.txt") || !strings.Contains(out, "operator's approval") {
+		t.Errorf("search_files did not name the file it could not read:\n%s", out)
+	}
+	// And the ordinary entries are searched as before.
+	for _, want := range []string{".env.example:1", "docs/readme.md:2"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("search_files lost %q:\n%s", want, out)
+		}
 	}
 }
 
-// The footers ride after the output cap: a capped search or tree still
-// says what it skipped (independent review after ADR-0015 — a footer
-// inside the capped text is the silent skip it exists to prevent).
+// The footers that survive the output cap are the ones that still
+// exist: the caps and the ignore tally (ADR-0016 §3 removed the
+// credential footer).
 func TestFootersSurviveTheOutputCap(t *testing.T) {
 	r := credentialProject(t)
 	dir := r.ProjectDir()
@@ -159,7 +106,7 @@ func TestFootersSurviveTheOutputCap(t *testing.T) {
 	if !strings.Contains(out, "[output truncated:") {
 		t.Fatalf("the fixture did not pass the byte cap (%d bytes)", len(out))
 	}
-	for _, want := range []string{"matches in", "stopped at the 200-line cap", "[credential files:", ".env"} {
+	for _, want := range []string{"matches in", "stopped at the 200-line cap"} {
 		if !strings.Contains(out[strings.Index(out, "[output truncated:"):], want) {
 			t.Errorf("search footer lost %q after the cap:\n…%s", want, out[len(out)-600:])
 		}
@@ -182,9 +129,7 @@ func TestFootersSurviveTheOutputCap(t *testing.T) {
 	if !strings.Contains(out, "[output truncated:") {
 		t.Fatalf("the tree fixture did not pass the byte cap (%d bytes)", len(out))
 	}
-	for _, want := range []string{"[stopped at 800 entries", "[credential files:", ".aws/", ".env"} {
-		if !strings.Contains(out[strings.Index(out, "[output truncated:"):], want) {
-			t.Errorf("tree footer lost %q after the cap:\n…%s", want, out[len(out)-600:])
-		}
+	if !strings.Contains(out[strings.Index(out, "[output truncated:"):], "[stopped at 800 entries") {
+		t.Errorf("tree footer lost its cap line:\n…%s", out[len(out)-600:])
 	}
 }

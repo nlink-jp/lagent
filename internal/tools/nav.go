@@ -15,7 +15,9 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/nlink-jp/lagent/internal/ignore"
-	"github.com/nlink-jp/lagent/internal/sandbox"
 )
 
 const (
@@ -92,42 +93,6 @@ func (t *ignoreTally) summary() string {
 	return fmt.Sprintf("[ignored: %s — pass include_ignored=true to include them]", strings.Join(parts, ", "))
 }
 
-// credentialTally counts the credential-named entries a walk or a
-// listing left out (ADR-0015 §2): the read and write lanes deny them at
-// the kernel and a single-file read tool asks the operator, so the
-// enumeration tools neither read nor list them — and say so, as every
-// skip is said (gem-agent ADR-0052), with the route. Judged by the
-// project-relative path against the one list the sandbox keeps.
-type credentialTally struct {
-	n     int
-	names []string
-}
-
-func (t *credentialTally) skip(display string, dir bool) {
-	t.n++
-	if dir {
-		display += "/"
-	}
-	if len(t.names) < 5 {
-		t.names = append(t.names, display)
-	}
-}
-
-func (t *credentialTally) summary() string {
-	if t.n == 0 {
-		return ""
-	}
-	// Sorted: list_files reads its directory in disk order, and a
-	// footer whose order changes between runs reads as a change.
-	sorted := append([]string(nil), t.names...)
-	sort.Strings(sorted)
-	names := strings.Join(sorted, ", ")
-	if t.n > len(t.names) {
-		names += ", …"
-	}
-	return fmt.Sprintf("[credential files: %d skipped (%s) — read_file on one asks the operator]", t.n, names)
-}
-
 func (r *Registry) listTree() *Tool {
 	return &Tool{
 		Name: "list_tree",
@@ -165,7 +130,6 @@ func (r *Registry) listTree() *Tool {
 			includeIgnored, _ := args["include_ignored"].(bool)
 			rules := ignore.RootWith(r.projectDir, abs, includeIgnored, r.gitignoreReader)
 			tally := &ignoreTally{}
-			creds := &credentialTally{}
 
 			var b strings.Builder
 			entries := 0
@@ -210,13 +174,6 @@ func (r *Registry) listTree() *Tool {
 					// A submodule's .git is a file, not a directory —
 					// VCS plumbing is skipped by name either way.
 					if vcsDirs[e.Name()] {
-						continue
-					}
-					// Credential material is left out and counted
-					// (ADR-0015 §2): a walk neither lists nor descends
-					// into what the lanes deny and read_file asks about.
-					if p := relOrDot(r.projectDir, filepath.Join(dir, e.Name())); sandbox.CredentialPath(p) {
-						creds.skip(p, e.IsDir())
 						continue
 					}
 					ignored := rules.Ignored(e.Name(), e.IsDir())
@@ -310,9 +267,6 @@ func (r *Registry) listTree() *Tool {
 			if s := tally.summary(); s != "" {
 				foot.WriteString(s + "\n")
 			}
-			if s := creds.summary(); s != "" {
-				foot.WriteString(s + "\n")
-			}
 			out := truncate(strings.TrimRight(body, "\n"), OutputCap)
 			if f := strings.TrimRight(foot.String(), "\n"); f != "" {
 				out += "\n" + f
@@ -367,6 +321,11 @@ func (r *Registry) searchFiles() *Tool {
 			"required": []string{"pattern"},
 		},
 		Run: func(ctx context.Context, args map[string]any) (string, error) {
+			// The kernel adjudicates this read (ADR-0016 §1): in the
+			// child, credential material cannot be opened at all.
+			if out, err, ok := r.viaChild(ctx, "search_files", args); ok {
+				return out, err
+			}
 			pattern, _ := args["pattern"].(string)
 			if pattern == "" {
 				return "", fmt.Errorf("pattern is required")
@@ -399,7 +358,7 @@ func (r *Registry) searchFiles() *Tool {
 			includeIgnored, _ := args["include_ignored"].(bool)
 			rules := ignore.RootWith(r.projectDir, abs, includeIgnored, r.gitignoreReader)
 			tally := &ignoreTally{}
-			creds := &credentialTally{}
+			var refused []string // files the kernel would not let us read (ADR-0016 §3)
 
 			var b strings.Builder
 			totalMatches, filesHit, filesScanned, filteredOut, shownLines := 0, 0, 0, 0, 0
@@ -442,13 +401,6 @@ func (r *Registry) searchFiles() *Tool {
 						continue // a submodule's .git is a file — skip by name either way
 					}
 					full := filepath.Join(dir, e.Name())
-					// Credential material is never read here (ADR-0015
-					// §2): the walk leaves it out, counted, before any
-					// open — include_ignored does not unlock it.
-					if p := relOrDot(r.projectDir, full); sandbox.CredentialPath(p) {
-						creds.skip(p, e.IsDir())
-						continue
-					}
 					if e.IsDir() {
 						if rules.Ignored(e.Name(), true) {
 							tally.dir(e.Name())
@@ -470,8 +422,13 @@ func (r *Registry) searchFiles() *Tool {
 					if err != nil || info.Size() > searchFileCap || isImageExt(e.Name()) {
 						continue
 					}
-					data, ok := r.readForSearch(full)
+					data, ok, readErr := r.readForSearch(full)
 					if !ok {
+						// A file the cage refused is named, not hidden:
+						// the shape `grep -r` has (ADR-0016 §3).
+						if errors.Is(readErr, fs.ErrPermission) && len(refused) < searchPerFileCap {
+							refused = append(refused, relOrDot(r.projectDir, full))
+						}
 						continue
 					}
 					filesScanned++
@@ -555,8 +512,8 @@ func (r *Registry) searchFiles() *Tool {
 			if s := tally.summary(); s != "" {
 				foot.WriteString("\n" + s)
 			}
-			if s := creds.summary(); s != "" {
-				foot.WriteString("\n" + s)
+			if len(refused) > 0 {
+				fmt.Fprintf(&foot, "\n[not read: %s — reading one needs the operator's approval]", strings.Join(refused, ", "))
 			}
 			out := truncate(body, OutputCap) + foot.String()
 			if n := rules.Note(); n != "" {

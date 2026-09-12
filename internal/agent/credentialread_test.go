@@ -166,3 +166,44 @@ func TestApprovedCredentialReadIsNotAnOperatorWrite(t *testing.T) {
 		t.Errorf("operator-write hooks after an operator-only write: before=%v after=%v", before, after)
 	}
 }
+
+// ADR-0016 §2: the kernel is the boundary and the matcher is only the
+// prompt-raiser. When the matcher misses, the child's refusal produces
+// no bytes, the operator gets the same question, and on a yes the read
+// runs in process. When the matcher hits, the approved call must not go
+// to the child at all: the cage would refuse what the operator allowed.
+func TestKernelRefusalBecomesTheOperatorsQuestion(t *testing.T) {
+	ctx := context.Background()
+	reg := credentialProject(t)
+	var childCalls int
+	reg.SetFileChild(func(context.Context, string, map[string]any) (string, error) {
+		childCalls++
+		return "", tools.ErrCredentialRead
+	})
+	gate := &floorGate{}
+	a := New(Options{Registry: reg, Gate: gate})
+	// README.md is ordinary: only the kernel's answer can raise a gate.
+	out, denied, _, _ := a.execCall(ctx, credCall("read_file", map[string]any{"path": "README.md"}))
+	if childCalls != 1 {
+		t.Errorf("the read did not go through the child: %d calls", childCalls)
+	}
+	if len(gate.calls) != 1 || !gate.calls[0] {
+		t.Errorf("the kernel's refusal must reach the operator as a must-prompt: %v", gate.calls)
+	}
+	if !denied || strings.Contains(out, "readme") {
+		t.Errorf("a refused-and-declined read returned content: denied=%v out=%q", denied, out)
+	}
+
+	// The approved credential read bypasses the cage entirely.
+	reg2 := credentialProject(t)
+	reg2.SetFileChild(func(context.Context, string, map[string]any) (string, error) {
+		t.Error("an approved credential read went to the cage that would refuse it")
+		return "", tools.ErrCredentialRead
+	})
+	approve := &approveAll{}
+	a2 := New(Options{Registry: reg2, Gate: approve})
+	out, denied, _, _ = a2.execCall(ctx, credCall("read_file", map[string]any{"path": ".env"}))
+	if denied || !strings.Contains(out, "sk-test-marker") {
+		t.Errorf("the approved read did not run in process: denied=%v out=%q", denied, out)
+	}
+}

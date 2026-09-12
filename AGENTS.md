@@ -237,6 +237,28 @@ answers.
   one child of six, and passed `OPENAI_KEY` while catching
   `NPM_TOKEN`. Apply `ChildEnv` at any new spawn site; never re-add a
   rule over names the runtime does not own.
+- **The kernel reads the file** (ADR-0016) — the covered reads
+  (`read_file`, `view_image`, `file_info`, `search_files`) run in a
+  child of this binary under `sandbox.FileReadProfile`, which denies
+  `sandbox.CredentialFilters` at the kernel. `Registry.SetFileChild`
+  injects it the way `SetLaneExec` injects the lanes, after
+  `sandbox.VerifyFileReadLane` proves on this machine that the cage
+  refuses `.env` and reads an ordinary file; unproven, the reads stay in
+  process and the note says so. A refused open comes back as
+  `tools.ErrCredentialRead`, which `Agent.credentialRetry` turns into
+  the operator's question and, on a yes, re-runs under
+  `tools.WithDirectRead` — the reason an approved credential read must
+  NOT go to the child. So the Go matcher raises the prompt and the
+  kernel is the boundary: a miss costs a spawn and a blunter prompt,
+  never a leak. **Never add a matching rule to close a reported
+  "hole"** — an entry in `internal/sandbox` is the mechanism working; a
+  rule about how paths compare is the signal the boundary is in the
+  wrong place. Hard links, copies and secrets in unlisted files are the
+  written ceiling.
+- **The walks judge no names** (ADR-0016 §3, withdrawing ADR-0015 §2) —
+  `list_files` and `list_tree` list a credential-named entry like any
+  other, and `search_files` names what the kernel would not let it read.
+  `credentialTally` is gone; do not reintroduce name judging in a walk.
 - **A credential path is the operator's question in every file tool**
   (ADR-0015). `read_file`, `file_info` and `view_image` on a path
   `sandbox.CredentialPath` names are Review with `OperatorOnly` —

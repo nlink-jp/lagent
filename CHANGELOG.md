@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+### Security
+
+- **The kernel reads the file** (ADR-0016). The file tools never made
+  the lanes' move to the kernel: they are in-process Go code, so
+  `sandbox.CredentialPath` was the boundary and a miss there was the
+  file's content in the transcript rather than a missing prompt.
+  `read_file`, `view_image`, `file_info` and the whole `search_files`
+  walk now run their reads in a child of this binary under a profile
+  built from the same `internal/sandbox` list, which denies credential
+  material at the kernel — measured: `cat .env` and `stat .env`
+  refused, `.env.example` read, `grep -r` skipping that one file, at
+  18.8 ms per spawn against a local-model round measured in seconds. A
+  refused open is the operator's question, and on approval the read
+  runs in process, which is the operator lane's authority applied to a
+  file tool. The matcher stays only to raise the prompt without
+  spending a spawn: a miss in it now costs a spawn and a blunter
+  prompt, never a leak. Verified at startup like the shell lanes; where
+  it cannot be verified the reads stay in process and the note says so.
+- **The walks stop hiding names** (ADR-0016 §3, withdrawing ADR-0015
+  §2). The kernel lists names and refuses content, so a name was never
+  the secret. `list_files` and `list_tree` list a credential-named
+  entry like any other and carry no credential code at all;
+  `search_files` names the file it could not read
+  (`[not read: .env — reading one needs the operator's approval]`), the
+  shape `grep -r` has. `credentialTally` is deleted. This also dissolves
+  the walk defect gem-agent's review found — the walks judged the
+  project-relative spelling and did not resolve their root — because
+  there is no spelling left for them to get wrong.
+
 ### Changed
 
 - **The operator's environment is no longer filtered, and the runtime's

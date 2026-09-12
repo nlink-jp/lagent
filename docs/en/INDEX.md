@@ -106,7 +106,8 @@ excepted).
   and `-p` denies them; `search_files`, `list_files` and `list_tree`
   skip such a file and say so; one list, in `internal/sandbox`
 - [`ADR-0016`](adr/0016-the-kernel-reads-the-file.md) —
-  the kernel reads the file: the file tools' reads run in a child under
+  the kernel reads the file (**Accepted**, implemented): the file tools'
+  reads run in a child under
   `sandbox-exec`, so a credential open is refused by the kernel and the
   Go matcher stops being the boundary; a refusal becomes the operator's
   prompt and the read is re-issued in process on approval. Measured:

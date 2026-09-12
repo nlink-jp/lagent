@@ -17,6 +17,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/llm"
 	"github.com/nlink-jp/lagent/internal/mention"
 	"github.com/nlink-jp/lagent/internal/policy"
+	"github.com/nlink-jp/lagent/internal/risk"
 	"github.com/nlink-jp/lagent/internal/sandbox"
 	"github.com/nlink-jp/lagent/internal/session"
 	"github.com/nlink-jp/lagent/internal/tools"
@@ -1390,7 +1391,24 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 	if operatorWrite && a.beforeOpWrite != nil {
 		a.beforeOpWrite(tc)
 	}
-	out, state, err := a.runWithFloor(ctx, tool, tc)
+	runCtx := ctx
+	if d.Verdict.CredentialRead {
+		// The operator answered the credential prompt above; the cage
+		// would refuse what they just allowed (ADR-0016 §2).
+		runCtx = tools.WithDirectRead(runCtx)
+	}
+	out, state, err := a.runWithFloor(runCtx, tool, tc)
+	credentialDenied := false
+	if errors.Is(err, tools.ErrCredentialRead) {
+		// The kernel refused a path the rule tier did not recognise.
+		// The read produced no bytes, so nothing reached the model; the
+		// operator gets the same question the matcher would have raised,
+		// and on a yes the call runs in process (ADR-0016 §2).
+		out, state, err, credentialDenied = a.credentialRetry(ctx, tool, tc)
+	}
+	if credentialDenied {
+		return out, true, false, state, nil
+	}
 	if state == floorAbandoned {
 		return abandonedResult, false, false, state, nil
 	}
@@ -1672,4 +1690,38 @@ func clip(s string, limit int) string {
 		return s
 	}
 	return string(r[:limit]) + "…"
+}
+
+// credentialRetry asks the operator about a read the kernel refused and
+// the rule tier did not predict (ADR-0016 §2), and runs it in process
+// on a yes. It is must-prompt like every other operator-only verdict:
+// no session allowlist, no `never` policy, no model tier, and in an
+// unattended run the gate denies and the model is told why.
+func (a *Agent) credentialRetry(ctx context.Context, tool *tools.Tool, tc llm.ToolCall) (string, floorState, error, bool) {
+	detail, purpose := a.Describe(tc)
+	reason := tools.ErrCredentialRead.Error()
+	ok, _, denyReason := a.askGate(tc, detail, purpose, reason, true, Decision{
+		Tool: tool, Verdict: risk.Verdict{Tier: risk.Review, OperatorOnly: true, CredentialRead: true, Reason: reason},
+	})
+	a.logRecord("gate_decision", map[string]any{
+		"name": tc.Name, "decision": approvalDecision(ok), "must_prompt": true,
+		"key": a.learnKey(tc), "detail": clip(detail, 300), "source": "operator",
+		"credential_read": true,
+	})
+	if !ok {
+		if denyReason != "" {
+			return deniedResult + "\nThe reason given: " + denyReason, floorRan, nil, true
+		}
+		return a.deniedText(), floorRan, nil, true
+	}
+	out, state, err := a.runWithFloor(tools.WithDirectRead(ctx), tool, tc)
+	return out, state, err, false
+}
+
+// approvalDecision renders a gate answer for the audit records.
+func approvalDecision(ok bool) string {
+	if ok {
+		return "approved"
+	}
+	return "denied"
 }

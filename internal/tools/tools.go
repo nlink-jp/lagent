@@ -120,6 +120,8 @@ type Registry struct {
 	// so a work directory rotated after the child was built is the
 	// child's too.
 	parent *Registry
+	// child runs the covered reads in a sandboxed process (ADR-0016).
+	child fileChild
 	// excluded holds the registry names the MCP filter removed
 	// (gem-agent ADR-0077). They are not registered, so a call naming one is
 	// refused by the executor like any name it cannot resolve — this
@@ -479,15 +481,15 @@ func (r *Registry) gitignoreReader(path string, cap int64) ([]byte, error) {
 // listing and the read is not searched at all — a match past the cap
 // would be missing from a result presented as complete (review after
 // v0.68.2).
-func (r *Registry) readForSearch(abs string) ([]byte, bool) {
+func (r *Registry) readForSearch(abs string) ([]byte, bool, error) {
 	data, more, err := r.readFileCapped(abs, searchFileCap)
 	if err != nil || more {
-		return nil, false
+		return nil, false, err
 	}
 	if bytes.IndexByte(data[:min(len(data), binarySniff)], 0) >= 0 {
-		return nil, false // binary
+		return nil, false, nil // binary
 	}
-	return data, true
+	return data, true, nil
 }
 
 // readDirIn lists the directory at abs through its root: a directory
@@ -839,6 +841,11 @@ func (r *Registry) viewImage() *Tool {
 		},
 		Mutating: false,
 		Run: func(ctx context.Context, args map[string]any) (string, error) {
+			// The kernel adjudicates this read (ADR-0016 §1): in the
+			// child, credential material cannot be opened at all.
+			if out, err, ok := r.viaChild(ctx, "view_image", args); ok {
+				return out, err
+			}
 			p, _ := args["path"].(string)
 			data, mime, err := r.ReadImage(p)
 			if err != nil {
@@ -1169,15 +1176,8 @@ func (r *Registry) listFiles() *Tool {
 				return "", err
 			}
 			rules := ignore.RootWith(r.projectDir, dir, false, r.gitignoreReader)
-			creds := &credentialTally{}
 			var names []string
 			for _, e := range entries {
-				// Credential material is left out and counted (ADR-0015
-				// §2), the one entry a listing does not show by name.
-				if p := relOrDot(r.projectDir, filepath.Join(dir, e.Name())); sandbox.CredentialPath(p) {
-					creds.skip(p, e.IsDir())
-					continue
-				}
 				n := e.Name()
 				if e.IsDir() {
 					n += "/"
@@ -1202,9 +1202,6 @@ func (r *Registry) listFiles() *Tool {
 			}
 			// A directory holding only credential files lists as its
 			// footer, never as "empty".
-			if s := creds.summary(); s != "" {
-				names = append(names, s)
-			}
 			if len(names) == 0 {
 				return "(empty directory)", nil
 			}
@@ -1241,6 +1238,11 @@ func (r *Registry) readFile() *Tool {
 			"required": []string{"path"},
 		},
 		Run: func(ctx context.Context, args map[string]any) (string, error) {
+			// The kernel adjudicates this read (ADR-0016 §1): in the
+			// child, credential material cannot be opened at all.
+			if out, err, ok := r.viaChild(ctx, "read_file", args); ok {
+				return out, err
+			}
 			p, ok := strArg(args, "path")
 			if !ok {
 				return "", errors.New("path is required")

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Accepted** |
+| Status | **Accepted** — §2 withdrawn by ADR-0016 |
 | Date | 2026-09-13 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |

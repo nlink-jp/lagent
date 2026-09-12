@@ -163,9 +163,13 @@ question for the read tools (ADR-0015): `read_file`, `file_info` and
 private key, `credentials.json`, the token stores under home, by the
 one list `internal/sandbox` keeps; `.env.example` and its siblings are
 ordinary files — are a Review only the operator answers, judged on the
-real path, in every mode; `-p` denies them. `search_files`,
-`list_files` and `list_tree` do not ask: they skip such an entry and
-report the count and names.
+real path, in every mode; `-p` denies them. Those reads run in a child
+under a profile that denies the same list at the kernel (ADR-0016), so
+the list raises the prompt and the kernel is the boundary: a path the
+list does not recognise is refused at the open and that refusal reaches
+the operator as the same question. `search_files`, `list_files` and
+`list_tree` do not ask and hide nothing — the kernel lists names and
+refuses content — and `search_files` names what it could not read.
 
 ## The round ladder
 
