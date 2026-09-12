@@ -102,9 +102,10 @@ stdin:
 Everything else is a pass: exit 0 with no output sends the call on to
 the normal approval ladder in silence. A hook can refuse a call but
 never approve one. A crash, a timeout (`timeout_sec`, default 10), or
-exit 0 with output that is not a verdict — plain text, or JSON that
-does not parse — proceeds with a warning in the session that names the
-hook and quotes its first line.
+exit 0 with output that is not a verdict — plain text, JSON that does
+not parse, or JSON with no field or value of the contract — proceeds
+with a warning in the session that names the hook and quotes its first
+line.
 
 A deny is final: neither auto-approve, a `"never"` row, `--allow` nor
 the session allowlist sees the call, the transcript records

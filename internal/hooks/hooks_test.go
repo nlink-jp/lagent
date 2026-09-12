@@ -463,3 +463,46 @@ print('ignored output')
 		t.Errorf("notes = %v", *notes)
 	}
 }
+
+// JSON that parses but is no verdict of the contract — a deny spelled
+// with the wrong field or the wrong value — is reported like plain
+// text (independent review after R06); a verdict of either form, or
+// a control field the contract allows, draws no notice.
+func TestStrayJSONIsReportedNotHonoured(t *testing.T) {
+	stray := []string{
+		`{"decision":"deny"}`,
+		`{"permissionDecision":"deny","permissionDecisionReason":"no"}`,
+		`{"hookSpecificOutput":{"permissionDecision":"block"}}`,
+		`{"verdict":"deny"}`,
+		`{}`,
+	}
+	for _, out := range stray {
+		deny, _, notes := run(t, Hook{Matcher: "*", Command: `echo '` + out + `'`}, "shell_exec", nil)
+		if deny {
+			t.Errorf("%s denied — only the two contract forms deny", out)
+		}
+		if len(notes) != 1 || !strings.Contains(notes[0], "not a verdict") {
+			t.Errorf("%s: notes = %v, want one 'not a verdict' notice", out, notes)
+		}
+	}
+	quiet := []string{
+		`{"hookSpecificOutput":{"permissionDecision":"allow"}}`,
+		`{"decision":"approve","reason":"fine"}`,
+		`{"continue":true}`,
+		`{"suppressOutput":true}`,
+	}
+	for _, out := range quiet {
+		deny, _, notes := run(t, Hook{Matcher: "*", Command: `echo '` + out + `'`}, "shell_exec", nil)
+		if deny || len(notes) != 0 {
+			t.Errorf("%s: deny=%v notes=%v, want a silent pass", out, deny, notes)
+		}
+	}
+	// A context hook with stray JSON injects nothing and says so.
+	r, notes, s := contextRunner(t, Hooks{SessionStart: []Hook{{Command: `echo '{"verdict":"x"}'`}}})
+	if text := r.SessionStart(context.Background(), s, "startup"); text != "" {
+		t.Errorf("stray JSON injected as context: %q", text)
+	}
+	if len(*notes) != 1 || !strings.Contains((*notes)[0], "not a verdict") {
+		t.Errorf("context hook notes = %v", *notes)
+	}
+}

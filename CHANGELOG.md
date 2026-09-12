@@ -43,7 +43,12 @@
   through in silence — the shape of a guard that meant to deny and
   printed the wrong form (system risk review R06). The call still
   proceeds, as hooks only tighten; the notice names the hook and quotes
-  the first line of what it printed. Empty stdout stays silent.
+  the first line of what it printed. Empty stdout stays silent. JSON
+  that parses but is no verdict of the contract — a deny spelled with
+  the wrong field (`decision: "deny"`, a bare `permissionDecision`) or
+  the wrong value — is reported the same way rather than passing as a
+  verdict that denies nothing (independent review); a context hook
+  printing such JSON injects nothing and says so.
 
 ## [0.3.3] - 2026-09-13
 

@@ -178,6 +178,9 @@ type verdict struct {
 		PermissionDecisionReason string `json:"permissionDecisionReason"`
 		AdditionalContext        string `json:"additionalContext"`
 	} `json:"hookSpecificOutput"`
+	// stray marks an object that parsed but is no verdict of the
+	// contract (parseVerdict); not part of the wire shape.
+	stray bool
 }
 
 // outcome is one finished hook process.
@@ -286,14 +289,15 @@ func (r *Runner) Pre(ctx context.Context, s Session, name string, args map[strin
 			continue
 		}
 		v, isJSON := parseVerdict(out.stdout)
-		if !isJSON {
-			// Exit 0 with output that is not a verdict: a guard that
-			// meant to deny and printed the wrong shape looks exactly
-			// like this, and it used to pass in silence — the one
-			// fail-open path §3's notice did not cover (system risk
-			// review R06). The call still proceeds; the operator hears
-			// what the hook said. Empty stdout is the ordinary pass
-			// and stays silent.
+		if !isJSON || v.stray {
+			// Exit 0 with output that is not a verdict — plain text,
+			// JSON that does not parse, or JSON with no field or value
+			// of the contract: a guard that meant to deny and printed
+			// the wrong shape looks exactly like this, and it used to
+			// pass in silence — the one fail-open path §3's notice did
+			// not cover (system risk review R06). The call still
+			// proceeds; the operator hears what the hook said. Empty
+			// stdout is the ordinary pass and stays silent.
 			if raw := strings.TrimSpace(out.stdout); raw != "" {
 				r.notify(fmt.Sprintf("hook %q printed output that is not a verdict (%s) — the call proceeds", h.Command, firstLine(raw)))
 			}
@@ -415,6 +419,12 @@ func (r *Runner) interpret(h Hook, out outcome, event string) (text string, bloc
 	if !isJSON {
 		return clip(raw), false, ""
 	}
+	if v.stray {
+		// JSON, so not context; no field of the contract, so not a
+		// verdict either. Said, as the pre-tool runner says it.
+		r.notify(fmt.Sprintf("%s hook %q printed JSON that is not a verdict (%s) — no context injected", event, h.Command, firstLine(raw)))
+		return "", false, ""
+	}
 	if blocked, why := v.denies(); blocked {
 		return "", true, why
 	}
@@ -431,17 +441,55 @@ func clip(s string) string {
 }
 
 // parseVerdict reads stdout as a JSON verdict object. Plain text — the
-// context form, or informational output — is not JSON.
+// context form, or informational output — is not JSON. A JSON object
+// that carries none of the contract's fields, or a decision value
+// outside its vocabulary, parses but is not a verdict: v.stray is set,
+// and the pre-tool runner reports it as it reports plain text (a guard
+// that meant to deny and printed the wrong shape mostly prints JSON —
+// independent review after system risk review R06).
 func parseVerdict(out string) (verdict, bool) {
 	out = strings.TrimSpace(out)
 	if !strings.HasPrefix(out, "{") {
+		return verdict{}, false
+	}
+	var keys map[string]json.RawMessage
+	if json.Unmarshal([]byte(out), &keys) != nil {
 		return verdict{}, false
 	}
 	var v verdict
 	if json.Unmarshal([]byte(out), &v) != nil {
 		return verdict{}, false
 	}
+	v.stray = !hasVerdictField(keys) ||
+		!oneOf(v.Decision, "", "approve", "block") ||
+		!oneOf(v.HookSpecificOutput.PermissionDecision, "", "allow", "deny")
 	return v, true
+}
+
+// verdictFields are the top-level fields of Claude Code's hook JSON:
+// the two measured verdict forms and the control fields every event
+// may carry. An object with none of them is not a verdict.
+var verdictFields = map[string]bool{
+	"decision": true, "reason": true, "hookSpecificOutput": true,
+	"continue": true, "stopReason": true, "suppressOutput": true, "systemMessage": true,
+}
+
+func hasVerdictField(keys map[string]json.RawMessage) bool {
+	for k := range keys {
+		if verdictFields[k] {
+			return true
+		}
+	}
+	return false
+}
+
+func oneOf(s string, allowed ...string) bool {
+	for _, a := range allowed {
+		if s == a {
+			return true
+		}
+	}
+	return false
 }
 
 // denies reports a block in either JSON contract, with its reason.
