@@ -72,3 +72,8 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   採らない: ベンチの Review 呼び出しは今や read レーンが走らせる write
   レーンの検証で、判定はローカルモデル 1 つが自分を裁いて呼び出しごとに
   数秒かかり、操作者の行とレーンが既に覆っている
+- [`ADR-0011`](adr/0011-skills.ja.md) — スキルは Claude Code の形式の
+  まま lagent 自身のディレクトリから読み込む: `~/.config/lagent/skills` と
+  プロジェクトの `.claude/skills`（信頼済み・ピン留め）、facts メッセージに
+  スキルごと 1 行の一覧、`load_skill` の結果は包まず閉じ込めて送る、
+  `/skill` と `/skills`、`allowed-tools` は無視

@@ -80,3 +80,8 @@ excepted).
   write-lane verifications the read lane now runs, a verdict would cost
   seconds per call on one local model that would be judging itself,
   and the operator's rows and lanes already cover them
+- [`ADR-0011`](adr/0011-skills.md) — skills are loaded, in Claude
+  Code's format, from lagent's own directory: `~/.config/lagent/skills`
+  and the project's `.claude/skills` (trusted and pinned), one catalog
+  line per skill in the facts message, `load_skill` results sent
+  unwrapped and confined, `/skill` and `/skills`, `allowed-tools` ignored
