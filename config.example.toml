@@ -158,6 +158,24 @@ show_thoughts = true
 #"mcp__tor-exit-lookup__*" = "never"
 #"shell_exec"              = "always"
 
+# Pre-tool hooks (ADR-0012): the control that lives outside the model.
+# Each entry runs `command` via sh -c before every model tool call
+# whose name `matcher` covers (exact, "a|b", or "*"; Claude Code names
+# like "Bash" also match their lagent equivalents). The command receives
+# Claude Code's PreToolUse JSON on stdin — tool_name, tool_input (for
+# shell_exec: command and the lane, access), cwd, session_id — and
+# denies via the same contracts (hookSpecificOutput.permissionDecision
+# "deny", or exit code 2 with the reason on stderr), so a Claude Code
+# guard script works unchanged. A deny is final: neither auto-approve,
+# a "never" row nor --allow can override it, and the reason is returned
+# to the model. Anything else (crash, timeout, unparseable output)
+# proceeds with a warning: hooks only ever tighten. Global config only —
+# a project hook would let a cloned repo run arbitrary commands.
+#[[hooks.pre_tool_use]]
+#matcher = "shell_exec"
+#command = "python3 /Users/you/.claude/hooks/guard-recursive-write.py"
+#timeout_sec = 10
+
 # Project directories you trust completely. This is NOT approval-only:
 # a listed project's .lagent.toml may REMOVE approvals, AND its
 # .mcp.json servers are spawned and its instruction files are read.

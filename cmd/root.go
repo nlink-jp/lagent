@@ -35,6 +35,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/repl"
 	"github.com/nlink-jp/lagent/internal/sandbox"
 	"github.com/nlink-jp/lagent/internal/session"
+	"github.com/nlink-jp/lagent/internal/hooks"
 	"github.com/nlink-jp/lagent/internal/skills"
 	"github.com/nlink-jp/lagent/internal/tools"
 	"github.com/nlink-jp/lagent/internal/tui"
@@ -673,6 +674,20 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Fprintf(stderr, "[⚠ %s]\n", msg)
 	}
+	// --- pre-tool hooks (ADR-0012): the operator's floor before the
+	// ladder. What a hook learns about the session: the transcript path
+	// only while a log is actually being written. /clear re-points it.
+	hookSession := hooks.Session{ID: sessionID, CWD: projectDir}
+	if sessionID != "" {
+		hookSession.TranscriptPath = sessionPath
+	}
+	var preToolHook func(ctx context.Context, name string, args map[string]any) (bool, string)
+	if len(cfg.Hooks.PreToolUse) > 0 {
+		hookRunner := hooks.New(hooks.Hooks{PreToolUse: hookEntries(cfg.Hooks.PreToolUse)}, notice)
+		preToolHook = func(ctx context.Context, name string, args map[string]any) (bool, string) {
+			return hookRunner.Pre(ctx, hookSession, name, args)
+		}
+	}
 	ag = agent.New(agent.Options{
 		// The operator's language for the notices the agent writes
 		// mid-turn (gem-agent ADR-0029 §3: they are chrome, not error chains).
@@ -688,6 +703,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		MaxTurns:       cfg.Agent.MaxTurns,
 		Policy:         approvalPolicy,
 		Advertise:      adv.Advertise,
+		PreToolHook:    preToolHook,
 		ClipboardImage: clipboardImage,
 		BeforeOperatorWrite: func(tc llm.ToolCall) {
 			if name := pinNameForWrite(projectDir, tc); name != "" {
@@ -1036,7 +1052,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		curLog = newLog
 		sessionLog = newLog
 		sessionPath, sessionID = newLog.Path(), newLog.ID()
-		_ = sessionPath
+		hookSession = hooks.Session{ID: sessionID, TranscriptPath: sessionPath, CWD: projectDir}
 		if err := session.Export(sessionID); err != nil {
 			note("cannot set %s: %v", session.EnvVar, err)
 		}

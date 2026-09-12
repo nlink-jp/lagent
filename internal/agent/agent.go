@@ -155,6 +155,8 @@ type Agent struct {
 	unattended   bool
 	// instructionTools: results sent unwrapped (Options.InstructionTools).
 	instructionTools map[string]bool
+	// preToolHook: the operator's floor before the ladder (Options.PreToolHook).
+	preToolHook func(ctx context.Context, name string, args map[string]any) (bool, string)
 	noMentions       bool
 	onToolDone       func(tc llm.ToolCall)
 	turnCalls        []string
@@ -217,6 +219,13 @@ type Options struct {
 	Log      SessionLog // optional
 	System   string
 	MaxTurns int
+	// PreToolHook, when set, is consulted before every tool call, ahead
+	// of the approval ladder (ADR-0012). A deny is a deterministic
+	// floor — neither auto-approve, a policy row nor the session
+	// allowlist can override it — and the reason is returned to the
+	// model as the tool result. Anything that is not an explicit deny
+	// proceeds to the normal ladder: hooks only ever tighten.
+	PreToolHook func(ctx context.Context, name string, args map[string]any) (deny bool, reason string)
 	// OnToolCall, when set, observes every tool call before it is gated
 	// and executed — the REPL uses it to show activity for read-only
 	// calls that never hit the approval prompt (a silent pause reads as
@@ -346,8 +355,9 @@ func New(opts Options) *Agent {
 			}
 			return m
 		}(),
-		noMentions: opts.NoMentions,
-		onToolDone: opts.OnToolDone,
+		noMentions:  opts.NoMentions,
+		onToolDone:  opts.OnToolDone,
+		preToolHook: opts.PreToolHook,
 		tag:        guard.NewTagWithPrefix("tool_output"),
 	}
 }
@@ -1080,29 +1090,30 @@ func deniedWithReason(reason string) string {
 func (a *Agent) execCall(ctx context.Context, tc llm.ToolCall) (result string, denied bool, ran bool, remote *tools.RemoteError) {
 	var floor floorState
 	var runErr error
-	result, denied, floor, runErr = a.execCallInner(ctx, tc)
+	var hookDenied bool
+	result, denied, hookDenied, floor, runErr = a.execCallInner(ctx, tc)
 	if floor == floorRan && runErr != nil {
 		_ = errors.As(runErr, &remote)
 	}
-	return result, denied, floor == floorRan && !denied, remote
+	return result, denied, floor == floorRan && !denied && !hookDenied, remote
 }
 
 // execCallInner reports, beside the result, three provenance facts the
 // callers must not infer from the text: denied (the gate refused,
-// gem-agent ADR-0060 §3), hookDenied (a pre-tool hook refused, gem-agent ADR-0044 §2), and
+// gem-agent ADR-0060 §3), hookDenied (a pre-tool hook refused, ADR-0012 §2), and
 // the gem-agent ADR-0065 floor state.
 //
 // runErr is the error the tool's Run returned, when it did (nil for a
 // refusal at any layer): the caller reads a remote call's provenance
 // from it with errors.As.
-func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result string, denied bool, floor floorState, runErr error) {
+func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result string, denied bool, hookDenied bool, floor floorState, runErr error) {
 	// A cancelled turn must not open an approval dialog: the operator
 	// interrupted, and a prompt (worse, an 'a' answer) on behalf of a
 	// dead call is the last thing they asked for (review round 2).
 	if ctx.Err() != nil {
 		// Audited as interrupted, not error: the call never ran
 		// because the operator stopped the turn (gem-agent ADR-0065 review).
-		return "error: interrupted before execution", false, floorInterrupted, nil
+		return "error: interrupted before execution", false, false, floorInterrupted, nil
 	}
 	tool, ok := a.registry.Get(tc.Name)
 	if !ok {
@@ -1116,14 +1127,35 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 			// drew the line.
 			a.logRecord("tool_excluded", map[string]any{"name": tc.Name})
 		}
-		return fmt.Sprintf("error: unknown tool %q", tc.Name), false, floorRan, nil
+		return fmt.Sprintf("error: unknown tool %q", tc.Name), false, false, floorRan, nil
 	}
 	// Registered but not advertised: the model was never given this
 	// tool's schema, so the call is a guess, and a guessed call must
 	// not reach a server. Refused before any gate, with the route.
 	if a.advertise != nil && !a.advertise(tc.Name) {
 		a.logRecord("tool_not_advertised", map[string]any{"name": tc.Name})
-		return fmt.Sprintf("error: tool %q is not in your tool list yet — its MCP server is not loaded; call mcp_load with the server name (the runtime facts list the servers), then call the tool", tc.Name), false, floorRan, nil
+		return fmt.Sprintf("error: tool %q is not in your tool list yet — its MCP server is not loaded; call mcp_load with the server name (the runtime facts list the servers), then call the tool", tc.Name), false, false, floorRan, nil
+	}
+	// Operator pre-tool hooks run before the ladder (ADR-0012 §2): the
+	// org's guards exist to catch the agent's lapses deterministically,
+	// so nothing downstream may overrule a deny.
+	if a.preToolHook != nil {
+		// The declared purpose is stripped here as everywhere else: the
+		// hook is a judge, and the proposer's self-justification is not
+		// evidence.
+		if deny, why := a.preToolHook(ctx, tc.Name, a.stripPurpose(tc.Name, tc.Args)); deny {
+			a.logRecord("hook_denied", map[string]any{"name": tc.Name, "reason": why})
+			// The denial exemption (gem-agent ADR-0060 §3) stays scoped to
+			// the gate path: a hook is a configured command whose output
+			// no one reviews at the prompt, so its words ship wrapped
+			// like any result.
+			return "denied by a pre-tool hook: " + why, false, true, floorRan, nil
+		}
+		// The hook is a process: a Ctrl+C that landed while it ran must
+		// not carry the call on to the ladder and the gate.
+		if ctx.Err() != nil {
+			return "error: interrupted before execution", false, false, floorInterrupted, nil
+		}
 	}
 	d := a.decide(tc)
 	operatorWrite := false // approved by the operator's own answer to an OperatorOnly call
@@ -1131,7 +1163,7 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 		// Refused before any gate: a call that names no lane is not a
 		// read-lane call to run unasked, nor a write-lane call to
 		// prompt about (review F7).
-		return "error: " + d.Invalid.Error(), false, floorRan, nil
+		return "error: " + d.Invalid.Error(), false, false, floorRan, nil
 	}
 	if d.OverCeiling {
 		// The ceiling is not an escalation: the gate can be answered by
@@ -1168,7 +1200,7 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 			// that ever printed, and in the TUI, where the operator saw
 			// the model retry with nothing said (independent review).
 			a.notify(fmt.Sprintf(a.msgs.CeilingRefusedAgainFmt, tc.Name))
-			return refused, false, floorRan, nil
+			return refused, false, false, floorRan, nil
 		}
 		detail, purpose := a.Describe(tc)
 		ok, denyReason := a.gate.ApproveLift(tc.Name, detail, purpose, a.ceilingPrompt(d, tc))
@@ -1176,9 +1208,9 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 			a.liftDeclined = true
 			record("refused")
 			if denyReason != "" {
-				return refused + ". " + denyReason, false, floorRan, nil
+				return refused + ". " + denyReason, false, false, floorRan, nil
 			}
-			return refused, false, floorRan, nil
+			return refused, false, false, floorRan, nil
 		}
 		// The ceiling only. The watcher the operator armed stays armed,
 		// so a later read-only request is caught the same way the first
@@ -1262,7 +1294,7 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 			// no human made, and the plain REPL's prompt would eat the
 			// next stdin line as its answer.
 			if ctx.Err() != nil {
-				return "error: interrupted before execution", false, floorInterrupted, nil
+				return "error: interrupted before execution", false, false, floorInterrupted, nil
 			}
 			approved = d.Approved
 			if !approved {
@@ -1331,9 +1363,9 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 			a.logRecord("gate_decision", record)
 			if !ok {
 				if denyReason != "" {
-					return deniedWithReason(denyReason), true, floorRan, nil
+					return deniedWithReason(denyReason), true, false, floorRan, nil
 				}
-				return a.deniedText(), true, floorRan, nil
+				return a.deniedText(), true, false, floorRan, nil
 			}
 		}
 	}
@@ -1342,18 +1374,18 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 	}
 	out, state, err := a.runWithFloor(ctx, tool, tc)
 	if state == floorAbandoned {
-		return abandonedResult, false, state, nil
+		return abandonedResult, false, false, state, nil
 	}
 	if err != nil {
-		return "error: " + err.Error(), false, state, err
+		return "error: " + err.Error(), false, false, state, err
 	}
 	if operatorWrite && a.onOpWrite != nil {
 		a.onOpWrite(tc)
 	}
 	if out == "" {
-		return "(no output)", false, state, nil
+		return "(no output)", false, false, state, nil
 	}
-	return out, false, state, nil
+	return out, false, false, state, nil
 }
 
 // floorState says how a tool call came back through the gem-agent ADR-0065

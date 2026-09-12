@@ -35,7 +35,9 @@ JSON-RPC client), `internal/mcpfilter` (the one predicate behind
 operator has typed anything, and the rule that decides which ones),
 `internal/mention` (`@`-references: files, directories, images — and a
 dropped image path without the `@`, ADR-0005),
-`internal/instructions` (`AGENTS.md` discovery), `internal/skills`
+`internal/instructions` (`AGENTS.md` discovery), `internal/hooks`
+(the operator's pre-tool hooks on Claude Code's measured contract,
+ADR-0012), `internal/skills`
 (skill discovery and confined loading in Claude Code's format,
 ADR-0011), `internal/ignore`
 (ignore-aware enumeration: builtin dir list + gitignore matcher),
@@ -135,10 +137,16 @@ callbacks and the agent never imports a UI package:
 - `ClipboardImage` — the `@clipboard` capture; nil reports it unavailable.
 - `Advertise` — which registered tools are declared to the model
   (ADR-0004); a call to a hidden one is refused before any gate.
+- `PreToolHook` — the operator's pre-tool hooks (ADR-0012), consulted
+  after the advertise check and before the ladder; a deny is a floor
+  and its reason is the tool result.
 
 ## Approval
 
-The rule tier (`internal/risk`) classifies every call: Safe runs under
+Before the ladder, the operator's pre-tool hooks (`internal/hooks`,
+ADR-0012) may refuse a call outright: a deny is a floor no mode, row or
+allowlist lifts, and the reason goes to the model as the tool result.
+The rule tier (`internal/risk`) then classifies every call: Safe runs under
 `--auto` without asking, Block always asks, Review asks the operator.
 There is no model tier here: gem-agent's second model call judging the
 proposed call was measured and not adopted (ADR-0010). The session ceiling
@@ -182,9 +190,9 @@ policy and MCP exclusions, nothing else.
 `web_search`, `web_fetch`, media uploads, Cloud Logging, thought
 signatures, safety settings, the summary model and the delegated file
 search are gem-agent features bound to Vertex AI (ADR-0002). History
-compaction, agent memory and operator hooks are Phase 2 (RFP §4); the
-model tier was measured and not adopted (ADR-0010); skills are in
-(ADR-0011).
+compaction and agent memory are Phase 2 (RFP §4); the model tier was
+measured and not adopted (ADR-0010); skills (ADR-0011) and pre-tool
+hooks (ADR-0012) are in.
 
 ## Skills
 

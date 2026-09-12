@@ -33,7 +33,8 @@ tools パッケージはプロジェクトディレクトリだけを要する 9
 `internal/banner`（操作者が何か打つ前に出る行と、どの行を出すかの規則）、
 `internal/mention`（`@` 参照: ファイル、ディレクトリ、画像 — および `@`
 無しでドロップされた画像パス、ADR-0005）、
-`internal/instructions`（`AGENTS.md` の発見）、`internal/skills`（Claude
+`internal/instructions`（`AGENTS.md` の発見）、`internal/hooks`（Claude
+Code の計測済み契約による操作者の pre-tool フック、ADR-0012）、`internal/skills`（Claude
 Code 形式のスキルの発見と閉じ込めた読み込み、ADR-0011）、`internal/ignore`（ignore
 対応の列挙: 組込ディレクトリ一覧 + gitignore マッチャ）、
 `internal/session`（transcript: ロガー + 再開ローダ、usage レコード）、
@@ -123,11 +124,16 @@ user ロールのメッセージとして会話を開く（`Agent.AnnounceSessio
 - `ClipboardImage` — `@clipboard` の取り込み。nil は利用不可を報告する。
 - `Advertise` — 登録済みツールのうちモデルに宣言するもの（ADR-0004）。隠した
   ツールへの呼び出しはどのゲートにも達する前に拒否される。
+- `PreToolHook` — 操作者の pre-tool フック（ADR-0012）。広告チェックの後、
+  梯子の前に問われ、拒否は床でその理由がツール結果になる。
 
 ## 承認
 
-規則層（`internal/risk`）が全呼び出しを分類する: Safe は `--auto` 下で
-尋ねずに走り、Block は常に尋ね、Review は操作者に尋ねる。モデル層はここに
+梯子の前に操作者の pre-tool フック（`internal/hooks`、ADR-0012）が呼び出し
+を丸ごと拒める: 拒否はどのモードも行も許可リストも外せない床で、理由は
+ツール結果としてモデルへ行く。次に規則層（`internal/risk`）が全呼び出しを
+分類する: Safe は `--auto` 下で尋ねずに走り、Block は常に尋ね、Review は
+操作者に尋ねる。モデル層はここに
 無い: 提案された呼び出しを裁く gem-agent の 2 つ目のモデル呼び出しは
 計測のうえ採らなかった（ADR-0010）。セッション天井（`--read-only`）は呼び出しが
 届けるレーンを上限で抑え、解除は操作者の行為。操作者専用ファイル —
@@ -167,9 +173,9 @@ MCP の除外だけを持ち、他は何も持たない。
 
 `web_search`、`web_fetch`、メディアアップロード、Cloud Logging、thought
 signature、safety 設定、要約モデル、委任ファイル探索は Vertex AI に
-縛られた gem-agent の機能（ADR-0002）。履歴圧縮、agent memory、操作者
-hooks は Phase 2（RFP §4）。モデル層は計測のうえ採らず（ADR-0010）、
-skills は入った（ADR-0011）。
+縛られた gem-agent の機能（ADR-0002）。履歴圧縮と agent memory は Phase 2
+（RFP §4）。モデル層は計測のうえ採らず（ADR-0010）、skills（ADR-0011）と
+pre-tool hooks（ADR-0012）は入った。
 
 ## スキル
 

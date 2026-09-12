@@ -50,6 +50,64 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 プロジェクトの `.lagent.toml` はどちらも持たず、`[approval.tools]` と
 `[mcp].exclude` だけを持つので、クローンしたリポジトリはゲートを外せない。
 
+### `[hooks]` — pre-tool フック
+
+`[[hooks.pre_tool_use]]` の各エントリ（ADR-0012）は、matcher が覆うモデルの
+ツール呼び出しの前に、あなたのコマンドを走らせる。フックごとに 1 ブロック。
+一致したフックは順に走り、最初の拒否が勝つ。フックはモデルが聞いているか
+に依存しない制御である: サンドボックスはレーンが触れるものを決め、フックは
+呼び出しをその形で拒む。
+
+```toml
+[[hooks.pre_tool_use]]
+matcher     = "shell_exec"
+command     = "python3 /Users/you/hooks/guard.py --strict"
+timeout_sec = 10
+```
+
+**`matcher`** — 各呼び出しのツール名、それだけ。3 形式: 厳密な名前
+（`shell_exec`）、`|` 選択（`shell_exec|write_file`）、全ツールの `"*"`
+（`mcp__server__tool` の MCP ツールを含む）。Claude Code の名前も lagent の
+対応物に一致する（`Bash` ↔ `shell_exec`、`Write` ↔ `write_file`、`Edit` ↔
+`edit_file`、`Read` ↔ `read_file`）ので、Claude Code 設定から複製した hooks
+ブロックがそのまま動く。
+
+**`command`** — シェルのコマンド行。プロジェクトディレクトリで lagent の
+環境のまま、サンドボックスの外で `/bin/sh -c` により実行する。スクリプトは
+絶対パスで名指す。呼び出しを JSON オブジェクト 1 つとして stdin で受け取る:
+
+```json
+{"hook_event_name": "PreToolUse",
+ "session_id": "20260912-124118",
+ "transcript_path": "/path/to/state/sessions/projects/<escaped>/20260912-124118.jsonl",
+ "tool_name": "shell_exec",
+ "tool_input": {"command": "gofmt -w .", "access": "write"},
+ "cwd": "/path/to/project"}
+```
+
+`tool_input` はモデルが送ったままのツール引数。`shell_exec` なら `command`
+とレーン `access`。セッションログが無効なら `session_id` と
+`transcript_path` は空。
+
+**判定** — フックは 2 通りのどちらかで拒む:
+
+- stdout に `{"hookSpecificOutput": {"permissionDecision": "deny",
+  "permissionDecisionReason": "why"}}` を印字して exit 0 — Claude Code の
+  ガードスクリプトが出す形。または
+- exit code 2、理由は stderr。
+
+それ以外は通過: 出力無し（または情報出力）の exit 0 は呼び出しを通常の
+承認梯子へ送る。フックは呼び出しを拒めるが、承認は決してできない。
+クラッシュ、タイムアウト（`timeout_sec`、既定 10）、解釈不能な出力は
+セッションに警告を出して進む。
+
+拒否は最終: 自動承認も `"never"` 行も `--allow` もセッション許可リストも
+その呼び出しを見ず、transcript は `hook_denied` を記録し、理由はモデルへ
+返り、モデルは直して再試行する。固執するモデルはループガードに会う: 同一
+呼び出し 3 連続はエスカレートし、無人実行なら止まる。global 設定のみ:
+プロジェクト側のフックはクローンしたリポジトリに任意のコマンドを走らせる
+ことになる。フックに実行時のトグルは無い — トグルのある制御はバイパスである。
+
 ## 優先順位
 
 フラグ > `LAGENT_*` 環境変数 > 設定ファイル > 組み込み既定値。

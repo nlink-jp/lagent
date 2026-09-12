@@ -75,6 +75,11 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   work directory); `shell_exec` runs under `sandbox-exec` in the lane it
   declares — read runs unasked (inspection, and Go builds and tests,
   whose cache lives in the session scratch), write and operator ask.
+- **Pre-tool hooks:** `[[hooks.pre_tool_use]]` runs your guard script
+  before a model tool call, on Claude Code's contract, so the same
+  script that guards Claude Code guards this runtime. A deny is final,
+  whatever the approval mode; the reason goes back to the model
+  (ADR-0012).
 - **Sessions:** a JSONL transcript per session; `--continue` and
   `--resume`; usage records in the shape
   [gem-usage-lens](https://github.com/nlink-jp/gem-usage-lens) reads for
@@ -85,7 +90,7 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   each is for; it loads one with `load_skill`, and you invoke one by
   hand with `/skill <name>` (ADR-0011).
 - **Not here:** web search and fetch, media uploads, audit-log export,
-  history compaction, agent memory, hooks — see the RFP and
+  history compaction, agent memory — see the RFP and
   [ADR-0002](docs/en/adr/0002-features-not-reproduced.md).
 
 ## Attachments

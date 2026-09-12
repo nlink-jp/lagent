@@ -344,7 +344,6 @@ max_turns = 7
 	}
 }
 
-// Hooks entries parse from [[hooks.pre_tool_use]] and are validated:
 // gem-agent ADR-0072 §4.5: a project config is untrusted input read before the
 // trust prompt; an oversized one is refused, never parsed.
 func TestLoadProjectRefusesOversizeFile(t *testing.T) {
@@ -374,5 +373,42 @@ func TestMCPAdvertiseAndPreload(t *testing.T) {
 	}
 	if _, err := Load(writeConfig(t, "[llm]\nmodel = \"m\"\n[mcp]\nadvertise = \"lazy\"\n")); err == nil || !strings.Contains(err.Error(), "[mcp].advertise") {
 		t.Errorf("unknown advertise accepted: %v", err)
+	}
+}
+
+// Pre-tool hooks (ADR-0012) load from the global file and are
+// validated: a matcher and a command are required, a negative timeout
+// is refused, and the zero value means no hooks.
+func TestHooksLoadAndValidate(t *testing.T) {
+	clearEnv(t)
+	path := writeConfig(t, `
+[llm]
+model = "m"
+[[hooks.pre_tool_use]]
+matcher = "shell_exec|Write"
+command = "/path/to/guard.sh --strict"
+timeout_sec = 3
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Hooks.PreToolUse) != 1 || cfg.Hooks.PreToolUse[0].Matcher != "shell_exec|Write" ||
+		cfg.Hooks.PreToolUse[0].Command != "/path/to/guard.sh --strict" || cfg.Hooks.PreToolUse[0].TimeoutSec != 3 {
+		t.Fatalf("hooks = %+v", cfg.Hooks)
+	}
+	for name, body := range map[string]string{
+		"no matcher":       "[[hooks.pre_tool_use]]\ncommand = \"x\"\n",
+		"no command":       "[[hooks.pre_tool_use]]\nmatcher = \"*\"\n",
+		"negative timeout": "[[hooks.pre_tool_use]]\nmatcher = \"*\"\ncommand = \"x\"\ntimeout_sec = -1\n",
+	} {
+		p := writeConfig(t, "[llm]\nmodel = \"m\"\n"+body)
+		if _, err := Load(p); err == nil || !strings.Contains(err.Error(), "hooks.pre_tool_use[0]") {
+			t.Errorf("%s: err = %v", name, err)
+		}
+	}
+	empty, err := Load(writeConfig(t, "[llm]\nmodel = \"m\"\n"))
+	if err != nil || len(empty.Hooks.PreToolUse) != 0 {
+		t.Errorf("no hooks: %+v %v", empty.Hooks, err)
 	}
 }

@@ -51,6 +51,69 @@ all. Both can be on. A project's `.lagent.toml` carries neither — it
 holds `[approval.tools]` and `[mcp].exclude` only, so a cloned
 repository cannot switch the gate off.
 
+### `[hooks]` — pre-tool hooks
+
+Each `[[hooks.pre_tool_use]]` entry (ADR-0012) runs a command of yours
+before every model tool call its matcher covers. One block per hook;
+matching hooks run in order, first denial wins. The hook is the control
+that does not depend on the model listening: the sandbox decides what a
+lane may touch, a hook refuses a call by its shape.
+
+```toml
+[[hooks.pre_tool_use]]
+matcher     = "shell_exec"
+command     = "python3 /Users/you/hooks/guard.py --strict"
+timeout_sec = 10
+```
+
+**`matcher`** — the tool name of each call, nothing else. Three forms:
+an exact name (`shell_exec`), a `|`-alternation
+(`shell_exec|write_file`), or `"*"` for every tool, MCP tools included
+(`mcp__server__tool`). Claude Code's names also match their lagent
+equivalents (`Bash` ↔ `shell_exec`, `Write` ↔ `write_file`, `Edit` ↔
+`edit_file`, `Read` ↔ `read_file`), so a hooks block copied from Claude
+Code settings works unchanged.
+
+**`command`** — a shell command line, run via `/bin/sh -c` in the
+project directory with lagent's environment, outside the sandbox; name
+the script by absolute path. It receives the call as one JSON object on
+stdin:
+
+```json
+{"hook_event_name": "PreToolUse",
+ "session_id": "20260912-124118",
+ "transcript_path": "/path/to/state/sessions/projects/<escaped>/20260912-124118.jsonl",
+ "tool_name": "shell_exec",
+ "tool_input": {"command": "gofmt -w .", "access": "write"},
+ "cwd": "/path/to/project"}
+```
+
+`tool_input` carries the tool's arguments as the model sent them; for
+`shell_exec` that is `command` and the lane, `access`. `session_id` and
+`transcript_path` are empty when the session log is disabled.
+
+**The verdict** — a hook denies in either of two ways:
+
+- print `{"hookSpecificOutput": {"permissionDecision": "deny",
+  "permissionDecisionReason": "why"}}` on stdout and exit 0 — the form
+  Claude Code guard scripts emit; or
+- exit with code 2, the reason on stderr.
+
+Everything else is a pass: exit 0 with no output (or informational
+output) sends the call on to the normal approval ladder. A hook can
+refuse a call but never approve one. A crash, a timeout (`timeout_sec`,
+default 10) or unparseable output proceeds with a warning in the
+session.
+
+A deny is final: neither auto-approve, a `"never"` row, `--allow` nor
+the session allowlist sees the call, the transcript records
+`hook_denied`, and the reason is returned to the model, which corrects
+and retries. A model that insists meets the loop guard: the same call
+three times in a row escalates, or stops an unattended run. Global
+config only: a project-level hook would let a cloned repository run
+arbitrary commands. Hooks have no runtime toggle — a control with a
+toggle is a bypass.
+
 ## Precedence
 
 flags > `LAGENT_*` environment > config file > built-in defaults.

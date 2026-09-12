@@ -153,7 +153,7 @@ func TestCeilingLiftDeclinedIsNotAskedTwiceInATurn(t *testing.T) {
 	gate := &liftGate{answer: false}
 	a.gate = gate
 
-	out, denied, _, err := a.execCallInner(context.Background(), shellLane("touch x", "write"))
+	out, denied, _, _, err := a.execCallInner(context.Background(), shellLane("touch x", "write"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestCeilingLiftDeclinedIsNotAskedTwiceInATurn(t *testing.T) {
 		t.Errorf("the ceiling moved on a declined lift: %+v", a.CeilingState())
 	}
 
-	if _, _, _, err := a.execCallInner(context.Background(), shellLane("touch y", "write")); err != nil {
+	if _, _, _, _, err := a.execCallInner(context.Background(), shellLane("touch y", "write")); err != nil {
 		t.Fatal(err)
 	}
 	if len(gate.asked) != 1 {
@@ -202,7 +202,7 @@ func TestCeilingSuppressedRefusalStillSpeaks(t *testing.T) {
 	a.onNotice = func(msg string) { notices = append(notices, msg) }
 
 	for _, cmd := range []string{"touch x", "touch y", "touch z"} {
-		if _, _, _, err := a.execCallInner(context.Background(), shellLane(cmd, "write")); err != nil {
+		if _, _, _, _, err := a.execCallInner(context.Background(), shellLane(cmd, "write")); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -251,7 +251,7 @@ func TestCeilingLiftApprovedTurnsTheModeOff(t *testing.T) {
 	gate := &liftGate{answer: true}
 	a.gate = gate
 
-	if _, _, _, err := a.execCallInner(context.Background(), writeCall("f.txt")); err != nil {
+	if _, _, _, _, err := a.execCallInner(context.Background(), writeCall("f.txt")); err != nil {
 		t.Fatal(err)
 	}
 	if a.CeilingState().ReadOnly {
@@ -266,7 +266,7 @@ func TestCeilingLiftApprovedTurnsTheModeOff(t *testing.T) {
 
 	// What follows is an ordinary session again: the ceiling is gone, so
 	// the next write asks as itself and not as another lift.
-	if _, _, _, err := a.execCallInner(context.Background(), writeCall("f.txt")); err != nil {
+	if _, _, _, _, err := a.execCallInner(context.Background(), writeCall("f.txt")); err != nil {
 		t.Fatal(err)
 	}
 	if len(gate.asked) != 3 || gate.lifts[2] {
@@ -286,7 +286,7 @@ func TestCeilingLiftDoesNotSpendTheToolsOwnGate(t *testing.T) {
 	a.policy = pol
 	gate := &liftGate{answer: true}
 	a.gate = gate
-	if _, _, _, err := a.execCallInner(context.Background(), writeCall("f.txt")); err != nil {
+	if _, _, _, _, err := a.execCallInner(context.Background(), writeCall("f.txt")); err != nil {
 		t.Fatal(err)
 	}
 	if len(gate.asked) != 2 {
@@ -305,7 +305,7 @@ func TestCeilingLiftDoesNotCarryACallPastAFloor(t *testing.T) {
 	a := ceilingAgent(t, "on")
 	gate := &liftGate{answer: true}
 	a.gate = gate
-	if _, _, _, err := a.execCallInner(context.Background(), shellLane("sudo rm -rf /", "write")); err != nil {
+	if _, _, _, _, err := a.execCallInner(context.Background(), shellLane("sudo rm -rf /", "write")); err != nil {
 		t.Fatal(err)
 	}
 	if len(gate.asked) != 2 {
@@ -373,7 +373,7 @@ func TestCeilingMakesUnboundedCallsTheOperatorsOwn(t *testing.T) {
 			}
 			gate := &ceilingAllowGate{always: map[string]bool{"mcp__vault__patch": true}}
 			a.gate = gate
-			if _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
+			if _, _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
 				t.Fatal(err)
 			}
 			if len(gate.prompts) != 1 {
@@ -392,7 +392,7 @@ func TestCeilingMakesUnboundedCallsTheOperatorsOwn(t *testing.T) {
 	a := ceilingAgent(t, "off", mcp)
 	gate := &ceilingAllowGate{always: map[string]bool{"mcp__vault__patch": true}}
 	a.gate = gate
-	if _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
+	if _, _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
 		t.Fatal(err)
 	}
 	if len(gate.prompts) != 0 {
@@ -414,7 +414,7 @@ func TestCeilingUnboundedCallsAreAskedOnceOnly(t *testing.T) {
 	a := ceilingAgent(t, "on", mcp)
 	gate := &onceGate{answer: true}
 	a.gate = gate
-	if _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
+	if _, _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
 		t.Fatal(err)
 	}
 	if len(gate.once) != 1 || len(gate.asked) != 0 {
@@ -429,7 +429,7 @@ func TestCeilingUnboundedCallsAreAskedOnceOnly(t *testing.T) {
 	a = ceilingAgent(t, "off", mcp)
 	gate = &onceGate{answer: true}
 	a.gate = gate
-	if _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
+	if _, _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
 		t.Fatal(err)
 	}
 	if len(gate.once) != 0 || len(gate.asked) != 1 {
@@ -453,7 +453,7 @@ func TestCeilingUnboundedReasonSurvivesTheLadder(t *testing.T) {
 	// sets a reason of its own on the way to the gate.
 	gate := &onceGate{answer: false}
 	a.gate = gate
-	if _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
+	if _, _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
 		t.Fatal(err)
 	}
 	if len(gate.once) != 1 {
@@ -478,7 +478,7 @@ func TestCeilingUnboundedFallsBackToApprove(t *testing.T) {
 	a := ceilingAgent(t, "on", mcp)
 	gate := &ceilingAllowGate{}
 	a.gate = gate
-	if _, _, _, err := a.execCallInner(context.Background(),
+	if _, _, _, _, err := a.execCallInner(context.Background(),
 		llm.ToolCall{ID: "m", Name: "mcp__vault__patch", Args: map[string]any{}}); err != nil {
 		t.Fatal(err)
 	}
@@ -538,7 +538,7 @@ func TestCeilingRecordsTheOutcomeNotTheProposal(t *testing.T) {
 		a.gate = &liftGate{answer: tc.answer}
 		log := &capturingLog{}
 		a.log = log
-		if _, _, _, err := a.execCallInner(context.Background(), shellLane("touch x", "write")); err != nil {
+		if _, _, _, _, err := a.execCallInner(context.Background(), shellLane("touch x", "write")); err != nil {
 			t.Fatal(err)
 		}
 		var got []string
@@ -602,7 +602,7 @@ func TestCeilingUnboundedUnderAuto(t *testing.T) {
 	a.SetAutoApprove(true)
 	gate := &ceilingAllowGate{always: map[string]bool{"mcp__vault__patch": true}}
 	a.gate = gate
-	if _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
+	if _, _, _, _, err := a.execCallInner(context.Background(), call); err != nil {
 		t.Fatal(err)
 	}
 	if len(gate.prompts) != 1 {

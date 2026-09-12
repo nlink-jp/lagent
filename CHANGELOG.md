@@ -4,6 +4,12 @@
 
 ### Added
 
+- Pre-tool hooks (ADR-0012): `[[hooks.pre_tool_use]]` runs the
+  operator's guard before a model tool call on Claude Code's measured
+  PreToolUse contract (stdin JSON; deny by `permissionDecision` or
+  exit 2). A deny is a floor before the approval ladder and the reason
+  is returned to the model; anything else fails open with a warning.
+  Global config only; `hook_denied` in the transcript.
 - Skills (ADR-0011): Claude Code's `SKILL.md` format read as-is from
   `~/.config/lagent/skills/<name>/` and a trusted project's
   `.claude/skills/<name>/` (pinned; a changed one stays out until

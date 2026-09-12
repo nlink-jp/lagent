@@ -26,6 +26,7 @@ type Config struct {
 	MCP      MCPConfig      `toml:"mcp"`
 	TUI      TUIConfig      `toml:"tui"`
 	Approval ApprovalConfig `toml:"approval"`
+	Hooks    HooksConfig    `toml:"hooks"`
 
 	// Sources records where each setting's effective value came from,
 	// keyed by its TOML path ("llm.model"). Three precedence layers with
@@ -444,6 +445,23 @@ func applyEnv(cfg *Config) {
 	}
 }
 
+// HooksConfig holds the operator's pre-tool hooks (ADR-0012). Global
+// config only: a project-level hook would let a cloned repository
+// execute an arbitrary command on every tool call (ADR-0012 §1).
+type HooksConfig struct {
+	PreToolUse []HookEntry `toml:"pre_tool_use"`
+}
+
+// HookEntry is one configured hook. Matcher is an exact tool name, an
+// "a|b" alternation, or "*", matched against both lagent's and Claude
+// Code's vocabulary. Command runs via sh -c with the Claude Code
+// PreToolUse JSON payload on stdin.
+type HookEntry struct {
+	Matcher    string `toml:"matcher"`
+	Command    string `toml:"command"`
+	TimeoutSec int    `toml:"timeout_sec"` // 0 = default
+}
+
 // trackedKeys are the settings /settings displays with provenance.
 var trackedKeys = []string{
 	"llm.provider", "llm.base_url", "llm.model", "llm.api_key", "llm.reasoning_effort",
@@ -460,6 +478,17 @@ var trackedKeys = []string{
 func (c *Config) validate() error {
 	if err := validateScratchCaches(c.Sandbox.ScratchCaches); err != nil {
 		return err
+	}
+	for i, h := range c.Hooks.PreToolUse {
+		if strings.TrimSpace(h.Matcher) == "" {
+			return fmt.Errorf("hooks.pre_tool_use[%d]: matcher is required (a tool name, \"a|b\", or \"*\")", i)
+		}
+		if strings.TrimSpace(h.Command) == "" {
+			return fmt.Errorf("hooks.pre_tool_use[%d]: command is required", i)
+		}
+		if h.TimeoutSec < 0 {
+			return fmt.Errorf("hooks.pre_tool_use[%d]: timeout_sec must be >= 0", i)
+		}
 	}
 	var missing []string
 	if c.LLM.Model == "" {

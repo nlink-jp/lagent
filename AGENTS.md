@@ -42,7 +42,8 @@ main.go            entry point (package main, calls cmd.Execute(version))
 cmd/               cobra root command, REPL loop, wiring, system prompt; `version`,
                    `sessions`, `trust`, `workdirs` subcommands; ask_user, MCP intake,
                    the MCP advertiser and mcp_load (cmd/mcpload.go, ADR-0004); skill
-                   discovery, load_skill, /skill and /skills (cmd/skills.go, ADR-0011)
+                   discovery, load_skill, /skill and /skills (cmd/skills.go, ADR-0011);
+                   hook config → runner (cmd/hooks.go, ADR-0012)
 internal/config/   strict-decode TOML + env/flag precedence ([llm], [model], [sandbox],
                    [agent], [mcp], [tui], [approval]); the policy file
 internal/llm/      Backend interface + the OpenAI-compatible client (stdlib net/http,
@@ -76,6 +77,8 @@ internal/mention/  @-reference parsing (files, directories, images), project-con
                    resolution, completion
 internal/instructions/ AGENTS.md / AGENT.md / CLAUDE.md / GEMINI.md discovery
                    (ancestor walk, stops at $HOME)
+internal/hooks/    operator pre-tool hooks on Claude Code's measured contract (ADR-0012):
+                   PreToolUse payload on stdin, deny by JSON or exit 2, fail-open otherwise
 internal/skills/   Claude Code SKILL.md discovery (global ~/.config/lagent/skills +
                    project .claude/skills), confined Body/File reads, the catalog lines
 internal/trustpin/ content pins for the agent-facing files and the persistent-file
@@ -170,6 +173,14 @@ answers.
   is the one tool whose results are sent unwrapped;
   `internal/archtest` pins `InstructionTools` to that one name, and a
   second exemption needs its own ADR.
+- **Pre-tool hooks are a floor, and their contract is measured, not
+  documented** (ADR-0012) — `internal/hooks` denies on Claude Code's real
+  stdout-JSON and exit-2 forms and fails open on everything else, with
+  a notice. The hook runs in `execCallInner` after the advertise check
+  and before `decide`; `hookDenied` is provenance the wrap layer and
+  the attach branches read, never inferred from the result text. Never
+  add an "allow" bypass: hooks tighten, the ladder decides. No settings
+  row, no runtime toggle. One event; more take an ADR each.
 - **There is no model tier, by decision** (ADR-0010).
   `agent.AutoDecision.ModelConsulted` is always false and stays for
   record-shape parity; the round checkpoint asks the operator or stops.
