@@ -231,3 +231,10 @@ answers.
   not resolve, a backticked identifier (tool name, flag, config key)
   present in one language only, an en/ja mermaid pair whose shape
   differs, or this file losing one of its sections.
+- **The footer's `ctx`/`cache` gauge is a mirror.** It follows each
+  round's `Usage` message and is reset on the `/clear` command word in
+  `internal/tui/model.go` — the shared slash handler empties the
+  conversation but cannot see the model (the same shape as the `/auto`
+  marker). A new slash command that empties the conversation must reset
+  it the same way; a third such case is the signal to make the handler
+  declare its effect instead of matching command words.
