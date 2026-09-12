@@ -5,7 +5,7 @@
 // tokens, wall time.
 //
 //	go run ./bench run --bin dist/lagent --configs baseline [--reps 3]
-//	go run ./bench report bench/results/<dir>
+//	go run ./bench report bench/_results/<dir>
 //
 // Nothing here ships in the lagent binary. Runs cost real minutes on
 // the local model server, so the bench is run by hand, never by
@@ -163,7 +163,7 @@ func cmdRun(args []string, out io.Writer) error {
 	taskSel := fs.String("tasks", "", "task names, comma-separated (default: all under bench/tasks)")
 	reps := fs.Int("reps", 3, "repetitions per task and configuration")
 	timeout := fs.Duration("timeout", 10*time.Minute, "deadline per run")
-	outDir := fs.String("out", "", "results directory (default bench/results/<timestamp>)")
+	outDir := fs.String("out", "", "results directory (default bench/_results/<timestamp>)")
 	mcpBin := fs.String("mcp-bin", "", "the bench MCP fixture server (default dist/bench-mcp)")
 	benchDir := fs.String("bench-dir", "bench", "the bench directory (tasks/, configs/)")
 	if err := fs.Parse(args); err != nil {
@@ -196,7 +196,7 @@ func cmdRun(args []string, out io.Writer) error {
 		}
 	}
 	if *outDir == "" {
-		*outDir = filepath.Join(*benchDir, "results", time.Now().Format("20060102-150405"))
+		*outDir = filepath.Join(*benchDir, "_results", time.Now().Format("20060102-150405"))
 	}
 	absBin, err := filepath.Abs(*bin)
 	if err != nil {

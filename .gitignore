@@ -24,5 +24,7 @@ dist/
 *.swo
 *~
 
-# Bench results (ADR-0006): runs, transcripts, isolated homes
-bench/results/
+# Bench results (ADR-0006): runs, transcripts, isolated homes. The
+# leading underscore keeps the copied fixture projects out of `./...`
+# — a run that broke a fixture's Go code must not break `go build`.
+bench/_results/
