@@ -77,8 +77,13 @@ lagent
   `--resume`。usage レコードは
   [gem-usage-lens](https://github.com/nlink-jp/gem-usage-lens) が両ランタイム
   に対して読む形。
+- **スキル:** Claude Code の `SKILL.md` 形式をそのまま、
+  `~/.config/lagent/skills/<name>/` と信頼済みプロジェクトの
+  `.claude/skills/<name>/` から読む。スキルごと 1 行が何のためのものかを
+  モデルに伝え、モデルは `load_skill` で読み込み、操作者は `/skill <name>`
+  で手で呼ぶ（ADR-0011）。
 - **無いもの:** web 検索と取得、メディアアップロード、監査ログ出力、
-  履歴圧縮、skills、agent memory、hooks — RFP と
+  履歴圧縮、agent memory、hooks — RFP と
   [ADR-0002](docs/ja/adr/0002-features-not-reproduced.ja.md) を参照。
 
 ## 添付

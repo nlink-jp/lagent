@@ -35,6 +35,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/repl"
 	"github.com/nlink-jp/lagent/internal/sandbox"
 	"github.com/nlink-jp/lagent/internal/session"
+	"github.com/nlink-jp/lagent/internal/skills"
 	"github.com/nlink-jp/lagent/internal/tools"
 	"github.com/nlink-jp/lagent/internal/tui"
 	"github.com/nlink-jp/lagent/internal/uitext"
@@ -510,6 +511,19 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	for _, n := range contextNotes {
 		fmt.Fprintf(stderr, "warning: instruction file %s\n", n)
 	}
+	// --- skills (ADR-0011): Claude Code's format from lagent's own
+	// global directory and the trusted project's .claude/skills ---
+	skillsList, skillNotes := discoverSkills(projectDir, grant)
+	defer skills.CloseAll(skillsList)
+	for _, n := range skillNotes {
+		fmt.Fprintf(stderr, "warning: skills: %s\n", n)
+	}
+	// load_skill is registered whether or not any skill was found, so
+	// the tool set — and the cached prefix — does not depend on what the
+	// operator has installed.
+	if err := registerSkillTool(registry, func() []skills.Skill { return skillsList }); err != nil {
+		return err
+	}
 
 	// --- MCP servers from the project's .mcp.json (drop-in) ---
 	mcpClients, mcpSummary, mcpInv := connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, stderr, grant, mcpFilter)
@@ -761,8 +775,11 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		RoundReview:  true,
 		OnRoundLimit: onRoundLimit,
 		Unattended:   oneShot,
-		AutoApprove:  autoOn,
-		Ceiling:      ceiling,
+		// A skill body is the operator's own instruction file (ADR-0011
+		// §3): sent unwrapped, and the only tool that is.
+		InstructionTools: []string{skills.ToolName},
+		AutoApprove:      autoOn,
+		Ceiling:          ceiling,
 		OnAutoDecision: func(tc llm.ToolCall, d agent.AutoDecision) {
 			if !d.Approved {
 				return // the escalation shows up in the approval prompt
@@ -785,7 +802,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// The per-session facts open the conversation (after SetHistory: the
 	// isolation tag is fresh, and the restored history's own opening
 	// message named the old one). The MCP catalog rides with them.
-	ag.AnnounceSession(sessionFacts(workDir, mcpInv.catalogLines(adv)))
+	ag.AnnounceSession(sessionFacts(workDir, append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...)))
 
 	// Exit summary (operator request): every interactive exit route —
 	// /quit, Ctrl+C, Ctrl+D — ends with the resume hint and the cost
@@ -869,7 +886,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// The catalog changed with the server set: the model is told
 		// through a fresh facts message (ADR-0003's lane), never through
 		// the system prompt.
-		ag.AnnounceSession(sessionFacts(workDir, mcpInv.catalogLines(adv)))
+		ag.AnnounceSession(sessionFacts(workDir, append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...)))
 		return out
 	}
 	loadMCP := func(server string) (string, bool) {
@@ -1055,7 +1072,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 		// Told last, once everything it names is in place: the work
 		// directory and the catalog ride one fresh facts message.
-		ag.AnnounceSession(sessionFacts(workDir, mcpInv.catalogLines(adv)))
+		ag.AnnounceSession(sessionFacts(workDir, append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...)))
 		return render()
 	}
 
@@ -1186,10 +1203,13 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			CompletePath: func(prefix string) []string {
 				return mention.Complete(projectDir, prefix, 24)
 			},
-			CompleteSlash:   slashCompletions(),
+			CompleteSlash:   slashCompletions(func() []skills.Skill { return skillsList }),
 			Settings:        &settingsData,
 			ApplySetting:    settings.Apply,
 			RefreshSettings: settings.data,
+			ExpandInput: func(in string) (string, bool, string) {
+				return expandSkillInput(in, skillsList)
+			},
 			Shell: func(shellCtx context.Context, command string) {
 				go func() {
 					out := runDirectShell(shellCtx, registry, ag, command)
@@ -1210,7 +1230,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 				}()
 			},
 			Slash: func(in string) (string, bool, bool) {
-				return slashOutput(in, ag, registry, mcpStatus(),
+				return slashOutput(in, ag, registry, mcpStatus(), skillsList,
 					slashReloads{mcp: reloadMCP, load: loadMCP},
 					func() string { return usageReport(ag, cfg.LLM.Model) },
 					appVersion, msgs, onClear)
@@ -1275,8 +1295,23 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			writeSettingsTable(stderr, settings.data())
 			continue
 		}
+		if turn, handled, errMsg := expandSkillInput(input, skillsList); handled {
+			if errMsg != "" {
+				fmt.Fprintln(stderr, errMsg)
+				continue
+			}
+			runErr := runTurnWith(ctx, ladder, func(turnCtx context.Context) error {
+				_, err := ag.Run(turnCtx, turn, func(s string) { fmt.Fprint(cmd.OutOrStdout(), s) })
+				return err
+			})
+			fmt.Fprintln(cmd.OutOrStdout())
+			if runErr != nil && !errors.Is(runErr, errInterrupted) {
+				fmt.Fprintf(stderr, "error: %v\n", runErr)
+			}
+			continue
+		}
 		if strings.HasPrefix(input, "/") {
-			out, _, quit := slashOutput(input, ag, registry, mcpStatus(),
+			out, _, quit := slashOutput(input, ag, registry, mcpStatus(), skillsList,
 				slashReloads{mcp: reloadMCP, load: loadMCP},
 				func() string { return usageReport(ag, cfg.LLM.Model) },
 				appVersion, msgs, onClear)
@@ -1827,13 +1862,22 @@ func runDirectShell(ctx context.Context, registry *tools.Registry, ag *agent.Age
 }
 
 // slashCompletions completes the slash commands this runtime has.
-func slashCompletions() func(string) []string {
+func slashCompletions(getSkills func() []skills.Skill) func(string) []string {
 	commands := []string{
 		"/auto", "/clear", "/exit", "/help", "/mcp",
-		"/quit", "/readonly", "/settings",
+		"/quit", "/readonly", "/settings", "/skill", "/skills",
 		"/tools", "/usage", "/version",
 	}
 	return func(prefix string) []string {
+		if rest, ok := strings.CutPrefix(prefix, "/skill "); ok {
+			var out []string
+			for _, s := range getSkills() {
+				if strings.HasPrefix(s.Name, rest) {
+					out = append(out, "/skill "+s.Name)
+				}
+			}
+			return out
+		}
 		var out []string
 		for _, c := range commands {
 			if strings.HasPrefix(c, prefix) {
@@ -1900,7 +1944,7 @@ type slashReloads struct {
 	load func(server string) (string, bool)
 }
 
-func slashOutput(input string, ag *agent.Agent, registry *tools.Registry, mcpSummary []string, reload slashReloads, usage func() string, version string, msgs *uitext.Messages, onClear func() string) (output string, isErr bool, quit bool) {
+func slashOutput(input string, ag *agent.Agent, registry *tools.Registry, mcpSummary []string, skillsList []skills.Skill, reload slashReloads, usage func() string, version string, msgs *uitext.Messages, onClear func() string) (output string, isErr bool, quit bool) {
 	var b strings.Builder
 	fields := strings.Fields(input)
 	// The supported subcommand shapes: "/mcp reload" and "/mcp load
@@ -1934,6 +1978,8 @@ func slashOutput(input string, ag *agent.Agent, registry *tools.Registry, mcpSum
 		// The text lives in uitext (gem-agent ADR-0029) — both languages in full,
 		// pinned to the command set by TestHelpListsEveryCommand.
 		b.WriteString(msgs.Help)
+	case "/skills":
+		b.WriteString(skillsListing(skillsList))
 	case "/tools":
 		// The LIVE policy: a /settings edit or a 'p' answer mid-session
 		// must show here, or the display the operator audits gating with

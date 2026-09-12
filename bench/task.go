@@ -24,6 +24,12 @@ type task struct {
 	// fixture's own .go files are never built, vetted or linted as
 	// part of the module.
 	Fixture string `toml:"-"`
+	// SkillsDir is <Dir>/skills when it exists: skill directories the
+	// runner installs into the run's global skills location
+	// (~/.config/lagent/skills under the isolated HOME), so a task can
+	// measure whether the model loads and follows a skill (ADR-0011).
+	// Global, not project scope: the bench's project is untrusted.
+	SkillsDir string `toml:"-"`
 }
 
 type expect struct {
@@ -104,6 +110,9 @@ func loadTask(dir string) (*task, error) {
 	}
 	if st, err := os.Stat(t.Fixture); err != nil || !st.IsDir() {
 		return nil, fmt.Errorf("task %s: fixture directory testdata/ missing", t.Name)
+	}
+	if st, err := os.Stat(filepath.Join(dir, "skills")); err == nil && st.IsDir() {
+		t.SkillsDir = filepath.Join(dir, "skills")
 	}
 	return t, nil
 }

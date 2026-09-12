@@ -8,7 +8,7 @@ updated in place as tasks and columns change.
 ```bash
 make build bench-build                       # dist/lagent, dist/bench-mcp
 go run ./bench run --bin dist/lagent --configs baseline --reps 3
-go run ./bench report bench/results/<timestamp>
+go run ./bench report bench/_results/<timestamp>
 ```
 
 The local model server must be up at the `base_url` the configuration
@@ -24,7 +24,7 @@ is about two minutes on the reference machine).
 | `--tasks` | task names to run (default: every directory under `bench/tasks`) |
 | `--reps` | repetitions per task and configuration (default 3) |
 | `--timeout` | deadline per run (default 10m); a run past it is recorded as timed out and the bench moves on |
-| `--out` | results directory (default `bench/results/<timestamp>`, ignored by git) |
+| `--out` | results directory (default `bench/_results/<timestamp>`, ignored by git) |
 | `--mcp-bin` | the fixture MCP server for the `mcp-lookup` task (default `dist/bench-mcp`) |
 
 Order: cases outside, configurations inside — for each task and
@@ -54,9 +54,12 @@ preload the server and hide whether the model loads it).
 | `shell-count` | a shell command for a number | the answer contains `57`; at least one tool call |
 | `mcp-lookup` | MCP lookup | the answer contains `Iceland`; at least two tool calls (`mcp_load`, then the lookup) |
 | `view-image` | an image to look at | the answer contains `red`; at least one tool call |
+| `skill-follow` | a skill to load and follow | the answer is the skill's fixed-format line `BRIEF: 57 rows, 3 columns, first id 1, last id 57`; at least two tool calls (`load_skill`, then the count) |
 
 A task is `bench/tasks/<name>/task.toml` (prompt, expectations, `mcp =
-true` when it needs the fixture server) plus `testdata/`. Expectations
+true` when it needs the fixture server) plus `testdata/`, and a
+`skills/` directory when the task needs skills installed — the runner
+copies it into the run's isolated global skill directory. Expectations
 are `min_tool_calls`, `[[expect.file]]` (`path` with `contains` /
 `not_contains`) and `[[expect.answer]]` (`regex`). A task the model
 could answer without the files does not belong here.

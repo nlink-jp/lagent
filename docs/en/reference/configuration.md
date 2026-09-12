@@ -93,6 +93,8 @@ In a session:
 | `/help` | list these commands |
 | `/tools` | list the tools and each one's current approval gate |
 | `/mcp`, `/mcp load <server>`, `/mcp reload` | list the servers with their loaded state; advertise one server's tools by hand; reconnect |
+| `/skills` | list the loaded skills and where the two skill directories are |
+| `/skill <name> [args]` | send a skill's instructions as this turn, with `args` appended (ADR-0011) |
 | `/auto on|off` | switch auto-approve for the session (shift+tab does the same) |
 | `/readonly on|off` | switch the lane ceiling for the session |
 | `/settings` | view and edit settings, with provenance |

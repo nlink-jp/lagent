@@ -173,7 +173,8 @@ Phase 2 で計測してから採否を決める。
 
 - 履歴圧縮（KV キャッシュ破棄コストを計測してから設計）
 - 自動承認のモデル層 — 計測のうえ採らず（ADR-0010）
-- skills、agent memory、hooks
+- skills — 採用、Claude Code の形式のまま lagent 自身のディレクトリから（ADR-0011）
+- agent memory、hooks
 - ローカル向けプロンプト改訂
 - Gemma 4 の thinking トグル
 

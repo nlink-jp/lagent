@@ -33,7 +33,8 @@ tools パッケージはプロジェクトディレクトリだけを要する 9
 `internal/banner`（操作者が何か打つ前に出る行と、どの行を出すかの規則）、
 `internal/mention`（`@` 参照: ファイル、ディレクトリ、画像 — および `@`
 無しでドロップされた画像パス、ADR-0005）、
-`internal/instructions`（`AGENTS.md` の発見）、`internal/ignore`（ignore
+`internal/instructions`（`AGENTS.md` の発見）、`internal/skills`（Claude
+Code 形式のスキルの発見と閉じ込めた読み込み、ADR-0011）、`internal/ignore`（ignore
 対応の列挙: 組込ディレクトリ一覧 + gitignore マッチャ）、
 `internal/session`（transcript: ロガー + 再開ローダ、usage レコード）、
 `internal/statedir`（プロジェクトごとの状態配置）、`internal/workdir`
@@ -166,7 +167,19 @@ MCP の除外だけを持ち、他は何も持たない。
 
 `web_search`、`web_fetch`、メディアアップロード、Cloud Logging、thought
 signature、safety 設定、要約モデル、委任ファイル探索は Vertex AI に
-縛られた gem-agent の機能（ADR-0002）。履歴圧縮、自動承認のモデル層、
-skills、agent memory、操作者 hooks は Phase 2（RFP §4）: trust プローブは
-変更検知のために `.claude/skills` を今もピン留めするが、このランタイムは
-スキルを読み込まない。
+縛られた gem-agent の機能（ADR-0002）。履歴圧縮、agent memory、操作者
+hooks は Phase 2（RFP §4）。モデル層は計測のうえ採らず（ADR-0010）、
+skills は入った（ADR-0011）。
+
+## スキル
+
+スキルは Claude Code の `SKILL.md` ディレクトリで、そのまま読む
+（ADR-0011）。global スキルは `~/.config/lagent/skills/<name>/` へ複製する
+— レーンが拒む `~/.claude` からリンクはしない。プロジェクトスキルは
+信頼済みプロジェクトの `.claude/skills/<name>/` で、指示ファイルと同じく
+内容でピン留めされ、変わったものは再信頼まで外れる。スキルごと 1 行の
+一覧が MCP 一覧と並んで runtime-facts メッセージに乗るので、システム
+プロンプトはバイト同一のまま（ADR-0003）。`load_skill` は結果が包まれずに
+プロンプトへ入る唯一のツール: 中身は操作者自身の指示で、ツールは発見済み
+スキルのディレクトリ外を読めない。`/skill <name>` はスキル本文を手で
+ターンとして送り、`/skills` は読み込み済みのものを列挙する。

@@ -382,6 +382,8 @@ var en = Messages{
   /auto      auto-approve: on|off, or bare to toggle (shift+tab too)
   /readonly  read-only: on|off · bare shows the state
   /settings  view and edit settings, with provenance
+  /skills    list installed skills
+  /skill <name> [args]   invoke a skill directly
   /usage     token statement for this session
   /version   version and platform
   /clear     reset the conversation
@@ -431,7 +433,7 @@ keys:
 	TrustHeaderFmt:           "\nnew project: %s\nthis project provides:\n",
 	TrustItemInstructionsFmt: "%s (loaded as your instructions)",
 	TrustItemMCPFmt:          ".mcp.json (%d server(s) — will be started)",
-	TrustItemSkillsFmt:       ".claude/skills/ (%d skill(s) — pinned for change detection; this runtime does not load skills)",
+	TrustItemSkillsFmt:       ".claude/skills/ (%d skill(s) — loaded as your instructions)",
 	TrustQuestion:            "trust this project? These files will be treated as YOUR instructions and its MCP servers will run. [y/N]: ",
 	PinRecordedFmt:           "project trust: %d file(s) recorded as trusted: %s",
 	PinNonePending:           "project trust: no trusted files recorded yet — start interactively once, or run `lagent trust --accept`",
@@ -531,6 +533,8 @@ var ja = Messages{
   /auto      auto-approve: on|off、引数なしで切替（shift+tab でも可）
   /readonly  読み取り専用: on|off・引数なしで状態を表示
   /settings  設定の表示と編集（出所つき）
+  /skills    インストール済みスキル一覧
+  /skill <name> [args]   スキルを直接起動
   /usage     このセッションのトークン明細
   /version   バージョンとプラットフォーム
   /clear     会話履歴をリセット
@@ -580,7 +584,7 @@ var ja = Messages{
 	TrustHeaderFmt:           "\n新しいプロジェクト: %s\nこのプロジェクトの提供物:\n",
 	TrustItemInstructionsFmt: "%s（あなたへの指示として読み込まれます）",
 	TrustItemMCPFmt:          ".mcp.json（サーバー %d 件 — 起動されます）",
-	TrustItemSkillsFmt:       ".claude/skills/（スキル %d 件 — 変更検知のために固定; このランタイムはスキルを読み込みません）",
+	TrustItemSkillsFmt:       ".claude/skills/（スキル %d 件 — あなたへの指示として読み込まれます）",
 	TrustQuestion:            "このプロジェクトを信用しますか？ これらのファイルはあなたへの指示として扱われ、MCP サーバーが起動します。 [y/N]: ",
 	PinRecordedFmt:           "project trust: %d 件を信用済みとして記録: %s",
 	PinNonePending:           "project trust: 信用済みファイルは未記録です — 一度対話起動するか `lagent trust --accept` を実行",

@@ -153,12 +153,14 @@ type Agent struct {
 	roundReview  bool
 	onRoundLimit func(ctx context.Context, info RoundLimitInfo) bool
 	unattended   bool
-	noMentions   bool
-	onToolDone   func(tc llm.ToolCall)
-	turnCalls    []string
-	loopPrevSig  string
-	loopStreak   int
-	loopOK       map[string]bool
+	// instructionTools: results sent unwrapped (Options.InstructionTools).
+	instructionTools map[string]bool
+	noMentions       bool
+	onToolDone       func(tc llm.ToolCall)
+	turnCalls        []string
+	loopPrevSig      string
+	loopStreak       int
+	loopOK           map[string]bool
 	// mcpFaults is the per-turn ledger of remote tools answering with
 	// one identical error text (gem-agent ADR-0075 §2), keyed by registry tool
 	// name; it starts fresh with the loop guard's state.
@@ -267,6 +269,12 @@ type Options struct {
 	ClipboardImage func() ([]byte, error)
 	// Msgs is the resolved UI catalog. Nil means English.
 	Msgs *uitext.Messages
+	// InstructionTools names tools whose results are instruction-grade
+	// rather than untrusted data, exempting them from the nonce wrap
+	// (ADR-0011: load_skill, whose reads are confined to operator-
+	// installed skill directories). Widen this list only with an ADR —
+	// it is a hole in the isolation unless the tool's reads are bounded.
+	InstructionTools []string
 	// RoundReview enables the intervention ladder: a loop detector,
 	// a checkpoint at the round limit, extensions up to an absolute
 	// cap. Off, the limit is a plain hard stop.
@@ -331,9 +339,16 @@ func New(opts Options) *Agent {
 		roundReview:  opts.RoundReview,
 		onRoundLimit: opts.OnRoundLimit,
 		unattended:   opts.Unattended,
-		noMentions:   opts.NoMentions,
-		onToolDone:   opts.OnToolDone,
-		tag:          guard.NewTagWithPrefix("tool_output"),
+		instructionTools: func() map[string]bool {
+			m := map[string]bool{}
+			for _, name := range opts.InstructionTools {
+				m[name] = true
+			}
+			return m
+		}(),
+		noMentions: opts.NoMentions,
+		onToolDone: opts.OnToolDone,
+		tag:        guard.NewTagWithPrefix("tool_output"),
 	}
 }
 
@@ -710,7 +725,7 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 		// caching can hit. Reuse is sound because guard.Wrap refuses
 		// content containing the tag name — a leaked tag cannot escape
 		// the wrapper, only get its carrier withheld.
-		msgs := wrapToolMessages(a.history, a.tag)
+		msgs := wrapToolMessages(a.history, a.tag, a.instructionTools)
 		if emptyAsked > 0 {
 			// A re-send after an empty completion carries a transient
 			// nudge (ADR-0007, second amendment): at the point the fault
@@ -752,7 +767,7 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 				"round": round, "finish_reason": resp.FinishReason,
 				"thought_tokens": resp.ThoughtTokens,
 				"output_tokens":  resp.OutputTokens, "prompt_tokens": resp.PromptTokens,
-				"retried":        retry,
+				"retried": retry,
 			})
 			if retry {
 				emptyAsked++
@@ -930,11 +945,14 @@ func (a *Agent) appendMessage(m llm.Message) {
 // the system prompt forbids following data would leave every skill
 // half-inert. The exemption is safe only because that tool's reads are
 // confined to discovered skill directories.
-func wrapToolMessages(history []llm.Message, tag guard.Tag) []llm.Message {
+func wrapToolMessages(history []llm.Message, tag guard.Tag, instructionTools map[string]bool) []llm.Message {
 	out := make([]llm.Message, len(history))
 	copy(out, history)
 	for i := range out {
 		if out[i].Role == llm.RoleTool {
+			if instructionTools[out[i].ToolName] {
+				continue
+			}
 			// Gate denials are the other trusted tool result (gem-agent ADR-0060
 			// §3): their content is authored by lagent and the
 			// operator, and wrapping the operator's typed guidance as

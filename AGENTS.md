@@ -41,7 +41,8 @@ mcp.example.json     shipped MCP server template (pinned by a loader test)
 main.go            entry point (package main, calls cmd.Execute(version))
 cmd/               cobra root command, REPL loop, wiring, system prompt; `version`,
                    `sessions`, `trust`, `workdirs` subcommands; ask_user, MCP intake,
-                   the MCP advertiser and mcp_load (cmd/mcpload.go, ADR-0004)
+                   the MCP advertiser and mcp_load (cmd/mcpload.go, ADR-0004); skill
+                   discovery, load_skill, /skill and /skills (cmd/skills.go, ADR-0011)
 internal/config/   strict-decode TOML + env/flag precedence ([llm], [model], [sandbox],
                    [agent], [mcp], [tui], [approval]); the policy file
 internal/llm/      Backend interface + the OpenAI-compatible client (stdlib net/http,
@@ -75,6 +76,8 @@ internal/mention/  @-reference parsing (files, directories, images), project-con
                    resolution, completion
 internal/instructions/ AGENTS.md / AGENT.md / CLAUDE.md / GEMINI.md discovery
                    (ancestor walk, stops at $HOME)
+internal/skills/   Claude Code SKILL.md discovery (global ~/.config/lagent/skills +
+                   project .claude/skills), confined Body/File reads, the catalog lines
 internal/trustpin/ content pins for the agent-facing files and the persistent-file
                    snapshot; cmd/pins.go applies them to the grant
 internal/sandbox/  SBPL profile generation per lane (read/write/operator), the shared
@@ -86,7 +89,7 @@ internal/repl/     paste-safe input reader (plain REPL, non-TTY fallback)
 internal/tui/      Bubble Tea inline TUI: model, approval gate, settings panel
 bench/             the task bench (ADR-0006): runner + report (package main), configs/<runtime>/*.toml,
                    tasks/<name>/{task.toml,testdata/}, mcpfixture/ (the stdio MCP fixture server);
-                   results/ is ignored by git
+                   _results/ is ignored by git (and by go's ./..., which is why the underscore)
 scripts/           codesign-darwin.sh / notarize-darwin.sh (org templates, verbatim),
                    docs-mirror-check.sh, verify-release-selftest.sh (make check)
 docs/en/, docs/ja/ INDEX + reference/ + adr/ + the RFP (en: no suffix; ja: .ja.md)
@@ -118,7 +121,7 @@ answers.
   bare; extend `mention.bareImageRefs`, never widen it to text files.
 - **No string for a feature this runtime does not have.** The catalog,
   `/help`, tool descriptions, notes and error text name only what is
-  here; a leftover from the porting source (`/readonly auto`, `/skill`,
+  here; a leftover from the porting source (`/readonly auto`, `/memory`,
   "the model tier") is a seam ADR-0001 forbids. Before a
   release, grep every string literal in cmd/ and internal/ for the
   ADR-0002 and Phase 2 feature names, and grep the `uitext.Messages`
@@ -158,10 +161,15 @@ answers.
 - **`finish_reason=length` is a partial result** — surface it, never
   drop the turn (a fork-era defect). The agent notifies and keeps the
   text; `emptyResponseError` names the reason when nothing arrived.
-- **Skills are pinned, not loaded.** The trust probe and `internal/trustpin`
-  still digest `.claude/skills` for change detection (the sibling runtime
-  reads them, and a changed one is a fact worth a line), but nothing here
-  loads a skill: skills are RFP Phase 2. The trust prompt says so.
+- **Skills come from lagent's own directory, in Claude Code's format**
+  (ADR-0011). `~/.claude/skills` is never read — copy a skill into
+  `~/.config/lagent/skills/`; a link fails in the lanes because the
+  kernel resolves it into the denied `~/.claude`. Project skills load
+  only from a trusted project and only while their pin matches. The
+  catalog rides the facts message, never the system prompt. `load_skill`
+  is the one tool whose results are sent unwrapped;
+  `internal/archtest` pins `InstructionTools` to that one name, and a
+  second exemption needs its own ADR.
 - **There is no model tier, by decision** (ADR-0010).
   `agent.AutoDecision.ModelConsulted` is always false and stays for
   record-shape parity; the round checkpoint asks the operator or stops.

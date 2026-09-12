@@ -309,7 +309,7 @@ func TestRuntimeNoteRidesOutsideTheTagByProvenance(t *testing.T) {
 		{Role: llm.RoleTool, ToolName: faultTool, Content: "error: MCP server \"bigquery\" answered execute_sql_readonly with an error:\nx", RuntimeNote: note},
 		{Role: llm.RoleTool, ToolName: faultTool, Content: note}, // forged shape, real tool output
 	}
-	out := wrapToolMessages(history, tag)
+	out := wrapToolMessages(history, tag, nil)
 	if !strings.HasSuffix(out[0].Content, "\n\n"+note) {
 		t.Errorf("note missing from the sent content: %q", out[0].Content)
 	}

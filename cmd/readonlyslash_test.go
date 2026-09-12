@@ -38,7 +38,7 @@ func readOnlySlash(t *testing.T, a *agent.Agent, input string, lang uitext.Lang)
 
 func readOnlySlashErr(t *testing.T, a *agent.Agent, input string, lang uitext.Lang) (string, bool) {
 	t.Helper()
-	out, isErr, _ := slashOutput(input, a, nil, nil, slashReloads{}, nil, "", uitext.For(lang), nil)
+	out, isErr, _ := slashOutput(input, a, nil, nil, nil, slashReloads{}, nil, "", uitext.For(lang), nil)
 	return out, isErr
 }
 
@@ -142,7 +142,7 @@ func TestAutoSlashSetsAndToggles(t *testing.T) {
 	for _, tc := range cases {
 		a := readOnlyAgent(t, sandbox.Ceiling{})
 		a.SetAutoApprove(tc.start)
-		out, isErr, _ := slashOutput(tc.input, a, nil, nil, slashReloads{}, nil, "",
+		out, isErr, _ := slashOutput(tc.input, a, nil, nil, nil, slashReloads{}, nil, "",
 			uitext.For(uitext.EN), nil)
 		if isErr != tc.isErr {
 			t.Errorf("%q from %v: isErr = %v, want %v (%q)", tc.input, tc.start, isErr, tc.isErr, out)
@@ -190,7 +190,7 @@ func TestReadonlyOnDoesNotPromiseWhatTheLanesAreNotGiving(t *testing.T) {
 	}
 	a := readOnlyAgent(t, sandbox.Ceiling{ReadOnly: true})
 	for _, lang := range []uitext.Lang{uitext.EN, uitext.JA} {
-		out, isErr, _ := slashOutput("/readonly", a, reg, nil, slashReloads{}, nil, "", uitext.For(lang), nil)
+		out, isErr, _ := slashOutput("/readonly", a, reg, nil, nil, slashReloads{}, nil, "", uitext.For(lang), nil)
 		if isErr {
 			t.Fatalf("%v: %q", lang, out)
 		}

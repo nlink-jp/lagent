@@ -13,11 +13,11 @@ func TestSlashReloadSubcommands(t *testing.T) {
 	reloads := slashReloads{
 		mcp: func() string { return "MCP-RELOADED" },
 	}
-	out, isErr, _ := slashOutput("/mcp reload", nil, nil, nil, reloads, nil, "", en, nil)
+	out, isErr, _ := slashOutput("/mcp reload", nil, nil, nil, nil, reloads, nil, "", en, nil)
 	if isErr || out != "MCP-RELOADED" {
 		t.Errorf("/mcp reload: %q isErr=%v", out, isErr)
 	}
-	if _, isErr, _ = slashOutput("/mcp restart", nil, nil, nil, reloads, nil, "", en, nil); !isErr {
+	if _, isErr, _ = slashOutput("/mcp restart", nil, nil, nil, nil, reloads, nil, "", en, nil); !isErr {
 		t.Error("unknown subcommand accepted")
 	}
 	// Reload unavailable (nil closure) reads as unknown, not a panic.

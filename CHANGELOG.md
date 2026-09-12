@@ -4,6 +4,14 @@
 
 ### Added
 
+- Skills (ADR-0011): Claude Code's `SKILL.md` format read as-is from
+  `~/.config/lagent/skills/<name>/` and a trusted project's
+  `.claude/skills/<name>/` (pinned; a changed one stays out until
+  re-trusted). One catalog line per skill rides the runtime-facts
+  message; `load_skill` returns a skill's body or supporting file,
+  confined to its directory and sent unwrapped as the operator's own
+  instructions; `/skill <name> [args]` sends a skill by hand and
+  `/skills` lists them. The bench gains `skill-follow`.
 - `[llm].reasoning_effort` (and `LAGENT_REASONING_EFFORT`) rides every
   request verbatim when set; the OpenAI vocabulary, which LM Studio
   maps to the model's thinking on/off. Measured on the bench

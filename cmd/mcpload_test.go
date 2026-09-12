@@ -198,11 +198,11 @@ func TestMCPLoadToolRefreshesTheDeclarations(t *testing.T) {
 func TestSlashMCPLoad(t *testing.T) {
 	loaded := ""
 	reloads := slashReloads{load: func(s string) (string, bool) { loaded = s; return "ok\n", false }}
-	out, isErr, _ := slashOutput("/mcp load tor-exit", nil, nil, nil, reloads, nil, "", uitext.For(uitext.EN), nil)
+	out, isErr, _ := slashOutput("/mcp load tor-exit", nil, nil, nil, nil, reloads, nil, "", uitext.For(uitext.EN), nil)
 	if isErr || loaded != "tor-exit" || out != "ok\n" {
 		t.Errorf("out=%q isErr=%v loaded=%q", out, isErr, loaded)
 	}
-	if _, isErr, _ := slashOutput("/mcp load", nil, nil, nil, reloads, nil, "", uitext.For(uitext.EN), nil); !isErr {
+	if _, isErr, _ := slashOutput("/mcp load", nil, nil, nil, nil, reloads, nil, "", uitext.For(uitext.EN), nil); !isErr {
 		t.Error("/mcp load without a name was not an error")
 	}
 }

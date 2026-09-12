@@ -192,6 +192,12 @@ type Options struct {
 	// CompleteSlash returns candidate completions for an input that
 	// starts with "/" — the command names.
 	CompleteSlash func(prefix string) []string
+	// ExpandInput rewrites an input line into the text of a turn before
+	// it is sent — the /skill route (ADR-0011): the operator's line is
+	// echoed, the expanded text is what actually runs. handled=false
+	// leaves the input to the normal paths; a non-empty errMsg means
+	// handled but nothing to run.
+	ExpandInput func(input string) (turn string, handled bool, errMsg string)
 	// Settings supplies the panel's initial content, and ApplySetting
 	// stores one edit and returns the refreshed content (gem-agent ADR-0009).
 	// Both nil disables /settings (the plain REPL prints a table).
@@ -279,6 +285,7 @@ type Model struct {
 	readOnlyState   func() sandbox.Ceiling
 	completePath    func(prefix string) []string
 	completeSlashFn func(prefix string) []string
+	expandInput     func(input string) (string, bool, string)
 	baseCtx         context.Context
 	cancelTurn      context.CancelFunc
 	// ask is the pending ask_user dialog (gem-agent ADR-0036).
@@ -318,13 +325,13 @@ type Model struct {
 	println      func(...any) tea.Cmd
 
 	// Footer state.
-	modelName     string
-	projectDir    string
-	ctxTokens     int // last round's prompt+output ≈ current context size
-	usedTokens    int // cumulative prompt+output across the session
-	promptTokens  int // last round's prompt alone (cache-share denominator)
-	cachedTokens  int // last round's cached prompt tokens (gem-agent ADR-0018)
-	window        int // model input token limit, 0 = unknown
+	modelName    string
+	projectDir   string
+	ctxTokens    int // last round's prompt+output ≈ current context size
+	usedTokens   int // cumulative prompt+output across the session
+	promptTokens int // last round's prompt alone (cache-share denominator)
+	cachedTokens int // last round's cached prompt tokens (gem-agent ADR-0018)
+	window       int // model input token limit, 0 = unknown
 }
 
 // New creates the model.
@@ -362,6 +369,7 @@ func New(opts Options) Model {
 		readOnlyState:   opts.ReadOnlyState,
 		completePath:    opts.CompletePath,
 		completeSlashFn: opts.CompleteSlash,
+		expandInput:     opts.ExpandInput,
 		settingsData:    opts.Settings,
 		refreshSettings: opts.RefreshSettings,
 		applySetting:    opts.ApplySetting,
@@ -1460,6 +1468,27 @@ func (m Model) submit() (tea.Model, tea.Cmd) {
 		// Leading blank line separates this turn from the previous
 		// output so consecutive turns don't run together.
 		return m, tea.Batch(m.emit(m.echoLine("!", command)), m.spin.Tick)
+	}
+
+	// /skill <name> [args] expands into a turn (ADR-0011): the typed
+	// line is echoed, the expanded text runs. A usage or lookup error
+	// is echoed like the answer it is.
+	if m.expandInput != nil {
+		if turn, handled, errMsg := m.expandInput(input); handled {
+			if errMsg != "" {
+				return m, m.emitJoined(m.echoLine(">", input), m.st.errS.Render("✗ "+errMsg))
+			}
+			m.phase = phaseRunning
+			m.status = m.msgs.StatusThinking
+			m.beginTurnStats()
+			m.live.Reset()
+			ctx, cancel := context.WithCancel(m.baseCtx)
+			m.cancelTurn = cancel
+			if m.startTurn != nil {
+				m.startTurn(ctx, turn)
+			}
+			return m, tea.Batch(m.emit(m.echoLine(">", input)), m.spin.Tick)
+		}
 	}
 
 	if input == "/settings" && m.settingsData != nil && m.applySetting != nil {

@@ -8,7 +8,7 @@
 ```bash
 make build bench-build                       # dist/lagent, dist/bench-mcp
 go run ./bench run --bin dist/lagent --configs baseline --reps 3
-go run ./bench report bench/results/<timestamp>
+go run ./bench report bench/_results/<timestamp>
 ```
 
 設定が指す `base_url` でローカルモデルサーバが動いている必要がある。6 タスク・
@@ -23,7 +23,7 @@ go run ./bench report bench/results/<timestamp>
 | `--tasks` | 走らせるタスク名（既定: `bench/tasks` 下の全ディレクトリ） |
 | `--reps` | タスク×構成ごとの反復数（既定 3） |
 | `--timeout` | 実行ごとの期限（既定 10m）。超えた実行は timed out として記録し、ベンチは次へ進む |
-| `--out` | 結果ディレクトリ（既定 `bench/results/<timestamp>`、git は無視） |
+| `--out` | 結果ディレクトリ（既定 `bench/_results/<timestamp>`、git は無視） |
 | `--mcp-bin` | `mcp-lookup` タスク用のフィクスチャ MCP サーバ（既定 `dist/bench-mcp`） |
 
 順序: ケースを外側、構成を内側 — タスクと反復ごとに全構成を連続で走らせる
@@ -52,9 +52,12 @@ go run ./bench report bench/results/<timestamp>
 | `shell-count` | 数を出すシェルコマンド | 回答が `57` を含む。ツール呼び出し 1 回以上 |
 | `mcp-lookup` | MCP lookup | 回答が `Iceland` を含む。ツール呼び出し 2 回以上（`mcp_load`、次に lookup） |
 | `view-image` | 見るべき画像 | 回答が `red` を含む。ツール呼び出し 1 回以上 |
+| `skill-follow` | 読み込んで従うべきスキル | 回答がスキルの固定形式行 `BRIEF: 57 rows, 3 columns, first id 1, last id 57`。ツール呼び出し 2 回以上（`load_skill`、次に数える） |
 
 タスクは `bench/tasks/<name>/task.toml`（プロンプト、期待、フィクスチャ
-サーバが要るなら `mcp = true`）と `testdata/`。期待は `min_tool_calls`、
+サーバが要るなら `mcp = true`）と `testdata/`、スキルのインストールが
+要るタスクなら `skills/` ディレクトリ — ランナーが実行の隔離 global スキル
+ディレクトリへ複製する。期待は `min_tool_calls`、
 `[[expect.file]]`（`path` と `contains` / `not_contains`）、
 `[[expect.answer]]`（`regex`）。ファイル無しで答えられるタスクはここに
 置かない。

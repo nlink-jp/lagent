@@ -106,7 +106,7 @@ func TestBroadReason(t *testing.T) {
 func TestHelpListsEveryCommand(t *testing.T) {
 	commands := []string{
 		"/auto", "/clear", "/help", "/mcp", "/readonly",
-		"/quit", "/settings", "/tools",
+		"/quit", "/settings", "/skill", "/skills", "/tools",
 		"/usage", "/version",
 	}
 	sort.Strings(commands)

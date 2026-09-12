@@ -79,8 +79,13 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   `--resume`; usage records in the shape
   [gem-usage-lens](https://github.com/nlink-jp/gem-usage-lens) reads for
   both runtimes.
+- **Skills:** Claude Code's `SKILL.md` format, read as-is from
+  `~/.config/lagent/skills/<name>/` and a trusted project's
+  `.claude/skills/<name>/`. One line per skill tells the model what
+  each is for; it loads one with `load_skill`, and you invoke one by
+  hand with `/skill <name>` (ADR-0011).
 - **Not here:** web search and fetch, media uploads, audit-log export,
-  history compaction, skills, agent memory, hooks — see the RFP and
+  history compaction, agent memory, hooks — see the RFP and
   [ADR-0002](docs/en/adr/0002-features-not-reproduced.md).
 
 ## Attachments

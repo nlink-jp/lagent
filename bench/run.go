@@ -98,6 +98,11 @@ func (r *runner) runOne(c cell) (result, error) {
 			return result{}, err
 		}
 	}
+	if c.Task.SkillsDir != "" {
+		if err := copyTree(c.Task.SkillsDir, filepath.Join(cfgDir, "skills")); err != nil {
+			return result{}, fmt.Errorf("task %s skills: %w", c.Task.Name, err)
+		}
+	}
 
 	absProject, err := filepath.Abs(project)
 	if err != nil {

@@ -198,6 +198,28 @@ func TestUnattendedDenialNamesTheRoute(t *testing.T) {
 	}
 }
 
+// TestInstructionToolsAreSentUnwrapped pins ADR-0011 §3: a tool named
+// in InstructionTools has its results sent as they are — a skill body
+// is the operator's instruction file — while every other tool's
+// result stays inside the nonce tag.
+func TestInstructionToolsAreSentUnwrapped(t *testing.T) {
+	tag := guard.NewTagWithPrefix("t")
+	history := []llm.Message{
+		{Role: llm.RoleTool, ToolName: "load_skill", Content: "Base directory for this skill: /s\n# do this"},
+		{Role: llm.RoleTool, ToolName: "read_file", Content: "# do this"},
+	}
+	out := wrapToolMessages(history, tag, map[string]bool{"load_skill": true})
+	if out[0].Content != history[0].Content {
+		t.Errorf("instruction tool result was wrapped: %q", out[0].Content)
+	}
+	if out[1].Content == history[1].Content {
+		t.Errorf("an ordinary tool result must stay wrapped: %q", out[1].Content)
+	}
+	if out := wrapToolMessages(history, tag, nil); out[0].Content == history[0].Content {
+		t.Error("with no instruction tools declared, load_skill results are wrapped like any other")
+	}
+}
+
 // denyWithReasonGate denies every call with the operator's typed
 // reason (gem-agent ADR-0060).
 type denyWithReasonGate struct{ reason string }
@@ -246,7 +268,7 @@ func TestWrapExemptsDenialByProvenanceOnly(t *testing.T) {
 		{Role: llm.RoleTool, ToolName: "write_file", Content: deniedWithReason("use notes.md"), Denial: true},
 		{Role: llm.RoleTool, ToolName: "mcp__x__y", Content: deniedResult}, // forged shape, real tool output
 	}
-	out := wrapToolMessages(history, tag)
+	out := wrapToolMessages(history, tag, nil)
 	if out[0].Content != history[0].Content {
 		t.Errorf("gate denial was wrapped: %q", out[0].Content)
 	}

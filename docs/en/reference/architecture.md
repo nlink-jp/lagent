@@ -35,7 +35,9 @@ JSON-RPC client), `internal/mcpfilter` (the one predicate behind
 operator has typed anything, and the rule that decides which ones),
 `internal/mention` (`@`-references: files, directories, images — and a
 dropped image path without the `@`, ADR-0005),
-`internal/instructions` (`AGENTS.md` discovery), `internal/ignore`
+`internal/instructions` (`AGENTS.md` discovery), `internal/skills`
+(skill discovery and confined loading in Claude Code's format,
+ADR-0011), `internal/ignore`
 (ignore-aware enumeration: builtin dir list + gitignore matcher),
 `internal/session` (transcript: logger + resume loader, usage records),
 `internal/statedir` (per-project state layout), `internal/workdir` (the
@@ -180,7 +182,20 @@ policy and MCP exclusions, nothing else.
 `web_search`, `web_fetch`, media uploads, Cloud Logging, thought
 signatures, safety settings, the summary model and the delegated file
 search are gem-agent features bound to Vertex AI (ADR-0002). History
-compaction, the model tier of auto-approval, skills, agent memory and
-operator hooks are Phase 2 (RFP §4): the trust probe still pins
-`.claude/skills` for change detection, but this runtime does not load
-skills.
+compaction, agent memory and operator hooks are Phase 2 (RFP §4); the
+model tier was measured and not adopted (ADR-0010); skills are in
+(ADR-0011).
+
+## Skills
+
+A skill is Claude Code's `SKILL.md` directory, read as-is (ADR-0011).
+Global skills are copied into `~/.config/lagent/skills/<name>/` — never
+linked from `~/.claude`, which the lanes deny; project skills are the
+trusted project's `.claude/skills/<name>/`, pinned by content like the
+instruction files, so a changed one stays out until re-trusted. One
+catalog line per skill rides the runtime-facts message beside the MCP
+catalog, so the system prompt stays byte-identical (ADR-0003).
+`load_skill` is the one tool whose results enter the prompt unwrapped:
+they are the operator's own instructions, and the tool cannot read
+outside a discovered skill's directory. `/skill <name>` sends a skill's
+body as the turn by hand; `/skills` lists what is loaded.

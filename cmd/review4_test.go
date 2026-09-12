@@ -140,7 +140,7 @@ var _ = errors.New
 // /clear prints what onClear returns — the hook notes and the MCP
 // reconnection report — inside the slash output (gem-agent ADR-0071 addendum).
 func TestClearOutputCarriesTheRestartReport(t *testing.T) {
-	out, isErr, quit := slashOutput("/clear", nil, nil, nil, slashReloads{}, nil, "", uitext.For(uitext.EN),
+	out, isErr, quit := slashOutput("/clear", nil, nil, nil, nil, slashReloads{}, nil, "", uitext.For(uitext.EN),
 		func() string { return "[⚠ note]\nmcp reloaded: 1 server(s), 2 tool(s)\n" })
 	if isErr || quit {
 		t.Fatalf("isErr=%v quit=%v", isErr, quit)

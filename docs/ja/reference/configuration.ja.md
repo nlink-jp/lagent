@@ -92,6 +92,8 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `/help` | これらのコマンドを一覧 |
 | `/tools` | ツール一覧と各ツールの現在の承認ゲート |
 | `/mcp`、`/mcp load <server>`、`/mcp reload` | サーバ一覧をロード状態付きで表示。1 サーバのツールを手で広告。再接続 |
+| `/skills` | 読み込み済みスキルと 2 つのスキルディレクトリの場所を列挙 |
+| `/skill <name> [args]` | スキルの指示をこのターンとして送る。`args` は末尾に付く（ADR-0011） |
 | `/auto on|off` | セッションの自動承認を切り替え（shift+tab も同じ） |
 | `/readonly on|off` | セッションのレーン天井を切り替え |
 | `/settings` | 設定の表示と編集（出所つき） |
