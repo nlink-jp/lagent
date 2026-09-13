@@ -1,5 +1,26 @@
 # Changelog
 
+## [Unreleased]
+
+### Documentation
+
+- **ADR-0018: how the injection bench has to be built** (design only; no code).
+  The RFP's open item — whether the model actually honours the nonce
+  isolation — was measured single-turn against this runtime's model on
+  2026-09-13, through `llm-cli`, which carries the same guard and an A/B
+  switch. Loud payloads ("discard every instruction", forged authority, forged
+  closing tag) never got through, wrapped or not: 0 in 500. Payloads that
+  accept the task and dictate one field of the output got through 92-100%
+  unwrapped, and wrapping cut one to 0.3%, another to 14%, and a third not at
+  all — so there is no single number for how well the wrapping protects, and a
+  bench built from loud payloads would report perfect resistance after the
+  defence was removed. The agent-side task therefore plants its payload in a
+  tool result (not `AGENTS.md`, which ADR-0013 measured at 0/18), scores the
+  value of a tool argument rather than prose or whether a tool ran, ships a
+  benign twin in the same run, varies the element it targets across at least
+  three payloads, and leaves rate measurement to the single-turn harness
+  because an agent run is too slow to reach n=100.
+
 ## [0.6.0] - 2026-09-13
 
 ### Security

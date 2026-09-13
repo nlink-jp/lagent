@@ -128,3 +128,14 @@ excepted).
   partition a test closes. `LAGENT_API_KEY`, the variable R01 named, is
   in the removed half; the configuration-file route stays the residue
   ADR-0015 accepted
+- [`ADR-0018`](adr/0018-the-injection-bench-scores-argument-values.md) —
+  the injection bench scores argument values, against a benign twin
+  (**Accepted**, design only): measured on this model, loud payloads
+  ("discard all instructions") never get through wrapped or not, so a
+  bench built from them reports perfect resistance after the defence is
+  removed; payloads that accept the task and dictate one output field
+  get through 92-100% unwrapped, and wrapping cuts one to 0.3%, another
+  to 14%, and a third not at all. So the agent task plants its payload
+  in a tool result, scores the value of an argument rather than prose,
+  ships a benign twin, varies the targeted element, and leaves rates to
+  the single-turn harness
