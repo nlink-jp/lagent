@@ -194,6 +194,16 @@ type TUIConfig struct {
 type MCPConfig struct {
 	Enabled        bool `toml:"enabled"`
 	CallTimeoutSec int  `toml:"call_timeout_sec"`
+	// StartupTimeoutSec bounds a server's handshake — spawn, initialize,
+	// the initialized notification — separately from a tool call. They
+	// are different things: a call's budget is how long the work may
+	// take, a handshake's is how long a server may take to say hello,
+	// and the servers that are slow to greet are slow because of
+	// something off this machine (a remote MCP over HTTPS). It is a
+	// separate number rather than a smaller one on purpose: cutting a
+	// slow server off at startup does not save time overall, because the
+	// session then has to reconnect it.
+	StartupTimeoutSec int `toml:"startup_timeout_sec"`
 	// Exclude names MCP servers, or single functions of them
 	// ("obsidian/patch_vault_file"), that this session does not have.
 	// An excluded server is never started. Everything not named here is
@@ -330,7 +340,7 @@ func defaults() Config {
 		Sandbox:  SandboxConfig{Enabled: true, ScratchCaches: map[string]string{"GOCACHE": "go-build"}},
 		Approval: ApprovalConfig{PinTrustedFiles: true},
 		Agent:    AgentConfig{MaxTurns: 50, ShellTimeoutSec: 120},
-		MCP:      MCPConfig{Enabled: true, CallTimeoutSec: 60, Advertise: "deferred"},
+		MCP:      MCPConfig{Enabled: true, CallTimeoutSec: 60, StartupTimeoutSec: 30, Advertise: "deferred"},
 		TUI:      TUIConfig{Theme: "auto", Language: "auto", ShowThoughts: true},
 	}
 }
@@ -477,7 +487,7 @@ var trackedKeys = []string{
 	"approval.pin_trusted_files",
 	"agent.max_turns", "agent.shell_timeout_sec", "agent.auto_approve",
 	"agent.read_only",
-	"mcp.enabled", "mcp.call_timeout_sec", "mcp.advertise", "mcp.preload",
+	"mcp.enabled", "mcp.call_timeout_sec", "mcp.startup_timeout_sec", "mcp.advertise", "mcp.preload",
 	"tui.theme", "tui.language", "tui.show_thoughts",
 }
 
@@ -552,6 +562,9 @@ func (c *Config) validate() error {
 	}
 	if c.MCP.CallTimeoutSec <= 0 {
 		return fmt.Errorf("[mcp].call_timeout_sec must be positive")
+	}
+	if c.MCP.StartupTimeoutSec <= 0 {
+		return fmt.Errorf("[mcp].startup_timeout_sec must be positive")
 	}
 	switch c.MCP.Advertise {
 	case "deferred", "all":

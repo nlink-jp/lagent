@@ -107,6 +107,13 @@ read_only = false
 enabled = true
 # Per-call timeout for an MCP tool, in seconds.
 call_timeout_sec = 60
+# How long a server may take to say hello: spawn, initialize, and the first
+# tools/list. Separate from call_timeout_sec on purpose — a call's budget is
+# how long the work may take, a handshake's is how long a greeting may take,
+# and the servers slow to greet are slow because of something off this machine
+# (a remote MCP over HTTPS). Do not shorten it to save startup time: a server
+# cut off here has to be reconnected later, which costs more than waiting.
+startup_timeout_sec = 30
 # Servers, or single functions of them ("obsidian/patch_vault_file"),
 # that this session does not have. An excluded server is never started.
 # A project's .lagent.toml may add exclusions, never remove them.
