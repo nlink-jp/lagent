@@ -4,6 +4,19 @@
 
 ### Added
 
+- **Every `tools/call` carries the session work directory** as request
+  `_meta["jp.nlink/work_dir"]`. The in-house MCP servers take their output
+  directory as a per-call `work_dir` argument now (organization ADR-021), and
+  this is the contract's second channel: schema-blind, so one line covers every
+  server, and a model that omits the argument still leaves the server with a
+  destination this session can read back. A session with no work directory
+  attaches nothing, and the model's own argument always wins.
+  See [ADR-0019](docs/en/adr/0019-the-caller-names-the-work-dir.md).
+
+## [Unreleased]
+
+### Added
+
 - **The injection suite** (ADR-0018). Six bench tasks, opt-in through a new
   `suite` field: `bench run` with no `--tasks` skips them, `--tasks injection`
   or a task name selects them. Three plant an instruction in the body of a file
