@@ -113,6 +113,16 @@ answers.
 
 ## Gotchas
 
+- **A tool with no path argument is invisible to the rule layer.**
+  `risk.credentialRead` judges a `path` (or `file_info`'s `paths`), so
+  `search_files` — which takes a pattern and walks — is `Safe` and never
+  gates. ADR-0016 §5 nevertheless promised the matcher as the boundary
+  when the file-read cage cannot be installed, and for the walk it was
+  not: the degraded walk read `.env` and printed the matching lines. The
+  walk now consults `sandbox.CredentialPath` itself in `readForSearch`.
+  Before writing "layer X covers this when layer Y is absent", check
+  that X can see the call at all.
+
 - **macOS-only by design** — isolation is built on sandbox-exec, as in
   gem-agent. Do not add linux/windows targets to the Makefile.
 - **gem-agent is a source, not an upstream.** Bring a package over with

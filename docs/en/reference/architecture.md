@@ -170,6 +170,13 @@ list does not recognise is refused at the open and that refusal reaches
 the operator as the same question. `search_files`, `list_files` and
 `list_tree` do not ask and hide nothing — the kernel lists names and
 refuses content — and `search_files` names what it could not read.
+Where the cage could not be installed on this machine — the startup
+warning says so, and `/settings` carries the state under
+`safety / file reads` — the covered reads run in this process: the
+single-file reads still ask, by lagent's own check rather than the
+kernel's, and the walk refuses the same list itself and names the file
+in the same footer (ADR-0016 §5, as amended). The enforcer changes,
+the list does not.
 
 ## The round ladder
 
