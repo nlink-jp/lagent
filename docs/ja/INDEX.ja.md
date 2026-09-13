@@ -94,8 +94,8 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   資格情報のパスは read ツールでも操作者専用: レーンが拒むパスへの
   `read_file`、`file_info`、`view_image` は実パスで判定され、どのモードでも
   操作者だけが答える Review で、`-p` は拒否する。`search_files`、
-  `list_files`、`list_tree` はそのファイルを飛ばし、飛ばしたと言う。一覧は
-  `internal/sandbox` に 1 つ
+  `list_files`、`list_tree` は何も隠さない — ADR-0016 が §2 を撤回した。
+  カーネルは名前を出して内容を拒むからである。一覧は `internal/sandbox` に 1 つ
 - [`ADR-0016`](adr/0016-the-kernel-reads-the-file.ja.md) —
   ファイルを読むのはカーネル（**Accepted**、実装済み）: file ツールの読取を
   `sandbox-exec` 下の子で

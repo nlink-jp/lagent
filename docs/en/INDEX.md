@@ -104,7 +104,8 @@ excepted).
   `read_file`, `file_info` and `view_image` on a path the lanes deny are
   a Review only the operator answers, on the real path, in every mode,
   and `-p` denies them; `search_files`, `list_files` and `list_tree`
-  skip such a file and say so; one list, in `internal/sandbox`
+  hide nothing — ADR-0016 withdraws §2, since the kernel lists names
+  while refusing content; one list, in `internal/sandbox`
 - [`ADR-0016`](adr/0016-the-kernel-reads-the-file.md) —
   the kernel reads the file (**Accepted**, implemented): the file tools'
   reads run in a child under

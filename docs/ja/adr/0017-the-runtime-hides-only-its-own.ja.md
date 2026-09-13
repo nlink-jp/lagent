@@ -79,8 +79,8 @@ export 以外の `LAGENT_*` を**外し**、他は何も推測しないことで
 
 ### 1. 操作者の環境変数には触れない
 
-`sandbox.ScrubEnv`・`secretEnvRe`・`readLaneExports` を削除し、承認リファレンスの
-read レーン行にある主張も併せて削除する。read レーンのコマンドは操作者が置いた
+`sandbox.ScrubEnv`・`secretEnvRe`・`readLaneExports` を削除し、設定リファレンスの
+環境変数の節にある主張も併せて削除する。read レーンのコマンドは操作者が置いた
 ままの環境を受け取る。そこで走るプログラムがどの変数を必要とするかは、この
 ランタイムが答えられる問いではないからである。
 

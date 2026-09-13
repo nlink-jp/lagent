@@ -89,7 +89,8 @@ nothing.
 ### 1. The operator's environment is not touched
 
 `sandbox.ScrubEnv`, `secretEnvRe` and `readLaneExports` are deleted,
-and with them the claim in the approval reference's read-lane row. A
+and with them the claim in the configuration reference's environment
+section. A
 read-lane command receives the operator's environment as the operator
 left it, because which variable the program it runs needs is not a
 question this runtime can answer.

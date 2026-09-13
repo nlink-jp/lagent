@@ -51,7 +51,7 @@ Measured 2026-09-13, with a profile carrying only `(allow default)`,
 | Operation on `.env` | Result |
 |---|---|
 | `cat .env` | `Operation not permitted` |
-| `stat .env` | `Operation not permitted` |
+| `stat .env` | allowed — the deny is `file-read-data`, see below |
 | `cat .env.example` | allowed — the template re-allow holds |
 | `grep -r` over the directory | refuses that one file, continues |
 | `ls -a` | **the name `.env` is listed** |
@@ -90,9 +90,13 @@ project is, and `os.Root` already refuses an escape at the syscall
 (gem-agent ADR-0072 §4). The kernel gets exactly one job: **in this
 process, credential material cannot be opened.**
 
-Covered: `read_file`, `view_image`, `file_info`, and the whole
-`search_files` walk, which runs inside the child so every open it
-performs is adjudicated.
+Covered: `read_file`, `file_info`, and the whole `search_files` walk,
+which runs inside the child so every open it performs is adjudicated.
+`view_image` is covered for the CALL — the tool runs in the child, so a
+credential path is refused there — while the bytes the model finally
+receives are re-read in process by the attachment path, which runs only
+when the call itself ran. The cage decides whether that happens; it
+does not carry the pixels.
 
 ### 2. The refusal is the operator's question, and the matcher stops being the boundary
 
@@ -151,7 +155,7 @@ unchanged by this ADR and stays accepted.
 At startup the child is verified the way the read lane is: a probe file
 the profile must refuse, and an ordinary file it must read. On failure
 the file tools fall back to in-process reads with `risk.credentialRead`
-as the boundary, which is today's behaviour, and the note says so. A
+as the boundary, and a startup warning names it. A
 degraded state that claimed the kernel was watching would be worse than
 the matcher.
 
@@ -203,3 +207,29 @@ fourth fix; it is a boundary in the wrong place.
 - **Patching the walks' root resolution, as gem-agent v0.78.0 did.**
   Correct for the shipped design and superseded by this one: the code
   that fix repairs is deleted here.
+
+## Independent review (2026-09-13, before release)
+
+Two readers who did not write the change reviewed the release diff, one
+per runtime, and agreed on the Critical. The change as first committed
+was broken: **`search_files` answered "no matches (0 files scanned)"
+for any project holding a credential-named file** — a confident false
+negative, worse than the leak it replaced. Findings and outcomes:
+
+| # | Finding | Outcome |
+|---|---|---|
+| Critical | `(deny file-read*)` covers `file-read-metadata`; Go's `os.Root` listing stats every entry, so one denied name failed the whole directory read and the walk dropped the error silently | Adopted — the deny is `file-read-data`; content refused, stat left, measured |
+| High | The parent's pipe cap (85 KB) silently halved a 200 KB read | Adopted — the cap is above anything a covered read emits, and a cut is stated |
+| High | `file_info` collapsed the permission error into "not found": the child never exited 3, the operator was never asked, the model was told the file was absent | Adopted — the cause is carried, and a refusal ends the batch |
+| High | A cancelled `search_files` lost its partial result and its label | Adopted — the parent keeps what the child wrote and labels it |
+| High | The `[not read: …]` note was unreachable for a credential file | Adopted — it fires, measured |
+| Medium | The file child did not get `ChildEnv`, falsifying ADR-0017 §2's "every spawn site" | Adopted for the child and its probe |
+| Medium | The probe ran a shell, not the child, and built a different profile — it passed while every walk was broken | Adopted — the probe drives the real child, the runner's profile, and a listing |
+| Medium | Any `EACCES` became "credential material" | Adopted — the refusal says the sandbox refused the read |
+| Medium | The hidden subcommand ran any registered tool | Adopted — it runs the covered reads only |
+| Medium | A missing work directory failed every read and leaked an absolute path | Adopted — the child keeps the project root |
+| Medium | "the banner says so", "the request rides argv", "Covered: view_image" | Adopted — all three corrected above; the request rides stdin, which is also the better choice |
+| Low | The probe directory leaked | Adopted |
+| Low | `FileReadProfile` omitted the tty hardening | Adopted |
+| Low | The degradation note had no next command | Adopted |
+| — | **No test ran the real child under the real profile** — the reason every defect above shipped green | Adopted, and it is the important one: `TestFileChildUnderTheRealProfile` builds this binary and drives it under the installed profile |

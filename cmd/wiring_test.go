@@ -109,7 +109,7 @@ func TestReasoningEffortIsWiredIntoTheBackend(t *testing.T) {
 // ADR-0008 §1: every lane's shell runs with the scratch-cache table
 // pointed into the session scratch — the read lane at the table's
 // directory, the approved lanes at a separate one — and the read lane
-// additionally scrubs the operator's secrets and points its temporary
+// additionally points its temporary
 // directory at the scratch.
 func TestLaneEnvRedirectsToolchainCachesInEveryLane(t *testing.T) {
 	parent := []string{"PATH=/bin", "GOCACHE=/Users/someone/Library/Caches/go-build", "AWS_SECRET_ACCESS_KEY=x", "LAGENT_API_KEY=sk"}
