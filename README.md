@@ -74,7 +74,9 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
 - **Confinement:** file tools stay inside the project (and the session
   work directory), and a credential file — `.env`, a private key, a
   token store — is read only when you approve it, every time, never
-  unattended; `shell_exec` runs under `sandbox-exec` in the lane it
+  unattended: those reads run in a sandboxed child that cannot open
+  credential material at all, so the list raises the question and the
+  kernel is what refuses; `shell_exec` runs under `sandbox-exec` in the lane it
   declares — read runs unasked (inspection, and Go builds and tests,
   whose cache lives in the session scratch), write and operator ask.
 - **Hooks:** `[[hooks.pre_tool_use]]` runs your guard script before a
