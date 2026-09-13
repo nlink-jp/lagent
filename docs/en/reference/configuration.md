@@ -221,7 +221,9 @@ What no child gets is lagent's **own** configuration variables —
 knows every one of them by name. The three exports above
 (`LAGENT_SESSION_ID`, `LAGENT_WORK_DIR`, `LAGENT_PROJECT_DIR`) exist
 for children and pass. A server that wants one of the removed values
-takes it from the `env` block of its own `.mcp.json` entry.
+takes it from the `env` block of its own `.mcp.json` entry. This
+holds for every child lagent starts, `--no-sandbox` included: that
+flag removes the kernel, not this rule (ADR-0017 §2, amended).
 
 ## Commands
 
