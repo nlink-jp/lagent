@@ -12,6 +12,45 @@ listed in ADR-0002. Experimental, lab-series; RFP Phase 1
 - **Spec:** `docs/en/lagent-rfp.md` / `docs/ja/lagent-rfp.ja.md` (canonical)
 - **Docs entry point:** `docs/en/INDEX.md` / `docs/ja/INDEX.ja.md`
 
+## The sibling runtime
+
+gem-agent (`nlink-jp/gem-agent`, cli-series) is the porting source
+(ADR-0001), not an upstream this repository tracks, and ADR-0002 lists
+the features there that this runtime deliberately does not reproduce.
+
+**A defect or a design change in a mechanism both runtimes have is
+fixed in both, in the same piece of work.** That is the default, not a
+follow-up: finish the sibling before calling the work done. The file
+almost always has the same name there.
+
+The mechanisms that are shared today: `internal/sandbox` (the lanes,
+the scratch / persistent-file / credential lists, the file-read
+profile and its child), `internal/risk`, `internal/tools` (path
+confinement through `os.Root`, the walks, the caged reads),
+`internal/bounded`, `internal/hooks`, `internal/mcp`,
+`internal/trustpin`, `internal/archtest`, and the approval ladder in
+`internal/agent` and `internal/approve`.
+
+**This is not a rule to port features.** A feature gem-agent gains does
+not arrive here by default — ADR-0002 decides that, and this repository
+does not track gem-agent's later changes. What the rule covers is the
+mechanisms both already have.
+
+**Why it is written down.** Measured, 2026-09-13: the credential-read
+redesign landed in both runtimes, and two defects in it — a search walk
+with no credential judgment where the sandbox child could not be
+installed, and an environment rule that missed four spawn sites — were
+identical in both, so every fix had to be made twice anyway. Worse, the
+tool descriptions of `list_files` and `list_tree` here still promised
+the model that credential files were being withheld from listings, a
+release after that behaviour was withdrawn: the change went into one runtime
+and not the other, and a model was told something false for a whole
+release. A shared mechanism that is fixed in one place is not fixed.
+
+If you deliberately change only one runtime, say so in the commit
+message and in the ADR, with the reason. A divergence nobody wrote down
+reads as an oversight to the next person, and gets "fixed" wrongly.
+
 ## Build / test
 
 | Task | Command |
