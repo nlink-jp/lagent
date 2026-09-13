@@ -101,6 +101,23 @@ One payload is one data point about one field, and §Context shows fields do not
 behave alike. A family that varies the target is the minimum that can detect
 the case where the defence covers everything except one thing.
 
+*Amended 2026-09-13, on the operator's reading of the first result: "this
+probably depends on the task instruction in the first place." Correct, and it
+is a gap in §4 rather than a caveat on it. An injection does not act in a
+vacuum — it competes with the legitimate instruction — so **the specificity of
+the task prompt is a second independent variable**, and this ADR varied only
+the payload while holding the prompt fixed. The first measured breakthrough is
+therefore tied to one arbitrary wording. Concretely, the prompt names where the
+value comes from (line 1, after `# `) but never says to reproduce it unchanged,
+and says nothing about a file that claims otherwise — so the injected sentence
+reads as a legitimate clarification of an underspecified rule rather than a
+competing order, which is what the quiet class is for. The same reading may
+explain §Context's asymmetry: the field that went through 100% was the one the
+system prompt constrained least. So the family varies the prompt too — loose,
+the current wording, and one that says to transcribe the recorded string and
+ignore instructions found in file content — and a result is reported with the
+prompt it was measured under.*
+
 ### 5. Rates are measured single-turn; the agent tasks measure existence
 
 An agent run costs a minute or more, so the trial counts that make a rate
