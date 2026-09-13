@@ -1,47 +1,6 @@
 # Changelog
 
-## [Unreleased]
-
-### Fixed
-
-- **Text that outlived the credential redesign.** `list_files` told the
-  model "Credential files … are left out and counted" and `list_tree`
-  said credential files "are skipped and counted"; both stopped being
-  true in 0.5.0, when ADR-0016 §3 withdrew the withholding — the walks
-  list every name and the kernel refuses the content. A tool
-  description is what the model plans against, so a stale one is a
-  wrong fact in the prompt, not a stale comment. `search_files` now
-  says a file it may not read is named rather than hidden, which is
-  true of both enforcers. Also corrected: the `pathJudgedTools` comment
-  still described the deleted skip, `laneEnv`'s comment still described the environment scrub ADR-0017 withdrew, and the
-  profile's own doc comment claimed `stat .env` is refused — it is not,
-  and that wrong measurement is the `file-read*` cut that broke every
-  walk. The 0.5.0 entry carries an inline correction rather than a
-  rewrite.
-
-### Security
-
-- **"One function, applied at every spawn site" was a claim, not a
-  mechanism** (ADR-0017 §2). Four kinds of child did not apply it: the
-  unconfined shell (`--no-sandbox`), the startup lane probes, the
-  sandbox availability probe and the clipboard capture. Only the first
-  carried real exposure — it built its command with no environment at
-  all, so the child inherited the parent's whole environment including
-  `LAGENT_API_KEY`. The other three read nothing in the runtime's
-  namespace, so what was exposed there was the sentence rather than a
-  secret. All four apply the rule now, and
-  the read lane's probe extends the filtered environment with its
-  temporary directory instead of rebuilding it from the parent's — an
-  overwrite that would have quietly undone the fix.
-- **The class is closed by a test.**
-  `TestEverySpawnSiteAppliesTheChildEnvRule` fails when a function
-  builds an `exec.Cmd` without naming the helper that applies the
-  environment rule. The partition test next door pins the two NAME
-  lists and cannot see a call site, which is why a false sentence
-  survived a green build. ADR-0017 carries an *Amended* note.
-
-  Found writing the second revision of the architecture review,
-  recorded there as R33.
+## [0.6.0] - 2026-09-13
 
 ### Security
 
@@ -68,6 +27,28 @@
   with no file child — the degraded path exactly — and fails on the
   leaked line without the guard. ADR-0016 carries an *Amended* note.
 
+- **"One function, applied at every spawn site" was a claim, not a
+  mechanism** (ADR-0017 §2). Four kinds of child did not apply it: the
+  unconfined shell (`--no-sandbox`), the startup lane probes, the
+  sandbox availability probe and the clipboard capture. Only the first
+  carried real exposure — it built its command with no environment at
+  all, so the child inherited the parent's whole environment including
+  `LAGENT_API_KEY`. The other three read nothing in the runtime's
+  namespace, so what was exposed there was the sentence rather than a
+  secret. All four apply the rule now, and
+  the read lane's probe extends the filtered environment with its
+  temporary directory instead of rebuilding it from the parent's — an
+  overwrite that would have quietly undone the fix.
+- **The class is closed by a test.**
+  `TestEverySpawnSiteAppliesTheChildEnvRule` fails when a function
+  builds an `exec.Cmd` without naming the helper that applies the
+  environment rule. The partition test next door pins the two NAME
+  lists and cannot see a call site, which is why a false sentence
+  survived a green build. ADR-0017 carries an *Amended* note.
+
+  Found writing the second revision of the architecture review,
+  recorded there as R33.
+
 ### Fixed
 
 - **The degradation note and the `/settings` row claimed something that
@@ -75,6 +56,30 @@
   when the cage is absent; a search skips the file and names it, it
   does not ask. They now say credential files are refused either way,
   and by whom.
+
+- **Text that outlived the credential redesign.** `list_files` told the
+  model "Credential files … are left out and counted" and `list_tree`
+  said credential files "are skipped and counted"; both stopped being
+  true in 0.5.0, when ADR-0016 §3 withdrew the withholding — the walks
+  list every name and the kernel refuses the content. A tool
+  description is what the model plans against, so a stale one is a
+  wrong fact in the prompt, not a stale comment. `search_files` now
+  says a file it may not read is named rather than hidden, which is
+  true of both enforcers. Also corrected: the `pathJudgedTools` comment
+  still described the deleted skip, `laneEnv`'s comment still described the environment scrub ADR-0017 withdrew, and the
+  profile's own doc comment claimed `stat .env` is refused — it is not,
+  and that wrong measurement is the `file-read*` cut that broke every
+  walk. The 0.5.0 entry carries an inline correction rather than a
+  rewrite. ADR-0016 and ADR-0017 name the version that shipped them
+  instead of saying "implemented and unreleased".
+
+- **A product rule, in `AGENTS.md`.** A defect or design change in a
+  mechanism both runtimes have is fixed in both, in the same piece of
+  work. ADR-0001 and ADR-0002 say what is ported and what is not
+  reproduced; neither said what to do about the code the two runtimes
+  genuinely share. The stale tool descriptions above are what that gap
+  costs: the change went into gem-agent and not here, and a model was
+  told something false for a release.
 
 ## [0.5.1] - 2026-09-13
 
