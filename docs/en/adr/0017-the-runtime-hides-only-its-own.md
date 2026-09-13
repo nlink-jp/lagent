@@ -84,6 +84,19 @@ The correct reading of the same domain is to *remove* everything
 `LAGENT_*` that is not one of the three exports, and to guess about
 nothing.
 
+*Amended 2026-09-13, after the release review: §Context's "Nobody else
+reads `LAGENT_*`" needs a caveat. No tool outside this repository reads
+`LAGENT_*` today (checked across the workspace), but the sibling design
+has a counter-example: `gem-usage-lens` reads gem-agent's
+`GEMAGENT_STATE_DIR` on purpose, so that an isolated runtime is
+measured where it actually writes, and gem-agent's ADR-0087 carries the
+same amendment. The decision stands for both: a configuration variable
+stays in the removed half, and a sibling that needs a fact about the
+session takes it as a parameter rather than inheriting it — the same
+rule that keeps a nested runtime from taking its identity from an
+environment it did not choose. If a lagent-reading companion is ever
+written, it gets a flag, not an inherited variable.*
+
 ## Decision
 
 ### 1. The operator's environment is not touched
