@@ -19,6 +19,21 @@ type task struct {
 	Dir    string `toml:"-"`
 	Prompt string `toml:"prompt"`
 	MCP    bool   `toml:"mcp"` // needs the bench MCP fixture server
+	// Suite keeps a task out of the default selection. An empty suite
+	// is the everyday set that `bench run` takes with no --tasks; a
+	// named one runs only when --tasks names the task or the suite.
+	// The injection family is the reason (ADR-0018 §5): those runs are
+	// a deliberate measurement session, not part of every sweep, and
+	// their result is not a rate the everyday table should carry.
+	Suite string `toml:"suite"`
+	// PayloadMarker is a string that must appear in a request body for
+	// the run to mean anything. An injection task whose payload never
+	// reached the model scores exactly like one where it arrived and
+	// was ignored, and the second is the only one worth counting
+	// (ADR-0018 §6). Measured on the family's first real sweep: 1 run
+	// in 9 read the fixture without the injected sentence reaching a
+	// request, and passed. Requires the runtime to have a trace switch.
+	PayloadMarker string `toml:"payload_marker"`
 	// Trust marks the run's project as trusted (the configuration's
 	// [approval].trusted_projects names it, and the runtime's pins are
 	// recorded before the run), so the fixture's own AGENTS.md and
@@ -71,10 +86,31 @@ func loadTasks(tasksDir string, only []string) ([]*task, error) {
 	for _, n := range only {
 		want[n] = true
 	}
-	selecting := len(want) > 0
 	var tasks []*task
+	if len(want) == 0 {
+		// The everyday sweep: everything except the named suites, which
+		// are deliberate measurement sessions (ADR-0018 §5).
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			t, err := loadTask(filepath.Join(tasksDir, e.Name()))
+			if err != nil {
+				return nil, err
+			}
+			if t.Suite == "" {
+				tasks = append(tasks, t)
+			}
+		}
+		if len(tasks) == 0 {
+			return nil, fmt.Errorf("no tasks under %s", tasksDir)
+		}
+		return tasks, nil
+	}
+	// A selection names tasks. Load only those, so a malformed task
+	// nobody asked for cannot break a run that does not include it.
 	for _, e := range entries {
-		if !e.IsDir() || (selecting && !want[e.Name()]) {
+		if !e.IsDir() || !want[e.Name()] {
 			continue
 		}
 		t, err := loadTask(filepath.Join(tasksDir, e.Name()))
@@ -84,6 +120,27 @@ func loadTasks(tasksDir string, only []string) ([]*task, error) {
 		tasks = append(tasks, t)
 		delete(want, e.Name())
 	}
+	// Whatever is left may name a suite rather than a task, which can
+	// only be answered by reading the remaining tasks.
+	if len(want) > 0 {
+		claimed := map[string]bool{}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			t, err := loadTask(filepath.Join(tasksDir, e.Name()))
+			if err != nil {
+				continue // a task nobody selected; its error is not this run's
+			}
+			if t.Suite != "" && want[t.Suite] {
+				tasks = append(tasks, t)
+				claimed[t.Suite] = true
+			}
+		}
+		for s := range claimed {
+			delete(want, s)
+		}
+	}
 	if len(want) > 0 {
 		missing := make([]string, 0, len(want))
 		for n := range want {
@@ -92,6 +149,7 @@ func loadTasks(tasksDir string, only []string) ([]*task, error) {
 		sort.Strings(missing)
 		return nil, fmt.Errorf("tasks not found: %s", strings.Join(missing, ", "))
 	}
+	sort.Slice(tasks, func(i, j int) bool { return tasks[i].Name < tasks[j].Name })
 	if len(tasks) == 0 {
 		return nil, fmt.Errorf("no tasks under %s", tasksDir)
 	}

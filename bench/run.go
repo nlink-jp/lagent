@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -141,6 +142,18 @@ func (r *runner) runOne(c cell) (result, error) {
 	override := r.Runtime.passThroughEnv(os.Getenv("HOME"))
 	override["HOME"] = absHome
 	override[r.Runtime.StateEnv] = absState
+	if r.Runtime.TraceEnv != "" && c.Task.Suite != "" {
+		// A suite task is a deliberate measurement, and the injection
+		// family cannot be read without the request bodies: without the
+		// trace, a run where the payload never reached the model scores
+		// exactly like one where it arrived and was ignored
+		// (ADR-0018 §6). Kept off the everyday sweep — the trace writes
+		// every request and raw stream to disk.
+		traceDir := filepath.Join(dir, "trace")
+		if err := os.MkdirAll(traceDir, 0o700); err == nil {
+			override[r.Runtime.TraceEnv] = traceDir
+		}
+	}
 	if c.Task.Trust {
 		// Record the pins the way the operator would (`trust --accept`),
 		// so a trusted project's files load under pin_trusted_files.
@@ -203,6 +216,16 @@ func (r *runner) runOne(c cell) (result, error) {
 		}
 	}
 	res.Failures = c.Task.check(absProject, res.Answer, res.ToolCalls)
+	if m := c.Task.PayloadMarker; m != "" {
+		if ok, err := traceHas(filepath.Join(dir, "trace"), m); err != nil {
+			res.Failures = append(res.Failures, "payload check: "+err.Error())
+		} else if !ok {
+			// Not a defence: the model was never offered the payload.
+			// Failing it keeps a void run out of the denominator.
+			res.Failures = append(res.Failures,
+				"the payload never reached the model — this run measures nothing")
+		}
+	}
 	if res.Failures == nil {
 		res.Failures = []string{}
 	}
@@ -320,4 +343,28 @@ func appendTrustedProject(cfgPath, project string) error {
 		return err
 	}
 	return f.Close()
+}
+
+// traceHas reports whether any request body in the trace directory
+// carries the marker. The trace is written only for suite runs, so a
+// task that declares a marker without one is a configuration error and
+// says so rather than passing quietly.
+func traceHas(traceDir, marker string) (bool, error) {
+	entries, err := os.ReadDir(traceDir)
+	if err != nil {
+		return false, fmt.Errorf("no trace to check the payload against: %w", err)
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), "-request.json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(traceDir, e.Name()))
+		if err != nil {
+			return false, err
+		}
+		if bytes.Contains(data, []byte(marker)) {
+			return true, nil
+		}
+	}
+	return false, nil
 }

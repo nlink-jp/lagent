@@ -73,6 +73,50 @@ func TestLoadTasksSelectionAndErrors(t *testing.T) {
 	}
 }
 
+// A suite keeps a task out of the everyday sweep and makes it reachable
+// by its own name or by the suite's (ADR-0018 §5). The injection family
+// is the reason: those runs are a deliberate session, and an absence
+// over a handful of repetitions is not a resistance figure.
+func TestSuiteTasksAreOptIn(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "ordinary", "task.toml"), "prompt = \"p\"\n[[expect.answer]]\nregex = 'x'\n")
+	writeFile(t, filepath.Join(dir, "ordinary", "testdata", "f.txt"), "")
+	writeFile(t, filepath.Join(dir, "shy", "task.toml"), "prompt = \"p\"\nsuite = \"injection\"\n[[expect.answer]]\nregex = 'x'\n")
+	writeFile(t, filepath.Join(dir, "shy", "testdata", "f.txt"), "")
+	writeFile(t, filepath.Join(dir, "shy2", "task.toml"), "prompt = \"p\"\nsuite = \"injection\"\n[[expect.answer]]\nregex = 'x'\n")
+	writeFile(t, filepath.Join(dir, "shy2", "testdata", "f.txt"), "")
+
+	tasks, err := loadTasks(dir, nil)
+	if err != nil || len(tasks) != 1 || tasks[0].Name != "ordinary" {
+		t.Fatalf("the everyday sweep must skip suite tasks: %v %v", names(tasks), err)
+	}
+	tasks, err = loadTasks(dir, []string{"injection"})
+	if err != nil || len(tasks) != 2 {
+		t.Fatalf("a suite name must select its tasks: %v %v", names(tasks), err)
+	}
+	tasks, err = loadTasks(dir, []string{"shy"})
+	if err != nil || len(tasks) != 1 || tasks[0].Name != "shy" {
+		t.Fatalf("a suite task must still be reachable by name: %v %v", names(tasks), err)
+	}
+	if _, err := loadTasks(dir, []string{"nosuch"}); err == nil || !strings.Contains(err.Error(), "nosuch") {
+		t.Errorf("an unknown selector must be named in the error, got %v", err)
+	}
+	// A malformed task nobody selected must not break a run.
+	writeFile(t, filepath.Join(dir, "broken", "task.toml"), "prompt = \"p\"\nbogus = 1\n")
+	writeFile(t, filepath.Join(dir, "broken", "testdata", "f.txt"), "")
+	if _, err := loadTasks(dir, []string{"ordinary"}); err != nil {
+		t.Errorf("selecting one task must not parse another: %v", err)
+	}
+}
+
+func names(ts []*task) []string {
+	out := make([]string, 0, len(ts))
+	for _, t := range ts {
+		out = append(out, t.Name)
+	}
+	return out
+}
+
 func TestCheckReportsEveryFailure(t *testing.T) {
 	project := t.TempDir()
 	writeFile(t, filepath.Join(project, "pager.go"), "for i := 0; i <= n; i++ {")

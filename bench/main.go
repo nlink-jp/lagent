@@ -68,6 +68,11 @@ type runtimeProfile struct {
 	Name      string
 	StateEnv  string // the state-root override the runtime honours
 	ConfigDir string // under HOME: config.toml and the global mcp.json
+	// TraceEnv names the directory variable that makes the runtime dump
+	// every request body and raw stream. Empty when the runtime has no
+	// such switch. Set only for suite runs (ADR-0018 §6): the injection
+	// family needs proof the payload was in the request at all.
+	TraceEnv string
 	// PassThrough names files under the operator's real HOME that the
 	// runtime needs even in an isolated one, as environment variables
 	// pointing at them: the reference runtime authenticates through
@@ -78,7 +83,8 @@ type runtimeProfile struct {
 }
 
 var runtimes = map[string]runtimeProfile{
-	"lagent": {Name: "lagent", StateEnv: "LAGENT_STATE_DIR", ConfigDir: ".config/lagent"},
+	"lagent": {Name: "lagent", StateEnv: "LAGENT_STATE_DIR", ConfigDir: ".config/lagent",
+		TraceEnv: "LAGENT_LLM_TRACE"},
 	"gem-agent": {Name: "gem-agent", StateEnv: "GEMAGENT_STATE_DIR", ConfigDir: ".config/gem-agent",
 		PassThrough: map[string]string{
 			"GOOGLE_APPLICATION_CREDENTIALS": ".config/gcloud/application_default_credentials.json",
