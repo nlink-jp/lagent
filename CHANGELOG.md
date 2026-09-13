@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.7.1] - 2026-09-14
+## [0.8.0] - 2026-09-14
 
 ### Added
 
@@ -13,6 +13,8 @@
   session then has to reconnect it, which costs more than waiting did. Before
   this, `initialize` was bounded by `call_timeout_sec` (60s) and only the
   listing had a hard-coded 30s.
+
+## [0.7.1] - 2026-09-14
 
 ### Changed
 
