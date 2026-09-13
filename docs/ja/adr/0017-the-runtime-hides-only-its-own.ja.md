@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Accepted**（2026-09-13） — 実装済み・未リリース |
+| Status | **Accepted**（2026-09-13） — v0.5.0 で出荷。§2 が全ての spawn 地点に届いたのは下記の修正注記以降 |
 | Date | 2026-09-13 |
 | Binds | lagent |
 | Decision makers | nlink-jp メンテナ |

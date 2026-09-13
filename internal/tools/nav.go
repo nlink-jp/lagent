@@ -100,8 +100,7 @@ func (r *Registry) listTree() *Tool {
 			"an optional subdirectory. Dependency and build directories (node_modules, vendor, dist, " +
 			"target, …) and .gitignore'd entries are skipped — ignored directories still appear, " +
 			"marked [ignored], and every skip is reported; pass include_ignored=true to include them. " +
-			"VCS internals (.git and friends) and credential files (.env, private keys, token stores) " +
-			"are skipped and counted; symlinks are shown but not followed. Big " +
+			"VCS internals (.git and friends) are skipped; symlinks are shown but not followed. Big " +
 			"directories are elided at a reported per-directory cap. To orient in a large project, " +
 			"start with dirs_only=true, then descend. Prefer this over repeated list_files calls.",
 		Parameters: map[string]any{
@@ -305,8 +304,8 @@ func (r *Registry) searchFiles() *Tool {
 			"skipped and reported — pass include_ignored=true to search them too. For a broad " +
 			"\"where does this live\" question, start with mode=\"files\" (per-file counts only) " +
 			"and narrow with include (gitignore-style file pattern, e.g. \"*.go\" or \"src/**\") " +
-			"or path. Binary files, VCS internals, symlinks, credential files (.env, private keys, " +
-			"token stores) and files over 2MB are skipped; caps and credential skips are reported. " +
+			"or path. Binary files, VCS internals, symlinks and files over 2MB are skipped; caps and " +
+			"skips are reported, and a file this tool may not read is named rather than hidden. " +
 			"Prefer this over reading files wholesale to locate something.",
 		Parameters: map[string]any{
 			"type": "object",

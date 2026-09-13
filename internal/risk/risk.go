@@ -308,8 +308,10 @@ func persistentTarget(rel string) (Verdict, bool) {
 // (credentialRead, ADR-0015). Agent.decide resolves the real path for
 // exactly these before asking, so a link's target is judged rather
 // than its name. The enumeration tools (list_files, list_tree,
-// search_files) are not here: they skip a credential-named entry and
-// say so (internal/tools), never prompting.
+// search_files) are not here because they take no path argument to
+// judge: they never prompt, list every name, and the walk refuses
+// credential content itself when the kernel is not doing it
+// (ADR-0016 §3 and §5 as amended).
 var pathJudgedTools = map[string]bool{
 	"write_file": true, "edit_file": true,
 	"read_file": true, "view_image": true, "file_info": true,

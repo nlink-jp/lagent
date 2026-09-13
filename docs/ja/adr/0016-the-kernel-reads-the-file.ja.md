@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Accepted**（2026-09-13） — 実装済み・未リリース |
+| Status | **Accepted**（2026-09-13） — v0.5.0 で出荷。檻が実際に据え付くのは v0.5.1 から（§5 修正注記） |
 | Date | 2026-09-13 |
 | Binds | lagent |
 | Decision makers | nlink-jp メンテナ |

@@ -1838,10 +1838,12 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 	}, enf, notes, nil
 }
 
-// laneEnv is the environment a shell command gets in a lane. The read
-// lane runs unasked: it does not get the operator's exported secrets to
-// print (review F-07), and its temporary directory is the private
-// scratch. Every lane gets the toolchain caches pointed into that
+// laneEnv is the environment a shell command gets in a lane. Every
+// lane gets the parent's environment minus lagent's own configuration
+// variables (ADR-0017): the operator's exported variables are not
+// filtered, because which one a program needs is not a question this
+// runtime can answer. The read lane's temporary directory is the
+// private scratch. Every lane gets the toolchain caches pointed into that
 // scratch (ADR-0008 §1): the sandbox denies every write outside the
 // project, the work directory and the scratch, so a cache under
 // ~/Library would fail a build in any lane — and the read lane must

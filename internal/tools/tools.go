@@ -1164,8 +1164,7 @@ func (r *Registry) listFiles() *Tool {
 		Name: "list_files",
 		Description: "List directory entries inside the project. Directories are " +
 			"suffixed with '/'; dependency/build directories and .gitignore'd entries are " +
-			"marked [ignored] — prefer not to descend into those. Credential files (.env, private " +
-			"keys, token stores) are left out and counted. Use this to explore the " +
+			"marked [ignored] — prefer not to descend into those. Use this to explore the " +
 			"project structure before reading or editing.",
 		Parameters: map[string]any{
 			"type": "object",
