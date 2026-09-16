@@ -168,36 +168,33 @@ excepted).
   `mcp.json` two separate files
 - [`ADR-0020`](adr/0020-inline-images-declare-their-height.md) — inline
   images declare their box: the counter is told, never measures
-  (**Proposed**, not implemented; rewritten 2026-09-17 after an independent
-  pass; gem-agent ADR-0089 is the same decision on the other side):
-  ADR-0005 settled how an image reaches the model and nothing has settled
-  how one reaches the operator. `emit` counts the physical rows of every
-  line and the bottom pin rests on that count; against x/ansi v0.11.6
-  `ansi.StringWidth` is 0 for iTerm2 `OSC 1337`, kitty `APC _G` and sixel
-  `DCS q` alike while `ansi.Hardwrap` leaves all three byte-identical, and
-  `physicalRows` floors at 1, so the shortfall is N-1. Measured on
-  gem-agent's probes — a terminal is what they measure, so they are not
-  ported — with the control at the same fill in every run: on tmux 3.7c,
-  which renders sixel, a full screen strands one frame per image while a
-  screen not yet full takes no damage, and on iTerm2 3.7.2 the same
-  undercount moved nothing; this runtime's own code says why the regime
-  matters, since the pin's padding floors at zero once the screen is full
-  (model.go:1570). The declared box is reserved exactly in both dimensions
-  whatever the picture does inside it, so the emitter declares it and
-  `physicalRows` is told — replacing its floor of 1, not adding to it — and
-  the declaration covers COLUMNS too, because `wrapForScrollback`'s
-  strictly-narrower invariant is inert for exactly the lines whose width
-  the counter cannot see. What differs from the other side is the lane:
-  `newGlamourRenderer` renders the reply as one piece, so this creates a
-  segment lane with an image as its only member, and porting
-  `internal/diagram` is explicitly not part of it. The source list is ONE
-  entry — the MCP intake already writes a tool's image to a path this
-  runtime chose (mcpresult.go:184), and a model-named path is rejected
-  because it would be a view-layer open invisible to `PathJudged`
-  (risk.go:323), the class ADR-0015/0016 repaired; ADR-0005's bare-path
-  grammar is not reused for it, now for two reasons rather than one.
-  Corrected on this side: the first draft called the `WithAutoStyle`
-  hazard note "recorded in this code rather than inherited" — it is
-  byte-identical to gem-agent's and inherited under ADR-0001. Left
-  unmeasured and said so: kitty and Ghostty honouring `r=`, Terminal.app's
-  support, and the per-image cost
+  (**Proposed**, not implemented; three verification passes, and the source
+  question deferred out of it; gem-agent ADR-0089 is the same decision on
+  the other side): ADR-0005 settled how an image reaches the model; how one
+  reaches the operator is still open. `emit` counts the physical rows of
+  every line and the bottom pin rests on that count, but `ansi.StringWidth`
+  is 0 for all three payload families and `physicalRows` floors at 1, so the
+  shortfall is N-1. Measured on gem-agent's probes — they measure a
+  terminal, not a runtime, so they are not ported — with the regime arranged
+  from the terminal's own height and a plain control at the same fill in
+  every run: iTerm2 3.7.2 strands three frames for three drawn images and
+  tmux 3.7c three for three rendered sixels, while the payloads tmux
+  swallows stay clean in the same run and a screen not yet full takes no
+  damage. So the emitter declares the box, `physicalRows` is told it in
+  place of its floor of 1, and the declaration covers COLUMNS too, for the
+  row count's sake rather than the renderer's. What differs from the other
+  side is the lane: `newGlamourRenderer` renders the reply as one piece, so
+  this creates a segment lane with an image as its only member, and porting
+  `internal/diagram` is explicitly not part of it. **What may be drawn is
+  NOT settled here**: that decision was written and refuted three times — a
+  model-named path bypasses `PathJudged`, the intake's path can be
+  pre-empted by a symlink because `write` short-circuits on `os.Stat` and
+  every call hands the server the work directory, and the third draft's
+  bytes have no carrier since `render` returns a string and `Tool.Run` is
+  string-only — so it is deferred to its own ADR with the one constraint
+  that held against all three: **the view layer opens no file.** Decision 4
+  rests on sixel's inability to declare a row count alone; the supply-chain
+  rule was first wrongly withdrawn and then wrongly extended to an encoder,
+  which its own primary source says it was not written for. `internal/tui`'s
+  scrollback accounting is now on both shared-mechanism lists, and the
+  `WithAutoStyle` hazard note is recorded as inherited, which it is

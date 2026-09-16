@@ -33,7 +33,7 @@ The counter is not blind, though. `physicalRows`
 1, 0`, so an image line is credited with exactly **one** row while the
 terminal advances N. The shortfall is `N-1`, not `N`.
 
-### What a shortfall costs, measured with a control
+### What a shortfall costs, measured with a control and in the right regime
 
 The measurements live in gem-agent (`tools/rowprobe`, `tools/pinprobe`,
 `tools/imgpayload`) and are **not ported**: they measure a terminal, not a
@@ -41,38 +41,46 @@ runtime, and this repository has no `tools/` directory. `pinprobe` drives
 that runtime's real model through its real emit path — which is this
 runtime's emit path too, function for function ([model.go:803, :962,
 :975](../../../internal/tui/model.go) against gem-agent's :857, :1016,
-:1029). Every row was taken with the control at the same fill:
+:1029; `diff` returns nothing on the last two).
 
-| terminal | payload | screen | frames stranded | control at same fill |
+The regime is arranged, not assumed. The pin's padding is
+`height − printed − view − 1` and the positive branch is labelled "screen
+not full" ([model.go:1614](../../../internal/tui/model.go)). A filler count
+chosen for a 30-row pane left an 80-row window on the other side of it, and
+an earlier draft of both records reported those runs under the wrong label.
+
+| terminal | payload | regime | stranded | control at same fill |
 |---|---|---|---|---|
-| tmux 3.7c | sixel ×3 | full | **3** | clean |
-| tmux 3.7c | sixel ×3 | not full | 0 | identical |
-| iTerm2 3.7.2 | `OSC 1337 height=12` ×1 and ×5 | full | 0 | identical |
+| iTerm2 3.7.2, 180×80 | OSC 1337 `height=12` ×3 | full | **3** | PLAIN ×3, clean |
+| tmux 3.7c, 120×30 | sixel ×3, at 36 / 72 / 144px | full | **3** each | PLAIN ×3, clean |
+| tmux 3.7c, 120×30 | OSC 1337 and kitty ×3 | full | 0 | same run: swallowed there, so controls |
+| both | every case | not full | 0 | identical |
 
-So: a terminal that draws what the counter cannot see strands one frame per
-image, once the screen is full — and on iTerm2 the same undercount moved
-nothing. The regime matters and this runtime's own code says why: the pin's
-padding is `height − printed − view − 1` and floors at zero once the screen
-is full ([model.go:1570](../../../internal/tui/model.go)).
+A terminal that draws what the counter cannot see strands one frame per
+image, once the screen is full — on two terminals and two protocols, each
+against a control at the same fill. Nothing happens while the screen is not
+yet full: the pad absorbs it.
 
-`rowprobe` separately established that a **declared box is reserved
-exactly, in both dimensions, whatever the picture does inside it** — a 16:9
-image in a 40×12 box draws about ten rows and occupies twelve — and that the
-cursor is left on the image's last row, past the last cell written there.
-That is what makes a declaration usable as a count.
+`rowprobe` separately established that a **declared box is reserved exactly,
+in both dimensions, whatever the picture does inside it** — a 16:9 image in
+a 40×12 box draws about ten rows and occupies twelve — and that the cursor
+is left on the image's last row, past the last cell written there. That is
+what makes a declaration usable as a count.
 
 ### What is different on this side
 
 gem-agent partitions a reply before rendering: `diagram.Split` hands art
 segments to the terminal verbatim, a lane its ADR-0063 built for mermaid.
 **This runtime has no such lane.** `newGlamourRenderer`
-([model.go:445](../../../internal/tui/model.go)) passes the whole reply
-through glamour in one piece — no `Split`, no segment type, no verbatim
+([model.go:436](../../../internal/tui/model.go), the render at `:449`)
+passes the whole reply through glamour in one piece — no `Split`, no segment type, no verbatim
 path. So this decision does not join a lane here; it creates one, and an
 image is its first and only member. That is the larger part of the work.
 
-The other half of the material is already here: `mcp.Client` decodes a tool
-result's binary blocks ([client.go:575](../../../internal/mcp/client.go)),
+The other half of the material is already here: `mcp.Client` runs a tool
+result's binary blocks through `base64.StdEncoding.DecodeString`
+([client.go:638](../../../internal/mcp/client.go);
+`:575` is the `Content` carrier an earlier draft cited instead),
 and the intake **writes an image into the session work directory** and hands
 the model `[image saved at <path> … use view_image on that path]`
 ([mcpresult.go:184](../../../cmd/mcpresult.go)). The first draft said such
@@ -85,11 +93,13 @@ behind decision 7 was "recorded in this code rather than inherited", citing
 because it queries the terminal and the reply arrives as phantom user input
 once Bubble Tea owns stdin. The note is real and the hazard is real, but it
 is **byte-identical to gem-agent's** — inherited under ADR-0001, not
-recorded here. The provenance claim was wrong. A related divergence is
-recorded rather than left to look like an oversight: gem-agent's `AGENTS.md`
-carries the fact that Bubble Tea v1 does not decode the kitty/CSI-u
-protocols and this repository's does not, although both pin `bubbletea
-v1.3.10`.
+recorded here. The provenance claim was wrong. A related divergence was recorded here and has since
+been repaired rather than left recorded: gem-agent's `AGENTS.md` carried the
+stdin-ownership fact behind that hazard and this repository's did not,
+although both pin `bubbletea v1.3.10`. This repository's `AGENTS.md` carries
+it as of 2026-09-17, and both now list `internal/tui`'s scrollback
+accounting among the shared mechanisms — which neither did while these
+records were arguing that it is shared.
 
 ### Not measured, and not asserted
 
@@ -110,11 +120,16 @@ to, not in addition to it.
 
 ### 2. The declaration covers columns too
 
-`wrapForScrollback` keeps every printed line strictly narrower than the
-terminal; for an image line that wrap is **inert**, because the payload is
-zero cells wide. The emitter declares a column count as well and clamps it
-below `m.width`. A declared box is a cage in two dimensions or it is not a
-cage.
+The emitter declares a column count as well and clamps it below `m.width`.
+A declared box is a cage in two dimensions or it is not a cage.
+
+The reason is the **row** count, not the renderer. An earlier draft argued
+that `wrapForScrollback`'s invariant goes unenforced for an image line; a
+verification pass refuted it, because Bubble Tea's renderer gates on
+`ansi.StringWidth` too and so always gives a zero-width line its
+`EraseLineRight`. What harms is an image wider than the terminal: the
+terminal wraps the picture itself and adds rows the declared height never
+claimed.
 
 ### 3. The renderer gains a segment lane, and an image is its only member
 
@@ -128,30 +143,46 @@ rows. Porting `internal/diagram` is **not** part of this (see A1).
 
 **iTerm2 `OSC 1337 File=` and the kitty graphics protocol**, both of which
 take the row count as a parameter — decision 1's precondition. **Sixel is
-not taken**: it cannot declare one, and the one terminal measured drawing
-sixel stranded a frame for every image. The first draft also cited a
-"standing rule" that the dependency floor is stdlib and first-party SDKs;
-that sentence is withdrawn on both sides, since it appears nowhere in either
-repository outside those drafts and gem-agent already depends on the
-community `mermaid-ascii` for the lane it joins.
+not taken**: it cannot declare one, which settles it without any
+measurement.
 
-### 5. One source, because the runtime chose its path
+A second reason was mis-handled twice. The rewrite withdrew the
+organization's supply-chain rule — the floor is stdlib, then a vendor's own
+SDK, then REST directly — on the ground that it appears nowhere in either
+repository, and **that was wrong, most obviously on this side**: the rule is
+in this repository's own RFP, the document `CLAUDE.md` calls canonical, and
+in `internal/llm/openai.go`. The negative was asserted without enumerating.
 
-**An image content block in an MCP tool result**, which the intake has
-already written to a path this runtime chose. The view layer draws a file
-this runtime named and wrote.
+**Restoring it as a reason to refuse a sixel encoder then over-reached.**
+Its clearest primary source, `web-fetch` ADR-0003, states the ladder and
+says it **was written for API clients**; a sixel encoder is not one. This
+record does not make that extension, and decision 4 rests on the first
+reason alone.
 
-**A local image path named by the model is rejected.** It would be a
-view-layer file open — not a tool call, so it never reaches the agent's
-decision, never runs in ADR-0016's sandboxed child, and is invisible to the
-path-judging list, which is keyed on tool name
-([risk.go:323](../../../internal/risk/risk.go), `PathJudged`). That is the
-class ADR-0015/0016 repaired.
+### 5. What may be drawn is NOT settled here — one constraint is
 
-**ADR-0005's bare-path grammar is not reused for this**, and now for two
-reasons rather than one: it reads the **operator's input** while drawing
-reads the **model's output**, and reusing it would open exactly the
-view-layer read the paragraph above refuses.
+Written three times, refuted three times, each time the worst finding of its
+round: a path the model names bypasses the enforcers, which are keyed on
+tool name (`PathJudged`, [risk.go:323](../../../internal/risk/risk.go)); the
+path the intake wrote can be pre-empted, because `write` short-circuits on
+`os.Stat` ([mcpresult.go:207](../../../cmd/mcpresult.go)) and every call
+hands the server the work directory in `_meta`
+([client.go:608](../../../internal/mcp/client.go)); and the third draft's
+decoded bytes have no carrier at all — `render` returns a `string`
+([mcpresult.go:53](../../../cmd/mcpresult.go)) and `Tool.Run` is
+`func(ctx, args) (string, error)` ([tools.go:67](../../../internal/tools/tools.go)).
+
+Three drafts in one place is one mistake: **the source cannot be named until
+the plumbing exists.** It is deferred to its own ADR, which inherits the one
+constraint that held against all three: **the view layer opens no file.**
+Whatever the source turns out to be, the bytes must arrive by a channel the
+enforcers already govern, because a read the view layer performs is not a
+tool call and nothing here can see it.
+
+**ADR-0005's bare-path grammar is still not reused for this**, and now for
+the older of the two reasons only: it reads the **operator's input** while
+drawing reads the **model's output**. The second reason — that reusing it
+would open the view-layer read — belongs to the deferred decision now.
 
 ### 6. Only the view layer emits an image escape
 
@@ -174,8 +205,8 @@ seconds, drains before querying, and treats no reply as *no capability*,
 because an abandoned cursor report is misfiled into the next query, not
 lost.
 
-`[tui] images = "auto"` selects it, beside `theme`
-([config.go:180](../../../internal/config/config.go)). Inside a multiplexer
+`[tui] images = "auto"` selects it, beside `theme` and `language`
+([config.go:180](../../../internal/config/config.go) and `:184`). Inside a multiplexer
 the answer is **off** — because the one measured rendering a payload
 stranded a frame for every image, not because passthrough is someone else's
 configuration.

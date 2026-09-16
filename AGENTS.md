@@ -28,8 +28,28 @@ the scratch / persistent-file / credential lists, the file-read
 profile and its child), `internal/risk`, `internal/tools` (path
 confinement through `os.Root`, the walks, the caged reads),
 `internal/bounded`, `internal/hooks`, `internal/mcp`,
-`internal/trustpin`, `internal/archtest`, and the approval ladder in
-`internal/agent` and `internal/approve`.
+`internal/trustpin`, `internal/archtest`, the approval ladder in
+`internal/agent` and `internal/approve`, and — added 2026-09-17, after a
+verification pass found ADR-0089/ADR-0020 arguing it while both these lists
+denied it — the **scrollback accounting in `internal/tui`**: `emit`,
+`wrapForScrollback`, `physicalRows` and the bottom-hold pad. `diff` returns
+nothing on `wrapForScrollback` and `physicalRows`; `emit` differs only in
+ADR-number prefixes, and the pad expression is byte-identical inside a
+`View()` that is not (gem-agent's carries a settings-panel frame cap).
+A first version of this sentence said "nothing on the first three", which
+the next verification pass refuted with one `diff` — the remedy for a false
+claim being a false claim is why the citation test in `internal/archtest`
+now exists.
+
+Never query the terminal after Bubble Tea starts. Once raw mode owns stdin,
+a terminal's reply to a query — an OSC background probe, a cursor report —
+arrives in the input box as phantom keystrokes. That is why
+`newGlamourRenderer` refuses `WithAutoStyle`, and why any capability probe
+must run before `tea.NewProgram`. (A separate fact, which a first version of
+this paragraph wrongly welded to it with a "so": Bubble Tea v1 does not
+decode the kitty/CSI-u protocols, which is about disambiguating keyboard
+input, not about query replies.) gem-agent's AGENTS.md has carried the rule
+since it was learned; this copy was missing it until 2026-09-17.
 
 **This is not a rule to port features.** A feature gem-agent gains does
 not arrive here by default — ADR-0002 decides that, and this repository
