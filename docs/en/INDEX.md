@@ -166,3 +166,40 @@ excepted).
   order). chrome-pilot's registration loses `--workspace-root
   ${LAGENT_WORK_DIR}`, the only line that made gem-agent's and lagent's
   `mcp.json` two separate files
+- [`ADR-0020`](adr/0020-inline-images-declare-their-height.md) — inline
+  images declare their height: the counter is told, never measures
+  (**Proposed**, not implemented; gem-agent ADR-0089 is the same decision
+  on the other side): ADR-0005 settled how an image reaches the model and
+  nothing has settled how one reaches the operator — an MCP server's
+  screenshot is, on this surface, a path in a line of text. `emit` counts
+  the physical rows of every line and the bottom pin rests on that count,
+  but an image is a line the counter cannot see: against x/ansi v0.11.6
+  `ansi.StringWidth` is 0 for iTerm2 `OSC 1337`, kitty `APC _G` and sixel
+  `DCS q` alike, while `ansi.Hardwrap` leaves all three byte-identical so
+  `wrapForScrollback` shears nothing. Measured with gem-agent's
+  `tools/rowprobe` on iTerm2 3.7.2 (16/16 cursor reports, a property of
+  the terminal rather than the runtime, so the tool is not ported): the
+  declared box is reserved exactly in both dimensions whatever the picture
+  does inside it — a 16:9 image in a 40x12 box draws about ten rows and
+  occupies twelve — so no aspect-ratio derivation is needed; the cursor is
+  left on the image's LAST row, which makes the raw delta one short and
+  made a terminal honouring every declaration read as one honouring none
+  on the first pass; and an undeclared image takes its native size,
+  recoverable only from the cell pixel size. So the emitter declares the
+  height and `physicalRows` is told it. The difference from the other side
+  is the lane: gem-agent's `diagram.Split` already partitions a reply,
+  while `newGlamourRenderer` here renders it as one piece — so this
+  creates a segment lane with an image as its only member, and porting
+  `internal/diagram` is explicitly not part of it. Only protocols that can
+  declare a row count are taken (sixel is refused for needing a derivation
+  and a community encoder); the capability is probed once before Bubble
+  Tea owns stdin, for the reason `newGlamourRenderer` already records
+  about `WithAutoStyle` — a terminal's reply becomes phantom user input —
+  and an unanswered probe means no capability, because a cursor report
+  carries no tag and an abandoned reply is misfiled rather than lost.
+  ADR-0005's bare-path grammar is deliberately not reused: it reads the
+  operator's input, drawing reads the model's output. Unresolved and
+  written down rather than claimed: iTerm2 answered the next cursor report
+  0.8-1.5s after a 2.4 KB payload, which bounds its parser and not its
+  drawing, and tool output still reaches the terminal without ANSI
+  stripping — pre-existing, not widened, not repaired here
