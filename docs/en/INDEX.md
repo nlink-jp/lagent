@@ -139,3 +139,30 @@ excepted).
   in a tool result, scores the value of an argument rather than prose,
   ships a benign twin, varies the targeted element, and leaves rates to
   the single-turn harness
+- [`ADR-0019`](adr/0019-the-caller-names-the-work-dir.md) — the caller
+  names the work directory: `_meta` on every `tools/call` (**Accepted**,
+  implemented; gem-agent ADR-0088 is the same decision on the other
+  side): organization ADR-021 settled that a server producing files
+  takes its destination as a per-call `work_dir` argument, and ten fleet
+  servers came to require it — the contract places an obligation on the
+  calling side too. Measurement of the four calling runtimes is why the
+  argument exists at all: neither MCP `roots` nor the environment
+  reaches half of them. The contract's second channel, the request's
+  `_meta["jp.nlink/work_dir"]`, exists for the runtimes we write
+  ourselves — it is schema-blind, so it rides every `tools/call` without
+  knowing any tool's schema, and a model that forgets the argument still
+  leaves the server a destination this session can read back.
+  `LAGENT_WORK_DIR` does not serve: it is an environment variable for
+  child processes, not a protocol value, and reading it needs
+  `${LAGENT_WORK_DIR}` in the registration entry, where the sibling
+  runtime expands an undefined variable silently to the empty string. So
+  `mcp.Client` carries the session work directory and attaches the key
+  to `params._meta` on every call; a session with no work directory
+  attaches nothing, because an empty hint is worse than none — a server
+  would take it for an answer; the value is a `NewStdio` parameter
+  rather than a global or a setter, since it does not change while the
+  client lives; and the model's own argument always wins, `_meta` being
+  read only when the argument was absent (ADR-021 §2's resolution
+  order). chrome-pilot's registration loses `--workspace-root
+  ${LAGENT_WORK_DIR}`, the only line that made gem-agent's and lagent's
+  `mcp.json` two separate files
