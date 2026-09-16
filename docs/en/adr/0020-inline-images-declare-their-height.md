@@ -1,243 +1,241 @@
-# ADR-0020: inline images declare their height — the counter is told, never measures
+# ADR-0020: inline images declare their box — the counter is told, never measures
 
 | Field | Value |
 |-------|-------|
-| Status | **Proposed** (2026-09-16) |
+| Status | **Proposed** (2026-09-16, rewritten 2026-09-17) |
 | Date | 2026-09-16 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
 | Triggered by | Operator: when the terminal supports graphics, can a reply draw them inline — here and in gem-agent? |
-| Relates to | [ADR-0005](0005-images-reach-the-model.md) (images reach the model — this decision is the other direction), [ADR-0001](0001-porting-sources-pinned.md) (the TUI came from gem-agent at a pinned commit); gem-agent ADR-0089 (the same decision on the other side — the two runtimes stay identical) |
+| Rewritten because | An independent verification pass returned findings in three classes against both sides of this decision: claims about adjacent code asserted without reading it, "measured" claims wider than the instrument, and a lane opened without enumerating the dimensions it opens. One finding was specific to this side and is corrected below |
+| Relates to | [ADR-0005](0005-images-reach-the-model.md) (images reach the model — this is the other direction), [ADR-0001](0001-porting-sources-pinned.md) (the TUI came from gem-agent at a pinned commit), [ADR-0015](0015-credential-reads-are-operator-only.md) / [ADR-0016](0016-the-kernel-reads-the-file.md) (who may open a file); gem-agent ADR-0089 (the same decision on the other side) |
 
 ## Context
 
 ADR-0005 settled how an image reaches the **model**: a dropped path attaches,
-`view_image` returned, and a reference that failed to attach is said. Nothing
-has ever settled how an image reaches the **operator**. A screenshot an MCP
-server saved is, on this surface, a file path in a line of text.
+`view_image` returned, and a reference that failed to attach is said.
+Nothing has settled how one reaches the **operator**. A screenshot an MCP
+server saved is, on this surface, a path in a line of text.
 
-`emit` prints one line into scrollback and counts its physical rows, and the
-bottom pinning rests on that count being exact. **An inline image defeats the
-counter outright.** Measured against `charmbracelet/x/ansi` v0.11.6 — the
-version this module pins, the same one gem-agent pins — `ansi.StringWidth`
-returns **0** for an iTerm2 `OSC 1337 File=`, a kitty `APC _G` and a sixel
-`DCS q` alike, and `ansi.Strip` returns the empty string, while the terminal
-advances real rows. An image is not a wide line; it is a line the counter
-cannot see at all. The same measurement shows `ansi.Hardwrap` leaves all three
-payloads byte-identical, so `wrapForScrollback` shears nothing.
+### What the counter can and cannot see
 
-Bubble Tea runs **inline** here as it does there: completed output goes to the
-terminal's native scrollback and is never repainted, so an image, once drawn,
-is the terminal's to keep.
+`emit` ([model.go:803](../../../internal/tui/model.go)) prints one line into
+scrollback and counts its physical rows; the bottom pinning rests on that
+count. Measured against `charmbracelet/x/ansi` v0.11.6 — the version
+`go.mod:11` pins, the same one gem-agent pins — `ansi.StringWidth` returns
+**0** and `ansi.Strip` the empty string for an iTerm2 `OSC 1337 File=`, a
+kitty `APC _G` and a sixel `DCS q` alike, and `ansi.Hardwrap` leaves all
+three byte-identical, so `wrapForScrollback`
+([model.go:962](../../../internal/tui/model.go)) shears nothing.
+
+The counter is not blind, though. `physicalRows`
+([model.go:975](../../../internal/tui/model.go)) starts at `rows, cells :=
+1, 0`, so an image line is credited with exactly **one** row while the
+terminal advances N. The shortfall is `N-1`, not `N`.
+
+### What a shortfall costs, measured with a control
+
+The measurements live in gem-agent (`tools/rowprobe`, `tools/pinprobe`,
+`tools/imgpayload`) and are **not ported**: they measure a terminal, not a
+runtime, and this repository has no `tools/` directory. `pinprobe` drives
+that runtime's real model through its real emit path — which is this
+runtime's emit path too, function for function ([model.go:803, :962,
+:975](../../../internal/tui/model.go) against gem-agent's :857, :1016,
+:1029). Every row was taken with the control at the same fill:
+
+| terminal | payload | screen | frames stranded | control at same fill |
+|---|---|---|---|---|
+| tmux 3.7c | sixel ×3 | full | **3** | clean |
+| tmux 3.7c | sixel ×3 | not full | 0 | identical |
+| iTerm2 3.7.2 | `OSC 1337 height=12` ×1 and ×5 | full | 0 | identical |
+
+So: a terminal that draws what the counter cannot see strands one frame per
+image, once the screen is full — and on iTerm2 the same undercount moved
+nothing. The regime matters and this runtime's own code says why: the pin's
+padding is `height − printed − view − 1` and floors at zero once the screen
+is full ([model.go:1570](../../../internal/tui/model.go)).
+
+`rowprobe` separately established that a **declared box is reserved
+exactly, in both dimensions, whatever the picture does inside it** — a 16:9
+image in a 40×12 box draws about ten rows and occupies twelve — and that the
+cursor is left on the image's last row, past the last cell written there.
+That is what makes a declaration usable as a count.
 
 ### What is different on this side
 
-gem-agent partitions a reply before rendering — `diagram.Split` hands art
-segments to the terminal verbatim, bypassing glamour, and gem-agent's
-ADR-0063 built that lane for mermaid. **lagent has no such lane.**
-`newGlamourRenderer` passes the whole reply through glamour in one piece;
-there is no `Split`, no segment type, and no verbatim path. So this decision
-does not join an existing lane here — it creates one, and an image is its
-first and only member.
+gem-agent partitions a reply before rendering: `diagram.Split` hands art
+segments to the terminal verbatim, a lane its ADR-0063 built for mermaid.
+**This runtime has no such lane.** `newGlamourRenderer`
+([model.go:445](../../../internal/tui/model.go)) passes the whole reply
+through glamour in one piece — no `Split`, no segment type, no verbatim
+path. So this decision does not join a lane here; it creates one, and an
+image is its first and only member. That is the larger part of the work.
 
-The runtime also already holds the other half of the material: `mcp.Client`
-decodes a tool result's binary blocks to `Content{Data, MIME}`, and
-`view_image` reads images from the project and the work directory. Both feed
-the model today and neither reaches the screen.
+The other half of the material is already here: `mcp.Client` decodes a tool
+result's binary blocks ([client.go:575](../../../internal/mcp/client.go)),
+and the intake **writes an image into the session work directory** and hands
+the model `[image saved at <path> … use view_image on that path]`
+([mcpresult.go:184](../../../cmd/mcpresult.go)). The first draft said such
+blocks were "forwarded to the model"; they are not — the bytes never ride
+back inline.
 
-One hazard is already recorded in this code rather than inherited.
-`newGlamourRenderer` says it: `WithAutoStyle` is deliberately absent because
-it queries the terminal and, once Bubble Tea owns stdin, the reply arrives as
-phantom user input. Detecting a graphics capability is the same query and the
-same hazard, and decision 4 answers it the same way.
+**A correction specific to this side.** The first draft said the hazard
+behind decision 7 was "recorded in this code rather than inherited", citing
+`newGlamourRenderer`'s note that `WithAutoStyle` is deliberately absent
+because it queries the terminal and the reply arrives as phantom user input
+once Bubble Tea owns stdin. The note is real and the hazard is real, but it
+is **byte-identical to gem-agent's** — inherited under ADR-0001, not
+recorded here. The provenance claim was wrong. A related divergence is
+recorded rather than left to look like an oversight: gem-agent's `AGENTS.md`
+carries the fact that Bubble Tea v1 does not decode the kitty/CSI-u
+protocols and this repository's does not, although both pin `bubbletea
+v1.3.10`.
 
-### What the terminal does
+### Not measured, and not asserted
 
-Measured with gem-agent's `tools/rowprobe` on iTerm2 3.7.2, 180×80 cells, 16
-of 16 cursor reports answered. This is a property of the **terminal**, not of
-the runtime, so it transfers and the tool is not ported:
-
-| case | declared | occupies | cursor Δ | end col |
-|------|----------|----------|----------|---------|
-| no size declared | (none) | 10 rows | 9 | 41 |
-| `height=6` only | 6 | 6 rows | 5 | 25 |
-| 40×6 box, aspect kept (wide image) | 6 | 6 rows | 5 | 41 |
-| 40×6 box, aspect kept (tall image) | 6 | 6 rows | 5 | 41 |
-| 40×6 box, stretched | 6 | 6 rows | 5 | 41 |
-| `height=1` | 1 | 1 row | 0 | 5 |
-| 40×12 box, aspect kept | 12 | 12 rows | 11 | 41 |
-| text + image + text on one line | 6 | 6 rows | 5 | 38 |
-
-1. **The declared box is reserved exactly, in both dimensions, whatever the
-   picture does inside it.** The 40×12 case holds a 16:9 image that draws
-   about ten rows and still occupies twelve; the 40×6 cases end at column 41
-   though the drawing is twenty-four columns wide. No aspect-ratio derivation
-   is needed — the declaration overrides the aspect ratio.
-2. **The cursor is left on the image's last row**, at the column past the box,
-   never at column 1. The raw delta is therefore one *less* than the
-   occupancy; read as the count it makes a terminal honouring every
-   declaration look like one honouring none, which is how the run was first
-   read.
-3. **An undeclared image takes its native size**, recoverable only from the
-   cell pixel size. Declaring is the difference between a number we choose and
-   one we have to go and ask for.
-4. **Text on the same line lands badly**: the prefix on the image's first row,
-   the suffix on its last.
-
-Unresolved: after a 2.4 KB payload iTerm2 answered the next cursor report
-0.8–1.5 s later. That bounds when its parser reached the image token and is
-*not* established as draw latency.
-
-macOS only, and **Terminal.app implements none of the three protocols**, so
-the no-graphics path is a main road rather than an edge case.
+Whether kitty or Ghostty honour `r=` (every measurement is iTerm2 or tmux);
+whether Terminal.app implements any of the three; the per-image cost (iTerm2
+answered the next cursor report 0.8–1.5 s after a 2.4 KB payload, which
+bounds its parser, not its drawing); and a terminal that draws without
+reserving rows, where the correction would credit one row too many.
 
 ## Decision
 
-### 1. The emitter declares the height; the counter is told
+### 1. The emitter declares the box; the counter is told
 
-`physicalRows` never measures an image and never learns to. An image segment
-carries the row count its payload declares — `height=N` for iTerm2, `r=N` for
-kitty — and `emit` adds **that** number. There is no second path to the
-number, so nothing can disagree with it: the count is exact by construction
-and the bottom pin stays exact. The cursor lands on the image's last row, so
-the newline `emit` already appends opens the next row rather than adding one;
-a segment declaring N rows costs exactly N.
+`physicalRows` never measures an image. An image segment carries the row
+count its payload declares — `height=N` for iTerm2, `r=N` for kitty — and
+`emit` uses that number **in place of** the one row `physicalRows` floors
+to, not in addition to it.
 
-### 2. The renderer gains a segment lane, and an image is its only member
+### 2. The declaration covers columns too
 
-`newGlamourRenderer` stops rendering the reply as one piece. It partitions
-into segments, renders ordinary segments through glamour as now, and emits
-image segments verbatim with their declared row count. This is the lane
-gem-agent's ADR-0063 already has; here it arrives with one member and no
-mermaid. Porting `internal/diagram` is **not** part of this decision (see
-Alternatives).
+`wrapForScrollback` keeps every printed line strictly narrower than the
+terminal; for an image line that wrap is **inert**, because the payload is
+zero cells wide. The emitter declares a column count as well and clamps it
+below `m.width`. A declared box is a cage in two dimensions or it is not a
+cage.
 
-An image occupies its own line, because text sharing the line with one is
-split across its first and last rows.
+### 3. The renderer gains a segment lane, and an image is its only member
 
-### 3. Two protocols, and only the ones that can declare
+`newGlamourRenderer` stops rendering the reply as one piece: it partitions
+into segments, renders ordinary ones through glamour as now, and emits image
+segments verbatim with their declared box. An image occupies its own line,
+because text sharing a line with one is split across its first and last
+rows. Porting `internal/diagram` is **not** part of this (see A1).
+
+### 4. Two protocols, and only the ones that can declare
 
 **iTerm2 `OSC 1337 File=` and the kitty graphics protocol**, both of which
-take the row count as a parameter — decision 1's precondition.
+take the row count as a parameter — decision 1's precondition. **Sixel is
+not taken**: it cannot declare one, and the one terminal measured drawing
+sixel stranded a frame for every image. The first draft also cited a
+"standing rule" that the dependency floor is stdlib and first-party SDKs;
+that sentence is withdrawn on both sides, since it appears nowhere in either
+repository outside those drafts and gem-agent already depends on the
+community `mermaid-ascii` for the lane it joins.
 
-**Sixel is not taken.** It cannot declare a row count; the count would have to
-be derived from the image's pixel height and the cell pixel size, reintroducing
-the derivation decision 1 removes and resting on a second query that can fail.
-It also needs an encoder, and the only ones available are community packages.
-PNG and JPEG go to the two protocols above as bytes, with `image.DecodeConfig`
-from the standard library the only decoding this runtime does.
+### 5. One source, because the runtime chose its path
 
-### 4. The capability is probed once, before Bubble Tea owns stdin
+**An image content block in an MCP tool result**, which the intake has
+already written to a path this runtime chose. The view layer draws a file
+this runtime named and wrote.
 
-`$TERM` cannot answer and is not asked. The terminal is queried — the kitty
-`a=q` probe, `TERM_PROGRAM` plus `XTVERSION` for iTerm2 — **once, at startup,
-before `tea.NewProgram`**, and cached for the session. Never during it, for
-the reason `newGlamourRenderer` already gives about `WithAutoStyle`: a
-terminal's reply to a query becomes phantom user input once Bubble Tea owns
-stdin.
+**A local image path named by the model is rejected.** It would be a
+view-layer file open — not a tool call, so it never reaches the agent's
+decision, never runs in ADR-0016's sandboxed child, and is invisible to the
+path-judging list, which is keyed on tool name
+([risk.go:323](../../../internal/risk/risk.go), `PathJudged`). That is the
+class ADR-0015/0016 repaired.
 
-The probe takes a budget in seconds rather than milliseconds, drains the
-stream before querying, and treats a reply that never arrives as *no
-capability* rather than skipping it — a cursor report carries no tag, so an
-abandoned reply is misfiled into the next query rather than lost (measured
-while building `rowprobe`: 11 sent, 5 read, 6 landing on the shell prompt
-after exit).
-
-`[tui] images = "auto"` selects it, beside `theme` and `language`: `auto`
-probes, `off` never draws, `iterm` / `kitty` force a protocol. Inside a
-multiplexer the answer is **off** unless a protocol is forced — passthrough is
-the multiplexer's configuration, not this runtime's to assume.
-
-### 5. What may be drawn is a list, not a rule
-
-Two entries:
-
-- an **image content block in an MCP tool result** — already decoded to
-  `Content{Data, MIME}` and today only forwarded to the model;
-- a **local image file named by the reply**, as a Markdown image link, whose
-  bytes decode as PNG or JPEG via `image.DecodeConfig`.
-
-A third source is a new entry argued on its own, not a rule generalizing these
-two.
-
-Note what is deliberately *not* an entry: the bare image path ADR-0005 made
-attachable. That grammar is about the **operator's input** reaching the model;
-drawing is about the **model's output** reaching the screen. Reusing it would
-make the runtime redraw the operator's own attachment back at them.
+**ADR-0005's bare-path grammar is not reused for this**, and now for two
+reasons rather than one: it reads the **operator's input** while drawing
+reads the **model's output**, and reusing it would open exactly the
+view-layer read the paragraph above refuses.
 
 ### 6. Only the view layer emits an image escape
 
-Bytes arriving from a tool are data. The view layer decides a segment is an
-image and writes the escape; nothing a tool returns is passed through as an
-escape because it looks like one.
+Bytes arriving from a tool are data. The implementation commit carries an
+architecture test enumerating the sites that may emit an escape; without it
+this sentence is "as of today". This does not close the existing surface:
+`ansi.Strip` is called at one site in non-test code
+([model.go:980](../../../internal/tui/model.go)), inside `physicalRows`, to
+*measure* — so raw escapes from shell output already reach the terminal.
+Pre-existing, not widened here, not repaired here.
 
-This does **not** close the existing surface: tool output is printed without
-ANSI stripping today — `ansi.Strip` is called only to *measure* width — so raw
-escapes from shell output already reach the terminal. Pre-existing, not
-widened here, not repaired here. Written down so the next review finds it
-named rather than missed.
+### 7. Drawing is TUI-only, and the capability is probed once
 
-### 7. The runtime says nothing about images
+`tea.NewProgram` is constructed at one site
+([root.go:1341](../../../cmd/root.go)); one-shot `-p` and the plain REPL
+never build it and never draw. The probe runs **before** that construction
+and is cached, for the reason `newGlamourRenderer` records about
+`WithAutoStyle` — inherited from the porting source, and true here. It takes
+seconds, drains before querying, and treats no reply as *no capability*,
+because an abandoned cursor report is misfiled into the next query, not
+lost.
 
-No tool, no prompt paragraph, no "this terminal can draw." The two sources in
-decision 5 are things the model already produces for its own reasons, so there
-is no capability waiting on a trigger that must be taught. A test pins the
-absence.
+`[tui] images = "auto"` selects it, beside `theme`
+([config.go:180](../../../internal/config/config.go)). Inside a multiplexer
+the answer is **off** — because the one measured rendering a payload
+stranded a frame for every image, not because passthrough is someone else's
+configuration.
+
+### 8. The runtime says nothing about images
+
+No tool, no prompt paragraph. The first draft argued the model "already
+produces" these sources; that is a firing-rate claim and neither runtime has
+a denominator for it. Decision 5's single source needs no model behaviour:
+the intake writes the file whether or not the model mentions it. This also
+keeps the decision clear of `CLAUDE.md`'s rule that a behavioural claim
+about the local model is measured on the bench (ADR-0006) before it is
+relied on — no such claim is made.
 
 ## Consequences
 
-- The bottom pin survives images by construction rather than by care.
-- No aspect-ratio arithmetic and no cell-pixel-size query enter the runtime.
-- Terminal.app loses nothing: the fallback is today's behaviour.
-- **The per-image cost is unmeasured**, and the 0.8–1.5 s figure bounds the
-  terminal's parser, not its drawing. Measuring it comes before `auto` is
-  trusted in a streaming turn.
-- This runtime gains a segment lane it has never had. That is the larger part
-  of the work here and the part gem-agent does not have to do.
-- An image a tool produced is drawn for the operator whether or not the model
-  was given it. ADR-0005 settled ingestion; this settles the screen. They are
-  separate surfaces and a tool's image can now reach both.
+- The bottom pin survives images by construction, in both dimensions.
+- This runtime gains a segment lane it has never had. That is the larger
+  part of the work here and the part gem-agent does not have to do.
+- An image a tool produced is drawn for the operator whether or not the
+  model was given it. ADR-0005 settled ingestion; this settles the screen.
+- Terminal.app — and any terminal that does not draw — loses nothing.
+- What is unmeasured stays unmeasured; `auto` should not be trusted in a
+  streaming turn until the per-image cost is.
+- gem-agent ADR-0089 is the same decision on the other side. Neither runtime
+  may hold it alone.
 
 ## Alternatives considered
 
-**A1. Port `internal/diagram` from gem-agent first, and add images to that
-lane.** Rejected as a precondition, not as an idea. The lane this needs is the
-partition and the verbatim path, which is small; the diagram package is the
-frozen mermaid translation table and the faithfulness guards, which are a
-separate decision with their own evidence (gem-agent ADR-0042/0063) and no
-measurement on this side. Bringing it along would make an image lane wait on a
-mermaid argument nobody has had here yet. If diagrams come later they join the
-lane this creates.
+**A1. Port `internal/diagram` first and add images to that lane.** Rejected
+as a precondition, not as an idea: the lane this needs is the partition and
+the verbatim path, which is small, while the diagram package is the frozen
+mermaid translation table and its faithfulness guards — a separate decision
+with its own evidence (gem-agent ADR-0042/0063) and no measurement here.
+Diagrams, if they come, join the lane this creates.
 
-**A2. Measure the image instead of declaring it.** There is no measurement
-path — the payload is zero cells wide to every surface the TUI has — and
-asking the terminal per line means a cursor round-trip inside the loop,
-impossible once Bubble Tea owns stdin.
+**A2. Measure the image instead of declaring it.** No measurement path
+exists, and a cursor round-trip per line is impossible once Bubble Tea owns
+stdin.
 
-**A3. Derive the row count from the image's pixels and the cell size.**
-Measured unnecessary: the declared box overrides the aspect ratio, so the
-derivation would compute a number the terminal ignores, and it would add an
-`ESC[16t` query that can go unanswered.
+**A3. Derive the row count from pixels and the cell size.** Measured
+unnecessary: the declared box overrides the aspect ratio.
 
-**A4. Sixel, for breadth.** See decision 3.
+**A4. Sixel, for breadth.** Decision 4, now with a measurement.
 
 **A5. An alt-screen region that manages images.** Rejected: inline mode and
 the native scrollback are what let an image survive being scrolled past.
 
-**A6. Reuse ADR-0005's bare-path grammar to decide what to draw.** Rejected —
-see decision 5: it reads the operator's input, and drawing reads the model's
-output.
+**A6. Reuse ADR-0005's bare-path grammar to decide what to draw.** Decision
+5 — wrong input, and it opens a read outside every enforcer.
 
 **A7. Wait for gem-agent to implement first and port the result.** Rejected
-for the decision, accepted as a possibility for the code. The two runtimes
-have been repaired before for holding the same rule in one and not the other;
-a decision taken on one side and left open on the other is that same class.
-Which runtime writes the implementation first is a scheduling question, not a
-design one.
+for the decision, accepted as a possibility for the code: which runtime
+writes the implementation first is scheduling, not design.
 
 ## References
 
-- gem-agent ADR-0089 — the same decision, and `tools/rowprobe`, the
-  measurement behind the table above
-- ADR-0005 — how an image reaches the model on this runtime
+- gem-agent ADR-0089 — the same decision, and `tools/rowprobe` /
+  `tools/pinprobe` / `tools/imgpayload`, the measurements behind the tables
+  above
+- ADR-0005 — how an image reaches the model here; ADR-0015 / ADR-0016 — who
+  may open a file
 - gem-agent ADR-0063 §3 — art bypasses glamour, and why

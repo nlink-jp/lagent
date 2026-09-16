@@ -167,39 +167,37 @@ excepted).
   ${LAGENT_WORK_DIR}`, the only line that made gem-agent's and lagent's
   `mcp.json` two separate files
 - [`ADR-0020`](adr/0020-inline-images-declare-their-height.md) — inline
-  images declare their height: the counter is told, never measures
-  (**Proposed**, not implemented; gem-agent ADR-0089 is the same decision
-  on the other side): ADR-0005 settled how an image reaches the model and
-  nothing has settled how one reaches the operator — an MCP server's
-  screenshot is, on this surface, a path in a line of text. `emit` counts
-  the physical rows of every line and the bottom pin rests on that count,
-  but an image is a line the counter cannot see: against x/ansi v0.11.6
+  images declare their box: the counter is told, never measures
+  (**Proposed**, not implemented; rewritten 2026-09-17 after an independent
+  pass; gem-agent ADR-0089 is the same decision on the other side):
+  ADR-0005 settled how an image reaches the model and nothing has settled
+  how one reaches the operator. `emit` counts the physical rows of every
+  line and the bottom pin rests on that count; against x/ansi v0.11.6
   `ansi.StringWidth` is 0 for iTerm2 `OSC 1337`, kitty `APC _G` and sixel
-  `DCS q` alike, while `ansi.Hardwrap` leaves all three byte-identical so
-  `wrapForScrollback` shears nothing. Measured with gem-agent's
-  `tools/rowprobe` on iTerm2 3.7.2 (16/16 cursor reports, a property of
-  the terminal rather than the runtime, so the tool is not ported): the
-  declared box is reserved exactly in both dimensions whatever the picture
-  does inside it — a 16:9 image in a 40x12 box draws about ten rows and
-  occupies twelve — so no aspect-ratio derivation is needed; the cursor is
-  left on the image's LAST row, which makes the raw delta one short and
-  made a terminal honouring every declaration read as one honouring none
-  on the first pass; and an undeclared image takes its native size,
-  recoverable only from the cell pixel size. So the emitter declares the
-  height and `physicalRows` is told it. The difference from the other side
-  is the lane: gem-agent's `diagram.Split` already partitions a reply,
-  while `newGlamourRenderer` here renders it as one piece — so this
-  creates a segment lane with an image as its only member, and porting
-  `internal/diagram` is explicitly not part of it. Only protocols that can
-  declare a row count are taken (sixel is refused for needing a derivation
-  and a community encoder); the capability is probed once before Bubble
-  Tea owns stdin, for the reason `newGlamourRenderer` already records
-  about `WithAutoStyle` — a terminal's reply becomes phantom user input —
-  and an unanswered probe means no capability, because a cursor report
-  carries no tag and an abandoned reply is misfiled rather than lost.
-  ADR-0005's bare-path grammar is deliberately not reused: it reads the
-  operator's input, drawing reads the model's output. Unresolved and
-  written down rather than claimed: iTerm2 answered the next cursor report
-  0.8-1.5s after a 2.4 KB payload, which bounds its parser and not its
-  drawing, and tool output still reaches the terminal without ANSI
-  stripping — pre-existing, not widened, not repaired here
+  `DCS q` alike while `ansi.Hardwrap` leaves all three byte-identical, and
+  `physicalRows` floors at 1, so the shortfall is N-1. Measured on
+  gem-agent's probes — a terminal is what they measure, so they are not
+  ported — with the control at the same fill in every run: on tmux 3.7c,
+  which renders sixel, a full screen strands one frame per image while a
+  screen not yet full takes no damage, and on iTerm2 3.7.2 the same
+  undercount moved nothing; this runtime's own code says why the regime
+  matters, since the pin's padding floors at zero once the screen is full
+  (model.go:1570). The declared box is reserved exactly in both dimensions
+  whatever the picture does inside it, so the emitter declares it and
+  `physicalRows` is told — replacing its floor of 1, not adding to it — and
+  the declaration covers COLUMNS too, because `wrapForScrollback`'s
+  strictly-narrower invariant is inert for exactly the lines whose width
+  the counter cannot see. What differs from the other side is the lane:
+  `newGlamourRenderer` renders the reply as one piece, so this creates a
+  segment lane with an image as its only member, and porting
+  `internal/diagram` is explicitly not part of it. The source list is ONE
+  entry — the MCP intake already writes a tool's image to a path this
+  runtime chose (mcpresult.go:184), and a model-named path is rejected
+  because it would be a view-layer open invisible to `PathJudged`
+  (risk.go:323), the class ADR-0015/0016 repaired; ADR-0005's bare-path
+  grammar is not reused for it, now for two reasons rather than one.
+  Corrected on this side: the first draft called the `WithAutoStyle`
+  hazard note "recorded in this code rather than inherited" — it is
+  byte-identical to gem-agent's and inherited under ADR-0001. Left
+  unmeasured and said so: kitty and Ghostty honouring `r=`, Terminal.app's
+  support, and the per-image cost
