@@ -21,9 +21,9 @@ agent's decision nor ADR-0016's sandboxed child, and the path-judging list
 That rules out the obvious design. The MCP intake already writes an image
 into the session work directory and hands the model
 `[image saved at <path> … use view_image on that path]`
-([mcpresult.go:200](../../../cmd/mcpresult.go)), so a path is sitting
+([mcpresult.go:224](../../../cmd/mcpresult.go)), so a path is sitting
 there — but `write` short-circuits on `os.Stat`
-([mcpresult.go:223](../../../cmd/mcpresult.go)) while every call hands the
+([mcpresult.go:247](../../../cmd/mcpresult.go)) while every call hands the
 server the work directory as `_meta[workdir.MetaKey]`
 ([client.go:608](../../../internal/mcp/client.go)). A local server child
 knows its own name, its tool name, the bytes it will return and the
