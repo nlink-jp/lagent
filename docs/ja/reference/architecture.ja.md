@@ -17,7 +17,8 @@ cmd/            flags, config load, project resolution, wiring, REPL/TUI
   |-- internal/llm         Backend interface + the OpenAI-compatible client (stream observer)
   |-- internal/tools       the nine file/shell/image built-ins + Register
   |-- internal/agent       the turn loop, approval dispatch, the round ladder
-  `-- internal/tui         Bubble Tea inline UI (or internal/repl, non-TTY)
+  |-- internal/tui         Bubble Tea inline UI (or internal/repl, non-TTY)
+  `-- internal/termimg     宣言したボックス内のインライン画像（ADR-0020）
 ```
 
 tools パッケージはプロジェクトディレクトリだけを要する 9 つの組込ツール

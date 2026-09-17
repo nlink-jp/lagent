@@ -153,6 +153,13 @@ internal/session/  JSONL transcript: logger + resume loader; usage records in th
                    gem-usage-lens shape; LAGENT_SESSION_ID is exported at startup
 internal/repl/     paste-safe input reader (plain REPL, non-TTY fallback)
 internal/tui/      Bubble Tea inline TUI: model, approval gate, settings panel
+internal/termimg/  inline images in a DECLARED box (ADR-0020): capability
+                   detection before Bubble Tea owns stdin, iTerm2/kitty
+                   payloads carrying the box, Fit clamping the width. The
+                   row counter is told the box, never asked to measure —
+                   an image payload is zero cells wide to every surface
+                   the TUI has. The source is the MCP intake, and only a
+                   block it both saved and described (ADR-0021)
 bench/             the task bench (ADR-0006): runner + report (package main), configs/<runtime>/*.toml,
                    tasks/<name>/{task.toml,testdata/}, mcpfixture/ (the stdio MCP fixture server);
                    _results/ is ignored by git (and by go's ./..., which is why the underscore)
