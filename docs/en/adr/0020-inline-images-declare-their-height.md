@@ -164,7 +164,8 @@ decoded bytes have no carrier at all — `render` returns a `string`
 `func(ctx, args) (string, error)` ([tools.go:67](../../../internal/tools/tools.go)).
 
 Three drafts in one place is one mistake: **the source cannot be named until
-the plumbing exists.** It is deferred to its own ADR, which inherits the one
+the plumbing exists.** It is deferred to [ADR-0021](0021-an-images-bytes-never-become-a-path.md),
+which inherits the one
 constraint that held against all three: **the view layer opens no file.**
 Whatever the source turns out to be, the bytes must arrive by a channel the
 enforcers already govern, because a read the view layer performs is not a

@@ -198,3 +198,32 @@ excepted).
   which its own primary source says it was not written for. `internal/tui`'s
   scrollback accounting is now on both shared-mechanism lists, and the
   `WithAutoStyle` hazard note is recorded as inherited, which it is
+- [`ADR-0021`](adr/0021-an-images-bytes-never-become-a-path.md) — an
+  image's bytes reach the screen without ever becoming a path
+  (**Proposed**, not implemented; gem-agent ADR-0090 is the same decision
+  on the other side): ADR-0020 §5 deferred the source after three drafts
+  and three refutations, keeping one constraint — the view layer opens no
+  file, because a read it performs is not a tool call and `pathJudgedTools`
+  is keyed on tool name. That rules out the saved path: `write`
+  short-circuits on `os.Stat` while every call hands the server the work
+  directory in `_meta`, so a local server child can plant a symlink at the
+  content-addressed name and the runtime writes nothing; reaching that file
+  through `view_image` is contained because the agent resolves symlinks
+  first, and a view-layer open would not be. The third draft's alternative
+  had no carrier — `render` returns a string and `Tool.Run` is string-only
+  — but the channel it needed already exists here too, and is the same one:
+  the agent loop sends to the UI mid-call. So `mcpIntake` gains one
+  optional sink beside `workDir`, called with the decoded bytes as the
+  block is taken in and wired to `prog.Send`; the string contract does not
+  move, and the sink is nil in every entrance that is not an interactive
+  TUI. An image is drawn if and only if the intake saved AND described it,
+  since a block the response budget refuses is already neither and drawing
+  one would put a picture on screen that the session's record does not
+  contain. `image.DecodeConfig` supplies the aspect ratio and doubles as
+  the validator; the payload is base64, whose alphabet holds no ESC or BEL.
+  The ceiling is 2 MiB decoded, from a measurement on the counter both
+  runtimes share — about 3.6 ms per MiB, with the string held in three
+  places at once. Named as a new surface: a server can now put a picture on
+  the operator's screen. No implementation here yet; gem-agent goes first
+  because the lane is there, and the decision is taken on both sides at
+  once so that neither holds it alone
