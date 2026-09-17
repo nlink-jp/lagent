@@ -141,6 +141,16 @@ language = "auto"
 # sends them. Display-only — never stored or replayed.
 show_thoughts = true
 
+# Inline images from MCP tools, when the terminal can draw them
+# (ADR-0020/0021). "auto" asks the terminal once, before the UI starts —
+# it cannot be asked later, because once the UI owns the keyboard a
+# terminal's reply arrives as if it had been typed. "off" never draws.
+# "iterm" and "kitty" force a protocol when the question is answered
+# wrongly for your terminal. Inside tmux or screen, "auto" resolves to
+# off. The model's own note is unchanged either way: it still gets the
+# path and still calls view_image to look.
+images = "auto"
+
 [approval]
 # Trust is given to content: a trusted project's agent-facing files
 # (AGENTS.md and friends, .mcp.json) are pinned by digest, and a changed

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Proposed** (2026-09-16, rewritten 2026-09-17) |
+| Status | **Accepted** (2026-09-17) — implemented; decision 3 gained the erase after gem-agent's first run on a real terminal |
 | Date | 2026-09-16 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
@@ -19,17 +19,17 @@ server saved is, on this surface, a path in a line of text.
 
 ### What the counter can and cannot see
 
-`emit` ([model.go:803](../../../internal/tui/model.go)) prints one line into
+`emit` ([model.go:818](../../../internal/tui/model.go)) prints one line into
 scrollback and counts its physical rows; the bottom pinning rests on that
 count. Measured against `charmbracelet/x/ansi` v0.11.6 — the version
 `go.mod:11` pins, the same one gem-agent pins — `ansi.StringWidth` returns
 **0** and `ansi.Strip` the empty string for an iTerm2 `OSC 1337 File=`, a
 kitty `APC _G` and a sixel `DCS q` alike, and `ansi.Hardwrap` leaves all
 three byte-identical, so `wrapForScrollback`
-([model.go:962](../../../internal/tui/model.go)) shears nothing.
+([model.go:1071](../../../internal/tui/model.go)) shears nothing.
 
 The counter is not blind, though. `physicalRows`
-([model.go:975](../../../internal/tui/model.go)) starts at `rows, cells :=
+([model.go:1084](../../../internal/tui/model.go)) starts at `rows, cells :=
 1, 0`, so an image line is credited with exactly **one** row while the
 terminal advances N. The shortfall is `N-1`, not `N`.
 
@@ -39,13 +39,13 @@ The measurements live in gem-agent (`tools/rowprobe`, `tools/pinprobe`,
 `tools/imgpayload`) and are **not ported**: they measure a terminal, not a
 runtime, and this repository has no `tools/` directory. `pinprobe` drives
 that runtime's real model through its real emit path — which is this
-runtime's emit path too, function for function ([model.go:803, :962,
-:975](../../../internal/tui/model.go) against gem-agent's :857, :1016,
-:1029; `diff` returns nothing on the last two).
+runtime's emit path too, function for function ([model.go:818, :1071,
+:1084](../../../internal/tui/model.go) against gem-agent's :872, :1130,
+:1143; `diff` returns nothing on the last two).
 
 The regime is arranged, not assumed. The pin's padding is
 `height − printed − view − 1` and the positive branch is labelled "screen
-not full" ([model.go:1614](../../../internal/tui/model.go)). A filler count
+not full" ([model.go:1723](../../../internal/tui/model.go)). A filler count
 chosen for a 30-row pane left an 80-row window on the other side of it, and
 an earlier draft of both records reported those runs under the wrong label.
 
@@ -72,7 +72,7 @@ what makes a declaration usable as a count.
 gem-agent partitions a reply before rendering: `diagram.Split` hands art
 segments to the terminal verbatim, a lane its ADR-0063 built for mermaid.
 **This runtime has no such lane.** `newGlamourRenderer`
-([model.go:436](../../../internal/tui/model.go), the render at `:449`)
+([model.go:448](../../../internal/tui/model.go), the render at `:461`)
 passes the whole reply through glamour in one piece — no `Split`, no segment type, no verbatim
 path. So this decision does not join a lane here; it creates one, and an
 image is its first and only member. That is the larger part of the work.
@@ -83,7 +83,7 @@ result's binary blocks through `base64.StdEncoding.DecodeString`
 `:575` is the `Content` carrier an earlier draft cited instead),
 and the intake **writes an image into the session work directory** and hands
 the model `[image saved at <path> … use view_image on that path]`
-([mcpresult.go:184](../../../cmd/mcpresult.go)). The first draft said such
+([mcpresult.go:200](../../../cmd/mcpresult.go)). The first draft said such
 blocks were "forwarded to the model"; they are not — the bytes never ride
 back inline.
 
@@ -135,9 +135,24 @@ claimed.
 
 `newGlamourRenderer` stops rendering the reply as one piece: it partitions
 into segments, renders ordinary ones through glamour as now, and emits image
-segments verbatim with their declared box. An image occupies its own line,
-because text sharing a line with one is split across its first and last
-rows. Porting `internal/diagram` is **not** part of this (see A1).
+segments verbatim with their declared box, each preceded by one erase. An
+image occupies its own line, because text sharing a line with one is split
+across its first and last rows. Porting `internal/diagram` is **not** part
+of this (see A1).
+
+**The erase is not decoration, and only a real terminal found it.** Bubble
+Tea flushes a queued line from the top of its own frame and appends
+`EraseLineRight`, which clears ONE row. An image then draws down N rows at
+its declared width, so every cell of the old frame to the RIGHT of a
+narrower picture survives on every row the picture covers. Measured on
+gem-agent's iTerm2 with the declared count already correct: three images,
+three stranded footers — the same damage this record was written to
+prevent, from a second cause it had not enumerated. `ansi.EraseScreenBelow`
+before the payload removes the frame the renderer is about to repaint below
+us anyway, and touches nothing above the cursor. The emit path here is the
+same one, function for function, so the fix is carried rather than
+rediscovered — and four verification passes missed it, none of them having
+a terminal.
 
 ### 4. Two protocols, and only the ones that can declare
 
@@ -156,11 +171,11 @@ Written three times, refuted three times, each time the worst finding of its
 round: a path the model names bypasses the enforcers, which are keyed on
 tool name (`PathJudged`, [risk.go:323](../../../internal/risk/risk.go)); the
 path the intake wrote can be pre-empted, because `write` short-circuits on
-`os.Stat` ([mcpresult.go:207](../../../cmd/mcpresult.go)) and every call
+`os.Stat` ([mcpresult.go:223](../../../cmd/mcpresult.go)) and every call
 hands the server the work directory in `_meta`
 ([client.go:608](../../../internal/mcp/client.go)); and the third draft's
 decoded bytes have no carrier at all — `render` returns a `string`
-([mcpresult.go:53](../../../cmd/mcpresult.go)) and `Tool.Run` is
+([mcpresult.go:61](../../../cmd/mcpresult.go)) and `Tool.Run` is
 `func(ctx, args) (string, error)` ([tools.go:67](../../../internal/tools/tools.go)).
 
 Three drafts in one place is one mistake: **the source cannot be named until
@@ -182,14 +197,14 @@ Bytes arriving from a tool are data. The implementation commit carries an
 architecture test enumerating the sites that may emit an escape; without it
 this sentence is "as of today". This does not close the existing surface:
 `ansi.Strip` is called at one site in non-test code
-([model.go:980](../../../internal/tui/model.go)), inside `physicalRows`, to
+([model.go:1089](../../../internal/tui/model.go)), inside `physicalRows`, to
 *measure* — so raw escapes from shell output already reach the terminal.
 Pre-existing, not widened here, not repaired here.
 
 ### 7. Drawing is TUI-only, and the capability is probed once
 
 `tea.NewProgram` is constructed at one site
-([root.go:1341](../../../cmd/root.go)); one-shot `-p` and the plain REPL
+([root.go:1350](../../../cmd/root.go)); one-shot `-p` and the plain REPL
 never build it and never draw. The probe runs **before** that construction
 and is cached, for the reason `newGlamourRenderer` records about
 `WithAutoStyle` — inherited from the porting source, and true here. It takes
@@ -219,9 +234,10 @@ relied on — no such claim is made.
 - The bottom pin survives images by construction, in both dimensions.
 - This runtime gains a segment lane it has never had. That is the larger
   part of the work here and the part gem-agent does not have to do.
-- An image a tool produced is **not** drawn for the operator yet: that needs
-  the source §5 defers. ADR-0005 settled ingestion on this side; the screen
-  is open on both, and gem-agent ADR-0089 says the same.
+- An image a tool produced **is** drawn for the operator: [ADR-0021](0021-an-images-bytes-never-become-a-path.md)
+  named the source §5 deferred — the MCP intake, for a block it both saved
+  and described. ADR-0005 settled ingestion on this side; the screen is now
+  settled on both, and gem-agent ADR-0089/0090 say the same.
 - Terminal.app — and any terminal that does not draw — loses nothing.
 - What is unmeasured stays unmeasured; `auto` should not be trusted in a
   streaming turn until the per-image cost is.

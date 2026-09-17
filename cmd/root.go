@@ -38,6 +38,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/sandbox"
 	"github.com/nlink-jp/lagent/internal/session"
 	"github.com/nlink-jp/lagent/internal/skills"
+	"github.com/nlink-jp/lagent/internal/termimg"
 	"github.com/nlink-jp/lagent/internal/tools"
 	"github.com/nlink-jp/lagent/internal/tui"
 	"github.com/nlink-jp/lagent/internal/uitext"
@@ -559,7 +560,14 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	}
 
 	// --- MCP servers from the project's .mcp.json (drop-in) ---
-	mcpClients, mcpSummary, mcpInv := connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, stderr, grant, mcpFilter)
+	// screen is the route from the MCP intake to the operator's screen
+	// (ADR-0021 §1). The servers connect here, long before the program
+	// exists, so the intake is handed this rather than prog.Send and the
+	// binding happens later — the same late-bind Gate already does for
+	// approvals. Unbound it is inert, which is what every entrance that
+	// is not an interactive TUI gets.
+	screen := tui.NewScreen()
+	mcpClients, mcpSummary, mcpInv := connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, stderr, grant, mcpFilter, screen.Image)
 	defer func() {
 		for _, c := range mcpClients {
 			c.Close()
@@ -945,7 +953,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 				fmt.Fprintf(&warn, "%s\n", n)
 			}
 		}
-		mcpClients, mcpSummary, mcpInv = connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, &warn, grant, mcpFilter)
+		mcpClients, mcpSummary, mcpInv = connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, &warn, grant, mcpFilter, screen.Image)
 		adv.setInventory(mcpInv)
 		ag.RefreshTools()
 		mcpTools := 0
@@ -1032,7 +1040,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		if running != nil {
 			runningServer = running
 		}
-		kept := reconnectMCPServer(ctx, server, runningServer, start, startupTimeout, registry, &warn, mcpFilter, &mcpInv)
+		kept := reconnectMCPServer(ctx, server, runningServer, start, startupTimeout, registry, &warn, mcpFilter, &mcpInv, screen.Image)
 		if kept != nil {
 			others = append(others, kept.(*mcp.Client))
 		}
@@ -1288,6 +1296,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			// whole chrome fell back to English (review round 2).
 			Msgs:          msgs,
 			Theme:         resolveTheme(cfg.TUI.Theme),
+			Images:        resolveImages(cfg.TUI.Images),
 			ModelName:     cfg.LLM.Model,
 			ProjectDir:    abbreviateHome(projectDir),
 			Banner:        bannerLines,
@@ -1340,6 +1349,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		})
 		prog = tea.NewProgram(model)
 		tuiGate.SetProgram(prog)
+		screen.SetProgram(prog)
 		go resolveWindow()
 		_, err := prog.Run()
 		return err
@@ -2028,6 +2038,27 @@ func abbreviateHome(path string) string {
 		return "~" + path[len(home):]
 	}
 	return path
+}
+
+// resolveImages asks the terminal what inline-image protocol it can draw
+// with, ONCE, here — before tea.NewProgram (ADR-0020 §7). The reason is
+// raw-mode stdin ownership: once Bubble Tea owns stdin, a terminal's reply
+// to a query arrives in the input box as phantom keystrokes, which is the
+// same hazard that keeps WithAutoStyle out of the Markdown renderer. The
+// probe needs a terminal it can read back, so it opens /dev/tty rather
+// than trusting stdin to be one; no /dev/tty means no capability, and the
+// fallback is what this runtime does without a protocol, which is not to
+// draw.
+func resolveImages(configured string) termimg.Protocol {
+	if configured == "off" {
+		return termimg.None // never open anything for a session that will not draw
+	}
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		return termimg.Resolve(configured, nil, os.Getenv, 0)
+	}
+	defer func() { _ = tty.Close() }()
+	return termimg.Resolve(configured, tty, os.Getenv, 2*time.Second)
 }
 
 // resolveTheme maps [tui].theme to the TUI's theme value. "auto" runs

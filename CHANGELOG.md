@@ -1,5 +1,44 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Images from MCP tools appear on screen** ([ADR-0021](docs/en/adr/0021-an-images-bytes-never-become-a-path.md)).
+  A server that returns an image block — a screenshot, a rendered chart —
+  now puts it in front of the operator as the call returns, drawn in a box
+  this runtime declares so the scrollback row counter is told a number
+  rather than measuring bytes it cannot see. The model's own note is
+  unchanged: it still gets the path and still has to call `view_image` to
+  look. The bytes travel in memory and the view layer opens no file, which
+  matters because the path the intake writes is one a server can pre-empt
+  with a symlink. An image is drawn only if the intake both saved and
+  described it, only if its bytes actually decode as an image whatever the
+  MIME says, and only up to 2 MiB decoded; every refusal is silent, because
+  a line per undrawable image is a report rather than a control.
+
+- **`[tui] images`** (`auto` | `off` | `iterm` | `kitty`, default `auto`) — the
+  capability behind it. An image payload is zero cells wide to every surface
+  the TUI has, so the row counter is TOLD the box the emitter declared
+  instead of measuring bytes it cannot see ([ADR-0020](docs/en/adr/0020-inline-images-declare-their-height.md)) —
+  measured on two terminals with a plain control at the same fill, a
+  terminal that draws what the counter cannot see strands one frame per
+  image once the screen is full. An image line also erases below itself
+  before its payload: Bubble Tea's own flush clears one row, while the
+  picture covers N, so without it the old frame survives to the right of
+  every row a narrower picture draws over — three images, three stranded
+  footers on gem-agent's iTerm2, with the row count already correct.
+  `auto` asks the terminal once, before the UI starts, because once Bubble
+  Tea owns stdin a reply arrives in the input box as phantom keystrokes;
+  inside tmux or screen it resolves to off.
+
+- **`internal/termimg`** — the protocol layer: capability detection
+  (environment first, one query only when it must), iTerm2 `OSC 1337 File=`
+  and kitty `APC _G` payloads that carry the declared box, and a fit that
+  clamps an image below the terminal width so the terminal never wraps a
+  picture into rows the declaration did not claim. Sixel is absent: it
+  cannot declare a row count.
+
 ## [0.8.0] - 2026-09-14
 
 ### Added

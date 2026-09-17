@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Proposed**（2026-09-16、2026-09-17 に書き直し） |
+| Status | **Accepted**（2026-09-17）— 実装済み。決定 3 の消去は gem-agent の実機初回実行の後に加わった |
 | Date | 2026-09-16 |
 | Binds | lagent |
 | Decision makers | nlink-jp メンテナ |
@@ -19,16 +19,16 @@ ADR-0005 は、画像が**モデル**へ届く道を決めた。ドロップさ�
 
 ### カウンタに見えるもの、見えないもの
 
-`emit`（[model.go:803](../../../internal/tui/model.go)）は 1 行を scrollback へ印字し、
+`emit`（[model.go:818](../../../internal/tui/model.go)）は 1 行を scrollback へ印字し、
 その物理行数を数える。bottom pin はその数に乗っている。`go.mod:11` が固定している版 —
 gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.6 で実測すると、
 `ansi.StringWidth` は iTerm2 の `OSC 1337 File=`、kitty の `APC _G`、sixel の `DCS q` の
 いずれにも **0** を返し、`ansi.Strip` は空文字を返す。`ansi.Hardwrap` は 3 方式とも
-バイト同一で通すので、`wrapForScrollback`（[model.go:962](../../../internal/tui/model.go)）は
+バイト同一で通すので、`wrapForScrollback`（[model.go:1071](../../../internal/tui/model.go)）は
 何も切り刻まない。
 
 ただしカウンタは盲目ではない。`physicalRows`
-（[model.go:975](../../../internal/tui/model.go)）は `rows, cells := 1, 0` から始まるので、
+（[model.go:1084](../../../internal/tui/model.go)）は `rows, cells := 1, 0` から始まるので、
 画像の行はちょうど **1 行**と計上される。端末が N 行進める間に、である。不足は `N` では
 なく `N-1` である。
 
@@ -38,11 +38,11 @@ gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.
 **移植しない。** それらが測るのは端末であってランタイムではなく、このリポジトリに
 `tools/` は無い。`pinprobe` は向こうのランタイムの本番 Model をその本番 emit 経路で
 駆動するが、それはこちらの emit 経路でもある — 関数ごとに同一である
-（[model.go:803, :962, :975](../../../internal/tui/model.go) が gem-agent の :857・:1016・
-:1029 に対応し、後ろ 2 つは `diff` が空を返す）。
+（[model.go:818, :1071, :1084](../../../internal/tui/model.go) が gem-agent の :872・:1130・
+:1143 に対応し、後ろ 2 つは `diff` が空を返す）。
 
 領域は仮定ではなく構成する。pin の padding は `height − printed − view − 1` で、正の分岐は
-「screen not full」とラベルされている（[model.go:1614](../../../internal/tui/model.go)）。
+「screen not full」とラベルされている（[model.go:1723](../../../internal/tui/model.go)）。
 30 行のペイン用に選んだ filler の行数が、80 行の窓をその反対側に置き、両記録の以前の稿は
 それらの実行を誤ったラベルの下で報告した。
 
@@ -66,7 +66,7 @@ gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.
 
 gem-agent は描画前に応答を分割する。`diagram.Split` が art segment を verbatim で端末へ
 渡す。ADR-0063 が mermaid のために作ったレーンである。**このランタイムにそのレーンは
-無い。** `newGlamourRenderer`（[model.go:436](../../../internal/tui/model.go)、描画は `:449`）は
+無い。** `newGlamourRenderer`（[model.go:448](../../../internal/tui/model.go)、描画は `:461`）は
 応答を丸ごと 1 個として glamour に通す。`Split` も segment 型も verbatim 経路も無い。よって
 本決定はここではレーンに乗るのではなく**レーンを作る**ものであり、画像がその最初で唯一の
 成員となる。作業の大部分はそれである。
@@ -74,7 +74,7 @@ gem-agent は描画前に応答を分割する。`diagram.Split` が art segment
 材料の残り半分は既にここにある。`mcp.Client` はツール結果のバイナリブロックを `base64.StdEncoding.DecodeString` に通し
 （[client.go:638](../../../internal/mcp/client.go)。`:575` は以前の稿が代わりに引いた
 `Content` の運搬体である）、intake は画像を**セッションの work dir へ書き出して**、モデルには `[image saved at <path> … use view_image on that path]` を渡す
-（[mcpresult.go:184](../../../cmd/mcpresult.go)）。初稿はそれらを「モデルへ転送される」と
+（[mcpresult.go:200](../../../cmd/mcpresult.go)）。初稿はそれらを「モデルへ転送される」と
 書いたが、そうではない。バイトはインラインで戻らない。
 
 **こちら側固有の訂正。** 初稿は、決定 7 の根拠となる危険が「継承ではなくこのコードに
@@ -119,8 +119,18 @@ kitty と Ghostty が `r=` を守るか（測定はすべて iTerm2 か tmux で
 
 `newGlamourRenderer` は応答を 1 個として描画するのをやめる。segment に分割し、通常の
 segment は今どおり glamour に通し、画像 segment は宣言されたボックスとともに verbatim で
-出す。画像は自分の行を占有する。画像と行を共有したテキストは 1 行目と最終行に分断される
-からである。`internal/diagram` の移植は本決定に含まない（A1 を見よ）。
+出す。各画像 segment の直前に消去を 1 つ置く。画像は自分の行を占有する。画像と行を共有した
+テキストは 1 行目と最終行に分断されるからである。`internal/diagram` の移植は本決定に含まない
+（A1 を見よ）。
+
+**この消去は装飾ではない。実機の端末だけが見つけた。** Bubble Tea は自分のフレームの先頭から
+キュー行を吐き、`EraseLineRight` を付ける。消えるのは 1 行だけである。画像はそこから宣言した
+幅で N 行下へ描かれるので、画像より右にある旧フレームのセルは、画像が覆う全ての行で生き残る。
+gem-agent の iTerm2 で計測: 行数の宣言は既に正しいのに、画像 3 枚に対しフッタの残骸が 3 つ。
+本記録が防ぐために書かれた損傷そのものが、列挙し損ねていた第 2 の原因から出た。ペイロードの前に
+`ansi.EraseScreenBelow` を置けば、レンダラがどのみち直後に描き直すフレームが消え、カーソルより
+上には触れない。こちらの emit 経路は関数単位で同一であり、修正は再発見ではなく持ち込みである。
+4 回の検証パスはこれを見逃した。どれも端末を持っていなかった。
 
 ### 4. プロトコルは 2 つ。宣言できるものだけを採る
 
@@ -137,10 +147,10 @@ segment は今どおり glamour に通し、画像 segment は宣言されたボ
 3 度書かれ、3 度反証された。いずれもそのラウンドの最悪の指摘だった。モデルが名指すパスは
 ツール名で引かれる強制者を迂回し（`PathJudged`、[risk.go:323](../../../internal/risk/risk.go)）、
 intake が書いたパスは先回りされうる。`write` が `os.Stat` で短絡し
-（[mcpresult.go:207](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに work dir を
+（[mcpresult.go:223](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに work dir を
 `_meta` で渡すからである（[client.go:608](../../../internal/mcp/client.go)）。そして第 3 稿の
 デコード済みバイト列には運搬体が無い。`render` は `string` を返し
-（[mcpresult.go:53](../../../cmd/mcpresult.go)）、`Tool.Run` は
+（[mcpresult.go:61](../../../cmd/mcpresult.go)）、`Tool.Run` は
 `func(ctx, args) (string, error)` である（[tools.go:67](../../../internal/tools/tools.go)）。
 
 同じ場所の 3 稿は 1 つの誤りである。**配管が存在するまで、供給源は名指せない。** [ADR-0021](0021-an-images-bytes-never-become-a-path.ja.md) へ先送りし、3 稿すべてに
@@ -157,13 +167,13 @@ view 層の読み取りを開く）は、いまや先送りした決定に属す
 ツールから届いたバイト列はデータである。実装コミットは、エスケープを出してよい場所を
 列挙するアーキテクチャテストを持つ。無ければこの一文は「現時点では」である。これは既存の
 面を塞いだと主張するものではない。非テストコードで `ansi.Strip` が呼ばれるのは 1 箇所
-（[model.go:980](../../../internal/tui/model.go)）、`physicalRows` の中で幅を**測る**ためだけ
+（[model.go:1089](../../../internal/tui/model.go)）、`physicalRows` の中で幅を**測る**ためだけ
 である。シェル出力の生エスケープは既に端末へ届いている。既存であり、ここで広がらず、
 ここで直しもしない。
 
 ### 7. 描画は TUI 限定。能力の検出は 1 度だけ
 
-`tea.NewProgram` が構築されるのは 1 箇所（[root.go:1341](../../../cmd/root.go)）。
+`tea.NewProgram` が構築されるのは 1 箇所（[root.go:1350](../../../cmd/root.go)）。
 one-shot `-p` と素の REPL はそれを作らず、描かない。探針はその構築の**前**に走りキャッシュ
 される。理由は `newGlamourRenderer` が `WithAutoStyle` について記録しているとおりで、これは
 移植元から継承した記述であり、ここでも真である。探針は秒単位の予算を取り、問い合わせ前に
@@ -188,9 +198,10 @@ passthrough が他人の設定だからではない。
 - bottom pin は構成によって、2 次元とも画像を生き延びる。
 - このランタイムは一度も持ったことのない segment レーンを得る。ここでの作業の大部分であり、
   gem-agent がやらなくてよい部分である。
-- ツールが産んだ画像は、まだ操作者へ描かれ**ない**。それには §5 が先送りした供給源が要る。
-  ADR-0005 はこちら側の取り込みを決めたが、画面は両側とも開いている。gem-agent ADR-0089 も
-  同じことを言う。
+- ツールが産んだ画像は操作者へ描かれ**る**。§5 が先送りした供給源は
+  [ADR-0021](0021-an-images-bytes-never-become-a-path.ja.md) が名指した — MCP intake が、
+  保存し説明したブロックについてのみ渡す。ADR-0005 はこちら側の取り込みを決めており、画面も
+  両側で決まった。gem-agent ADR-0089/0090 も同じことを言う。
 - Terminal.app も、描かない端末も、何も失わない。
 - 測っていないものは測っていないままにする。画像 1 枚あたりのコストが測れるまで、
   ストリーミング中の `auto` は信用すべきでない。

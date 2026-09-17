@@ -101,6 +101,20 @@ type ContextWindow struct {
 	Tokens int
 }
 
+// Image carries an image a tool produced, for the operator's screen
+// (ADR-0021). Data is the decoded bytes — never a path: a read the view
+// layer performs is not a tool call, so no enforcer can see it, and the
+// path the intake writes is one a server can pre-empt with a symlink.
+// MIME is what the server claimed; the bytes decide (termimg.Measure).
+//
+// The sender is the MCP intake, and only for a block it both saved AND
+// described: a picture on screen that the session's record does not
+// contain is worse than no picture.
+type Image struct {
+	Data []byte
+	MIME string
+}
+
 // ApprovalAnswer is the UI's reply to one ApprovalRequest. Key is the
 // dialog answer byte ('y', 'n', 'a' — 'p' resolves to 'y' before it is
 // sent, and a reasoned denial arrives as 'n'); Reason is the operator's
@@ -246,4 +260,40 @@ func (g *Gate) Approve(toolName, detail, purpose, reason string, mustPrompt bool
 	default:
 		return false, false, answer.Reason
 	}
+}
+
+// Screen is the late-bound route from work that starts BEFORE the UI to
+// the UI itself. The MCP servers connect while the program does not exist
+// yet, so the intake cannot be handed prog.Send at the moment it is built
+// (ADR-0021 §1) — it is handed this, and this learns the program when
+// there is one. The same shape as Gate, and for the same reason.
+//
+// Unbound, every send is a no-op: an entrance with no UI drops what it is
+// given rather than holding it.
+type Screen struct {
+	mu   sync.Mutex
+	prog sender
+}
+
+// NewScreen makes an unbound screen. Sends before SetProgram go nowhere.
+func NewScreen() *Screen { return &Screen{} }
+
+// SetProgram binds the screen to the running program, once it exists.
+func (s *Screen) SetProgram(p sender) {
+	s.mu.Lock()
+	s.prog = p
+	s.mu.Unlock()
+}
+
+// Image sends a tool's picture to the operator's screen. The caller has
+// already decided this block may be drawn (ADR-0021 §2); what may be drawn
+// at all, and in what box, is the model's decision on receipt.
+func (s *Screen) Image(data []byte, mime string) {
+	s.mu.Lock()
+	p := s.prog
+	s.mu.Unlock()
+	if p == nil {
+		return
+	}
+	p.Send(Image{Data: data, MIME: mime})
 }

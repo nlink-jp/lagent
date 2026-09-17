@@ -186,6 +186,13 @@ type TUIConfig struct {
 	// server sends them, into the live area. Display-only — never
 	// stored or replayed.
 	ShowThoughts bool `toml:"show_thoughts"`
+	// Images: "auto" (ask the terminal once, before the UI starts),
+	// "off", or a protocol forced by name — "iterm" or "kitty" — for the
+	// case where the probe is wrong (ADR-0020 §7). Inside a multiplexer
+	// "auto" resolves to off: passthrough is the multiplexer's
+	// configuration, and the one measured rendering a payload stranded a
+	// frame for every image.
+	Images string `toml:"images"`
 }
 
 // MCPConfig controls the MCP client. Server definitions live in the
@@ -341,7 +348,7 @@ func defaults() Config {
 		Approval: ApprovalConfig{PinTrustedFiles: true},
 		Agent:    AgentConfig{MaxTurns: 50, ShellTimeoutSec: 120},
 		MCP:      MCPConfig{Enabled: true, CallTimeoutSec: 60, StartupTimeoutSec: 30, Advertise: "deferred"},
-		TUI:      TUIConfig{Theme: "auto", Language: "auto", ShowThoughts: true},
+		TUI:      TUIConfig{Theme: "auto", Language: "auto", ShowThoughts: true, Images: "auto"},
 	}
 }
 
@@ -580,6 +587,11 @@ func (c *Config) validate() error {
 	case "auto", "ja", "en":
 	default:
 		return fmt.Errorf("[tui].language must be auto, ja, or en (got %q)", c.TUI.Language)
+	}
+	switch c.TUI.Images {
+	case "auto", "off", "iterm", "kitty":
+	default:
+		return fmt.Errorf("[tui].images must be auto, off, iterm, or kitty (got %q)", c.TUI.Images)
 	}
 	if c.Model.ContextWindow < 0 {
 		return fmt.Errorf("[model].context_window must not be negative")

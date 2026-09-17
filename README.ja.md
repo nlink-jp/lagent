@@ -97,6 +97,11 @@ lagent
   `.claude/skills/<name>/` から読む。スキルごと 1 行が何のためのものかを
   モデルに伝え、モデルは `load_skill` で読み込み、操作者は `/skill <name>`
   で手で呼ぶ（ADR-0011）。
+- **インライン画像:** MCP ツールが返した画像 — スクリーンショット、描画した
+  チャート — を、端末が描けるならその呼び出しの戻りと同時に端末へ描く
+  （iTerm2 と kitty。`[tui].images`、既定は `auto`、tmux・screen の中では
+  off）。モデルへの注記は変わらない。パスを受け取り、`view_image` で見る
+  （ADR-0020/0021）。
 - **無いもの:** web 検索と取得、メディアアップロード、監査ログ出力、
   履歴圧縮 — RFP と
   [ADR-0002](docs/ja/adr/0002-features-not-reproduced.ja.md) を参照。

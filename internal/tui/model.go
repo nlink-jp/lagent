@@ -20,6 +20,7 @@ import (
 	"github.com/rivo/uniseg"
 
 	"github.com/nlink-jp/lagent/internal/sandbox"
+	"github.com/nlink-jp/lagent/internal/termimg"
 	"github.com/nlink-jp/lagent/internal/uitext"
 )
 
@@ -150,6 +151,13 @@ type Options struct {
 	// Msgs is the resolved language catalog (gem-agent ADR-0029); nil means
 	// English.
 	Msgs *uitext.Messages
+	// Images is the inline-image protocol this session may draw with
+	// (ADR-0020 §7), resolved by the caller BEFORE tea.NewProgram: the
+	// probe queries the terminal, and once Bubble Tea owns stdin a reply
+	// arrives in the input box as phantom keystrokes. termimg.None — the
+	// zero value — draws nothing, which is what every entrance that is
+	// not an interactive TUI gets.
+	Images termimg.Protocol
 	// Theme is "dark", "light", or "notty" (plain: no colors anywhere).
 	// It MUST be decided by the caller BEFORE the Bubble Tea program
 	// starts: background detection sends an OSC query, and once raw
@@ -286,8 +294,11 @@ type Model struct {
 	completePath    func(prefix string) []string
 	completeSlashFn func(prefix string) []string
 	expandInput     func(input string) (string, bool, string)
-	baseCtx         context.Context
-	cancelTurn      context.CancelFunc
+	// images is the protocol this session may draw inline images with
+	// (ADR-0020 §7); termimg.None draws nothing.
+	images     termimg.Protocol
+	baseCtx    context.Context
+	cancelTurn context.CancelFunc
 	// ask is the pending ask_user dialog (gem-agent ADR-0036).
 	ask       *AskRequest
 	askChoice int
@@ -373,6 +384,7 @@ func New(opts Options) Model {
 		settingsData:    opts.Settings,
 		refreshSettings: opts.RefreshSettings,
 		applySetting:    opts.ApplySetting,
+		images:          opts.Images,
 		baseCtx:         opts.BaseCtx,
 		println:         opts.Printer,
 		mkRender:        opts.RenderFactory,
@@ -693,6 +705,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return next, cmd
 
+	case Image:
+		return m, m.drawImage(msg)
+
 	case Attached:
 		var parts []string
 		for _, line := range msg.Lines {
@@ -801,22 +816,71 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // on (gem-agent ADR-0003). Every print of the model must go through here, never
 // through m.println directly.
 func (m *Model) emit(s string) tea.Cmd {
-	// Tabs are expanded before counting AND printing: the width counter
-	// sees "\t" as zero cells while the terminal advances to the next
-	// 8-column stop, and every mismatch shifts the pinned input line —
-	// `!git diff` output drifted it one row per wrapped tab line
-	// (gem-agent ADR-0021). Printing the expansion keeps count and drawing equal.
-	s = expandTabs(s)
-	// Then every line is hard-wrapped under the terminal width: an
-	// over-wide scrollback line is NOT harmless (see wrapForScrollback).
-	s = wrapForScrollback(s, m.width)
+	return m.emitSegments([]Segment{{Text: s}})
+}
+
+// Segment is one run of a reply on its way to scrollback.
+//
+// Rows == 0 is ordinary text: tab-expanded, hard-wrapped and COUNTED,
+// which is what every line has always been.
+//
+// Rows > 0 is a DECLARED height (ADR-0020 §1). The text is an inline-image
+// payload whose box the emitter chose, and the counter is told that number
+// instead of measuring bytes it cannot see: ansi.StringWidth returns 0 for
+// every image escape, so physicalRows would credit the line with the one
+// row it floors to while the terminal advances N. Measured on two
+// terminals with a plain control at the same fill: once the screen is
+// full, a terminal that draws what the counter cannot see strands one
+// frame per image. The declaration REPLACES the floor of 1; adding to it
+// would over-count by one per image.
+type Segment struct {
+	Text string
+	Rows int
+}
+
+// emitSegments prints a reply into scrollback AND counts its physical rows
+// — the accounting the bottom pinning rests on (gem-agent ADR-0003). Every
+// print of the model goes through here, never through m.println directly,
+// and the whole run is ONE write: every tea.Println is a separate
+// clear-insert-repaint on the inline renderer.
+func (m *Model) emitSegments(segs []Segment) tea.Cmd {
 	w := m.width
 	if w <= 0 {
 		w = 80
 	}
+	out := make([]string, 0, len(segs))
 	total := 0
-	for _, line := range strings.Split(s, "\n") {
-		total += physicalRows(line, w)
+	for _, seg := range segs {
+		if seg.Rows > 0 {
+			// Verbatim, on its own line, and preceded by one erase.
+			//
+			// The erase is not decoration. Bubble Tea flushes a queued
+			// line from the TOP of its own frame, appending
+			// EraseLineRight — which clears ONE row. An image then draws
+			// down N rows at its declared width, so every cell of the
+			// old frame to the RIGHT of the picture survives on every
+			// row the picture covers. Measured on iTerm2: three images,
+			// three stranded footers, with the declared count already
+			// correct. Erasing to the end of the screen removes the
+			// frame the renderer is about to repaint below us anyway,
+			// and nothing above the cursor is touched.
+			out = append(out, ansi.EraseScreenBelow+seg.Text)
+			total += seg.Rows
+			continue
+		}
+		// Tabs are expanded before counting AND printing: the width
+		// counter sees "\t" as zero cells while the terminal advances to
+		// the next 8-column stop, and every mismatch shifts the pinned
+		// input line — `!git diff` output drifted it one row per wrapped
+		// tab line (gem-agent ADR-0021). Printing the expansion keeps
+		// count and drawing equal. Then every line is hard-wrapped under
+		// the terminal width: an over-wide scrollback line is NOT
+		// harmless (see wrapForScrollback).
+		s := wrapForScrollback(expandTabs(seg.Text), m.width)
+		out = append(out, s)
+		for _, line := range strings.Split(s, "\n") {
+			total += physicalRows(line, w)
+		}
 	}
 	if m.hold != nil {
 		m.hold.printed += total
@@ -830,7 +894,52 @@ func (m *Model) emit(s string) tea.Cmd {
 			}
 		}
 	}
-	return m.println(s)
+	return m.println(strings.Join(out, "\n"))
+}
+
+// drawImage puts a tool's picture on the operator's screen (ADR-0021),
+// in a box this runtime declares so the row counter can be told what it
+// cannot measure (ADR-0020 §1). Every refusal is silent: a line per
+// undrawable image is a report rather than a control, and the model's own
+// note — with the path and view_image — is unchanged either way.
+func (m *Model) drawImage(msg Image) tea.Cmd {
+	if m.images == termimg.None {
+		return nil // no protocol: this session draws nothing
+	}
+	w, h, ok := termimg.Measure(msg.Data)
+	if !ok {
+		return nil // not an image, or past the ceiling — MIME claimed, bytes decided
+	}
+	box := termimg.BoxFor(w, h, m.width, maxImageRows(m.height))
+	payload, err := termimg.Payload(m.images, msg.Data, box)
+	if err != nil {
+		return nil
+	}
+	return m.emitSegments([]Segment{{Text: payload, Rows: box.Rows}})
+}
+
+// maxImageRows is how much of the screen one picture may take. Printing N
+// rows scrolls N rows of history away, so a picture that fills the screen
+// costs the operator the conversation around it; a third leaves the reply
+// it belongs to still visible. An unknown height falls back to a size that
+// is modest on any terminal.
+//
+// No floor beyond one row. A first version floored at four, which on a
+// three-row terminal was taller than the screen — the test that enumerates
+// heights caught it, and a minimum that exceeds the maximum is not a
+// minimum.
+func maxImageRows(height int) int {
+	if height <= 0 {
+		return 10
+	}
+	r := height / 3
+	if r > height-1 {
+		r = height - 1
+	}
+	if r < 1 {
+		r = 1
+	}
+	return r
 }
 
 // beginTurnStats arms the gem-agent ADR-0033 heartbeat for a fresh turn.

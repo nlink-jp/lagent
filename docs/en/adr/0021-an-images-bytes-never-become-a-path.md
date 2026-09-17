@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Proposed** (2026-09-17) |
+| Status | **Accepted** (2026-09-17) — implemented |
 | Date | 2026-09-17 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
@@ -21,9 +21,9 @@ agent's decision nor ADR-0016's sandboxed child, and the path-judging list
 That rules out the obvious design. The MCP intake already writes an image
 into the session work directory and hands the model
 `[image saved at <path> … use view_image on that path]`
-([mcpresult.go:184](../../../cmd/mcpresult.go)), so a path is sitting
+([mcpresult.go:200](../../../cmd/mcpresult.go)), so a path is sitting
 there — but `write` short-circuits on `os.Stat`
-([mcpresult.go:207](../../../cmd/mcpresult.go)) while every call hands the
+([mcpresult.go:223](../../../cmd/mcpresult.go)) while every call hands the
 server the work directory as `_meta[workdir.MetaKey]`
 ([client.go:608](../../../internal/mcp/client.go)). A local server child
 knows its own name, its tool name, the bytes it will return and the
@@ -37,15 +37,15 @@ view layer that opened it would not be.
 
 The third refuted draft said the view layer would be handed "the bytes the
 intake already holds". It cannot: `render` returns a `string`
-([mcpresult.go:53](../../../cmd/mcpresult.go)), `mcpIntake` keeps only a
+([mcpresult.go:61](../../../cmd/mcpresult.go)), `mcpIntake` keeps only a
 work-directory getter, a byte cap and a preview length
-([mcpresult.go:46](../../../cmd/mcpresult.go)), and the tool contract is
+([mcpresult.go:54](../../../cmd/mcpresult.go)), and the tool contract is
 `Run func(ctx, args) (string, error)`
 ([tools.go:67](../../../internal/tools/tools.go)).
 
 The channel this needs already exists here too, and it is the same one:
 the agent loop talks to the UI **during** a tool call —
-`prog.Send(tui.ToolCall{…})` at [root.go:801](../../../cmd/root.go). Nothing
+`prog.Send(tui.ToolCall{…})` at [root.go:809](../../../cmd/root.go). Nothing
 about the string contract has to move.
 
 ### The cost
@@ -79,7 +79,7 @@ anywhere rather than deciding not to draw them.
 
 A block whose note does not fit the response budget is already neither
 saved nor described individually — the guard sizes `binaryNote` before
-anything is written ([mcpresult.go:105](../../../cmd/mcpresult.go)) — and
+anything is written ([mcpresult.go:113](../../../cmd/mcpresult.go)) — and
 such a block is not drawn. Drawing one would put a picture on the
 operator's screen that appears nowhere in the session's record. One rule,
 not a second budget.
@@ -120,9 +120,10 @@ operator — and gives it a channel that opens no file.
 - The 2 MiB ceiling refuses some images silently: a warning per oversized
   block is a report rather than a control, and the picture stays reachable
   through `view_image`.
-- **This runtime has no implementation yet.** gem-agent implements first
-  because the lane is there; the decision is taken here at the same time so
-  that neither runtime holds it alone.
+- **Implemented here after gem-agent**, which had the lane already. The
+  decision was taken in both records at the same time so that neither
+  runtime holds it alone, and the port carries the erase gem-agent's first
+  real-terminal run made necessary (ADR-0020 decision 3).
 
 ## Alternatives considered
 

@@ -100,6 +100,11 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   `.claude/skills/<name>/`. One line per skill tells the model what
   each is for; it loads one with `load_skill`, and you invoke one by
   hand with `/skill <name>` (ADR-0011).
+- **Inline images:** an image an MCP tool returns — a screenshot, a
+  rendered chart — is drawn in the terminal as the call returns, when the
+  terminal can draw one (iTerm2 or kitty; `[tui].images`, `auto` by
+  default, off inside tmux and screen). The model's note is unchanged: it
+  gets the path and calls `view_image` to look (ADR-0020/0021).
 - **Not here:** web search and fetch, media uploads, audit-log export,
   history compaction — see the RFP and
   [ADR-0002](docs/en/adr/0002-features-not-reproduced.md).
