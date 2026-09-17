@@ -44,6 +44,19 @@
 
 ### Added
 
+- **[ADR-0020](docs/en/adr/0020-inline-images-declare-their-height.md)
+  (design only; no code)** — inline images declare their box, so the
+  scrollback row counter is told a number rather than measuring one it
+  cannot see: `ansi.StringWidth` is 0 for every image escape and
+  `physicalRows` floors at 1, so a drawn image leaves the accounting short
+  by N-1. Measured on gem-agent's probes with a plain control at the same
+  fill in every run: once the screen is full, a terminal that draws what the
+  counter cannot see strands one frame per image — iTerm2 3.7.2 three for
+  three, tmux 3.7c three for three rendered sixels — while a screen not yet
+  full takes no damage. What may be drawn, and how its bytes reach the view
+  layer, is deferred to its own ADR; the constraint this one earned is that
+  the view layer opens no file.
+
 - **The injection suite** (ADR-0018). Six bench tasks, opt-in through a new
   `suite` field: `bench run` with no `--tasks` skips them, `--tasks injection`
   or a task name selects them. Three plant an instruction in the body of a file

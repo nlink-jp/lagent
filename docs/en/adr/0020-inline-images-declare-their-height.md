@@ -142,22 +142,13 @@ rows. Porting `internal/diagram` is **not** part of this (see A1).
 ### 4. Two protocols, and only the ones that can declare
 
 **iTerm2 `OSC 1337 File=` and the kitty graphics protocol**, both of which
-take the row count as a parameter — decision 1's precondition. **Sixel is
-not taken**: it cannot declare one, which settles it without any
-measurement.
+take the row count as a parameter — decision 1's precondition. **Sixel is not taken**: it cannot declare one, which settles it.
 
-A second reason was mis-handled twice. The rewrite withdrew the
-organization's supply-chain rule — the floor is stdlib, then a vendor's own
-SDK, then REST directly — on the ground that it appears nowhere in either
-repository, and **that was wrong, most obviously on this side**: the rule is
-in this repository's own RFP, the document `CLAUDE.md` calls canonical, and
-in `internal/llm/openai.go`. The negative was asserted without enumerating.
-
-**Restoring it as a reason to refuse a sixel encoder then over-reached.**
-Its clearest primary source, `web-fetch` ADR-0003, states the ladder and
-says it **was written for API clients**; a sixel encoder is not one. This
-record does not make that extension, and decision 4 rests on the first
-reason alone.
+A second reason was tried twice and is **removed rather than adjudicated a
+third time**. The organization's supply-chain rule was withdrawn here as
+unsupported (wrong: it is in this repository's own RFP), restored as a
+reason to refuse an encoder, then narrowed to "API clients". Its reach is
+not settled here and decision 4 does not rest on it.
 
 ### 5. What may be drawn is NOT settled here — one constraint is
 
@@ -215,8 +206,9 @@ configuration.
 
 No tool, no prompt paragraph. The first draft argued the model "already
 produces" these sources; that is a firing-rate claim and neither runtime has
-a denominator for it. Decision 5's single source needs no model behaviour:
-the intake writes the file whether or not the model mentions it. This also
+a denominator for it. And §5 defers the source, so there is no source for a prompt to steer
+toward — an earlier draft argued from "decision 5's single source", which
+was one of the refuted drafts. This also
 keeps the decision clear of `CLAUDE.md`'s rule that a behavioural claim
 about the local model is measured on the bench (ADR-0006) before it is
 relied on — no such claim is made.
@@ -226,8 +218,9 @@ relied on — no such claim is made.
 - The bottom pin survives images by construction, in both dimensions.
 - This runtime gains a segment lane it has never had. That is the larger
   part of the work here and the part gem-agent does not have to do.
-- An image a tool produced is drawn for the operator whether or not the
-  model was given it. ADR-0005 settled ingestion; this settles the screen.
+- An image a tool produced is **not** drawn for the operator yet: that needs
+  the source §5 defers. ADR-0005 settled ingestion on this side; the screen
+  is open on both, and gem-agent ADR-0089 says the same.
 - Terminal.app — and any terminal that does not draw — loses nothing.
 - What is unmeasured stays unmeasured; `auto` should not be trusted in a
   streaming turn until the per-image cost is.
