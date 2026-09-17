@@ -70,11 +70,14 @@ what makes a declaration usable as a count.
 ### What is different on this side
 
 gem-agent partitions a reply before rendering: `diagram.Split` hands art
-segments to the terminal verbatim, a lane its ADR-0063 built for mermaid.
+segments to the terminal verbatim, a lane gem-agent ADR-0063 built there for mermaid.
 **This runtime has no such lane.** `newGlamourRenderer`
 ([model.go:448](../../../internal/tui/model.go), the render at `:461`)
-passes the whole reply through glamour in one piece — no `Split`, no segment type, no verbatim
-path. So this decision does not join a lane here; it creates one, and an
+passes the whole reply through glamour in one piece — no `Split`, no segment
+type, no verbatim path. (As of this record's implementation the last two
+exist: `Segment` and the verbatim branch of `emitSegments`. What is still
+absent is `Split` — a reply is never partitioned, and an image reaches the
+lane from outside the reply.) So this decision does not join a lane here; it creates one, and an
 image is its first and only member. That is the larger part of the work.
 
 The other half of the material is already here: `mcp.Client` runs a tool
@@ -83,7 +86,7 @@ result's binary blocks through `base64.StdEncoding.DecodeString`
 `:575` is the `Content` carrier an earlier draft cited instead),
 and the intake **writes an image into the session work directory** and hands
 the model `[image saved at <path> … use view_image on that path]`
-([mcpresult.go:224](../../../cmd/mcpresult.go)). The first draft said such
+([mcpresult.go:226](../../../cmd/mcpresult.go)). The first draft said such
 blocks were "forwarded to the model"; they are not — the bytes never ride
 back inline.
 
@@ -133,12 +136,19 @@ claimed.
 
 ### 3. The renderer gains a segment lane, and an image is its only member
 
-`newGlamourRenderer` stops rendering the reply as one piece: it partitions
-into segments, renders ordinary ones through glamour as now, and emits image
-segments verbatim with their declared box, each preceded by one erase. An
-image occupies its own line, because text sharing a line with one is split
-across its first and last rows. Porting `internal/diagram` is **not** part
-of this (see A1).
+The emitter gains a segment lane: `emitSegments` renders ordinary segments
+as now and emits image segments verbatim with their declared box, each
+preceded by one erase. An image occupies its own line, because text sharing
+a line with one is split across its first and last rows. Porting
+`internal/diagram` is **not** part of this (see A1).
+
+**This section first said `newGlamourRenderer` would stop rendering the
+reply as one piece and partition it.** It does not, and it was never
+changed: an image never passes through the Markdown renderer, because it
+does not arrive inside a reply at all. It arrives out-of-band as a
+`tui.Image` message while a tool call is still running (ADR-0021 §1) and
+goes straight to `drawImage`. The lane is real; it is in `emit`, not in the
+renderer.
 
 **The erase is not decoration, and only a real terminal found it.** Bubble
 Tea flushes a queued line from the top of its own frame and appends
@@ -171,11 +181,11 @@ Written three times, refuted three times, each time the worst finding of its
 round: a path the model names bypasses the enforcers, which are keyed on
 tool name (`PathJudged`, [risk.go:323](../../../internal/risk/risk.go)); the
 path the intake wrote can be pre-empted, because `write` short-circuits on
-`os.Stat` ([mcpresult.go:247](../../../cmd/mcpresult.go)) and every call
+`os.Stat` ([mcpresult.go:249](../../../cmd/mcpresult.go)) and every call
 hands the server the work directory in `_meta`
 ([client.go:608](../../../internal/mcp/client.go)); and the third draft's
 decoded bytes have no carrier at all — `render` returns a `string`
-([mcpresult.go:61](../../../cmd/mcpresult.go)) and `Tool.Run` is
+([mcpresult.go:63](../../../cmd/mcpresult.go)) and `Tool.Run` is
 `func(ctx, args) (string, error)` ([tools.go:67](../../../internal/tools/tools.go)).
 
 Three drafts in one place is one mistake: **the source cannot be named until
@@ -193,9 +203,13 @@ would open the view-layer read — belongs to the deferred decision now.
 
 ### 6. Only the view layer emits an image escape
 
-Bytes arriving from a tool are data. The implementation commit carries an
-architecture test enumerating the sites that may emit an escape; without it
-this sentence is "as of today". This does not close the existing surface:
+Bytes arriving from a tool are data. `internal/archtest` enumerates the
+sites that may emit an escape: `termimg.Payload` is callable from
+`internal/tui` and nowhere else. **This record said the implementation
+commit would carry that test and it did not** — an independent pass found
+the sentence standing alone, which by the rule in it makes the claim "as of
+today"; the test was written afterwards, and the sentence now describes what
+exists rather than what was intended. This does not close the existing surface:
 `ansi.Strip` is called at one site in non-test code
 ([model.go:1089](../../../internal/tui/model.go)), inside `physicalRows`, to
 *measure* — so raw escapes from shell output already reach the terminal.
@@ -212,8 +226,9 @@ seconds, drains before querying, and treats no reply as *no capability*,
 because an abandoned cursor report is misfiled into the next query, not
 lost.
 
-`[tui] images = "auto"` selects it, beside `theme` and `language`
-([config.go:180](../../../internal/config/config.go) and `:184`). Inside a multiplexer
+`[tui] images = "auto"` selects it
+([config.go:196](../../../internal/config/config.go)), beside `theme` and
+`language` (`:180` and `:184`). Inside a multiplexer
 the answer is **off** — because the one measured rendering a payload
 stranded a frame for every image, not because passthrough is someone else's
 configuration.

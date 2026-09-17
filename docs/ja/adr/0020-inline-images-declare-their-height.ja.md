@@ -65,16 +65,18 @@ gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.
 ### こちら側で違うこと
 
 gem-agent は描画前に応答を分割する。`diagram.Split` が art segment を verbatim で端末へ
-渡す。ADR-0063 が mermaid のために作ったレーンである。**このランタイムにそのレーンは
+渡す。gem-agent ADR-0063 が向こうで mermaid のために作ったレーンである。**このランタイムにそのレーンは
 無い。** `newGlamourRenderer`（[model.go:448](../../../internal/tui/model.go)、描画は `:461`）は
-応答を丸ごと 1 個として glamour に通す。`Split` も segment 型も verbatim 経路も無い。よって
+応答を丸ごと 1 個として glamour に通す。`Split` も segment 型も verbatim 経路も無い（本記録の
+実装後、後ろ 2 つは存在する — `Segment` と `emitSegments` の verbatim 分岐である。いまも無いのは
+`Split` であり、応答が分割されることはなく、画像は応答の外からレーンへ入る）。よって
 本決定はここではレーンに乗るのではなく**レーンを作る**ものであり、画像がその最初で唯一の
 成員となる。作業の大部分はそれである。
 
 材料の残り半分は既にここにある。`mcp.Client` はツール結果のバイナリブロックを `base64.StdEncoding.DecodeString` に通し
 （[client.go:638](../../../internal/mcp/client.go)。`:575` は以前の稿が代わりに引いた
 `Content` の運搬体である）、intake は画像を**セッションの work dir へ書き出して**、モデルには `[image saved at <path> … use view_image on that path]` を渡す
-（[mcpresult.go:224](../../../cmd/mcpresult.go)）。初稿はそれらを「モデルへ転送される」と
+（[mcpresult.go:226](../../../cmd/mcpresult.go)）。初稿はそれらを「モデルへ転送される」と
 書いたが、そうではない。バイトはインラインで戻らない。
 
 **こちら側固有の訂正。** 初稿は、決定 7 の根拠となる危険が「継承ではなくこのコードに
@@ -117,11 +119,16 @@ kitty と Ghostty が `r=` を守るか（測定はすべて iTerm2 か tmux で
 
 ### 3. レンダラが segment レーンを得る。画像がその唯一の成員である
 
-`newGlamourRenderer` は応答を 1 個として描画するのをやめる。segment に分割し、通常の
-segment は今どおり glamour に通し、画像 segment は宣言されたボックスとともに verbatim で
-出す。各画像 segment の直前に消去を 1 つ置く。画像は自分の行を占有する。画像と行を共有した
-テキストは 1 行目と最終行に分断されるからである。`internal/diagram` の移植は本決定に含まない
-（A1 を見よ）。
+emitter が segment レーンを得る。`emitSegments` は通常の segment を今どおり描画し、画像
+segment は宣言されたボックスとともに verbatim で出す。各画像 segment の直前に消去を 1 つ
+置く。画像は自分の行を占有する。画像と行を共有したテキストは 1 行目と最終行に分断される
+からである。`internal/diagram` の移植は本決定に含まない（A1 を見よ）。
+
+**本節は当初「`newGlamourRenderer` が応答を 1 個として描画するのをやめ、分割する」と
+書いていた。** そうはならず、実際に変更もされていない。画像が Markdown レンダラを通る
+ことはない。そもそも応答の中に届かないからである — ツールコールの最中に `tui.Image`
+メッセージとして帯域外で届き（ADR-0021 §1）、そのまま `drawImage` へ行く。レーンは実在
+するが、それはレンダラではなく `emit` にある。
 
 **この消去は装飾ではない。実機の端末だけが見つけた。** Bubble Tea は自分のフレームの先頭から
 キュー行を吐き、`EraseLineRight` を付ける。消えるのは 1 行だけである。画像はそこから宣言した
@@ -147,10 +154,10 @@ gem-agent の iTerm2 で計測: 行数の宣言は既に正しいのに、画像
 3 度書かれ、3 度反証された。いずれもそのラウンドの最悪の指摘だった。モデルが名指すパスは
 ツール名で引かれる強制者を迂回し（`PathJudged`、[risk.go:323](../../../internal/risk/risk.go)）、
 intake が書いたパスは先回りされうる。`write` が `os.Stat` で短絡し
-（[mcpresult.go:247](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに work dir を
+（[mcpresult.go:249](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに work dir を
 `_meta` で渡すからである（[client.go:608](../../../internal/mcp/client.go)）。そして第 3 稿の
 デコード済みバイト列には運搬体が無い。`render` は `string` を返し
-（[mcpresult.go:61](../../../cmd/mcpresult.go)）、`Tool.Run` は
+（[mcpresult.go:63](../../../cmd/mcpresult.go)）、`Tool.Run` は
 `func(ctx, args) (string, error)` である（[tools.go:67](../../../internal/tools/tools.go)）。
 
 同じ場所の 3 稿は 1 つの誤りである。**配管が存在するまで、供給源は名指せない。** [ADR-0021](0021-an-images-bytes-never-become-a-path.ja.md) へ先送りし、3 稿すべてに
@@ -164,8 +171,11 @@ view 層の読み取りを開く）は、いまや先送りした決定に属す
 
 ### 6. 画像エスケープを発行するのは view 層だけ
 
-ツールから届いたバイト列はデータである。実装コミットは、エスケープを出してよい場所を
-列挙するアーキテクチャテストを持つ。無ければこの一文は「現時点では」である。これは既存の
+ツールから届いたバイト列はデータである。`internal/archtest` がエスケープを出してよい
+場所を列挙する — `termimg.Payload` を呼べるのは `internal/tui` だけである。**本記録は
+「実装コミットがそのテストを持つ」と書いたが、実際には持たなかった。** 独立検証パスが
+この一文だけが立っているのを見つけた。この一文自身の規則により、それは「現時点では」に
+すぎない。テストは後から書かれ、いまこの一文は意図ではなく実在を述べている。これは既存の
 面を塞いだと主張するものではない。非テストコードで `ansi.Strip` が呼ばれるのは 1 箇所
 （[model.go:1089](../../../internal/tui/model.go)）、`physicalRows` の中で幅を**測る**ためだけ
 である。シェル出力の生エスケープは既に端末へ届いている。既存であり、ここで広がらず、
@@ -181,7 +191,7 @@ one-shot `-p` と素の REPL はそれを作らず、描かない。探針はそ
 問い合わせへ誤配されるからである。
 
 選択は `theme`・`language` と並ぶ `[tui] images = "auto"`
-（[config.go:180](../../../internal/config/config.go) と `:184`）。多重化端末の中では **off** である。
+（[config.go:196](../../../internal/config/config.go)。`theme` と `language` は `:180` と `:184`）。多重化端末の中では **off** である。
 payload を描くと測定された唯一の多重化端末が画像 1 枚ごとにフレームを取り残したからであって、
 passthrough が他人の設定だからではない。
 

@@ -168,10 +168,11 @@ excepted).
   `mcp.json` two separate files
 - [`ADR-0020`](adr/0020-inline-images-declare-their-height.md) — inline
   images declare their box: the counter is told, never measures
-  (**Proposed**, not implemented; three verification passes, and the source
-  question deferred out of it; gem-agent ADR-0089 is the same decision on
-  the other side): ADR-0005 settled how an image reaches the model; how one
-  reaches the operator is still open. `emit` counts the physical rows of
+  (**Accepted**, implemented; four verification passes, the fourth of which
+  was a real terminal and found what the other three could not; gem-agent
+  ADR-0089 is the same decision on the other side): ADR-0005 settled how an
+  image reaches the model, and [ADR-0021](adr/0021-an-images-bytes-never-become-a-path.md)
+  — deferred out of §5 — settled how one reaches the operator. `emit` counts the physical rows of
   every line and the bottom pin rests on that count, but `ansi.StringWidth`
   is 0 for all three payload families and `physicalRows` floors at 1, so the
   shortfall is N-1. Measured on gem-agent's probes — they measure a
@@ -194,13 +195,14 @@ excepted).
   string-only — so it is deferred to its own ADR with the one constraint
   that held against all three: **the view layer opens no file.** Decision 4
   rests on sixel's inability to declare a row count alone; the supply-chain
-  rule was first wrongly withdrawn and then wrongly extended to an encoder,
-  which its own primary source says it was not written for. `internal/tui`'s
+  rule is not adjudicated here, and this line said it was — the record
+  removed that reason rather than settling a question it is not the place
+  to settle. `internal/tui`'s
   scrollback accounting is now on both shared-mechanism lists, and the
   `WithAutoStyle` hazard note is recorded as inherited, which it is
 - [`ADR-0021`](adr/0021-an-images-bytes-never-become-a-path.md) — an
   image's bytes reach the screen without ever becoming a path
-  (**Proposed**, not implemented; gem-agent ADR-0090 is the same decision
+  (**Accepted**, implemented; gem-agent ADR-0090 is the same decision
   on the other side): ADR-0020 §5 deferred the source after three drafts
   and three refutations, keeping one constraint — the view layer opens no
   file, because a read it performs is not a tool call and `pathJudgedTools`
@@ -215,8 +217,10 @@ excepted).
   the agent loop sends to the UI mid-call. So `mcpIntake` gains one
   optional sink beside `workDir`, called with the decoded bytes as the
   block is taken in and wired to `prog.Send`; the string contract does not
-  move, and the sink is nil in every entrance that is not an interactive
-  TUI. An image is drawn if and only if the intake saved AND described it,
+  move. The sink is not nil outside an interactive TUI — an earlier draft
+  promised that and the ordering does not allow it, because MCP connects
+  before the runtime knows whether it has a UI; it is inert there instead,
+  dropping what it is given. An image is drawn if and only if the intake saved AND described it,
   since a block the response budget refuses is already neither and drawing
   one would put a picture on screen that the session's record does not
   contain. `image.DecodeConfig` supplies the aspect ratio and doubles as
@@ -224,6 +228,7 @@ excepted).
   The ceiling is 2 MiB decoded, from a measurement on the counter both
   runtimes share — about 3.6 ms per MiB, with the string held in three
   places at once. Named as a new surface: a server can now put a picture on
-  the operator's screen. No implementation here yet; gem-agent goes first
-  because the lane is there, and the decision is taken on both sides at
-  once so that neither holds it alone
+  the operator's screen. Implemented here after gem-agent, which had the
+  lane already; the decision was taken on both sides at once so that
+  neither holds it alone, and the port carried the erase gem-agent's first
+  real-terminal run made necessary

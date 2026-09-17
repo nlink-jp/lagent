@@ -37,6 +37,18 @@ var withdrawn = []struct {
 	{"nothing on the first three", "emit differs between the trees in its ADR-number prefixes"},
 	{"recorded in this code rather than inherited", "the WithAutoStyle note is byte-identical to gem-agent's and came with the port"},
 	{"forwarded to the model", "the intake writes the image to the work directory and hands the model a path; the bytes never ride back inline"},
+	{"nothing draws yet", "the source was settled and wired: the MCP intake draws, for a block it both saved and described"},
+	{"No implementation here yet", "implemented here after gem-agent, in the same work that wrote this"},
+	{"こちらにはまだ実装が無い", "same"},
+	{"nil in every entrance", "the sink is NOT nil outside a TUI — MCP connects before the runtime knows whether it has a UI, so it is inert there instead"},
+	{"sink は対話的 TUI でない入口すべてで nil", "same"},
+	{"reaches the operator is still open", "how an image reaches the operator was settled; ADR-0021 named the source"},
+	{"stops rendering the reply as one piece", "newGlamourRenderer was never changed; an image arrives out-of-band, not inside a reply"},
+	{"Not wired to any source yet", "the intake is the source and it is wired"},
+	{"three verification passes", "four, the fourth being the real terminal that found the erase"},
+	{"検証パス 3 本", "same"},
+	{"Closed by mechanism", "narrowed by mechanism; the records say narrowed, not closed, and an INDEX line said otherwise"},
+	{"the implementation commit carries an architecture test", "it did not; the escape-site test was written after an independent pass found the promise standing alone"},
 }
 
 var withdrawalMarkers = []string{

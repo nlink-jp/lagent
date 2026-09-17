@@ -21,9 +21,9 @@ agent's decision nor ADR-0016's sandboxed child, and the path-judging list
 That rules out the obvious design. The MCP intake already writes an image
 into the session work directory and hands the model
 `[image saved at <path> … use view_image on that path]`
-([mcpresult.go:224](../../../cmd/mcpresult.go)), so a path is sitting
+([mcpresult.go:226](../../../cmd/mcpresult.go)), so a path is sitting
 there — but `write` short-circuits on `os.Stat`
-([mcpresult.go:247](../../../cmd/mcpresult.go)) while every call hands the
+([mcpresult.go:249](../../../cmd/mcpresult.go)) while every call hands the
 server the work directory as `_meta[workdir.MetaKey]`
 ([client.go:608](../../../internal/mcp/client.go)). A local server child
 knows its own name, its tool name, the bytes it will return and the
@@ -37,9 +37,10 @@ view layer that opened it would not be.
 
 The third refuted draft said the view layer would be handed "the bytes the
 intake already holds". It cannot: `render` returns a `string`
-([mcpresult.go:61](../../../cmd/mcpresult.go)), `mcpIntake` keeps only a
-work-directory getter, a byte cap and a preview length
-([mcpresult.go:54](../../../cmd/mcpresult.go)), and the tool contract is
+([mcpresult.go:63](../../../cmd/mcpresult.go)), `mcpIntake` keeps a
+work-directory getter, a byte cap and a preview length — and, since this
+decision, the sink; what it has never kept is the bytes
+([mcpresult.go:56](../../../cmd/mcpresult.go)), and the tool contract is
 `Run func(ctx, args) (string, error)`
 ([tools.go:67](../../../internal/tools/tools.go)).
 
@@ -71,15 +72,18 @@ than by reference, so this record is readable cold.
 `mcpIntake` gains one optional sink beside `workDir`, called with the
 decoded bytes and their MIME type as the block is taken in, and `cmd` wires
 it to `prog.Send`. The tool result stays a `string`; the transcript, resume
-and error paths are untouched. The sink is nil in every entrance that is
-not an interactive TUI, so one-shot `-p` and the plain REPL pass no bytes
-anywhere rather than deciding not to draw them.
+and error paths are untouched. The sink is NOT nil outside an interactive
+TUI: an earlier draft of this record promised that, and the ordering does
+not allow it — the MCP servers connect before the runtime knows whether it
+has a UI, so the intake is handed an unbound `tui.Screen` and the binding
+happens later, if it happens. Unbound it is inert, so one-shot `-p` and the
+plain REPL drop what they are given rather than deciding not to draw it.
 
 ### 2. An image is drawn if and only if the intake saved and described it
 
 A block whose note does not fit the response budget is already neither
 saved nor described individually — the guard sizes `binaryNote` before
-anything is written ([mcpresult.go:113](../../../cmd/mcpresult.go)) — and
+anything is written ([mcpresult.go:115](../../../cmd/mcpresult.go)) — and
 such a block is not drawn. Drawing one would put a picture on the
 operator's screen that appears nowhere in the session's record. One rule,
 not a second budget.

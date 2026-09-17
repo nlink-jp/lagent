@@ -16,7 +16,6 @@
   described it, only if its bytes actually decode as an image whatever the
   MIME says, and only up to 2 MiB decoded; every refusal is silent, because
   a line per undrawable image is a report rather than a control.
-
 - **`[tui] images`** (`auto` | `off` | `iterm` | `kitty`, default `auto`) — the
   capability behind it. An image payload is zero cells wide to every surface
   the TUI has, so the row counter is TOLD the box the emitter declared
@@ -31,7 +30,6 @@
   `auto` asks the terminal once, before the UI starts, because once Bubble
   Tea owns stdin a reply arrives in the input box as phantom keystrokes;
   inside tmux or screen it resolves to off.
-
 - **`internal/termimg`** — the protocol layer: capability detection
   (environment first, one query only when it must), iTerm2 `OSC 1337 File=`
   and kitty `APC _G` payloads that carry the declared box, and a fit that
@@ -39,62 +37,6 @@
   picture into rows the declaration did not claim. Sixel is absent: it
   cannot declare a row count.
 
-## [0.8.0] - 2026-09-14
-
-### Added
-
-- **`[mcp] startup_timeout_sec` (default 30)** — a server's handshake (spawn,
-  `initialize`, the first `tools/list`) now has its own budget instead of
-  borrowing `call_timeout_sec`. They are different things: a call's budget is
-  how long the work may take, a handshake's is how long a server may take to
-  say hello. It is a separate number rather than a smaller one on purpose —
-  cutting a slow server off at startup does not save time overall, because the
-  session then has to reconnect it, which costs more than waiting did. Before
-  this, `initialize` was bounded by `call_timeout_sec` (60s) and only the
-  listing had a hard-coded 30s.
-
-## [0.7.1] - 2026-09-14
-
-### Changed
-
-- **MCP servers are spawned and listed at once instead of one after another.**
-  Measured on a 25-server configuration: twenty-three answer `tools/list` in
-  under 20ms and two go over the network — GitHub's remote MCP at ~1.9s and a
-  Slack proxy at ~1.3s — so serially those two were the whole of MCP startup
-  (~6.5s of a ~10s start), and a slow day at either landed on it in full.
-  Startup now costs the slowest server rather than the sum. Only the waiting is
-  concurrent: attaching still runs in configured order, so the registry, the
-  catalog and the warnings read exactly as before.
-
-## [0.7.0] - 2026-09-13
-
-### Added
-
-- **Every `tools/call` carries the session work directory** as request
-  `_meta["jp.nlink/work_dir"]`. The in-house MCP servers take their output
-  directory as a per-call `work_dir` argument now (organization ADR-021), and
-  this is the contract's second channel: schema-blind, so one line covers every
-  server, and a model that omits the argument still leaves the server with a
-  destination this session can read back. A session with no work directory
-  attaches nothing, and the model's own argument always wins.
-  See [ADR-0019](docs/en/adr/0019-the-caller-names-the-work-dir.md).
-
-## [Unreleased]
-
-### Added
-
-- **[ADR-0020](docs/en/adr/0020-inline-images-declare-their-height.md)
-  (design only; no code)** — inline images declare their box, so the
-  scrollback row counter is told a number rather than measuring one it
-  cannot see: `ansi.StringWidth` is 0 for every image escape and
-  `physicalRows` floors at 1, so a drawn image leaves the accounting short
-  by N-1. Measured on gem-agent's probes with a plain control at the same
-  fill in every run: once the screen is full, a terminal that draws what the
-  counter cannot see strands one frame per image — iTerm2 3.7.2 three for
-  three, tmux 3.7c three for three rendered sixels — while a screen not yet
-  full takes no damage. What may be drawn, and how its bytes reach the view
-  layer, is deferred to its own ADR; the constraint this one earned is that
-  the view layer opens no file.
 
 - **The injection suite** (ADR-0018). Six bench tasks, opt-in through a new
   `suite` field: `bench run` with no `--tasks` skips them, `--tasks injection`
@@ -149,6 +91,46 @@
   benign twin in the same run, varies the element it targets across at least
   three payloads, and leaves rate measurement to the single-turn harness
   because an agent run is too slow to reach n=100.
+
+## [0.8.0] - 2026-09-14
+
+### Added
+
+- **`[mcp] startup_timeout_sec` (default 30)** — a server's handshake (spawn,
+  `initialize`, the first `tools/list`) now has its own budget instead of
+  borrowing `call_timeout_sec`. They are different things: a call's budget is
+  how long the work may take, a handshake's is how long a server may take to
+  say hello. It is a separate number rather than a smaller one on purpose —
+  cutting a slow server off at startup does not save time overall, because the
+  session then has to reconnect it, which costs more than waiting did. Before
+  this, `initialize` was bounded by `call_timeout_sec` (60s) and only the
+  listing had a hard-coded 30s.
+
+## [0.7.1] - 2026-09-14
+
+### Changed
+
+- **MCP servers are spawned and listed at once instead of one after another.**
+  Measured on a 25-server configuration: twenty-three answer `tools/list` in
+  under 20ms and two go over the network — GitHub's remote MCP at ~1.9s and a
+  Slack proxy at ~1.3s — so serially those two were the whole of MCP startup
+  (~6.5s of a ~10s start), and a slow day at either landed on it in full.
+  Startup now costs the slowest server rather than the sum. Only the waiting is
+  concurrent: attaching still runs in configured order, so the registry, the
+  catalog and the warnings read exactly as before.
+
+## [0.7.0] - 2026-09-13
+
+### Added
+
+- **Every `tools/call` carries the session work directory** as request
+  `_meta["jp.nlink/work_dir"]`. The in-house MCP servers take their output
+  directory as a per-call `work_dir` argument now (organization ADR-021), and
+  this is the contract's second channel: schema-blind, so one line covers every
+  server, and a model that omits the argument still leaves the server with a
+  destination this session can read back. A session with no work directory
+  attaches nothing, and the model's own argument always wins.
+  See [ADR-0019](docs/en/adr/0019-the-caller-names-the-work-dir.md).
 
 ## [0.6.0] - 2026-09-13
 

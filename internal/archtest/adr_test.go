@@ -12,7 +12,8 @@ import (
 )
 
 // TestADRCitationsResolve: an `ADR-NNNN` in a comment or a string of
-// cmd/ and internal/ names one of this repository's records
+// cmd/ and internal/, or in any prose surface a maintainer reads, names one
+// of this repository's records
 // (docs/en/adr/NNNN-*.md) unless it is written `gem-agent ADR-NNNN`,
 // the porting source's. The ported code keeps the source's design
 // references (ADR-0001), and bare they pointed a maintainer at the
@@ -83,5 +84,68 @@ func TestADRCitationsResolve(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+
+	// The prose surfaces. The Go scan above left them out, and a
+	// verification pass then found the porting source's own number
+	// (gem-agent ADR-0089) written bare in AGENTS.md, where it read as one
+	// of this repository's records.
+	//
+	// Prose qualifies differently from code: a paragraph names gem-agent
+	// once and then writes "its gem-agent ADR-0063" a few lines later, and a reader
+	// carries the context across the sentence. So the unit here is the
+	// paragraph, not the line. That is deliberately weaker than the Go
+	// rule and closes the class it can close — a number with no source
+	// context anywhere near it — while a sentence that reads wrong INSIDE
+	// a qualified paragraph is still a human's catch. One such (a gem-agent ADR-0063
+	// whose Japanese carried no possessive) was fixed by hand the day this
+	// scan was written.
+	proseFiles := 0
+	scan := func(rel string, b []byte) {
+		proseFiles++
+		lines := strings.Split(string(b), "\n")
+		para := func(i int) string {
+			a := i
+			for a > 0 && strings.TrimSpace(lines[a-1]) != "" {
+				a--
+			}
+			z := i
+			for z < len(lines)-1 && strings.TrimSpace(lines[z+1]) != "" {
+				z++
+			}
+			return strings.Join(lines[a:z+1], "\n")
+		}
+		for i, line := range lines {
+			if !cite.MatchString(line) || strings.Contains(para(i), "gem-agent") {
+				continue
+			}
+			check(token.Position{Filename: rel, Line: i + 1}, line)
+		}
+	}
+	for _, rel := range []string{"AGENTS.md", "README.md", "README.ja.md", "CHANGELOG.md"} {
+		if b, err := os.ReadFile(filepath.Join(root, rel)); err == nil {
+			scan(rel, b)
+		}
+	}
+	err = filepath.WalkDir(filepath.Join(root, "docs"), func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(p, ".md") {
+			return nil
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(root, p)
+		scan(rel, b)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proseFiles == 0 {
+		t.Fatal("no prose surface was scanned — the walk is broken, not the tree")
 	}
 }

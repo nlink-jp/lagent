@@ -30,16 +30,25 @@ confinement through `os.Root`, the walks, the caged reads),
 `internal/bounded`, `internal/hooks`, `internal/mcp`,
 `internal/trustpin`, `internal/archtest`, the approval ladder in
 `internal/agent` and `internal/approve`, and — added 2026-09-17, after a
-verification pass found ADR-0089/ADR-0020 arguing it while both these lists
-denied it — the **scrollback accounting in `internal/tui`**: `emit`,
-`wrapForScrollback`, `physicalRows` and the bottom-hold pad. `diff` returns
-nothing on `wrapForScrollback` and `physicalRows`; `emit` differs only in
-ADR-number prefixes, and the pad expression is byte-identical inside a
-`View()` that is not (gem-agent's carries a settings-panel frame cap).
+verification pass found gem-agent ADR-0089/ADR-0020 arguing it while both
+these lists denied it — the **scrollback accounting in `internal/tui`**:
+`emit`, `wrapForScrollback`, `physicalRows` and the bottom-hold pad. `diff`
+returns nothing on `wrapForScrollback` and `physicalRows`; `emit` differs
+only in ADR-number prefixes, and the pad expression is byte-identical inside
+a `View()` that is not (gem-agent's carries a settings-panel frame cap).
 A first version of this sentence said "nothing on the first three", which
 the next verification pass refuted with one `diff` — the remedy for a false
 claim being a false claim is why the citation test in `internal/archtest`
 now exists.
+
+**Added the same day, by the inline-image work and named here because the
+same pass caught this list going stale again:** `internal/termimg` entire
+(only the ADR renumbering and the provenance line differ), the segment lane
+in `internal/tui` — `Segment`, `emitSegments`, `drawImage`, `maxImageRows` —
+and the intake's draw condition in `cmd/mcpresult.go` (`isImageBlock` and
+the saved-AND-described gate). A defect in any of them is fixed in both
+runtimes in the same piece of work; the probe's device-attributes question
+and the drawn-implies-described predicate were both fixed that way.
 
 Never query the terminal after Bubble Tea starts. Once raw mode owns stdin,
 a terminal's reply to a query — an OSC background probe, a cursor report —

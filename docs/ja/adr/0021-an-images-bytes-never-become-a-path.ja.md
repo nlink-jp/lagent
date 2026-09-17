@@ -18,8 +18,8 @@ ADR-0020 はレーンを作り、供給源を開いたまま残し、反証さ�
 
 それが素直な設計を排除する。MCP intake は既に画像をセッションの work dir へ書き出し、モデルには
 `[image saved at <path> … use view_image on that path]` を渡している
-（[mcpresult.go:224](../../../cmd/mcpresult.go)）。つまりパスはそこにある。しかし `write` は
-`os.Stat` で短絡し（[mcpresult.go:247](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに
+（[mcpresult.go:226](../../../cmd/mcpresult.go)）。つまりパスはそこにある。しかし `write` は
+`os.Stat` で短絡し（[mcpresult.go:249](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに
 work dir を `_meta[workdir.MetaKey]` で渡す（[client.go:608](../../../internal/mcp/client.go)）。
 ローカルのサーバ子は自分の名前・ツール名・返すバイト列・ディレクトリを知るので、応答の前に
 content-addressed の名前へ symlink を置ける。するとランタイムは何も書かず、パスはサーバが選んだ
@@ -29,8 +29,9 @@ content-addressed の名前へ symlink を置ける。するとランタイム�
 ### こちら側の配管
 
 反証された第 3 稿は、view 層に「intake が既に保持しているバイト列」を渡すと書いた。渡せない。
-`render` は `string` を返し（[mcpresult.go:61](../../../cmd/mcpresult.go)）、`mcpIntake` が持つのは
-work dir の getter とバイト上限とプレビュー長だけで（[mcpresult.go:54](../../../cmd/mcpresult.go)）、
+`render` は `string` を返し（[mcpresult.go:63](../../../cmd/mcpresult.go)）、`mcpIntake` が持つのは
+work dir の getter とバイト上限とプレビュー長、そして本決定以降は sink であって（[mcpresult.go:56](../../../cmd/mcpresult.go)）、
+一度も持ったことが無いのがバイト列であり、
 ツール契約は `Run func(ctx, args) (string, error)` である
 （[tools.go:67](../../../internal/tools/tools.go)）。
 
@@ -57,13 +58,15 @@ gem-agent ADR-0090 と同一である。intake もツール契約も UI 経路�
 
 `mcpIntake` は `workDir` の隣に任意の sink を 1 つ得て、ブロックを取り込む瞬間にデコード済み
 バイト列と MIME 型で呼ばれ、`cmd` がそれを `prog.Send` に配線する。ツール結果は `string` の
-ままで、transcript・resume・エラー経路には触れない。sink は対話的 TUI でない入口すべてで nil で
-あり、one-shot `-p` と素の REPL は「描かないと判断する」のではなくバイト列をどこへも渡さない。
+ままで、transcript・resume・エラー経路には触れない。sink は対話的 TUI でない入口でも nil では
+ない。以前の稿はそう約束したが順序が許さない — MCP サーバは UI の有無が決まる前に接続するので、
+intake が受け取るのは未束縛の `tui.Screen` であり、束縛は後から、起きるなら起きる。未束縛の
+それは不活性なので、one-shot `-p` と素の REPL は「描かないと判断する」のではなく渡された物を捨てる。
 
 ### 2. 画像を描くのは、intake が保存し記述したときに限る
 
 注記が response budget に収まらないブロックは、既に保存も個別記述もされない — ガードは何かを
-書く前に `binaryNote` の大きさを測る（[mcpresult.go:113](../../../cmd/mcpresult.go)）— そして
+書く前に `binaryNote` の大きさを測る（[mcpresult.go:115](../../../cmd/mcpresult.go)）— そして
 そうしたブロックは描かない。描けば、セッションの記録のどこにも現れない絵を操作者の画面に置く
 ことになる。規則 1 つ、第 2 の budget ではない。
 
