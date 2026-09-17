@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Accepted** (2026-09-17) — implemented |
+| Status | **Accepted** (2026-09-17) — implemented; **§2's source withdrawn by [ADR-0022](0022-showing-is-an-act-of-output.md)** (2026-09-17), §1's plumbing stands |
 | Date | 2026-09-17 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
@@ -79,7 +79,17 @@ has a UI, so the intake is handed an unbound `tui.Screen` and the binding
 happens later, if it happens. Unbound it is inert, so one-shot `-p` and the
 plain REPL drop what they are given rather than deciding not to draw it.
 
-### 2. An image is drawn if and only if the intake saved and described it
+### 2. An image is drawn if and only if the intake saved and described it (withdrawn)
+
+> **Withdrawn by [ADR-0022](0022-showing-is-an-act-of-output.md) (2026-09-17).**
+> The condition below is sound about the session's record and answers the
+> wrong question: an MCP image block carries an image into the MODEL's
+> context, MCP says who content is for with an `audience` annotation this
+> runtime drops at the parser, and none of the four servers that can emit a
+> block sets one — so "the intake saved and described it" was never the
+> server asking for a picture to be shown. The intake draws nothing now;
+> what follows is kept as the reasoning that was refuted, not as a rule.
+
 
 A block whose note does not fit the response budget is already neither
 saved nor described individually — the guard sizes `binaryNote` before

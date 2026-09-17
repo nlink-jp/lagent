@@ -220,7 +220,7 @@ excepted).
   move. The sink is not nil outside an interactive TUI — an earlier draft
   promised that and the ordering does not allow it, because MCP connects
   before the runtime knows whether it has a UI; it is inert there instead,
-  dropping what it is given. An image is drawn if and only if the intake saved AND described it,
+  dropping what it is given. An image was drawn if and only if the intake saved AND described it (withdrawn by ADR-0022),
   since a block the response budget refuses is already neither and drawing
   one would put a picture on screen that the session's record does not
   contain. `image.DecodeConfig` supplies the aspect ratio and doubles as
@@ -231,4 +231,26 @@ excepted).
   the operator's screen. Implemented here after gem-agent, which had the
   lane already; the decision was taken on both sides at once so that
   neither holds it alone, and the port carried the erase gem-agent's first
-  real-terminal run made necessary
+  real-terminal run made necessary. **§2's source is withdrawn by
+  [ADR-0022](adr/0022-showing-is-an-act-of-output.md)**
+- [`ADR-0022`](adr/0022-showing-is-an-act-of-output.md) — showing an image is
+  an act of output, not a side effect of a tool result (**Proposed**, design
+  only; gem-agent ADR-0091 is the same decision on the other side): an MCP
+  image block is how a tool result carries an image into the MODEL's context,
+  and MCP says who content is for with an `audience` annotation this runtime
+  drops at the parser — measured across the 24 registered servers, four can
+  emit an image block and none sets an audience, so ADR-0021's condition was
+  never "the server asked for this to be shown" but this runtime inferring it.
+  Two of those four return a screenshot so the MODEL can look, and every such
+  inspection also put a full-size picture into the operator's scrollback,
+  competing with the model's own reply. Meanwhile the common case — a
+  generated artifact — comes back as a path under the work-directory
+  contract, so the intake route never fires for it, and a model asked to show
+  one reaches for `shell_exec` with `open`, which the read lane denies at the
+  kernel. So the intake draws nothing; showing becomes an act of the model's
+  output through a tool whose read happens in the TOOL layer, where a
+  model-named path is judged like any other (`view_image`'s own confinement),
+  and the operator keeps a direct route in `/show <path>`, the trust line
+  ADR-0005 already draws for `@<image>`. The lane, the declared box, the
+  erase, the ceiling and the probe are ADR-0020's and unchanged; only the
+  source moves
