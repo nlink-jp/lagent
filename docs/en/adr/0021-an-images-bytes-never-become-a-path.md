@@ -45,7 +45,7 @@ work-directory getter, a byte cap and a preview length
 
 The channel this needs already exists here too, and it is the same one:
 the agent loop talks to the UI **during** a tool call —
-`prog.Send(tui.ToolCall{…})` at [root.go:809](../../../cmd/root.go). Nothing
+`prog.Send(tui.ToolCall{…})` at [root.go:819](../../../cmd/root.go). Nothing
 about the string contract has to move.
 
 ### The cost

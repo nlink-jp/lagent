@@ -600,6 +600,16 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// so both components drain the same buffer and no typed-ahead input
 	// is stranded in a second one. (The TUI reads the terminal itself.)
 	stdin := bufio.NewReader(cmd.InOrStdin())
+	// The inline-image capability is resolved ONCE, here: before
+	// tea.NewProgram (ADR-0020 §7), and only for a session that will have
+	// a UI — the probe writes escapes to the terminal and a one-shot or a
+	// piped run has none to write to. The settings panel answers with it
+	// too, so it cannot be resolved twice or answered differently in the
+	// two places.
+	images := termimg.None
+	if useTUI {
+		images = resolveImages(cfg.TUI.Images)
+	}
 	var gate agent.Approver
 	var tuiGate *tui.Gate
 	switch {
@@ -921,7 +931,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		cfg: cfg, projectCfg: projectCfg, policyFile: policyFile,
 		policyPath: policyPath, projectDir: projectDir,
 		registry: registry, ag: ag, current: approvalPolicy,
-		filter: mcpFilter, inv: mcpInv,
+		filter: mcpFilter, inv: mcpInv, images: images,
 	}
 	settingsData := settings.data()
 
@@ -1296,7 +1306,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			// whole chrome fell back to English (review round 2).
 			Msgs:          msgs,
 			Theme:         resolveTheme(cfg.TUI.Theme),
-			Images:        resolveImages(cfg.TUI.Images),
+			Images:        images,
 			ModelName:     cfg.LLM.Model,
 			ProjectDir:    abbreviateHome(projectDir),
 			Banner:        bannerLines,
