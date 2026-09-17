@@ -4,6 +4,23 @@
 
 ### Added
 
+- **The image capability probe no longer costs a terminal that cannot draw.**
+  Asking only the graphics question left silence as the single verdict, so
+  every unclassified terminal paid the whole timeout: measured at 2.001 s on
+  Apple Terminal at every start, with the query's own body printed on the
+  screen because that terminal does not parse APC. A device-attributes
+  request now rides in the same write, and a DA1 reply with no graphics
+  reply before it is the definitive no. Re-measured: under 1 ms, clean
+  screen.
+
+- **Verified on a real terminal, with a negative control.** iTerm2, screen
+  full, three images through the production path: one frame, no stranded
+  footer, the same reading as the plain control at the same fill. The same
+  tree with the erase removed strands three — which is what makes the zero a
+  measurement rather than a blind instrument. The pictures were confirmed to
+  have actually drawn, because a silent refusal to draw would also leave a
+  clean pin.
+
 - **Images from MCP tools appear on screen** ([ADR-0021](docs/en/adr/0021-an-images-bytes-never-become-a-path.md)).
   A server that returns an image block — a screenshot, a rendered chart —
   now puts it in front of the operator as the call returns, drawn in a box

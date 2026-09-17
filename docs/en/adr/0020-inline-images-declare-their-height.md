@@ -56,6 +56,27 @@ an earlier draft of both records reported those runs under the wrong label.
 | tmux 3.7c, 120×30 | OSC 1337 and kitty ×3 | full | 0 | same run: swallowed there, so controls |
 | both | every case | not full | 0 | identical |
 
+**This runtime was then measured on its own terminal, which is the one
+thing no verification pass could do.** A throwaway probe (not committed —
+§2's reason stands) built the REAL model, resolved the protocol the way
+`cmd` does, and pushed a real PNG through `tui.Image` → `drawImage` →
+`emitSegments`; iTerm2 was driven and read back through its scripting
+interface, and a frame was counted by EITHER footer sentinel, because an
+image covers the left one while leaving the right one intact.
+
+| lagent run, iTerm2 3.7.2 180×80, filler 90 (full) | frames | stranded | gap END→pin |
+|---|---|---|---|
+| PLAIN ×3, the control | 1 | **0** | 1 |
+| IMAGE ×3, the production path | 1 | **0** | 1 |
+| IMAGE ×3, one line removed: no erase | 4 | **3** | −10 |
+
+The third row is the negative control, and it is why the second means
+anything: the same tree with `ansi.EraseScreenBelow` deleted reproduces
+gem-agent's three-for-three exactly, so the zero above it is a measurement
+rather than a blind instrument. A screen capture of the same run confirms
+what the text cannot — the three pictures really drew, so the clean pin is
+not a silent refusal to draw at all.
+
 A terminal that draws what the counter cannot see strands one frame per
 image, once the screen is full — on two terminals and two protocols, each
 against a control at the same fill. Nothing happens while the screen is not
@@ -221,10 +242,22 @@ Pre-existing, not widened here, not repaired here.
 ([root.go:1360](../../../cmd/root.go)); one-shot `-p` and the plain REPL
 never build it and never draw. The probe runs **before** that construction
 and is cached, for the reason `newGlamourRenderer` records about
-`WithAutoStyle` — inherited from the porting source, and true here. It takes
-seconds, drains before querying, and treats no reply as *no capability*,
-because an abandoned cursor report is misfiled into the next query, not
-lost.
+`WithAutoStyle` — inherited from the porting source, and true here. It
+drains before querying and treats no reply as *no capability*, because an
+abandoned cursor report is misfiled into the next query, not lost.
+
+**The probe asks a second question, and this record first said it merely
+"takes seconds".** That was the whole defect: the graphics query has no
+negative answer, so silence could not be told from slowness and every
+terminal that cannot draw paid the entire budget. Measured on Apple
+Terminal: **2.001 s at every start**, with `TERM_PROGRAM` set, plus the
+query's own body — `Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA` — printed on the
+operator's screen, since that terminal does not parse APC. A
+device-attributes request now rides in the same write; every VT-compatible
+terminal answers it, so a DA1 reply with no graphics reply before it IS the
+no. Re-measured with the same instrument: **under 1 ms, and a clean
+screen.** The budget stays as the backstop for a terminal that answers
+neither.
 
 `[tui] images = "auto"` selects it
 ([config.go:196](../../../internal/config/config.go)), beside `theme` and
