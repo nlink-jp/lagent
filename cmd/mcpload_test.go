@@ -29,7 +29,7 @@ func loadHarness(t *testing.T, all bool, preload, allow []string) (*mcpAdvertise
 		{stubCaller: stubCaller{name: "tor-exit"}, tools: []string{"check_ip", "update_list"}, instructions: "Reports whether an IP is a Tor exit. Call list_status first."},
 		{stubCaller: stubCaller{name: "github"}, tools: []string{"get_me"}},
 	} {
-		if !attachMCPServer(context.Background(), s, time.Second, reg, &strings.Builder{}, filterOf(t), &inv, nil) {
+		if !attachMCPServer(context.Background(), s, time.Second, reg, &strings.Builder{}, filterOf(t), &inv) {
 			t.Fatalf("%s did not attach", s.name)
 		}
 	}

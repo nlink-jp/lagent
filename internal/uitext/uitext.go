@@ -390,6 +390,7 @@ var en = Messages{
   /memory    list memories (facts recalled in every session)
   /remember [global] <name> <fact>   save a memory (project scope unless global)
   /forget [global] <name>            remove a memory
+  /show <path>   draw an image in this terminal (the model uses show_image for the same thing)
   /usage     token statement for this session
   /version   version and platform
   /clear     reset the conversation
@@ -545,6 +546,7 @@ var ja = Messages{
   /memory    メモリ一覧（毎セッション想起される事実）
   /remember [global] <name> <fact>   メモリを保存（global 指定が無ければ project）
   /forget [global] <name>            メモリを削除
+  /show <path>   画像をこの端末に描く（モデルは同じことを show_image で行う）
   /usage     このセッションのトークン明細
   /version   バージョンとプラットフォーム
   /clear     会話履歴をリセット

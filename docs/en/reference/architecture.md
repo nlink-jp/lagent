@@ -15,15 +15,15 @@ One binary, one process, one conversation. `main.go` hands off to
 cmd/            flags, config load, project resolution, wiring, REPL/TUI
   |-- internal/config      strict-decode TOML + env/flag precedence
   |-- internal/llm         Backend interface + the OpenAI-compatible client (stream observer)
-  |-- internal/tools       the nine file/shell/image built-ins + Register
+  |-- internal/tools       the ten file/shell/image built-ins + Register
   |-- internal/agent       the turn loop, approval dispatch, the round ladder
   |-- internal/tui         Bubble Tea inline UI (or internal/repl, non-TTY)
   `-- internal/termimg     inline images in a declared box (ADR-0020)
 ```
 
-The tools package holds the nine built-ins that need only the project
+The tools package holds the ten built-ins that need only the project
 directory: `list_files`, `list_tree`, `search_files`, `read_file`,
-`file_info`, `view_image`, `write_file`, `edit_file`, `shell_exec`.
+`file_info`, `view_image`, `show_image`, `write_file`, `edit_file`, `shell_exec`.
 `cmd/` registers `ask_user` and `mcp_load` through the same `Register`,
 plus every MCP tool.
 

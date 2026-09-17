@@ -560,14 +560,13 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	}
 
 	// --- MCP servers from the project's .mcp.json (drop-in) ---
-	// screen is the route from the MCP intake to the operator's screen
-	// (ADR-0021 §1). The servers connect here, long before the program
-	// exists, so the intake is handed this rather than prog.Send and the
-	// binding happens later — the same late-bind Gate already does for
-	// approvals. Unbound it is inert, which is what every entrance that
-	// is not an interactive TUI gets.
+	// screen is the route to the operator's screen, late-bound because
+	// the program does not exist yet (ADR-0021 §1's plumbing, which
+	// ADR-0022 keeps while withdrawing the intake as its source). What
+	// sends through it now is show_image, which the model calls, and
+	// /show, which the operator types. Unbound it is inert.
 	screen := tui.NewScreen()
-	mcpClients, mcpSummary, mcpInv := connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, stderr, grant, mcpFilter, screen.Image)
+	mcpClients, mcpSummary, mcpInv := connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, stderr, grant, mcpFilter)
 	defer func() {
 		for _, c := range mcpClients {
 			c.Close()
@@ -927,6 +926,47 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}()
 	}
 
+	// showImage is the one door to the operator's screen (ADR-0022). Both
+	// routes use it — show_image, which the model calls, and /show, which
+	// the operator types — so a refusal reads the same either way, and
+	// the reason is returned rather than printed: the screen stays silent
+	// on refusal (ADR-0020), and the caller is the one who can say
+	// something useful about it.
+	showImage := func(data []byte, mime string) error {
+		if images == termimg.None {
+			return fmt.Errorf("this terminal cannot draw inline images (see [tui].images and /settings)")
+		}
+		if _, _, ok := termimg.Measure(data); !ok {
+			return fmt.Errorf("not a drawable image, or larger than %d bytes decoded", termimg.MaxBytes)
+		}
+		if !screen.Image(data, mime) {
+			return fmt.Errorf("this session has no screen (one-shot or non-interactive)")
+		}
+		return nil
+	}
+	registry.SetShowImage(showImage)
+
+	// showPath is /show: the OPERATOR names the file, so it resolves
+	// through the same grammar as an `@<image>` attachment — a project
+	// path, or an absolute or ~ path for an image (ADR-0005) — rather
+	// than through the tools' project confinement.
+	showPath := func(ref string) (string, bool) {
+		atts, probs := mention.Expand(ctx, "@"+strings.TrimPrefix(ref, "@"), projectDir, registry.WorkDir(), mention.DefaultLimits())
+		for _, a := range atts {
+			if a.Kind != "image" {
+				continue
+			}
+			if err := showImage(a.Data, a.MIME); err != nil {
+				return fmt.Sprintf("not shown: %v", err), true
+			}
+			return "", false // the picture is the output
+		}
+		if len(probs) > 0 {
+			return fmt.Sprintf("not shown: %s", probs[0].Reason), true
+		}
+		return fmt.Sprintf("not shown: %s is not an image this runtime can read", ref), true
+	}
+
 	settings := &settingsStore{
 		cfg: cfg, projectCfg: projectCfg, policyFile: policyFile,
 		policyPath: policyPath, projectDir: projectDir,
@@ -963,7 +1003,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 				fmt.Fprintf(&warn, "%s\n", n)
 			}
 		}
-		mcpClients, mcpSummary, mcpInv = connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, &warn, grant, mcpFilter, screen.Image)
+		mcpClients, mcpSummary, mcpInv = connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, &warn, grant, mcpFilter)
 		adv.setInventory(mcpInv)
 		ag.RefreshTools()
 		mcpTools := 0
@@ -1050,7 +1090,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		if running != nil {
 			runningServer = running
 		}
-		kept := reconnectMCPServer(ctx, server, runningServer, start, startupTimeout, registry, &warn, mcpFilter, &mcpInv, screen.Image)
+		kept := reconnectMCPServer(ctx, server, runningServer, start, startupTimeout, registry, &warn, mcpFilter, &mcpInv)
 		if kept != nil {
 			others = append(others, kept.(*mcp.Client))
 		}
@@ -1352,7 +1392,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 					return out, isErr, false
 				}
 				return slashOutput(in, ag, registry, mcpStatus(), skillsList,
-					slashReloads{mcp: reloadMCP, load: loadMCP},
+					slashReloads{mcp: reloadMCP, load: loadMCP, show: showPath},
 					func() string { return usageReport(ag, cfg.LLM.Model) },
 					appVersion, msgs, onClear)
 			},
@@ -1438,7 +1478,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 				continue
 			}
 			out, _, quit := slashOutput(input, ag, registry, mcpStatus(), skillsList,
-				slashReloads{mcp: reloadMCP, load: loadMCP},
+				slashReloads{mcp: reloadMCP, load: loadMCP, show: showPath},
 				func() string { return usageReport(ag, cfg.LLM.Model) },
 				appVersion, msgs, onClear)
 			fmt.Fprint(stderr, out)
@@ -2099,6 +2139,12 @@ type slashReloads struct {
 	// load advertises one server's tools by hand (/mcp load <server>,
 	// ADR-0004); returns the text and whether it is an error.
 	load func(server string) (string, bool)
+	// show draws an image the OPERATOR named (/show <path>, ADR-0022
+	// §3). It is here rather than in the tools because the operator
+	// typed the path: that is the trust line ADR-0005 already draws for
+	// `@<image>`, and it is why the symlink hazard that rules out a
+	// runtime-chosen path does not apply.
+	show func(path string) (string, bool)
 }
 
 func slashOutput(input string, ag *agent.Agent, registry *tools.Registry, mcpSummary []string, skillsList []skills.Skill, reload slashReloads, usage func() string, version string, msgs *uitext.Messages, onClear func() string) (output string, isErr bool, quit bool) {
@@ -2129,6 +2175,20 @@ func slashOutput(input string, ag *agent.Agent, registry *tools.Registry, mcpSum
 			return b.String(), true, false
 		}
 		return fn(), false, false
+	}
+	if fields[0] == "/show" {
+		if reload.show == nil {
+			fmt.Fprintf(&b, msgs.UnknownCommandFmt, input)
+			return b.String(), true, false
+		}
+		if len(fields) < 2 {
+			return "/show <path> — the image to draw in this terminal", true, false
+		}
+		// Everything after the command is the path: an operator's path
+		// may hold spaces, and splitting it into "unknown command" would
+		// be the least useful thing this could do.
+		out, isErr := reload.show(strings.TrimSpace(strings.TrimPrefix(input, fields[0])))
+		return out, isErr, false
 	}
 	switch fields[0] {
 	case "/help":

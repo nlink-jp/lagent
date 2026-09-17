@@ -314,7 +314,7 @@ func persistentTarget(rel string) (Verdict, bool) {
 // (ADR-0016 §3 and §5 as amended).
 var pathJudgedTools = map[string]bool{
 	"write_file": true, "edit_file": true,
-	"read_file": true, "view_image": true, "file_info": true,
+	"read_file": true, "view_image": true, "show_image": true, "file_info": true,
 }
 
 // PathJudged reports whether toolName's verdict is taken on its path

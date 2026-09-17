@@ -101,8 +101,8 @@ func TestPlainAnswer(t *testing.T) {
 	if mb.systems[0] != "test system" {
 		t.Error("system prompt not passed through")
 	}
-	if len(mb.toolDefs[0]) != 9 { // the built-ins; ask_user, mcp_load and MCP tools register in cmd
-		t.Errorf("tool defs = %d, want 9 built-ins", len(mb.toolDefs[0]))
+	if len(mb.toolDefs[0]) != 10 { // the built-ins; ask_user, mcp_load and MCP tools register in cmd
+		t.Errorf("tool defs = %d, want 10 built-ins", len(mb.toolDefs[0]))
 	}
 }
 

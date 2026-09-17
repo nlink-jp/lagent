@@ -65,7 +65,7 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
 ## What it does
 
 - **Tools:** `list_files`, `list_tree`, `search_files`, `read_file`,
-  `file_info`, `view_image`, `write_file`, `edit_file`, `shell_exec`,
+  `file_info`, `view_image`, `show_image`, `write_file`, `edit_file`, `shell_exec`,
   `ask_user`, and
   every tool of the MCP servers in `.mcp.json` — shown to the model as a
   catalog, and advertised per server once it calls `mcp_load` (a local
@@ -100,11 +100,11 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   `.claude/skills/<name>/`. One line per skill tells the model what
   each is for; it loads one with `load_skill`, and you invoke one by
   hand with `/skill <name>` (ADR-0011).
-- **Inline images:** an image an MCP tool returns — a screenshot, a
-  rendered chart — is drawn in the terminal as the call returns, when the
-  terminal can draw one (iTerm2 or kitty; `[tui].images`, `auto` by
-  default, off inside tmux and screen). The model's note is unchanged: it
-  gets the path and calls `view_image` to look (ADR-0020/0021).
+- **Inline images:** the model shows you a picture with `show_image`, and
+  you ask for one with `/show <path>` — drawn in the terminal when it can
+  draw (iTerm2 or kitty; `[tui].images`, `auto` by default, off inside tmux
+  and screen). `view_image` is the other direction: that is the model
+  looking at an image, not you (ADR-0020/0021/0022).
 - **Not here:** web search and fetch, media uploads, audit-log export,
   history compaction — see the RFP and
   [ADR-0002](docs/en/adr/0002-features-not-reproduced.md).

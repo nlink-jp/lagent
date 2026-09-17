@@ -167,8 +167,9 @@ internal/termimg/  inline images in a DECLARED box (ADR-0020): capability
                    payloads carrying the box, Fit clamping the width. The
                    row counter is told the box, never asked to measure —
                    an image payload is zero cells wide to every surface
-                   the TUI has. The source is the MCP intake, and only a
-                   block it both saved and described (ADR-0021)
+                   the TUI has. What reaches the screen is authored: the
+                   model's show_image, or the operator's /show (ADR-0022,
+                   which withdrew the MCP intake as the source)
 bench/             the task bench (ADR-0006): runner + report (package main), configs/<runtime>/*.toml,
                    tasks/<name>/{task.toml,testdata/}, mcpfixture/ (the stdio MCP fixture server);
                    _results/ is ignored by git (and by go's ./..., which is why the underscore)

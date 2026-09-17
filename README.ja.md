@@ -63,7 +63,7 @@ lagent
 ## できること
 
 - **ツール:** `list_files`、`list_tree`、`search_files`、`read_file`、
-  `file_info`、`view_image`、`write_file`、`edit_file`、`shell_exec`、
+  `file_info`、`view_image`、`show_image`、`write_file`、`edit_file`、`shell_exec`、
   `ask_user`、および
   `.mcp.json` の MCP サーバが提供する全ツール — モデルには目録として見せ、
   サーバごとに `mcp_load` を呼んだ時点で広告する（ローカルモデルは毎ターン
@@ -97,11 +97,10 @@ lagent
   `.claude/skills/<name>/` から読む。スキルごと 1 行が何のためのものかを
   モデルに伝え、モデルは `load_skill` で読み込み、操作者は `/skill <name>`
   で手で呼ぶ（ADR-0011）。
-- **インライン画像:** MCP ツールが返した画像 — スクリーンショット、描画した
-  チャート — を、端末が描けるならその呼び出しの戻りと同時に端末へ描く
-  （iTerm2 と kitty。`[tui].images`、既定は `auto`、tmux・screen の中では
-  off）。モデルへの注記は変わらない。パスを受け取り、`view_image` で見る
-  （ADR-0020/0021）。
+- **インライン画像:** モデルは `show_image` であなたに絵を見せ、あなたは
+  `/show <path>` で見たい画像を出す。端末が描けるときに描く（iTerm2 と kitty。
+  `[tui].images`、既定は `auto`、tmux・screen の中では off）。`view_image` は
+  逆向きで、**モデルが**画像を見るためのものである（ADR-0020/0021/0022）。
 - **無いもの:** web 検索と取得、メディアアップロード、監査ログ出力、
   履歴圧縮 — RFP と
   [ADR-0002](docs/ja/adr/0002-features-not-reproduced.ja.md) を参照。

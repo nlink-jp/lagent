@@ -15,15 +15,15 @@ lagent の現在の挙動を、前提知識なしで読めるように書く。�
 cmd/            flags, config load, project resolution, wiring, REPL/TUI
   |-- internal/config      strict-decode TOML + env/flag precedence
   |-- internal/llm         Backend interface + the OpenAI-compatible client (stream observer)
-  |-- internal/tools       the nine file/shell/image built-ins + Register
+  |-- internal/tools       the ten file/shell/image built-ins + Register
   |-- internal/agent       the turn loop, approval dispatch, the round ladder
   |-- internal/tui         Bubble Tea inline UI (or internal/repl, non-TTY)
   `-- internal/termimg     宣言したボックス内のインライン画像（ADR-0020）
 ```
 
-tools パッケージはプロジェクトディレクトリだけを要する 9 つの組込ツール
+tools パッケージはプロジェクトディレクトリだけを要する 10 の組込ツール
 （`list_files`、`list_tree`、`search_files`、`read_file`、`file_info`、
-`view_image`、`write_file`、`edit_file`、`shell_exec`）を持つ。`cmd/` は
+`view_image`、`show_image`、`write_file`、`edit_file`、`shell_exec`）を持つ。`cmd/` は
 同じ `Register` で `ask_user` と `mcp_load` と全 MCP ツールを登録する。
 
 補助パッケージ: `internal/sandbox`（レーンごとの Seatbelt プロファイル
