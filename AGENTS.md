@@ -50,6 +50,19 @@ the saved-AND-described gate). A defect in any of them is fixed in both
 runtimes in the same piece of work; the probe's device-attributes question
 and the drawn-implies-described predicate were both fixed that way.
 
+A terminal query leaves no reader behind. Read the reply on the calling
+goroutine, every wait bounded by `select(2)` (`waitReadable` / `readReady` in
+`internal/termimg`; `poll` does not work on macOS's `/dev/tty`), and read
+until the LAST thing the query asked for has answered. The image probe first
+read from a goroutine and returned on the verdict: `/dev/tty` is a blocking
+descriptor on macOS, `Close` does not wake a read already in it, and the
+stale reader took the terminal's next input — the OSC 11 reply
+`theme = "auto"` was waiting for, or the operator's first key (measured on
+Apple Terminal, ADR-0020 §7). It also hid that the parser never read the DA1
+reply. Only a real terminal or a pseudo-terminal test sees this;
+`askkitty_darwin_test.go` holds the property, and fails on the first
+implementation.
+
 Never query the terminal after Bubble Tea starts. Once raw mode owns stdin,
 a terminal's reply to a query — an OSC background probe, a cursor report —
 arrives in the input box as phantom keystrokes. That is why
