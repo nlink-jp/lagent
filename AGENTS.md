@@ -50,6 +50,17 @@ the saved-AND-described gate). A defect in any of them is fixed in both
 runtimes in the same piece of work; the probe's device-attributes question
 and the drawn-implies-described predicate were both fixed that way.
 
+An MCP time budget is stated once, by the work that owns it (`withBudget` in
+`internal/mcp/client.go`). The handshake runs under `mcp.startup_timeout_sec`,
+an ordinary call under `mcp.call_timeout_sec`; `rawCall` and `send` take the
+budget their context already states instead of layering `c.timeout` on top.
+Layered, a startup budget longer than the call budget was silently cut at the
+call's, and every timeout — the handshake's included — was reported as
+`c.timeout`, sending the operator to the wrong setting. Error text names
+`budgetOf(ctx)`. Listing servers at start-up runs in parallel into an
+index-addressed slice; attaching stays serial, in configured order, so the
+tool list is deterministic.
+
 A terminal query leaves no reader behind. Read the reply on the calling
 goroutine, every wait bounded by `select(2)` (`waitReadable` / `readReady` in
 `internal/termimg`; `poll` does not work on macOS's `/dev/tty`), and read

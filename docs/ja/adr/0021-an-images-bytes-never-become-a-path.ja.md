@@ -20,7 +20,7 @@ ADR-0020 はレーンを作り、供給源を開いたまま残し、反証さ�
 `[image saved at <path> … use view_image on that path]` を渡している
 （[mcpresult.go:200](../../../cmd/mcpresult.go)）。つまりパスはそこにある。しかし `write` は
 `os.Stat` で短絡し（[mcpresult.go:236](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに
-work dir を `_meta[workdir.MetaKey]` で渡す（[client.go:608](../../../internal/mcp/client.go)）。
+work dir を `_meta[workdir.MetaKey]` で渡す（[client.go:634](../../../internal/mcp/client.go)）。
 ローカルのサーバ子は自分の名前・ツール名・返すバイト列・ディレクトリを知るので、応答の前に
 content-addressed の名前へ symlink を置ける。するとランタイムは何も書かず、パスはサーバが選んだ
 先を指す。`view_image` 経由でそこへ到達する道は封じ込められている。エージェントが強制者の判定
