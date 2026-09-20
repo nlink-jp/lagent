@@ -50,6 +50,15 @@ the saved-AND-described gate). A defect in any of them is fixed in both
 runtimes in the same piece of work; the probe's device-attributes question
 and the drawn-implies-described predicate were both fixed that way.
 
+An edit that shifts a cited line is repaired with
+`scripts/remap-adr-citations.py`, not by hand. The ADRs cite code as
+`file.go:NNN` and `TestADRFileCitationsResolve` fails when a cited line moves —
+but only when it lands on a line without one of its paragraph's identifiers, so
+fixing the one it names can leave others pointing at the wrong line and
+passing. The script maps every citation into every file changed since a base
+ref (default `HEAD`) by diffing the two texts; run it before committing a
+change that adds or removes lines in a cited file.
+
 `/show` takes a path, not a reference: `mention.Image`, never
 `mention.Expand("@"+path)`. The `@` grammar finds references in running text
 and ends one at the first space, so `/show Screenshot 2026-09-21 at

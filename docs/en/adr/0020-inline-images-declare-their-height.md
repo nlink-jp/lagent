@@ -103,7 +103,7 @@ image is its first and only member. That is the larger part of the work.
 
 The other half of the material is already here: `mcp.Client` runs a tool
 result's binary blocks through `base64.StdEncoding.DecodeString`
-([client.go:664](../../../internal/mcp/client.go);
+([client.go:669](../../../internal/mcp/client.go);
 `:575` is the `Content` carrier an earlier draft cited instead),
 and the intake **writes an image into the session work directory** and hands
 the model `[image saved at <path> … use view_image on that path]`
@@ -204,7 +204,7 @@ tool name (`PathJudged`, [risk.go:323](../../../internal/risk/risk.go)); the
 path the intake wrote can be pre-empted, because `write` short-circuits on
 `os.Stat` ([mcpresult.go:236](../../../cmd/mcpresult.go)) and every call
 hands the server the work directory in `_meta`
-([client.go:634](../../../internal/mcp/client.go)); and the third draft's
+([client.go:639](../../../internal/mcp/client.go)); and the third draft's
 decoded bytes have no carrier at all — `render` returns a `string`
 ([mcpresult.go:53](../../../cmd/mcpresult.go)) and `Tool.Run` is
 `func(ctx, args) (string, error)` ([tools.go:67](../../../internal/tools/tools.go)).

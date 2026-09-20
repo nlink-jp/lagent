@@ -91,7 +91,7 @@ gem-agent は描画前に応答を分割する。`diagram.Split` が art segment
 成員となる。作業の大部分はそれである。
 
 材料の残り半分は既にここにある。`mcp.Client` はツール結果のバイナリブロックを `base64.StdEncoding.DecodeString` に通し
-（[client.go:664](../../../internal/mcp/client.go)。`:575` は以前の稿が代わりに引いた
+（[client.go:669](../../../internal/mcp/client.go)。`:575` は以前の稿が代わりに引いた
 `Content` の運搬体である）、intake は画像を**セッションの work dir へ書き出して**、モデルには `[image saved at <path> … use view_image on that path]` を渡す
 （[mcpresult.go:200](../../../cmd/mcpresult.go)）。初稿はそれらを「モデルへ転送される」と
 書いたが、そうではない。バイトはインラインで戻らない。
@@ -172,7 +172,7 @@ gem-agent の iTerm2 で計測: 行数の宣言は既に正しいのに、画像
 ツール名で引かれる強制者を迂回し（`PathJudged`、[risk.go:323](../../../internal/risk/risk.go)）、
 intake が書いたパスは先回りされうる。`write` が `os.Stat` で短絡し
 （[mcpresult.go:236](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに work dir を
-`_meta` で渡すからである（[client.go:634](../../../internal/mcp/client.go)）。そして第 3 稿の
+`_meta` で渡すからである（[client.go:639](../../../internal/mcp/client.go)）。そして第 3 稿の
 デコード済みバイト列には運搬体が無い。`render` は `string` を返し
 （[mcpresult.go:53](../../../cmd/mcpresult.go)）、`Tool.Run` は
 `func(ctx, args) (string, error)` である（[tools.go:67](../../../internal/tools/tools.go)）。
