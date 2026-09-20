@@ -101,7 +101,8 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   each is for; it loads one with `load_skill`, and you invoke one by
   hand with `/skill <name>` (ADR-0011).
 - **Inline images:** the model shows you a picture with `show_image`, and
-  you ask for one with `/show <path>` — drawn in the terminal when it can
+  you ask for one with `/show <path>` (PNG or JPEG, up to 2 MiB; the path may
+  hold spaces, be quoted, or be a file dragged into the window) — drawn in the terminal when it can
   draw (iTerm2 or kitty; `[tui].images`, `auto` by default, off inside tmux
   and screen). `view_image` is the other direction: that is the model
   looking at an image, not you (ADR-0020/0021/0022).

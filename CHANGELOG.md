@@ -25,6 +25,32 @@
   at the call's value, although the two are documented as separate. A slow
   server given a long startup budget now gets it. `/settings` lists
   `mcp.startup_timeout_sec` beside `mcp.call_timeout_sec`.
+- **`/show` could not open a path with a space in it** — which is every macOS
+  screenshot. The path was handed to the `@`-reference grammar, which ends a
+  reference at the first space, so `/show Screenshot 2026-09-21 at
+  10.00.00.png` answered "not found". `/show` now takes its argument as a
+  path, and accepts one that is quoted or has its spaces backslash-escaped,
+  which is what dragging a file into the terminal types.
+- `show_image` told the model it could show "PNG, JPEG, WebP, GIF, HEIC". The
+  screen draws PNG and JPEG (up to 2 MiB); the other formats were accepted,
+  read, and then always refused. The description now says what is drawn.
+
+### Documentation
+
+- The ADR index listed ADR-0022 as "Proposed" after it was accepted
+  and shipped; `config.example.toml`, the `/settings` help line and a
+  type's doc comment still described the MCP intake as the source of inline
+  images, which ADR-0022 withdrew; the reference's list of tools that ask
+  before a credential read omitted `show_image`. Each now has a test that
+  reads the document against its source: INDEX status against the ADR header,
+  retired phrases across `cmd/`, `internal/` and the example config as well as
+  `docs/`, and the credential-read list against `internal/risk`.
+- Not changed, and said so: on a kitty-protocol terminal a JPEG is sent marked
+  as PNG. No such terminal was available to measure, and this lane is only
+  judged on a real one. `AGENTS.md` carries it as unmeasured.
+- The injection-suite entries recorded under [0.9.0] shipped in v0.7.0 and are
+  filed there now. `AGENTS.md` lists ten built-in tools, `show_image` among
+  them, and states that the PreToolUse session fields stay.
 
 ## [0.10.0] - 2026-09-17
 
@@ -137,7 +163,49 @@
   picture into rows the declaration did not claim. Sixel is absent: it
   cannot declare a row count.
 
+## [0.8.0] - 2026-09-14
 
+### Added
+
+- **`[mcp] startup_timeout_sec` (default 30)** — a server's handshake (spawn,
+  `initialize`, the first `tools/list`) now has its own budget instead of
+  borrowing `call_timeout_sec`. They are different things: a call's budget is
+  how long the work may take, a handshake's is how long a server may take to
+  say hello. It is a separate number rather than a smaller one on purpose —
+  cutting a slow server off at startup does not save time overall, because the
+  session then has to reconnect it, which costs more than waiting did. Before
+  this, `initialize` was bounded by `call_timeout_sec` (60s) and only the
+  listing had a hard-coded 30s.
+
+## [0.7.1] - 2026-09-14
+
+### Changed
+
+- **MCP servers are spawned and listed at once instead of one after another.**
+  Measured on a 25-server configuration: twenty-three answer `tools/list` in
+  under 20ms and two go over the network — GitHub's remote MCP at ~1.9s and a
+  Slack proxy at ~1.3s — so serially those two were the whole of MCP startup
+  (~6.5s of a ~10s start), and a slow day at either landed on it in full.
+  Startup now costs the slowest server rather than the sum. Only the waiting is
+  concurrent: attaching still runs in configured order, so the registry, the
+  catalog and the warnings read exactly as before.
+
+## [0.7.0] - 2026-09-13
+
+### Added
+
+- **Every `tools/call` carries the session work directory** as request
+  `_meta["jp.nlink/work_dir"]`. The in-house MCP servers take their output
+  directory as a per-call `work_dir` argument now (organization ADR-021), and
+  this is the contract's second channel: schema-blind, so one line covers every
+  server, and a model that omits the argument still leaves the server with a
+  destination this session can read back. A session with no work directory
+  attaches nothing, and the model's own argument always wins.
+  See [ADR-0019](docs/en/adr/0019-the-caller-names-the-work-dir.md).
+
+<!-- The injection-suite entries below were recorded under [0.9.0] until 2026-09-21: they sat in an
+     orphaned [Unreleased] block and a sweep filed them with the release being cut. The commits are
+     in the v0.7.0 tag. -->
 - **The injection suite** (ADR-0018). Six bench tasks, opt-in through a new
   `suite` field: `bench run` with no `--tasks` skips them, `--tasks injection`
   or a task name selects them. Three plant an instruction in the body of a file
@@ -191,46 +259,6 @@
   benign twin in the same run, varies the element it targets across at least
   three payloads, and leaves rate measurement to the single-turn harness
   because an agent run is too slow to reach n=100.
-
-## [0.8.0] - 2026-09-14
-
-### Added
-
-- **`[mcp] startup_timeout_sec` (default 30)** — a server's handshake (spawn,
-  `initialize`, the first `tools/list`) now has its own budget instead of
-  borrowing `call_timeout_sec`. They are different things: a call's budget is
-  how long the work may take, a handshake's is how long a server may take to
-  say hello. It is a separate number rather than a smaller one on purpose —
-  cutting a slow server off at startup does not save time overall, because the
-  session then has to reconnect it, which costs more than waiting did. Before
-  this, `initialize` was bounded by `call_timeout_sec` (60s) and only the
-  listing had a hard-coded 30s.
-
-## [0.7.1] - 2026-09-14
-
-### Changed
-
-- **MCP servers are spawned and listed at once instead of one after another.**
-  Measured on a 25-server configuration: twenty-three answer `tools/list` in
-  under 20ms and two go over the network — GitHub's remote MCP at ~1.9s and a
-  Slack proxy at ~1.3s — so serially those two were the whole of MCP startup
-  (~6.5s of a ~10s start), and a slow day at either landed on it in full.
-  Startup now costs the slowest server rather than the sum. Only the waiting is
-  concurrent: attaching still runs in configured order, so the registry, the
-  catalog and the warnings read exactly as before.
-
-## [0.7.0] - 2026-09-13
-
-### Added
-
-- **Every `tools/call` carries the session work directory** as request
-  `_meta["jp.nlink/work_dir"]`. The in-house MCP servers take their output
-  directory as a per-call `work_dir` argument now (organization ADR-021), and
-  this is the contract's second channel: schema-blind, so one line covers every
-  server, and a model that omits the argument still leaves the server with a
-  destination this session can read back. A session with no work directory
-  attaches nothing, and the model's own argument always wins.
-  See [ADR-0019](docs/en/adr/0019-the-caller-names-the-work-dir.md).
 
 ## [0.6.0] - 2026-09-13
 
