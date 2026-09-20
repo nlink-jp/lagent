@@ -50,6 +50,35 @@ the saved-AND-described gate). A defect in any of them is fixed in both
 runtimes in the same piece of work; the probe's device-attributes question
 and the drawn-implies-described predicate were both fixed that way.
 
+`/show` takes a path, not a reference: `mention.Image`, never
+`mention.Expand("@"+path)`. The `@` grammar finds references in running text
+and ends one at the first space, so `/show Screenshot 2026-09-21 at
+10.00.00.png` looked for "Screenshot". `UnquotePath` accepts what a terminal
+delivers (quotes, backslash-escaped spaces from a dragged file).
+`showslash_test.go` hands the slash handler a fake `show`, so it could only
+ever prove the layer above the defect; `showpath_test.go` runs the real
+`newShowPath`.
+
+What `show_image` promises is what `termimg` decodes. `termimg.Formats` sits
+beside the decoder imports, `tools.ShowImageFormats` repeats it (tools cannot
+import the drawing package) and `TestShowImagePromisesWhatTheScreenDraws`
+holds them equal. The description once carried `view_image`'s list — what the
+MODEL can read — so WebP and GIF were accepted, read and then always refused
+at the draw.
+
+UNMEASURED: JPEG on a kitty-protocol terminal. `kitty()` sends every image as
+`f=100`, which the protocol defines as PNG, and `Measure` admits JPEG. By the
+specification a kitty or Ghostty terminal rejects that payload, `q=2` hides
+the rejection, the tool still answers "shown", and `emitSegments` credits rows
+the terminal never used — ADR-0020's failure. Not changed, because no
+kitty-protocol terminal was available to measure on (2026-09-21) and this lane
+is only ever judged on a real terminal. Measure before touching.
+
+The PreToolUse payload carries `session_id` and `transcript_path` and keeps
+them: they are part of the hook payload contract, and a hook that holds
+per-session state needs them to tie a call to its session. Their first
+consumer, agent-board, is archived; the contract is not.
+
 An MCP time budget is stated once, by the work that owns it (`withBudget` in
 `internal/mcp/client.go`). The handshake runs under `mcp.startup_timeout_sec`,
 an ordinary call under `mcp.call_timeout_sec`; `rawCall` and `send` take the
@@ -143,8 +172,8 @@ internal/llm/      Backend interface + the OpenAI-compatible client (stdlib net/
                    hand-written SSE, tool-call assembly, retry, per-provider context probe)
 internal/agent/    tool-calling loop, approval dispatch, nonce wrapping, history,
                    the rule-tier auto-approve ladder, the round ladder
-internal/tools/    the nine built-in tools (list_files, list_tree, search_files, read_file,
-                   file_info, view_image, write_file, edit_file, shell_exec), path
+internal/tools/    the ten built-in tools (list_files, list_tree, search_files, read_file,
+                   file_info, view_image, show_image, write_file, edit_file, shell_exec), path
                    confinement, lane-aware exec injection, Register
 internal/bounded/  the one place a read, listing or process output is capped —
                    every primitive returns the `more` fact
@@ -348,7 +377,7 @@ answers.
   `NPM_TOKEN`. Apply `ChildEnv` at any new spawn site; never re-add a
   rule over names the runtime does not own.
 - **The kernel reads the file** (ADR-0016) — the covered reads
-  (`read_file`, `view_image`, `file_info`, `search_files`) run in a
+  (`read_file`, `view_image`, `show_image`, `file_info`, `search_files`) run in a
   child of this binary under `sandbox.FileReadProfile`, which denies
   `sandbox.CredentialFilters` at the kernel. `Registry.SetFileChild`
   injects it the way `SetLaneExec` injects the lanes, after
@@ -370,7 +399,7 @@ answers.
   other, and `search_files` names what the kernel would not let it read.
   `credentialTally` is gone; do not reintroduce name judging in a walk.
 - **A credential path is the operator's question in every file tool**
-  (ADR-0015). `read_file`, `file_info` and `view_image` on a path
+  (ADR-0015). `read_file`, `file_info`, `view_image` and `show_image` on a path
   `sandbox.CredentialPath` names are Review with `OperatorOnly` —
   must-prompt: no session allowlist, `"never"` row or `--allow`
   answers it, `--auto` escalates it, `-p` denies it — judged on the

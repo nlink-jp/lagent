@@ -159,8 +159,8 @@ proposed call was measured and not adopted (ADR-0010). The session ceiling
 operator's act. Operator-only files — the instruction files, `.mcp.json`,
 `.lagent.toml`, and the sibling runtime's `.gem-agent.toml` — are never
 answered by a standing approval. Credential material is the same
-question for the read tools (ADR-0015): `read_file`, `file_info` and
-`view_image` on a path the lanes deny — `.env` and its variants, a
+question for the read tools (ADR-0015): `read_file`, `file_info`,
+`view_image` and `show_image` on a path the lanes deny — `.env` and its variants, a
 private key, `credentials.json`, the token stores under home, by the
 one list `internal/sandbox` keeps; `.env.example` and its siblings are
 ordinary files — are a Review only the operator answers, judged on the

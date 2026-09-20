@@ -42,7 +42,7 @@ Unknown keys are errors (strict decode).
 | `[tui].theme` | `auto` | `auto`, `dark`, `light`, or `plain` |
 | `[tui].language` | `auto` | `auto` (from `LC_ALL` / `LC_MESSAGES` / `LANG`), `ja`, or `en` |
 | `[tui].show_thoughts` | `true` | show the server's reasoning deltas in the live area; display-only |
-| `[tui].images` | `auto` | inline images from MCP tools: `auto` (ask the terminal before the UI starts), `off`, or a forced protocol — `iterm` or `kitty` (ADR-0020/0021). Inside tmux or screen `auto` resolves to off |
+| `[tui].images` | `auto` | inline images — what the model shows with `show_image` and what you ask for with `/show` (PNG or JPEG, up to 2 MiB): `auto` (ask the terminal before the UI starts), `off`, or a forced protocol — `iterm` or `kitty` (ADR-0020/0022). Inside tmux or screen `auto` resolves to off |
 | `[approval].pin_trusted_files` | `true` | trust is given to content: a trusted project's agent-facing files are pinned by digest and a changed one asks again |
 | `[approval].tools` | (unset) | per-tool policy: `"always"` (always ask; a floor auto-approve cannot lift) or `"never"` (never ask; blocked shell patterns and credential reads still ask). `--allow` does the same for one run |
 | `[approval].trusted_projects` | (unset) | projects whose own `.lagent.toml` may remove approvals (`"never"` entries). The startup trust prompt only loads a project's files; nothing but this list lets a project loosen the gate |

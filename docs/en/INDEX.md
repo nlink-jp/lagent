@@ -234,8 +234,8 @@ excepted).
   real-terminal run made necessary. **§2's source is withdrawn by
   [ADR-0022](adr/0022-showing-is-an-act-of-output.md)**
 - [`ADR-0022`](adr/0022-showing-is-an-act-of-output.md) — showing an image is
-  an act of output, not a side effect of a tool result (**Proposed**, design
-  only; gem-agent ADR-0091 is the same decision on the other side): an MCP
+  an act of output, not a side effect of a tool result (**Accepted**,
+  implemented; gem-agent ADR-0091 is the same decision on the other side): an MCP
   image block is how a tool result carries an image into the MODEL's context,
   and MCP says who content is for with an `audience` annotation this runtime
   drops at the parser — measured across the 24 registered servers, four can

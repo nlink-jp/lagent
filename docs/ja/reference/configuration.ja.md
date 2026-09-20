@@ -42,7 +42,7 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `[tui].theme` | `auto` | `auto`、`dark`、`light`、`plain` |
 | `[tui].language` | `auto` | `auto`（`LC_ALL` / `LC_MESSAGES` / `LANG` から）、`ja`、`en` |
 | `[tui].show_thoughts` | `true` | サーバが送る推論差分をライブ領域に表示。表示専用 |
-| `[tui].images` | `auto` | MCP ツールの画像をインライン描画: `auto`（UI 起動前に端末へ一度だけ問う）、`off`、または強制指定の `iterm` / `kitty`（ADR-0020/0021）。tmux・screen の中では `auto` は off に解決 |
+| `[tui].images` | `auto` | インライン画像 — モデルが `show_image` で見せるものと、あなたが `/show` で出すもの（PNG か JPEG、2 MiB まで）: `auto`（UI 起動前に端末へ一度だけ問う）、`off`、または強制指定の `iterm` / `kitty`（ADR-0020/0022）。tmux・screen の中では `auto` は off に解決 |
 | `[approval].pin_trusted_files` | `true` | 信頼は内容に与える: 信頼済みプロジェクトのエージェント向けファイルはダイジェストで固定され、変わると再度尋ねる |
 | `[approval].tools` | （未設定） | ツールごとのポリシー: `"always"`（常に尋ねる。自動承認でも外せない床）または `"never"`（尋ねない。ブロック対象のシェルパターンと資格情報の読取は尋ねる）。`--allow` は 1 実行分の同等物 |
 | `[approval].trusted_projects` | （未設定） | 自身の `.lagent.toml` で承認を削除（`"never"` 項目）できるプロジェクト。起動時の信頼プロンプトはプロジェクトのファイルを読み込むだけで、ゲートを緩められるのはこの一覧に載ったプロジェクトだけ |

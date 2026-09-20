@@ -148,7 +148,7 @@ user ロールのメッセージとして会話を開く（`Agent.AnnounceSessio
 ツールでも同じ問い（ADR-0015）: レーンが拒むパス — `.env` とその変種、
 秘密鍵、`credentials.json`、home 下のトークン保存先。`internal/sandbox` が
 持つ唯一の一覧で、`.env.example` とその同類は通常のファイル — への
-`read_file`、`file_info`、`view_image` は実パスで判定され、どのモードでも
+`read_file`、`file_info`、`view_image`、`show_image` は実パスで判定され、どのモードでも
 操作者だけが答える Review で、`-p` は拒否する。これらの読取は同じ一覧を
 カーネルで拒むプロファイルの子で走るので（ADR-0016）、一覧は確認を上げ、境界は
 カーネルである。一覧が認識しないパスも open で拒まれ、その拒否が同じ問いとして
