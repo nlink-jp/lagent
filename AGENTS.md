@@ -77,7 +77,7 @@ at the draw.
 
 kitty gets PNG, whatever arrived. `f=100` is the protocol's PNG and it has no
 JPEG format, while `Measure` admits JPEG. A JPEG sent as `f=100` drew nothing
-on kitty (the operator, 2026-09-22, with gem-agent's identical code), `q=2`
+on kitty (the operator, 2026-09-22; after the fix, lagent drew one there), `q=2`
 hid the rejection, and `emitSegments` credited rows the terminal never used —
 ADR-0020's failure. `kittyPNG` passes a PNG through and decodes anything else,
 scales it down to what the box can show (`kittyPxPerCol` / `kittyPxPerRow`,

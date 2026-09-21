@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.2] - 2026-09-22
+
+### Fixed
+
+- **A JPEG drew nothing on a kitty-protocol terminal** (kitty, Ghostty, and
+  WezTerm when it answers the graphics probe). The kitty graphics protocol's
+  `f=100` means PNG and it has no JPEG format, but a JPEG went out labelled
+  `f=100`; the terminal rejected it, `q=2` hid the rejection, and the rows it
+  would have used were still counted. The kitty payload now passes a PNG
+  through and decodes anything else, scales it down to what the declared box
+  can show, and re-encodes it as PNG. A picture that does not decode is not
+  drawn. iTerm2's inline images are unchanged. Seen by the operator on kitty: a JPEG that drew nothing before now draws.
+
 ## [0.10.1] - 2026-09-21
 
 ### Fixed
