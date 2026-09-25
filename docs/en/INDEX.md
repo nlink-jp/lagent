@@ -254,3 +254,16 @@ excepted).
   ADR-0005 already draws for `@<image>`. The lane, the declared box, the
   erase, the ceiling and the probe are ADR-0020's and unchanged; only the
   source moves
+- [`ADR-0023`](adr/0023-promotion-to-cli-series.md) — an agent runtime
+  in daily use: repositioning and promotion to cli-series (**Accepted**;
+  gem-agent ADR-0061 is the same move on the sibling runtime): the
+  charter's measurements have been taken and the operator uses lagent
+  daily, so its identity becomes the RFP's problem statement — work that
+  should not go to a cloud API — and the bench stays as the instrument
+  that decides changes. Promoted on the evidence of daily use, with no
+  bar written after the fact. cli-series rather than the lite-series
+  RFP §6 anticipated, because lite-series' conventions (pipeline tools,
+  no interactive UI, Linux and Windows builds, `LITE_<PROJECT>_`) would
+  each need a standing exception, while cli-series already holds
+  gem-agent and llm-cli. The cli-series stability contract applies from
+  now; the health-check procedure is not built and is not a condition

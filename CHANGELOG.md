@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Promoted from lab-series to cli-series** (ADR-0023), on the evidence
+  of daily use. lagent is now positioned as a coding-agent runtime for
+  work that should not go to a cloud API, and the cli-series stability
+  contract applies: flags, config keys, `LAGENT_*` variables, record
+  formats and hook contracts change only through the org's
+  breaking-change process. No behaviour changes in this entry.
+
 ## [0.10.2] - 2026-09-22
 
 ### Fixed

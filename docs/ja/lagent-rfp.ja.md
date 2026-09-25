@@ -18,6 +18,11 @@ gem-agent は Vertex AI Gemini 専用で、オフライン環境、機密プロ�
 **想定利用者:** 当面は開発者本人。実験用途であり、配布は前提にしない。
 macOS 上で LM Studio または Ollama を自力で運用できることが前提。
 
+ADR-0023 で改訂（2026-09-26）: この目的が求めた計測は取り終え、ランタイムは日常的に
+使われている。同一性は上の問題設定 — クラウド API に出すべきでない作業 — に移り、
+ベンチは変更を決める計測器となる。lagent は配布されており（署名済みリリース、
+Homebrew）、cli-series に属してその安定性契約の下にある。
+
 **位置づけ:** gem-agent とは別プロダクトライン。gem-agent の技術（設計・pure
 パッケージ）を移植元とするが、フォークではない。Vertex AI 固有機能を再現しないことは
 仕様として許容する。
@@ -137,7 +142,8 @@ Phase 2 で計測してから採否を決める。
 - thought signature、safety 設定
 - Linux / Windows、GUI
 - 複数バックエンドの同時接続
-- 配布・チーム利用（実験段階）
+- 配布・チーム利用（実験段階）— ADR-0023 で改訂: 配布は対象内。チーム利用は
+  引き続き前提にしない
 
 ## 4. Development Plan
 
@@ -182,8 +188,10 @@ Phase 2 で計測してから採否を決める。
 ### Phase 3: Release
 
 - README.md / README.ja.md、CHANGELOG、AGENTS.md
-- 健全性チェック手順（gem-agent の drill 相当）
-- 署名・notarize、`_wip` から lab-series へ統合
+- 健全性チェック手順（gem-agent の drill 相当）— 作っていない。ADR-0023 は
+  劣化検知を日常の利用に任せ、条件にしない
+- 署名・notarize、`_wip` から lab-series へ統合（2026-09-10 完了。ADR-0023 で
+  cli-series へ移動）
 
 ## 5. Required API Scopes / Permissions
 
@@ -196,6 +204,11 @@ Series: lab-series
 Reason: 実験用途、利用者は本人、目的はコストと実効性の検証。gem-agent も lab-series で
 始まり実戦投入実績で cli-series に昇格した前例に従う。実用性が示せた時点で lite-series
 （ローカルファースト LLM ツール）への昇格を再検討する。
+
+ADR-0023 で改訂（2026-09-26）: 日常の利用を根拠に昇格した。昇格先は lite-series では
+なく **cli-series** — lite-series の規約（パイプラインの道具、対話 UI 不要、Linux・
+Windows ビルド、`LITE_<PROJECT>_` 変数）は macOS 専用の TUI エージェントにはそれぞれ
+恒常的な例外を要し、cli-series には既に gem-agent と llm-cli がある。
 
 ## 7. External Platform Constraints
 

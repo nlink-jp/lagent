@@ -4,11 +4,14 @@ Sandboxed CLI agent runtime on a local LLM served over an
 OpenAI-compatible API (LM Studio, Ollama). A separate product line from
 gem-agent built on the same design; gem-agent is the porting source
 (ADR-0001), and the features it has that lagent does not reproduce are
-listed in ADR-0002. Experimental, lab-series; RFP Phase 1
-(the core loop, tools, sandbox, MCP, sessions, TUI) is in.
+listed in ADR-0002. A cli-series tool since ADR-0023 (promoted from
+lab-series on the evidence of daily use): the operator-facing surface
+— flags, config keys, `LAGENT_*` variables, record formats, hook
+contracts — is under the series' stability contract, so a breaking
+change goes through the org's breaking-change process.
 
 - **Module:** `github.com/nlink-jp/lagent`
-- **Series:** lab-series (target; developed in `_wip/lagent` until integration)
+- **Series:** cli-series (local path `cli-series/lagent`; lab-series until ADR-0023)
 - **Spec:** `docs/en/lagent-rfp.md` / `docs/ja/lagent-rfp.ja.md` (canonical)
 - **Docs entry point:** `docs/en/INDEX.md` / `docs/ja/INDEX.ja.md`
 

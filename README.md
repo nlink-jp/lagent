@@ -5,21 +5,22 @@ OpenAI-compatible API (LM Studio, Ollama). File read/write, sandboxed
 shell commands and MCP servers, with mutating calls gated by the
 operator.
 
-lagent is a separate product line from
+lagent is for work that should not go to a cloud API: offline
+environments, confidential projects, and work where per-token spend is
+unwanted. It is a separate product line from
 [gem-agent](https://github.com/nlink-jp/gem-agent), built on the same
 design: the same auditable minimal loop (read / edit / shell / MCP /
 approval), the same drop-in reading of a project's AGENTS.md / CLAUDE.md /
-.mcp.json, the same session records. It exists to measure, on the same
-scale as gem-agent, how far a local model carries an agent runtime in cost
-(tokens, wall-clock time, turns) and effectiveness.
+.mcp.json and Claude Code-format skills, the same session records.
 
-> **Status: experimental (lab-series).** The Phase 1 core of the
-> [RFP](docs/en/lagent-rfp.md) is in: the loop, the tools, the sandbox
-> lanes, approval, MCP, sessions, the TUI. Releases carry a signed and
-> notarized darwin/arm64 archive. The side-by-side measurement against
-> gem-agent did not become a comparison (RFP §4): the local model answers
-> in one round where Gemini works through a tool loop, and that finding
-> is where Phase 2 starts.
+> **Released.** Install with `brew install nlink-jp/tap/lagent` or from the
+> [releases page](https://github.com/nlink-jp/lagent/releases) (Developer
+> ID signed, Apple-notarized, macOS arm64) — the releases page is the
+> authority on the current version. It is a cli-series tool: interface
+> stability is a promise, and breaking changes go through the org's
+> breaking-change process
+> ([ADR-0023](docs/en/adr/0023-promotion-to-cli-series.md)). See the
+> [RFP](docs/en/lagent-rfp.md) for the specification.
 
 Japanese: [README.ja.md](README.ja.md)
 

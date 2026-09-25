@@ -19,6 +19,13 @@ on the same scale as gem-agent.
 **Target user:** the developer, for now. Experimental; distribution is not
 assumed. The operator runs LM Studio or Ollama on macOS themselves.
 
+Amended by ADR-0023 (2026-09-26): the measurements this purpose asked
+for have been taken and the runtime is in daily use. Its identity is
+now the problem statement above — work that should not go to a cloud
+API — and the bench is the instrument that decides changes. lagent is
+distributed (signed releases, Homebrew) and sits in cli-series under
+its stability contract.
+
 **Positioning:** a separate product line from gem-agent. gem-agent's
 technology (design, pure packages) is the porting source, but this is not
 a fork. Not reproducing Vertex-specific features is accepted as the spec.
@@ -149,7 +156,8 @@ Phase 2 before adoption.
 - thought signatures, safety settings
 - Linux / Windows, GUI
 - connecting several backends at once
-- distribution and team use (experimental stage)
+- distribution and team use (experimental stage) — amended by ADR-0023:
+  distribution is in scope; team use is still not assumed
 
 ## 4. Development Plan
 
@@ -199,8 +207,10 @@ measurements.
 ### Phase 3: Release
 
 - README.md / README.ja.md, CHANGELOG, AGENTS.md
-- a health-check procedure (gem-agent's drill equivalent)
+- a health-check procedure (gem-agent's drill equivalent) — not built;
+  ADR-0023 leaves rot detection to daily use and makes it no condition
 - signing and notarization, integration from `_wip` into lab-series
+  (done 2026-09-10; moved to cli-series by ADR-0023)
 
 ## 5. Required API Scopes / Permissions
 
@@ -216,6 +226,13 @@ effectiveness. Follows the precedent of gem-agent, which started in
 lab-series and was promoted to cli-series on production use. Promotion to
 lite-series (local-first LLM tools) is reconsidered once practicality is
 shown.
+
+Amended by ADR-0023 (2026-09-26): promoted on the evidence of daily
+use, to **cli-series** rather than lite-series — lite-series'
+conventions (pipeline tools, no interactive UI, Linux and Windows
+builds, `LITE_<PROJECT>_` variables) would each need a standing
+exception for a macOS-only TUI agent, and cli-series already holds
+gem-agent and llm-cli.
 
 ## 7. External Platform Constraints
 

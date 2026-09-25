@@ -5,19 +5,20 @@ OpenAI 互換 API（LM Studio、Ollama）を通してモデルに接続し、フ
 読み書き、サンドボックス内のシェルコマンド、MCP サーバを扱う。変更を伴う
 呼び出しは操作者が承認する。
 
-lagent は [gem-agent](https://github.com/nlink-jp/gem-agent) とは別の
-プロダクトラインで、設計は同じもの: 監査可能な最小ループ（read / edit /
-shell / MCP / 承認）、対象プロジェクトの AGENTS.md / CLAUDE.md / .mcp.json を
-そのまま読む drop-in 互換、同じセッション記録。ローカルモデルがエージェント
-ランタイムをどこまで担えるかを、コスト（トークン数・壁時計時間・ターン数）と
-実効性の両面で、gem-agent と同じ物差しで測るために存在する。
+lagent は、クラウド API に出すべきでない作業のためのもの: オフライン環境、
+機密プロジェクト、トークン単位の費用を掛けたくない作業。
+[gem-agent](https://github.com/nlink-jp/gem-agent) とは別のプロダクトライン
+で、設計は同じもの: 監査可能な最小ループ（read / edit / shell / MCP / 承認）、
+対象プロジェクトの AGENTS.md / CLAUDE.md / .mcp.json と Claude Code 形式の
+skills をそのまま読む drop-in 互換、同じセッション記録。
 
-> **状態: 実験中（lab-series）。** [RFP](docs/ja/lagent-rfp.ja.md) の
-> Phase 1 コア — ループ、ツール、sandbox レーン、承認、MCP、セッション、
-> TUI — が入った。リリースは署名・notarize 済みの darwin/arm64 アーカイブを
-> 伴う。gem-agent との並列計測は比較にならなかった（RFP §4）: Gemini が
-> ツールループで作業するところをローカルモデルは 1 ラウンドで答える。
-> その所見が Phase 2 の出発点。
+> **リリース済み。** `brew install nlink-jp/tap/lagent` または
+> [リリースページ](https://github.com/nlink-jp/lagent/releases) から入手できる
+> （Developer ID 署名・Apple notarize 済み、macOS arm64）— 現在の版数は
+> リリースページが正。cli-series のツールであり、インタフェースの安定は約束で、
+> 破壊的変更は組織の破壊的変更プロセスを通す
+> （[ADR-0023](docs/ja/adr/0023-promotion-to-cli-series.ja.md)）。仕様は
+> [RFP](docs/ja/lagent-rfp.ja.md) を参照。
 
 English: [README.md](README.md)
 
