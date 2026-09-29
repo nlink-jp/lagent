@@ -267,3 +267,14 @@ excepted).
   each need a standing exception, while cli-series already holds
   gem-agent and llm-cli. The cli-series stability contract applies from
   now; the health-check procedure is not built and is not a condition
+- [`ADR-0024`](adr/0024-outside-text-is-made-inert-for-the-terminal.md) —
+  text from outside the runtime is made inert before the terminal sees it
+  (**Accepted**; ported from gem-agent ADR-0093): the model's words, a tool
+  call's detail and the approval dialog reached the terminal with their
+  escape sequences intact — measured on a real terminal (tmux 3.7c) with a temporary copy of gem-agent's probe, 61 of 95 deliveries acted before and 0 after. Control characters are
+  removed, not sequence bodies, once at the TUI's ingress (every message
+  string by reflection, every shown `Options` callback and field), the
+  Markdown renderer's output is held to the SGR it writes and closed at the
+  reply's end because goldmark decodes `&#27;`, and the plain REPL and `-p`
+  go inert only when the stream is a terminal (the RFP's stdout contract
+  amended). No box-art hold: this runtime draws no diagrams
