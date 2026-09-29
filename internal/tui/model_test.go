@@ -774,11 +774,12 @@ func TestViewLinesClippedToWidth(t *testing.T) {
 	}
 }
 
-// TestShrinkClearsScreenOnce: the first size report performs the gem-agent ADR-0003
-// startup clear (banner follows it inside the same sequence, so nothing
-// is lost); growth must not clear; a genuine width shrink clears to sweep
-// re-wrapped stale frames and resets the line counter.
-func TestShrinkClearsScreenOnce(t *testing.T) {
+// TestOnlyTheFirstSizeReportClears: the first size report performs the
+// startup clear (gem-agent ADR-0003; the banner follows it inside the same
+// sequence, so nothing is lost). Nothing after it clears — not a growth, and
+// not a shrink: ADR-0026 replaced the shrink clear, which lost every picture
+// on the screen, with an erase of the frame's own rows.
+func TestOnlyTheFirstSizeReportClears(t *testing.T) {
 	c := &capture{}
 	m := newTestModel(c)
 
@@ -789,17 +790,17 @@ func TestShrinkClearsScreenOnce(t *testing.T) {
 	}
 	next, cmd = m.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
 	m = next.(Model)
-	if cmd != nil {
+	if clearsScreen(cmd) {
 		t.Error("growth must not clear the screen")
 	}
 	m.hold.printed = 7
 	next, cmd = m.Update(tea.WindowSizeMsg{Width: 50, Height: 40})
 	m = next.(Model)
-	if cmd == nil {
-		t.Error("shrink must trigger a screen clear")
+	if clearsScreen(cmd) {
+		t.Error("a shrink must not clear the screen (ADR-0026)")
 	}
-	if m.hold.printed != 0 {
-		t.Errorf("shrink clear must reset the line counter, got %d", m.hold.printed)
+	if m.hold.printed != 7 {
+		t.Errorf("with nothing erased the counter must stand, got %d", m.hold.printed)
 	}
 }
 
@@ -842,11 +843,8 @@ func TestBottomPinning(t *testing.T) {
 	}
 
 	// A wide line counts its wrapped physical lines.
-	next, _ = m.Update(tea.WindowSizeMsg{Width: 20, Height: 24}) // no shrink reset on first... width shrinks: clear resets
+	next, _ = m.Update(tea.WindowSizeMsg{Width: 20, Height: 24})
 	m = next.(Model)
-	if m.hold.printed != 0 {
-		t.Fatalf("shrink clear should reset the counter: %d", m.hold.printed)
-	}
 	before := m.hold.printed
 	cmd := m.emit(strings.Repeat("x", 45)) // 45 cells / 20 wide = 3 physical lines
 	_ = cmd

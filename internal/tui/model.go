@@ -235,6 +235,10 @@ type Options struct {
 	// The factory is re-invoked on resize; it must never query the
 	// terminal (see DarkBackground).
 	RenderFactory func(width int) func(string) string
+	// Sweep is the output writer a width shrink erases the frame's
+	// re-wrapped rows through (ADR-0026); the program must be built with
+	// tea.WithOutput(Sweep). nil erases nothing.
+	Sweep *SweepWriter
 }
 
 // Model is the Bubble Tea model for the interactive session.
@@ -312,6 +316,12 @@ type Model struct {
 	picture    diagram.Picture
 	cellAspect func() (float64, bool)
 	aspect     float64 // cell height over width; 0 until read
+	sweep      *SweepWriter
+	// resizing is true from a size report until none has come for
+	// resizeSettle; resizeSeq tells the settling tick of the last report
+	// from the earlier ones (ADR-0026).
+	resizing   bool
+	resizeSeq  int
 	baseCtx    context.Context
 	cancelTurn context.CancelFunc
 	// ask is the pending ask_user dialog (gem-agent ADR-0036).
@@ -402,6 +412,7 @@ func New(opts Options) Model {
 		images:          opts.Images,
 		picture:         opts.Picture,
 		cellAspect:      opts.CellAspect,
+		sweep:           opts.Sweep,
 		baseCtx:         opts.BaseCtx,
 		println:         opts.Printer,
 		mkRender:        opts.RenderFactory,
@@ -620,11 +631,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Inline-renderer resize is the fragile spot: when the terminal
 		// narrows, the previous frame's lines re-wrap and the renderer's
 		// recorded height no longer matches, leaving stale copies of the
-		// input box on screen. Two defenses: View() clips every line to
-		// the width (no line of ours ever soft-wraps), and a genuine
-		// shrink clears the viewport once to sweep the re-wrapped
-		// leftovers. The first size report must not clear — it would
-		// wipe the banner.
+		// input box on screen. The defenses (ADR-0026): View() clips every
+		// line to the width and ends it at its text, so few rows re-wrap;
+		// while reports keep coming the frame is drawn narrow, because
+		// the terminal runs ahead of what it reports; and a genuine
+		// shrink erases the rows the drawn frame gained, never the screen
+		// — a clear lost the pictures on it. Only the first size report
+		// clears, to lay out the first frame under the banner.
 		// A terminal that reports no size (some pty harnesses, and any
 		// environment where the ioctl fails) would otherwise give the
 		// textarea a negative width and render an input box that shows
@@ -636,11 +649,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if height < minHeight {
 			height = minHeight
 		}
-		// Deliberately shrink-only (gem-agent ADR-0021 §9): growth also reflows in
-		// some terminals (the counter then over-states and the input
-		// block floats until the next shrink), but clearing on every
-		// grow would erase visible content repeatedly during a drag
-		// resize — a worse trade than the graceful drift.
+		// Shrink-only (gem-agent ADR-0021 §9, ADR-0026): a growth re-wraps
+		// nothing of the frame into more rows, so there is nothing to erase.
 		resized := m.sized && width < m.width
 		first := !m.sized
 		m.sized = true
@@ -669,9 +679,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.initialInput = ""
 			return m, tea.Sequence(cmds...)
 		case resized:
-			m.hold.printed = 0 // the clear empties the viewport
-			m.hold.lastTotal = 0
-			return m, tea.ClearScreen
+			m.shrinkSweep(msg.Width)
+			return m, m.resizeUnderway()
+		}
+		return m, m.resizeUnderway()
+
+	case resizeSettled:
+		if msg.seq == m.resizeSeq {
+			m.resizing = false // the next view is drawn at the settled width
 		}
 		return m, nil
 
@@ -1834,7 +1849,23 @@ type bottomHold struct {
 }
 
 func (m Model) View() string {
-	content := clipLines(m.viewContent(), m.width)
+	v := m.view()
+	m.sweep.note(v) // what the renderer may draw next (ADR-0026)
+	return v
+}
+
+func (m Model) view() string {
+	// Clipped, then as short as its text (ADR-0026): a row as wide as the
+	// terminal wraps when a repaint lands during a live resize.
+	content := shortRows(clipLines(m.viewContent(), m.width))
+	if m.resizing {
+		// While the window is being resized the terminal runs ahead of
+		// the width it has reported, so a row laid out for that width can
+		// be wider than the screen by the time it lands, and wraps where
+		// the renderer does not count it. Rows no wider than the narrowest
+		// width this model lays out cannot (ADR-0026).
+		content = clipLines(content, minWidth)
+	}
 	if m.height > 0 {
 		// The managed view must never exceed height-1 lines: an
 		// over-tall frame scrolls the terminal and permanently desyncs

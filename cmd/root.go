@@ -1332,7 +1332,11 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// stderr stream accumulated every line for the whole session
 		// (review round 3).
 		notes.freeze()
+		// The renderer writes through the sweep writer, which erases the
+		// rows a narrowing re-wrapped (ADR-0026); the model arms it.
+		sweep := tui.NewSweepWriter(os.Stdout)
 		model := tui.New(tui.Options{
+			Sweep:   sweep,
 			BaseCtx: ctx,
 			// Msgs is the wiring gem-agent ADR-0029 shipped without: the catalog
 			// was resolved here but never handed to the TUI, so the
@@ -1394,7 +1398,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 					appVersion, msgs, onClear)
 			},
 		})
-		prog = tea.NewProgram(model)
+		prog = tea.NewProgram(model, tea.WithOutput(sweep))
 		tuiGate.SetProgram(prog)
 		screen.SetProgram(prog)
 		go resolveWindow()
