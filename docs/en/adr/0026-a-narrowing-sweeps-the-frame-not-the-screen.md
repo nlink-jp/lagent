@@ -74,8 +74,11 @@ no one calls is a surface no one checks. `Stats` stays: the tests read it.
   report settles, the cursor cell and the highlight survive the shortening,
   and no size report after the first clears the screen.
 - Measured in gem-agent, not re-measured here: the mechanism and the frame it
-  draws are the same code. Before a release the operator checks it by hand on
-  iTerm2 and kitty with this runtime, as ADR-0025 was.
+  draws are the same code. Checked by hand by the operator with this
+  runtime's built binary (`v0.11.0-5-g14b81c0`, 2026-09-29) on iTerm2 and
+  kitty, a `/show` picture on the screen: the picture kept, no stale input
+  box, no empty rows in the scrollback, widening back fine. A mermaid picture
+  was not part of that check.
 
 ## Alternatives considered
 
