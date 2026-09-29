@@ -62,7 +62,7 @@ no one calls is a surface no one checks. `Stats` stays: the tests read it.
   erased, and D shortens the managed view, not what is printed.
 - While the window's width is changing, every row of the frame — the input
   box, the footer, a dialog, the live tail — is drawn cut to 19 cells, for
-  400 ms after the last size report.
+  400 ms after the last report that changed the width.
 - The residue and scope gem-agent ADR-0094 records apply here unchanged:
   measured on iTerm2, kitty and tmux only; a terminal that counts erased
   cells with a background as content, or one that truncates instead of

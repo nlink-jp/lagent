@@ -49,7 +49,7 @@ gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.
 **移植しない。** それらが測るのは端末であってランタイムではなく、このリポジトリに
 `tools/` は無い。`pinprobe` は向こうのランタイムの本番 Model をその本番 emit 経路で
 駆動するが、それはこちらの emit 経路でもある — 関数ごとに同一である
-（[model.go:821, :1074, :1087](../../../internal/tui/model.go) が gem-agent の :872・:1130・
+（[model.go:961, :1214, :1227](../../../internal/tui/model.go) が gem-agent の :872・:1130・
 :1143 に対応し、後ろ 2 つは `diff` が空を返す）。
 
 領域は仮定ではなく構成する。pin の padding は `height − printed − view − 1` で、正の分岐は

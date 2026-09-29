@@ -14,8 +14,8 @@
 
 - **The input box's rows end where their text ends**, and **while the
   window's width is changing the frame below the conversation is drawn
-  short** — every row cut to 19 cells until no size report has come for
-  400 ms (ADR-0026). A
+  short** — every row cut to 19 cells until no report changing the width has
+  come for 400 ms (ADR-0026). A
   row as wide as the window, repainted while the terminal was already
   narrower than it had reported, left a stale copy of the box behind. The
   input line's highlight still spans the window.

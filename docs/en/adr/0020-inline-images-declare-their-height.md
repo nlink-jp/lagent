@@ -53,8 +53,8 @@ The measurements live in gem-agent (`tools/rowprobe`, `tools/pinprobe`,
 `tools/imgpayload`) and are **not ported**: they measure a terminal, not a
 runtime, and this repository has no `tools/` directory. `pinprobe` drives
 that runtime's real model through its real emit path — which is this
-runtime's emit path too, function for function ([model.go:821, :1074,
-:1087](../../../internal/tui/model.go) against gem-agent's :872, :1130,
+runtime's emit path too, function for function ([model.go:961, :1214,
+:1227](../../../internal/tui/model.go) against gem-agent's :872, :1130,
 :1143; `diff` returns nothing on the last two).
 
 The regime is arranged, not assumed. The pin's padding is

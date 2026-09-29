@@ -248,7 +248,7 @@ internal/tui/      Bubble Tea inline TUI: model, approval gate, settings panel;
                    a width shrink erases only the frame's re-wrapped rows through
                    SweepWriter, never the screen (ADR-0026) — the program must
                    be built with tea.WithOutput(sweep); View() ends every row at
-                   its text and draws the frame narrow until size reports stop
+                   its text and draws the frame narrow until width-changing reports stop
 internal/diagram/  mermaid fences in a reply drawn as pictures where images draw
                    (ADR-0025): the fence scanner and the mermaid-render Picture;
                    no box art — without a Picture every fence stays source
