@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-29
+
 ### Added
 
 - **Pie charts are drawn as pictures** where the terminal draws images
