@@ -244,7 +244,11 @@ internal/approve/  MITL gate (y/n/N/a + session allowlist; N = deny with a typed
 internal/session/  JSONL transcript: logger + resume loader; usage records in the
                    gem-usage-lens shape; LAGENT_SESSION_ID is exported at startup
 internal/repl/     paste-safe input reader (plain REPL, non-TTY fallback)
-internal/tui/      Bubble Tea inline TUI: model, approval gate, settings panel
+internal/tui/      Bubble Tea inline TUI: model, approval gate, settings panel;
+                   a width shrink erases only the frame's re-wrapped rows through
+                   SweepWriter, never the screen (ADR-0026) — the program must
+                   be built with tea.WithOutput(sweep); View() ends every row at
+                   its text and draws the frame narrow until size reports stop
 internal/diagram/  mermaid fences in a reply drawn as pictures where images draw
                    (ADR-0025): the fence scanner and the mermaid-render Picture;
                    no box art — without a Picture every fence stays source

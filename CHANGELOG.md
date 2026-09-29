@@ -1,5 +1,24 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Narrowing the window no longer clears the screen** (ADR-0026, ported
+  from gem-agent ADR-0094). Pictures on the screen — mermaid diagrams and
+  `/show` — stay, and no empty screens pile into the scrollback: v0.11.0's
+  known limitation. A shrink erases only the rows the input box gained by
+  re-wrapping.
+
+### Changed
+
+- **The input box's rows end where their text ends**, and **while the
+  window is being resized the input line and the footer are drawn short**
+  — cut to 19 cells until no size report has come for 400 ms (ADR-0026). A
+  row as wide as the window, repainted while the terminal was already
+  narrower than it had reported, left a stale copy of the box behind. The
+  input line's highlight still spans the window.
+
 ## [0.11.0] - 2026-09-29
 
 ### Added
