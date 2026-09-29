@@ -281,7 +281,7 @@ excepted).
   amended). No box-art hold: this runtime draws no box-art diagrams
 - [`ADR-0025`](adr/0025-mermaid-fences-render-as-pictures.md) —
   mermaid fences render as pictures where the terminal can draw them
-  (**Accepted**; ported from gem-agent ADR-0092): on iTerm2 and kitty a fence
+  (**Accepted**, implemented; ported from gem-agent ADR-0092): on iTerm2 and kitty a fence
   in a reply is drawn by mermaid-render from the source as written, one em of
   diagram text per terminal line, the width from the cell aspect read with an
   ioctl; tall pictures scroll, in bands on kitty only. Every failure is the

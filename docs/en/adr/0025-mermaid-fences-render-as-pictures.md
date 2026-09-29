@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Accepted** (2026-09-29) |
+| Status | **Accepted** (2026-09-29) — implemented |
 | Date | 2026-09-29 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
@@ -110,6 +110,8 @@ that commit (ADR-0024).
 ## Consequences
 
 - On iTerm2 and kitty a reply's diagrams are readable, CJK labels included.
+  Checked by the operator on both terminals with this runtime before release
+  (2026-09-29): size, a tall diagram on kitty, and the order after a picture.
 - **Known limitation, measured in gem-agent** (ADR-0092 §4): narrowing the
   window loses the pictures on the screen at that moment and leaves black
   space in the scrollback, because the TUI clears the screen on a shrink —
