@@ -113,7 +113,7 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   and screen). `view_image` is the other direction: that is the model
   looking at an image, not you (ADR-0020/0021/0022).
 - **Diagrams as pictures:** a mermaid fence in a reply (flowchart / graph,
-  sequenceDiagram, erDiagram, pie, stateDiagram, CJK labels included) is drawn as a picture
+  sequenceDiagram, erDiagram, pie, stateDiagram, gantt, CJK labels included) is drawn as a picture
   where the terminal draws images, one em of its text per terminal line;
   anything that cannot be drawn right stays source with a one-line note, and
   elsewhere the fence stays source. `[tui.diagram]` picks the font. Narrowing
