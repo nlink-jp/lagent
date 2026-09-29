@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Pie charts are drawn as pictures** where the terminal draws images
+  (mermaid-render v0.2.1): slices as mermaid draws them, every item's
+  percentage in a column beside the legend.
+
 ## [0.11.1] - 2026-09-29
 
 ### Fixed
