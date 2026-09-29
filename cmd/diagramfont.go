@@ -24,8 +24,8 @@ var systemFonts = fontLoaders{spec: raster.LoadFont, def: raster.DefaultFont}
 // and only for a session that draws images: one that cannot show a
 // picture reads no font (ADR-0025 §5). A setting that does not load is a
 // banner warning and the default font, never a refusal to start (the
-// operator's decision); without the default font either, diagrams stay on
-// the box-art lane (nil).
+// operator's decision); without the default font either, fences stay
+// source (nil) — this runtime has no box-art lane (ADR-0025 §1).
 func diagramPicture(images termimg.Protocol, c config.DiagramConfig, load fontLoaders) (diagram.Picture, []string) {
 	if images == termimg.None {
 		return nil, nil
