@@ -278,3 +278,15 @@ excepted).
   reply's end because goldmark decodes `&#27;`, and the plain REPL and `-p`
   go inert only when the stream is a terminal (the RFP's stdout contract
   amended). No box-art hold: this runtime draws no diagrams
+- [`ADR-0025`](adr/0025-mermaid-fences-render-as-pictures.md) —
+  mermaid fences render as pictures where the terminal can draw them
+  (**Proposed**; ported from gem-agent ADR-0092): on iTerm2 and kitty a fence
+  in a reply is drawn by mermaid-render from the source as written, one em of
+  diagram text per terminal line, the width from the cell aspect read with an
+  ioctl; tall pictures scroll, in bands on kitty only. Every failure is the
+  source with a note. Elsewhere the fence stays source — no box-art lane is
+  added. The reply is now partitioned (ADR-0020 §3 amended), and a payload
+  reaches the terminal beside the renderer's ADR-0024 hold, as a tool image
+  does. The font is `[tui.diagram]`, read only where images draw; a bad
+  setting is a banner warning. Known limitation: narrowing the window loses
+  the pictures on screen
