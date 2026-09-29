@@ -57,7 +57,7 @@ func TestOnlyTheIngressesMakeTextInert(t *testing.T) {
 }
 
 // TestThePlainStreamsAreMadeInertFirst pins where runREPL wires the plain
-// entrances (ADR-0024 §3): before its first print. Wired after, the lines
+// entrances (ADR-0024 §4): before its first print. Wired after, the lines
 // before it — the startup notes, which quote MCP server output — would
 // still reach a terminal as they came.
 func TestThePlainStreamsAreMadeInertFirst(t *testing.T) {
@@ -92,7 +92,7 @@ func TestThePlainStreamsAreMadeInertFirst(t *testing.T) {
 			found = true
 			if wired < 0 {
 				t.Errorf("%s: runREPL never calls inertStreams — the plain REPL and -p "+
-					"write outside text to a terminal as it came (ADR-0024 §3)", fset.Position(fn.Pos()))
+					"write outside text to a terminal as it came (ADR-0024 §4)", fset.Position(fn.Pos()))
 			} else if firstUse >= 0 && firstUse < wired {
 				t.Errorf("%s: runREPL reads its streams at statement %d, before "+
 					"inertStreams at %d", fset.Position(fn.Pos()), firstUse, wired)

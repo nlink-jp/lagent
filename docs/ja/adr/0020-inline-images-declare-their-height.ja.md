@@ -10,6 +10,11 @@
 | Rewritten because | 独立検証パスが、この決定の両側に対して 3 クラスの指摘を返した。隣接コードを読まずに断定したもの、計測器より広い範囲を「実測」と称したもの、開く次元を数え上げないままレーンを開くもの。うち 1 件はこちら側固有であり、下で訂正する |
 | Relates to | [ADR-0005](0005-images-reach-the-model.ja.md)（画像はモデルへ届く — 本決定はその逆方向）、[ADR-0001](0001-porting-sources-pinned.ja.md)（TUI は gem-agent の固定コミットから来た）、[ADR-0015](0015-credential-reads-are-operator-only.ja.md) / [ADR-0016](0016-the-kernel-reads-the-file.ja.md)（誰がファイルを開いてよいか）; gem-agent ADR-0089（反対側の同じ決定） |
 
+*ADR-0024 による修正: §6 の既存の面 — `!` のシェル出力を含め、エスケープを保ったまま
+端末に届く文字列 — を TUI について修復した。メッセージが運ぶ文字列はすべて TUI の入口で
+無害化されるので、モデルの文字列も `!` の出力も、宣言の無い画像やその他の制御を画面に
+置けない。画像エスケープを書くのは引き続き payload の組み立てだけである。*
+
 ## Context（背景）
 
 ADR-0005 は、画像が**モデル**へ届く道を決めた。ドロップされたパスは添付され、
@@ -38,7 +43,7 @@ gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.
 **移植しない。** それらが測るのは端末であってランタイムではなく、このリポジトリに
 `tools/` は無い。`pinprobe` は向こうのランタイムの本番 Model をその本番 emit 経路で
 駆動するが、それはこちらの emit 経路でもある — 関数ごとに同一である
-（[model.go:818, :1071, :1084](../../../internal/tui/model.go) が gem-agent の :872・:1130・
+（[model.go:821, :1074, :1087](../../../internal/tui/model.go) が gem-agent の :872・:1130・
 :1143 に対応し、後ろ 2 つは `diff` が空を返す）。
 
 領域は仮定ではなく構成する。pin の padding は `height − printed − view − 1` で、正の分岐は
@@ -83,7 +88,7 @@ iTerm2 はスクリプト経由で駆動し画面を読み戻し、フレーム�
 
 gem-agent は描画前に応答を分割する。`diagram.Split` が art segment を verbatim で端末へ
 渡す。gem-agent ADR-0063 が向こうで mermaid のために作ったレーンである。**このランタイムにそのレーンは
-無い。** `newGlamourRenderer`（[model.go:449](../../../internal/tui/model.go)、描画は `:461`）は
+無い。** `newGlamourRenderer`（[model.go:449](../../../internal/tui/model.go)、描画は `:462`）は
 応答を丸ごと 1 個として glamour に通す。`Split` も segment 型も verbatim 経路も無い（本記録の
 実装後、後ろ 2 つは存在する — `Segment` と `emitSegments` の verbatim 分岐である。いまも無いのは
 `Split` であり、応答が分割されることはなく、画像は応答の外からレーンへ入る）。よって

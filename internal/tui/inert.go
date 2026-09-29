@@ -109,9 +109,8 @@ var walkKinds = map[reflect.Kind]bool{
 
 // inertRenderer holds every renderer the factory builds to the escapes that
 // renderer writes: SGR for the dark and light styles, nothing at all for the
-// plain one (measured, ADR-0024 §2). It is applied once, to the factory, so
-// the renders at resize and the note on a refused picture are covered
-// without a call at any of them.
+// plain one (measured, ADR-0024 §3). It is applied once, to the factory, so
+// the render at resize is covered without a call at any print site.
 //
 // An SGR in the output is closed at its end. glamour's plain style prints an
 // HTML block as its decoded text with no reset after it, and nothing below

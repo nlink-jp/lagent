@@ -10,7 +10,7 @@ import (
 )
 
 // inertStreams makes the command's stdout and stderr inert where each one
-// is a terminal, and leaves it alone where it is not (ADR-0024 §3). The
+// is a terminal, and leaves it alone where it is not (ADR-0024 §4). The
 // plain REPL and -p write the model's text to stdout and its tool details,
 // approval prompts and questions to stderr; a terminal executes some of
 // those bytes, a pipe or a file does not. This is `ls -q` / `ls -w`: the

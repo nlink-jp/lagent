@@ -71,7 +71,7 @@ func String(s string) string {
 // It exists because a renderer is a transform, and a transform can make a
 // control out of text that had none: goldmark decodes the character reference
 // &#27; into a real ESC, after the ingress has already seen only "&#27;"
-// (ADR-0024 §2). What the renderer is held to is what the runtime writes, not
+// (ADR-0024 §3). What the renderer is held to is what the runtime writes, not
 // what the text contained. An SGR decoded that way can only style text.
 func Styled(s string) string {
 	if !strings.ContainsFunc(s, func(r rune) bool { return r == utf8.RuneError || Removed(r) }) {

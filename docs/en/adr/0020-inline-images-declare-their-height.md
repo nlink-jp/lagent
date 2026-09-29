@@ -10,6 +10,13 @@
 | Rewritten because | An independent verification pass returned findings in three classes against both sides of this decision: claims about adjacent code asserted without reading it, "measured" claims wider than the instrument, and a lane opened without enumerating the dimensions it opens. One finding was specific to this side and is corrected below |
 | Relates to | [ADR-0005](0005-images-reach-the-model.md) (images reach the model — this is the other direction), [ADR-0001](0001-porting-sources-pinned.md) (the TUI came from gem-agent at a pinned commit), [ADR-0015](0015-credential-reads-are-operator-only.md) / [ADR-0016](0016-the-kernel-reads-the-file.md) (who may open a file); gem-agent ADR-0089 (the same decision on the other side) |
 
+*Amended by ADR-0024: §6's pre-existing surface — text reaching the
+terminal with its escapes, `!` shell output included — is repaired for the
+TUI. Every string a message carries is made inert at the TUI's ingress, so
+neither model text nor `!` output can put an undeclared image, or any other
+control, on the screen; the payload builder remains the only author of an
+image escape.*
+
 ## Context
 
 ADR-0005 settled how an image reaches the **model**: a dropped path attaches,
@@ -39,8 +46,8 @@ The measurements live in gem-agent (`tools/rowprobe`, `tools/pinprobe`,
 `tools/imgpayload`) and are **not ported**: they measure a terminal, not a
 runtime, and this repository has no `tools/` directory. `pinprobe` drives
 that runtime's real model through its real emit path — which is this
-runtime's emit path too, function for function ([model.go:818, :1071,
-:1084](../../../internal/tui/model.go) against gem-agent's :872, :1130,
+runtime's emit path too, function for function ([model.go:821, :1074,
+:1087](../../../internal/tui/model.go) against gem-agent's :872, :1130,
 :1143; `diff` returns nothing on the last two).
 
 The regime is arranged, not assumed. The pin's padding is
@@ -93,7 +100,7 @@ what makes a declaration usable as a count.
 gem-agent partitions a reply before rendering: `diagram.Split` hands art
 segments to the terminal verbatim, a lane gem-agent ADR-0063 built there for mermaid.
 **This runtime has no such lane.** `newGlamourRenderer`
-([model.go:449](../../../internal/tui/model.go), the render at `:461`)
+([model.go:449](../../../internal/tui/model.go), the render at `:462`)
 passes the whole reply through glamour in one piece — no `Split`, no segment
 type, no verbatim path. (As of this record's implementation the last two
 exist: `Segment` and the verbatim branch of `emitSegments`. What is still

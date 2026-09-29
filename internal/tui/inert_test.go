@@ -246,7 +246,7 @@ func TestCallbackTextReachesTheScreenInert(t *testing.T) {
 // The Markdown renderer decodes character references: "&#27;" in the text
 // the ingress saw becomes a real ESC in what glamour prints, and so do BEL,
 // CR, C1 and RLO. The renderer's output is held to the SGR it writes itself
-// (ADR-0024 §2), in both the styled and the plain theme.
+// (ADR-0024 §3), in both the styled and the plain theme.
 func TestRendererCannotMakeAControlFromAnEntity(t *testing.T) {
 	const encoded = "hello &#27;]0;PWN&#7; and &#x1b;]52;c;RVNDUFdO&#x07; then &#13;MARKER " +
 		"&#8;&#27;[2J&#27;[3;60H &#x9b;&#x202e; [link &#27;]8;;x&#7;](https://e.invalid/&#27;]0;L&#7;)\n\n" +
