@@ -373,26 +373,26 @@ func New(opts Options) Model {
 		hold:            &bottomHold{},
 		startTurn:       opts.StartTurn,
 		shell:           opts.Shell,
-		slash:           opts.Slash,
+		slash:           inertSlash(opts.Slash),
 		toggleAuto:      opts.ToggleAuto,
 		autoMode:        opts.AutoMode,
 		autoState:       opts.AutoState,
 		readOnlyState:   opts.ReadOnlyState,
-		completePath:    opts.CompletePath,
-		completeSlashFn: opts.CompleteSlash,
-		expandInput:     opts.ExpandInput,
-		settingsData:    opts.Settings,
-		refreshSettings: opts.RefreshSettings,
-		applySetting:    opts.ApplySetting,
+		completePath:    inertStrings(opts.CompletePath),
+		completeSlashFn: inertStrings(opts.CompleteSlash),
+		expandInput:     inertExpand(opts.ExpandInput),
+		settingsData:    inertSettingsPtr(opts.Settings),
+		refreshSettings: inertRefresh(opts.RefreshSettings),
+		applySetting:    inertApply(opts.ApplySetting),
 		images:          opts.Images,
 		baseCtx:         opts.BaseCtx,
 		println:         opts.Printer,
 		mkRender:        opts.RenderFactory,
 		width:           80,
-		banner:          opts.Banner,
+		banner:          inertLines(opts.Banner),
 		initialInput:    opts.InitialInput,
-		modelName:       opts.ModelName,
-		projectDir:      opts.ProjectDir,
+		modelName:       inertLine(opts.ModelName),
+		projectDir:      inertLine(opts.ProjectDir),
 	}
 	if m.baseCtx == nil {
 		m.baseCtx = context.Background()
@@ -414,6 +414,7 @@ func New(opts Options) Model {
 			return newGlamourRenderer(width, theme)
 		}
 	}
+	m.mkRender = inertRenderer(m.mkRender, theme == "notty")
 	m.render = m.mkRender(m.width)
 	return m
 }
@@ -500,7 +501,9 @@ func (m Model) firstFrameCmds() []tea.Cmd {
 
 // Update implements tea.Model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
+	// Text from outside the TUI is made inert here, once, before any
+	// branch reads it (ADR-0024).
+	switch msg := inertMsg(msg).(type) {
 	case tea.WindowSizeMsg:
 		// Inline-renderer resize is the fragile spot: when the terminal
 		// narrows, the previous frame's lines re-wrap and the renderer's

@@ -19,16 +19,16 @@ ADR-0005 は、画像が**モデル**へ届く道を決めた。ドロップさ�
 
 ### カウンタに見えるもの、見えないもの
 
-`emit`（[model.go:818](../../../internal/tui/model.go)）は 1 行を scrollback へ印字し、
+`emit`（[model.go:821](../../../internal/tui/model.go)）は 1 行を scrollback へ印字し、
 その物理行数を数える。bottom pin はその数に乗っている。`go.mod:11` が固定している版 —
 gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.6 で実測すると、
 `ansi.StringWidth` は iTerm2 の `OSC 1337 File=`、kitty の `APC _G`、sixel の `DCS q` の
 いずれにも **0** を返し、`ansi.Strip` は空文字を返す。`ansi.Hardwrap` は 3 方式とも
-バイト同一で通すので、`wrapForScrollback`（[model.go:1071](../../../internal/tui/model.go)）は
+バイト同一で通すので、`wrapForScrollback`（[model.go:1074](../../../internal/tui/model.go)）は
 何も切り刻まない。
 
 ただしカウンタは盲目ではない。`physicalRows`
-（[model.go:1084](../../../internal/tui/model.go)）は `rows, cells := 1, 0` から始まるので、
+（[model.go:1087](../../../internal/tui/model.go)）は `rows, cells := 1, 0` から始まるので、
 画像の行はちょうど **1 行**と計上される。端末が N 行進める間に、である。不足は `N` では
 なく `N-1` である。
 
@@ -42,7 +42,7 @@ gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.
 :1143 に対応し、後ろ 2 つは `diff` が空を返す）。
 
 領域は仮定ではなく構成する。pin の padding は `height − printed − view − 1` で、正の分岐は
-「screen not full」とラベルされている（[model.go:1723](../../../internal/tui/model.go)）。
+「screen not full」とラベルされている（[model.go:1726](../../../internal/tui/model.go)）。
 30 行のペイン用に選んだ filler の行数が、80 行の窓をその反対側に置き、両記録の以前の稿は
 それらの実行を誤ったラベルの下で報告した。
 
@@ -83,7 +83,7 @@ iTerm2 はスクリプト経由で駆動し画面を読み戻し、フレーム�
 
 gem-agent は描画前に応答を分割する。`diagram.Split` が art segment を verbatim で端末へ
 渡す。gem-agent ADR-0063 が向こうで mermaid のために作ったレーンである。**このランタイムにそのレーンは
-無い。** `newGlamourRenderer`（[model.go:448](../../../internal/tui/model.go)、描画は `:461`）は
+無い。** `newGlamourRenderer`（[model.go:449](../../../internal/tui/model.go)、描画は `:461`）は
 応答を丸ごと 1 個として glamour に通す。`Split` も segment 型も verbatim 経路も無い（本記録の
 実装後、後ろ 2 つは存在する — `Segment` と `emitSegments` の verbatim 分岐である。いまも無いのは
 `Split` であり、応答が分割されることはなく、画像は応答の外からレーンへ入る）。よって
@@ -194,13 +194,13 @@ view 層の読み取りを開く）は、いまや先送りした決定に属す
 この一文だけが立っているのを見つけた。この一文自身の規則により、それは「現時点では」に
 すぎない。テストは後から書かれ、いまこの一文は意図ではなく実在を述べている。これは既存の
 面を塞いだと主張するものではない。非テストコードで `ansi.Strip` が呼ばれるのは 1 箇所
-（[model.go:1089](../../../internal/tui/model.go)）、`physicalRows` の中で幅を**測る**ためだけ
+（[model.go:1092](../../../internal/tui/model.go)）、`physicalRows` の中で幅を**測る**ためだけ
 である。シェル出力の生エスケープは既に端末へ届いている。既存であり、ここで広がらず、
 ここで直しもしない。
 
 ### 7. 描画は TUI 限定。能力の検出は 1 度だけ
 
-`tea.NewProgram` が構築されるのは 1 箇所（[root.go:1385](../../../cmd/root.go)）。
+`tea.NewProgram` が構築されるのは 1 箇所（[root.go:1389](../../../cmd/root.go)）。
 one-shot `-p` と素の REPL はそれを作らず、描かない。探針はその構築の**前**に走りキャッシュ
 される。理由は `newGlamourRenderer` が `WithAutoStyle` について記録しているとおりで、これは
 移植元から継承した記述であり、ここでも真である。探針は問い合わせ前に排出し、応答が無いことを

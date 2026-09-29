@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.10.4] - 2026-09-29
+
+### Security
+
+- **Text from outside the runtime reaches the terminal inert**
+  (ADR-0024, ported from gem-agent ADR-0093). The model's reply, its
+  thoughts, a tool call's detail and purpose, the approval and ask
+  dialogs, `!` output and every other string the TUI shows reached the
+  terminal with its escape sequences intact: measured on tmux, 61 of 95 hostile deliveries acted — the title set, the clipboard buffer written, the screen erased, the cursor moved, and in the approval dialog a CR or an unterminated OSC hid part of the command being approved. C0
+  controls other than tab and newline, DEL, C1 and the bidi embeddings,
+  overrides and isolates are now removed once, where text enters the
+  TUI; the text of a sequence stays visible (`]0;…`), so nothing the
+  operator could have read is hidden. The Markdown renderer's output is
+  held to the colour codes it writes itself — none in the plain theme —
+  and closed at the reply's end, because it decodes character
+  references such as `&#27;` into real controls. The plain REPL and
+  `-p` do the same when their stream is a terminal and stay
+  byte-for-byte to a pipe or a file. The transcript is unchanged.
+
 ## [0.10.3] - 2026-09-26
 
 ### Changed

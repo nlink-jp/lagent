@@ -55,6 +55,7 @@ search_files / file_info / shell_exec / ask_user。MCP サーバのツールは
 ### Input / Output
 
 - stdout はモデルテキストのみ。バナー・ツールイベント・承認プロンプトは stderr。
+  ADR-0024 による修正: パイプやファイルには逐語、端末には制御文字を先に取り除く。
 - `-p` は非端末 stdin を EOF まで読む（gem-agent と同じ契約）。
 - セッションは JSONL transcript。レコード種別は gem-agent と同じ命名を保ち、
   `--continue` はこれを読む。

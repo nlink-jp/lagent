@@ -30,7 +30,9 @@ The mechanisms that are shared today: `internal/sandbox` (the lanes,
 the scratch / persistent-file / credential lists, the file-read
 profile and its child), `internal/risk`, `internal/tools` (path
 confinement through `os.Root`, the walks, the caged reads),
-`internal/bounded`, `internal/hooks`, `internal/mcp`,
+`internal/bounded`, `internal/inert` and the TUI ingress that calls it
+(`internal/tui/inert.go`, `cmd/inertstreams.go` — ADR-0024, gem-agent
+ADR-0093), `internal/hooks`, `internal/mcp`,
 `internal/trustpin`, `internal/archtest`, the approval ladder in
 `internal/agent` and `internal/approve`, and — added 2026-09-17, after a
 verification pass found gem-agent ADR-0089/ADR-0020 arguing it while both
@@ -191,6 +193,14 @@ internal/agent/    tool-calling loop, approval dispatch, nonce wrapping, history
 internal/tools/    the ten built-in tools (list_files, list_tree, search_files, read_file,
                    file_info, view_image, show_image, write_file, edit_file, shell_exec), path
                    confinement, lane-aware exec injection, Register
+internal/inert/    the one predicate that makes outside text inert for a terminal
+                   (ADR-0024, ported from gem-agent ADR-0093): control characters out,
+                   nothing else; Styled holds a renderer's output to SGR (goldmark
+                   decodes &#27; into ESC). Importers are pinned by import path to
+                   internal/tui/inert.go (every message string by reflection at the
+                   top of Update, every Options callback and shown text field, the
+                   renderer factory) and cmd/inertstreams.go (plain REPL / -p
+                   streams, terminal only)
 internal/bounded/  the one place a read, listing or process output is capped —
                    every primitive returns the `more` fact
 internal/archtest/ AST tests pinning confined opens, bounded reads and the

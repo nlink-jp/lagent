@@ -80,6 +80,11 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   kernel is what refuses; `shell_exec` runs under `sandbox-exec` in the lane it
   declares — read runs unasked (inspection, and Go builds and tests,
   whose cache lives in the session scratch), write and operator ask.
+- **Terminal safety:** text the model writes, and the other text from
+  outside the runtime the TUI shows, reaches the terminal with its control
+  characters removed, so a prompt-injected reply cannot retitle the window,
+  write the clipboard, move the cursor or disguise a command in an approval
+  dialog; `-p` output stays byte-for-byte to a pipe or a file (ADR-0024).
 - **Hooks:** `[[hooks.pre_tool_use]]` runs your guard script before a
   model tool call, on Claude Code's contract, so the same script that
   guards Claude Code guards this runtime; a deny is final, whatever the

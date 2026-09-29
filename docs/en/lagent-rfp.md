@@ -58,7 +58,8 @@ tools are added by connecting from `.mcp.json`. Amended by ADR-0005:
 ### Input / Output
 
 - stdout carries model text only; banner, tool events and approval
-  prompts go to stderr.
+  prompts go to stderr. Amended by ADR-0024: verbatim to a pipe or a
+  file; to a terminal, control characters are removed first.
 - `-p` reads a non-terminal stdin to EOF (gem-agent's contract).
 - Sessions are JSONL transcripts. Record kinds keep gem-agent's names;
   `--continue` reads them.

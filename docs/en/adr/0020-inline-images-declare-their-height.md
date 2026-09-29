@@ -19,17 +19,17 @@ server saved is, on this surface, a path in a line of text.
 
 ### What the counter can and cannot see
 
-`emit` ([model.go:818](../../../internal/tui/model.go)) prints one line into
+`emit` ([model.go:821](../../../internal/tui/model.go)) prints one line into
 scrollback and counts its physical rows; the bottom pinning rests on that
 count. Measured against `charmbracelet/x/ansi` v0.11.6 — the version
 `go.mod:11` pins, the same one gem-agent pins — `ansi.StringWidth` returns
 **0** and `ansi.Strip` the empty string for an iTerm2 `OSC 1337 File=`, a
 kitty `APC _G` and a sixel `DCS q` alike, and `ansi.Hardwrap` leaves all
 three byte-identical, so `wrapForScrollback`
-([model.go:1071](../../../internal/tui/model.go)) shears nothing.
+([model.go:1074](../../../internal/tui/model.go)) shears nothing.
 
 The counter is not blind, though. `physicalRows`
-([model.go:1084](../../../internal/tui/model.go)) starts at `rows, cells :=
+([model.go:1087](../../../internal/tui/model.go)) starts at `rows, cells :=
 1, 0`, so an image line is credited with exactly **one** row while the
 terminal advances N. The shortfall is `N-1`, not `N`.
 
@@ -45,7 +45,7 @@ runtime's emit path too, function for function ([model.go:818, :1071,
 
 The regime is arranged, not assumed. The pin's padding is
 `height − printed − view − 1` and the positive branch is labelled "screen
-not full" ([model.go:1723](../../../internal/tui/model.go)). A filler count
+not full" ([model.go:1726](../../../internal/tui/model.go)). A filler count
 chosen for a 30-row pane left an 80-row window on the other side of it, and
 an earlier draft of both records reported those runs under the wrong label.
 
@@ -93,7 +93,7 @@ what makes a declaration usable as a count.
 gem-agent partitions a reply before rendering: `diagram.Split` hands art
 segments to the terminal verbatim, a lane gem-agent ADR-0063 built there for mermaid.
 **This runtime has no such lane.** `newGlamourRenderer`
-([model.go:448](../../../internal/tui/model.go), the render at `:461`)
+([model.go:449](../../../internal/tui/model.go), the render at `:461`)
 passes the whole reply through glamour in one piece — no `Split`, no segment
 type, no verbatim path. (As of this record's implementation the last two
 exist: `Segment` and the verbatim branch of `emitSegments`. What is still
@@ -232,14 +232,14 @@ the sentence standing alone, which by the rule in it makes the claim "as of
 today"; the test was written afterwards, and the sentence now describes what
 exists rather than what was intended. This does not close the existing surface:
 `ansi.Strip` is called at one site in non-test code
-([model.go:1089](../../../internal/tui/model.go)), inside `physicalRows`, to
+([model.go:1092](../../../internal/tui/model.go)), inside `physicalRows`, to
 *measure* — so raw escapes from shell output already reach the terminal.
 Pre-existing, not widened here, not repaired here.
 
 ### 7. Drawing is TUI-only, and the capability is probed once
 
 `tea.NewProgram` is constructed at one site
-([root.go:1385](../../../cmd/root.go)); one-shot `-p` and the plain REPL
+([root.go:1389](../../../cmd/root.go)); one-shot `-p` and the plain REPL
 never build it and never draw. The probe runs **before** that construction
 and is cached, for the reason `newGlamourRenderer` records about
 `WithAutoStyle` — inherited from the porting source, and true here. It

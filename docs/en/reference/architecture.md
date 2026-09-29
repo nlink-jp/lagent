@@ -49,7 +49,10 @@ per-session work directory under the state root), `internal/trustpin`
 (content pins of the agent-facing files and the persistent-file
 snapshot), `internal/uitext` (ja/en UI string catalogs),
 `internal/bounded` (the capped read/list/capture primitives every other
-package uses), `internal/archtest` (AST tests that pin the structural
+package uses), `internal/inert` (the one predicate that makes outside text
+inert for a terminal — control characters removed, nothing else — and the
+hold on a renderer's output, SGR kept; imported only by the TUI's ingress
+file and the plain entrances' stream setup — ADR-0024), `internal/archtest` (AST tests that pin the structural
 rules: path packages open through `os.Root`, reads are bounded, the
 rule tier is consulted in one function, every loader of project content
 takes the grant).
