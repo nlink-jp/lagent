@@ -117,7 +117,7 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   where the terminal draws images, one em of its text per terminal line;
   anything that cannot be drawn right stays source with a one-line note, and
   elsewhere the fence stays source. `[tui.diagram]` picks the font. Narrowing
-  the window loses the pictures on screen at that moment (ADR-0025).
+  the window keeps the pictures on screen (ADR-0026).
 - **Not here:** web search and fetch, media uploads, audit-log export,
   history compaction — see the RFP and
   [ADR-0002](docs/en/adr/0002-features-not-reproduced.md).

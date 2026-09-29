@@ -41,8 +41,9 @@ The three parts gem-agent adopted, as they are there:
   becomes an erase to the edge under it, so the input line's highlight still
   spans the window. The input box's cursor, a reversed blank, is kept.
 - **E. The frame is drawn narrow while a resize is underway.** From a size
-  report until none has come for 400 ms every frame row is clipped to
-  `minWidth − 1` cells; the settling tick draws it in full.
+  report that changes the width until none has come for 400 ms every frame
+  row is clipped to `minWidth − 1` cells; the settling tick draws it in full.
+  A report that changes only the height starts none of this.
 
 `internal/tui/sweep.go` and `shortrows.go` are ported from gem-agent at the
 commit that adopted them, and the `Update`/`View` changes are the same.
@@ -59,8 +60,14 @@ no one calls is a surface no one checks. `Stats` stays: the tests read it.
 - ADR-0020's accounting is unchanged: `emitSegments`, the declared rows and
   `physicalRows` are not modified; C only sets the counter to the rows it
   erased, and D shortens the managed view, not what is printed.
-- While the window is being resized, the input line and the footer are drawn
-  cut to 19 cells, for 400 ms after the last size report.
+- While the window's width is changing, every row of the frame — the input
+  box, the footer, a dialog, the live tail — is drawn cut to 19 cells, for
+  400 ms after the last size report.
+- The residue and scope gem-agent ADR-0094 records apply here unchanged:
+  measured on iTerm2, kitty and tmux only; a terminal that counts erased
+  cells with a background as content, or one that truncates instead of
+  re-wrapping, can leave a stale row or blank rows of history; microsecond
+  races can give one shrink a wrong K.
 - The same tests hold it here as in gem-agent: the real renderer's flush
   begins with the cursor-up the sweep rewrites, K is the frame's wrap growth,
   a later arm replaces an earlier one, the frame is narrow until the last
