@@ -73,12 +73,15 @@ no one calls is a surface no one checks. `Stats` stays: the tests read it.
   a later arm replaces an earlier one, the frame is narrow until the last
   report settles, the cursor cell and the highlight survive the shortening,
   and no size report after the first clears the screen.
-- Measured in gem-agent, not re-measured here: the mechanism and the frame it
-  draws are the same code. Checked by hand by the operator with this
-  runtime's built binary (`v0.11.0-5-g14b81c0`, 2026-09-29) on iTerm2 and
-  kitty, a `/show` picture on the screen: the picture kept, no stale input
-  box, no empty rows in the scrollback, widening back fine. A mermaid picture
-  was not part of that check.
+- Measured on this runtime's built binary too, with nobody at the keyboard,
+  by gem-agent's `resizeprobe -auto T -app lagent -bin …` (this repository
+  has no probe of its own): `v0.11.0-7-g55cc046` in new iTerm2 and kitty
+  windows with an isolated config, a draft as wide as the window and two
+  `/show` pictures, narrowed by the terminal's interface and by a mouse drag
+  and widened back — no stale copy, no empty row, no lost line in any run,
+  the picture on the screen kept. A mermaid picture reaches the screen as
+  the same declared-image segment (ADR-0025). The operator's hand check of
+  the same binary on both terminals found nothing wrong either.
 
 ## Alternatives considered
 
