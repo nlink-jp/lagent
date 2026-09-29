@@ -85,6 +85,7 @@ gem-agent v0.85.1（`8d7c780`）から移植する（ADR-0001）。絵のコー�
 - **既知の制約（gem-agent で実測、ADR-0092 §4）**: ウィンドウを狭めると、そのとき画面にある絵が失われ、
   スクロールバックに黒い空白が残る。TUI が縮小時に画面を消去するためで、このランタイムのリサイズ処理も
   同じである。gem-agent の見直しとあわせて直す。
+  [ADR-0026](0026-a-narrowing-sweeps-the-frame-not-the-screen.ja.md) で解決。
 - lagent は `github.com/nlink-jp/mermaid-render`（組織のモジュール）に、それを通じて `golang.org/x/image`
   に依存する。モジュールグラフで `golang.org/x/sys` が v0.47.0 から v0.48.0 へ、`golang.org/x/text` が
   v0.30.0 から v0.42.0 へ上がる（mermaid-render が必要とする）。ADR-0024 §3 が実測したデコーダである

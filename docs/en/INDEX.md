@@ -292,3 +292,13 @@ excepted).
   does. The font is `[tui.diagram]`, read only where images draw; a bad
   setting is a banner warning. Known limitation: narrowing the window loses
   the pictures on screen
+- [`ADR-0026`](adr/0026-a-narrowing-sweeps-the-frame-not-the-screen.md) —
+  a narrowing sweeps the frame's rows, not the screen (**Accepted**,
+  implemented; ported from gem-agent ADR-0094): the screen clear on a width
+  shrink lost the pictures on the screen and piled empty screens into the
+  scrollback. A shrink now erases only the rows the drawn frame gained by
+  re-wrapping, through a writer that extends the renderer's next flush; frame
+  rows end at their text; and while size reports keep coming the frame is
+  drawn narrow, because the terminal runs ahead of the width it reports.
+  Resolves ADR-0025's known limitation. The writer's measurement surface,
+  read only by gem-agent's probe, is not ported

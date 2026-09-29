@@ -116,6 +116,7 @@ that commit (ADR-0024).
   window loses the pictures on the screen at that moment and leaves black
   space in the scrollback, because the TUI clears the screen on a shrink —
   this runtime's resize handling is the same. It is revisited with gem-agent's.
+  Resolved by [ADR-0026](0026-a-narrowing-sweeps-the-frame-not-the-screen.md).
 - lagent gains a dependency on `github.com/nlink-jp/mermaid-render` (an
   organization module) and, through it, `golang.org/x/image`; the module
   graph moves `golang.org/x/sys` from v0.47.0 to v0.48.0 and `golang.org/x/text`
