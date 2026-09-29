@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- **State diagrams are drawn as pictures** where the terminal draws images
+  (mermaid-render v0.3.0): composite states as frames, concurrent regions,
+  choice / fork / join, notes on the side they name. A transition crossing a
+  composite's frame shows the source with a note.
+
 ## [0.12.0] - 2026-09-29
 
 ### Added
