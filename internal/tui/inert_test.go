@@ -327,6 +327,11 @@ func TestEveryOptionsCallbackIsAccountedFor(t *testing.T) {
 		"ToggleAuto": "returns a bool", "AutoState": "returns a bool",
 		"ReadOnlyState": "returns a ceiling value",
 		"Printer":       "the terminal's side, not a source",
+		// Its pixels become a payload this runtime writes (ADR-0025 §6); its
+		// refusal reason is shown only inside the note, which is Markdown
+		// and goes through the renderer's hold.
+		"Picture":    "an image; its reason reaches the screen only through the held renderer",
+		"CellAspect": "returns a number",
 	}
 	typ := reflect.TypeOf(Options{})
 	strs := map[string]string{

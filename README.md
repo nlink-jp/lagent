@@ -112,6 +112,12 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   draw (iTerm2 or kitty; `[tui].images`, `auto` by default, off inside tmux
   and screen). `view_image` is the other direction: that is the model
   looking at an image, not you (ADR-0020/0021/0022).
+- **Diagrams as pictures:** a mermaid fence in a reply (flowchart / graph,
+  sequenceDiagram, erDiagram, CJK labels included) is drawn as a picture
+  where the terminal draws images, one em of its text per terminal line;
+  anything that cannot be drawn right stays source with a one-line note, and
+  elsewhere the fence stays source. `[tui.diagram]` picks the font. Narrowing
+  the window loses the pictures on screen at that moment (ADR-0025).
 - **Not here:** web search and fetch, media uploads, audit-log export,
   history compaction — see the RFP and
   [ADR-0002](docs/en/adr/0002-features-not-reproduced.md).

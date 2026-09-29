@@ -17,6 +17,13 @@ neither model text nor `!` output can put an undeclared image, or any other
 control, on the screen; the payload builder remains the only author of an
 image escape.*
 
+*Amended by [ADR-0025](0025-mermaid-fences-render-as-pictures.md): a reply
+is now partitioned — a mermaid fence becomes a picture where images draw —
+so the Context's "a reply is never partitioned" and §3's "an image does not
+arrive inside a reply" no longer hold, and A3 is answered: a diagram's box is
+derived from its pixels and the cell size, read with an ioctl, never a query.
+A1's "diagrams, if they come, join the lane this creates" is what happened.*
+
 ## Context
 
 ADR-0005 settled how an image reaches the **model**: a dropped path attaches,
@@ -26,17 +33,17 @@ server saved is, on this surface, a path in a line of text.
 
 ### What the counter can and cannot see
 
-`emit` ([model.go:821](../../../internal/tui/model.go)) prints one line into
+`emit` ([model.go:935](../../../internal/tui/model.go)) prints one line into
 scrollback and counts its physical rows; the bottom pinning rests on that
 count. Measured against `charmbracelet/x/ansi` v0.11.6 — the version
 `go.mod:11` pins, the same one gem-agent pins — `ansi.StringWidth` returns
 **0** and `ansi.Strip` the empty string for an iTerm2 `OSC 1337 File=`, a
 kitty `APC _G` and a sixel `DCS q` alike, and `ansi.Hardwrap` leaves all
 three byte-identical, so `wrapForScrollback`
-([model.go:1074](../../../internal/tui/model.go)) shears nothing.
+([model.go:1188](../../../internal/tui/model.go)) shears nothing.
 
 The counter is not blind, though. `physicalRows`
-([model.go:1087](../../../internal/tui/model.go)) starts at `rows, cells :=
+([model.go:1201](../../../internal/tui/model.go)) starts at `rows, cells :=
 1, 0`, so an image line is credited with exactly **one** row while the
 terminal advances N. The shortfall is `N-1`, not `N`.
 
@@ -52,7 +59,7 @@ runtime's emit path too, function for function ([model.go:821, :1074,
 
 The regime is arranged, not assumed. The pin's padding is
 `height − printed − view − 1` and the positive branch is labelled "screen
-not full" ([model.go:1726](../../../internal/tui/model.go)). A filler count
+not full" ([model.go:1857](../../../internal/tui/model.go)). A filler count
 chosen for a 30-row pane left an 80-row window on the other side of it, and
 an earlier draft of both records reported those runs under the wrong label.
 
@@ -100,7 +107,7 @@ what makes a declaration usable as a count.
 gem-agent partitions a reply before rendering: `diagram.Split` hands art
 segments to the terminal verbatim, a lane gem-agent ADR-0063 built there for mermaid.
 **This runtime has no such lane.** `newGlamourRenderer`
-([model.go:449](../../../internal/tui/model.go), the render at `:462`)
+([model.go:466](../../../internal/tui/model.go), the render at `:462`)
 passes the whole reply through glamour in one piece — no `Split`, no segment
 type, no verbatim path. (As of this record's implementation the last two
 exist: `Segment` and the verbatim branch of `emitSegments`. What is still
@@ -239,14 +246,14 @@ the sentence standing alone, which by the rule in it makes the claim "as of
 today"; the test was written afterwards, and the sentence now describes what
 exists rather than what was intended. This does not close the existing surface:
 `ansi.Strip` is called at one site in non-test code
-([model.go:1092](../../../internal/tui/model.go)), inside `physicalRows`, to
+([model.go:1206](../../../internal/tui/model.go)), inside `physicalRows`, to
 *measure* — so raw escapes from shell output already reach the terminal.
 Pre-existing, not widened here, not repaired here.
 
 ### 7. Drawing is TUI-only, and the capability is probed once
 
 `tea.NewProgram` is constructed at one site
-([root.go:1389](../../../cmd/root.go)); one-shot `-p` and the plain REPL
+([root.go:1397](../../../cmd/root.go)); one-shot `-p` and the plain REPL
 never build it and never draw. The probe runs **before** that construction
 and is cached, for the reason `newGlamourRenderer` records about
 `WithAutoStyle` — inherited from the porting source, and true here. It

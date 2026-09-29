@@ -1,9 +1,12 @@
 package tui
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"image"
+	"image/png"
 	"os"
 	"strings"
 	"time"
@@ -19,6 +22,7 @@ import (
 	"github.com/mattn/go-runewidth"
 	"github.com/rivo/uniseg"
 
+	"github.com/nlink-jp/lagent/internal/diagram"
 	"github.com/nlink-jp/lagent/internal/sandbox"
 	"github.com/nlink-jp/lagent/internal/termimg"
 	"github.com/nlink-jp/lagent/internal/uitext"
@@ -158,6 +162,14 @@ type Options struct {
 	// zero value — draws nothing, which is what every entrance that is
 	// not an interactive TUI gets.
 	Images termimg.Protocol
+	// Picture draws a mermaid fence as an image where Images draws
+	// (ADR-0025). nil keeps every fence as source; so does a session that
+	// draws no images, whatever this holds.
+	Picture diagram.Picture
+	// CellAspect reads a cell's height over its width, at start and on
+	// every resize (ADR-0025 §3); false when the terminal reports no
+	// pixels. It must never write to the terminal.
+	CellAspect func() (float64, bool)
 	// Theme is "dark", "light", or "notty" (plain: no colors anywhere).
 	// It MUST be decided by the caller BEFORE the Bubble Tea program
 	// starts: background detection sends an OSC query, and once raw
@@ -297,6 +309,9 @@ type Model struct {
 	// images is the protocol this session may draw inline images with
 	// (ADR-0020 §7); termimg.None draws nothing.
 	images     termimg.Protocol
+	picture    diagram.Picture
+	cellAspect func() (float64, bool)
+	aspect     float64 // cell height over width; 0 until read
 	baseCtx    context.Context
 	cancelTurn context.CancelFunc
 	// ask is the pending ask_user dialog (gem-agent ADR-0036).
@@ -385,6 +400,8 @@ func New(opts Options) Model {
 		refreshSettings: inertRefresh(opts.RefreshSettings),
 		applySetting:    inertApply(opts.ApplySetting),
 		images:          opts.Images,
+		picture:         opts.Picture,
+		cellAspect:      opts.CellAspect,
 		baseCtx:         opts.BaseCtx,
 		println:         opts.Printer,
 		mkRender:        opts.RenderFactory,
@@ -467,6 +484,97 @@ func newGlamourRenderer(width int, style string) func(string) string {
 	}
 }
 
+// renderReply turns a reply into the segments that reach scrollback
+// (ADR-0025 §2). Mermaid fences are a view-layer transform; the transcript
+// keeps the model's source verbatim either way. Where this session draws
+// images a fence becomes a picture in a declared box; elsewhere — and
+// whenever it cannot be drawn — it is source, with a note when a draw was
+// refused. There is no box art here. Text goes through the Markdown
+// renderer and its ADR-0024 hold; a picture's payload goes beside it, as a
+// tool image's does. Parts are separated by one blank line, as the
+// Markdown renderer separates paragraphs.
+func (m *Model) renderReply(text string) []Segment {
+	var pic diagram.Picture
+	if m.images != termimg.None {
+		pic = m.picture
+	}
+	var out []Segment
+	add := func(segs ...Segment) {
+		if len(out) > 0 {
+			out = append(out, Segment{})
+		}
+		out = append(out, segs...)
+	}
+	for _, seg := range diagram.Split(text, pic) {
+		switch {
+		case seg.Img != nil:
+			add(m.pictureSegments(seg)...)
+		case strings.TrimSpace(seg.Text) != "":
+			// Trimmed here too: the blank line between parts is add's.
+			add(Segment{Text: strings.Trim(m.render(seg.Text), "\n")})
+		}
+	}
+	return out
+}
+
+// pictureSegments declares a diagram's box and builds its payloads. On
+// kitty a tall picture goes out as bands of at most half the screen
+// (termimg.Bands): kitty clips a picture taller than the screen and draws
+// the frame over it, and the bands abut into the whole picture. On iTerm2
+// it goes out whole: iTerm2 scrolls a tall picture correctly, and bands
+// there showed seams and a missing corner (both measured, gem-agent ADR-0092 §4; ADR-0025 §3).
+// The encoded payloads together may not pass termimg.MaxBytes. A
+// picture that cannot become payloads shows the fence as source with the
+// note: the source is already out of the text, so a silent refusal would
+// lose both (ADR-0025 §4).
+func (m *Model) pictureSegments(seg diagram.Segment) []Segment {
+	fail := func(why string) []Segment {
+		return []Segment{{Text: strings.Trim(m.render(diagram.WithNote(seg.Source, why)), "\n")}}
+	}
+	b := seg.Img.Bounds()
+	sub, ok := seg.Img.(interface {
+		SubImage(image.Rectangle) image.Image
+	})
+	if !ok {
+		return fail("the picture cannot be cut into bands")
+	}
+	box := termimg.DiagramBox(b.Dx(), b.Dy(), m.width, m.aspect)
+	var out []Segment
+	total := 0
+	maxRows := box.Rows
+	if m.images == termimg.Kitty {
+		maxRows = bandRows(m.height)
+	}
+	for _, band := range termimg.Bands(b.Dy(), box, maxRows) {
+		var buf bytes.Buffer
+		if err := png.Encode(&buf, sub.SubImage(image.Rect(b.Min.X, b.Min.Y+band.Y0, b.Max.X, b.Min.Y+band.Y1))); err != nil {
+			return fail("encoding the picture: " + err.Error())
+		}
+		if total += buf.Len(); total > termimg.MaxBytes {
+			return fail(fmt.Sprintf("the picture is over the %d KiB an inline image may be", termimg.MaxBytes>>10))
+		}
+		payload, err := termimg.Payload(m.images, buf.Bytes(), termimg.Box{Rows: band.Rows, Cols: box.Cols})
+		if err != nil {
+			return fail(err.Error())
+		}
+		out = append(out, Segment{Text: payload, Rows: band.Rows})
+	}
+	if len(out) == 0 {
+		return fail("the picture is empty")
+	}
+	return out
+}
+
+// bandRows is the tallest band a diagram is drawn in: half the screen, so
+// a band always fits whatever the frame below it takes. An unknown height
+// falls back to a modest band.
+func bandRows(height int) int {
+	if height <= 0 {
+		return 10
+	}
+	return max(1, height/2)
+}
+
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd { return textarea.Blink }
 
@@ -536,6 +644,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = height
 		m.ta.SetWidth(width - 2)
 		m.render = m.mkRender(width)
+		if m.cellAspect != nil {
+			// An ioctl, not a query: safe while Bubble Tea owns stdin.
+			if a, ok := m.cellAspect(); ok {
+				m.aspect = a
+			}
+		}
 		switch {
 		case first:
 			// gem-agent ADR-0003: clear to a known cursor row, then print the
@@ -620,7 +734,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Purpose != "" {
 			line += "\n" + m.st.hint.Render("  "+m.msgs.PurposePrefix+m.purposeText(msg.Purpose))
 		}
-		return m, m.emitJoined(m.takeLive(), line)
+		return m, m.emitAfterLive(m.takeLive(), line)
 
 	case ToolDone:
 		// The tool returned: stall detection re-arms, and the status
@@ -751,7 +865,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		var cmds []tea.Cmd
-		if c := m.emitJoined(m.takeLive(), tail); c != nil {
+		if c := m.emitAfterLive(m.takeLive(), tail); c != nil {
 			cmds = append(cmds, c)
 		}
 		m.phase = phaseInput
@@ -1134,16 +1248,33 @@ func expandTabs(s string) string {
 }
 
 // takeLive renders the accumulated streamed text as Markdown and
-// returns it for scrollback (empty when nothing streamed). Rendering
-// happens exactly once per segment — the live region shows raw text,
-// the flush shows the pretty version.
-func (m *Model) takeLive() string {
+// pictures, and returns it for scrollback (nil when nothing streamed).
+// Rendering happens exactly once per segment — the live region shows raw
+// text, the flush shows the pretty version. A diagram is rendered here, on
+// the update path.
+func (m *Model) takeLive() []Segment {
 	text := strings.TrimSpace(m.live.String())
 	m.live.Reset()
 	if text == "" {
-		return ""
+		return nil
 	}
-	return m.render(text)
+	return m.renderReply(text)
+}
+
+// emitAfterLive is emitJoined behind the flushed reply: ONE write, the
+// reply's segments first — a picture keeps its declared rows — then the
+// lines that follow it.
+func (m *Model) emitAfterLive(live []Segment, parts ...string) tea.Cmd {
+	segs := live
+	for _, p := range parts {
+		if p != "" {
+			segs = append(segs, Segment{Text: p})
+		}
+	}
+	if len(segs) == 0 {
+		return nil
+	}
+	return m.emitSegments(segs)
 }
 
 // emitJoined prints consecutive scrollback lines as ONE write. Every
@@ -2054,7 +2185,7 @@ func (m Model) setAutoMode(input, echo string) (tea.Model, tea.Cmd) {
 		if want {
 			state = strings.TrimSpace(m.msgs.AutoOn)
 		}
-		return m, m.emitJoined(m.takeLive(), echo, m.st.tool.Render(state))
+		return m, m.emitAfterLive(m.takeLive(), echo, m.st.tool.Render(state))
 	}
 	return m.toggleAutoMode(echo)
 }
@@ -2074,7 +2205,7 @@ func (m Model) toggleAutoMode(echo string) (tea.Model, tea.Cmd) {
 	// One write: the notice lands after the output it followed, with a
 	// single repaint. The echo goes between them — after whatever was
 	// still streaming, before the answer to it.
-	return m, m.emitJoined(m.takeLive(), echo, m.st.tool.Render(state))
+	return m, m.emitAfterLive(m.takeLive(), echo, m.st.tool.Render(state))
 }
 
 // updateAsk handles the ask_user dialog (gem-agent ADR-0036): the approval

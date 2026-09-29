@@ -50,7 +50,7 @@ var withdrawn = []struct {
 	{"nil in every entrance", "the sink is NOT nil outside a TUI — MCP connects before the runtime knows whether it has a UI, so it is inert there instead"},
 	{"sink は対話的 TUI でない入口すべてで nil", "same"},
 	{"reaches the operator is still open", "how an image reaches the operator was settled; ADR-0021 named the source"},
-	{"stops rendering the reply as one piece", "newGlamourRenderer was never changed; an image arrives out-of-band, not inside a reply"},
+	{"stops rendering the reply as one piece", "ADR-0020 never changed the reply renderer — a tool image arrives out-of-band; ADR-0025 later partitioned the reply for its own diagrams, which is not this claim"},
 	{"Not wired to any source yet", "the intake is the source and it is wired"},
 	{"three verification passes", "four, the fourth being the real terminal that found the erase"},
 	{"検証パス 3 本", "same"},

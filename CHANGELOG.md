@@ -1,5 +1,33 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Mermaid fences are pictures where the terminal draws images**
+  (ADR-0025, ported from gem-agent ADR-0092 at v0.85.1). On iTerm2 and kitty
+  a fence in a reply is drawn by mermaid-render (an organization library):
+  flowchart / graph, sequenceDiagram and erDiagram, from the source as
+  written, CJK labels included. One em of diagram text is one terminal
+  line; the width follows the cell's shape, read with an ioctl
+  (`TIOCGWINSZ`), never a terminal query. A picture wider than the terminal
+  shrinks; a taller one scrolls — on kitty in bands of at most half the
+  screen, since kitty clips a picture taller than the screen. Anything the
+  engine refuses is shown as source with a one-line note. There is no box
+  art: without an image protocol, and in `-p` and the plain REPL, a fence
+  stays source as before. `[tui.diagram]` picks the font (default Hiragino
+  Sans W3 / W6); a value that does not load is a banner warning. A
+  picture's payload reaches the terminal beside the renderer's ADR-0024
+  hold, as a tool image does.
+
+### Known limitations
+
+- Narrowing the window loses the pictures on the screen at that moment and
+  leaves black space in the scrollback (text survives). The TUI clears the
+  screen on a shrink, and an image does not survive a clear; `/show`
+  pictures are affected the same way. Measured in gem-agent; to be
+  revisited with it.
+
 ## [0.10.4] - 2026-09-29
 
 ### Security

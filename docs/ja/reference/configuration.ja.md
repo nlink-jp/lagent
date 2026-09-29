@@ -42,6 +42,7 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `[tui].theme` | `auto` | `auto`、`dark`、`light`、`plain` |
 | `[tui].language` | `auto` | `auto`（`LC_ALL` / `LC_MESSAGES` / `LANG` から）、`ja`、`en` |
 | `[tui].show_thoughts` | `true` | サーバが送る推論差分をライブ領域に表示。表示専用 |
+| `[tui.diagram].font` / `font_name` / `bold_font` / `bold_font_name` | ヒラギノ角ゴシック W3 / W6 | 画像を描ける場所で mermaid の図を描くフォント（ADR-0025）: .ttf/.otf/.ttc のファイルと、その中の書体（フル名か PostScript 名）。`bold_font`（実体名・枠の見出し）の既定は本文の書体。起動時に一度、画像を描くときだけ読む。読めない値はバナーの警告と既定のフォントになり、起動は止めない。ユーザ設定だけ |
 | `[tui].images` | `auto` | インライン画像 — モデルが `show_image` で見せるものと、あなたが `/show` で出すもの（PNG か JPEG、2 MiB まで）: `auto`（UI 起動前に端末へ一度だけ問う）、`off`、または強制指定の `iterm` / `kitty`（ADR-0020/0022）。tmux・screen の中では `auto` は off に解決 |
 | `[approval].pin_trusted_files` | `true` | 信頼は内容に与える: 信頼済みプロジェクトのエージェント向けファイルはダイジェストで固定され、変わると再度尋ねる |
 | `[approval].tools` | （未設定） | ツールごとのポリシー: `"always"`（常に尋ねる。自動承認でも外せない床）または `"never"`（尋ねない。ブロック対象のシェルパターンと資格情報の読取は尋ねる）。`--allow` は 1 実行分の同等物 |

@@ -194,6 +194,36 @@ type TUIConfig struct {
 	// is someone else's configuration, which is the reason that ADR
 	// refuses.
 	Images string `toml:"images"`
+	// Diagram picks the font mermaid diagrams are drawn in where Images
+	// draws (ADR-0025 §5). User config only: the project config has no
+	// [tui] table. Deliberately not validated here — a display font is
+	// not worth a session, so a bad setting is a banner line at start,
+	// never a refusal to start.
+	Diagram DiagramConfig `toml:"diagram"`
+}
+
+// DiagramConfig is [tui.diagram]. Every field empty means Hiragino Sans
+// W3 / W6.
+type DiagramConfig struct {
+	// Font is a .ttf, .otf or .ttc file for body text; FontName picks a
+	// face in it by full or PostScript name (empty: the first face).
+	Font     string `toml:"font"`
+	FontName string `toml:"font_name"`
+	// BoldFont is the bold face's file (entity names, frame titles);
+	// empty means the body face.
+	BoldFont     string `toml:"bold_font"`
+	BoldFontName string `toml:"bold_font_name"`
+}
+
+// Files returns Font and BoldFont with a leading ~ expanded.
+func (d DiagramConfig) Files() (font, bold string) {
+	x := func(p string) string {
+		if p == "" {
+			return ""
+		}
+		return expandHome(p)
+	}
+	return x(d.Font), x(d.BoldFont)
 }
 
 // MCPConfig controls the MCP client. Server definitions live in the
@@ -497,6 +527,7 @@ var trackedKeys = []string{
 	"agent.read_only",
 	"mcp.enabled", "mcp.call_timeout_sec", "mcp.startup_timeout_sec", "mcp.advertise", "mcp.preload",
 	"tui.theme", "tui.language", "tui.show_thoughts",
+	"tui.diagram.font", "tui.diagram.font_name", "tui.diagram.bold_font", "tui.diagram.bold_font_name",
 }
 
 func (c *Config) validate() error {

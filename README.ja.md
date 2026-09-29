@@ -108,6 +108,10 @@ lagent
   引用符付きでも、ウィンドウへドラッグしたファイルでもよい）。端末が描けるときに描く（iTerm2 と kitty。
   `[tui].images`、既定は `auto`、tmux・screen の中では off）。`view_image` は
   逆向きで、**モデルが**画像を見るためのものである（ADR-0020/0021/0022）。
+- **図を絵として:** 返答中の mermaid フェンス（flowchart / graph・sequenceDiagram・erDiagram、
+  日本語のラベルも）は、端末が画像を描けるなら絵として描く。図の文字 1 em が端末の 1 行になる大きさ。
+  正しく描けないものは注記 1 行つきでソースのまま、それ以外の端末ではソースのまま。フォントは
+  `[tui.diagram]`。ウィンドウを狭めると、そのとき画面にある絵は失われる（ADR-0025）。
 - **無いもの:** web 検索と取得、メディアアップロード、監査ログ出力、
   履歴圧縮 — RFP と
   [ADR-0002](docs/ja/adr/0002-features-not-reproduced.ja.md) を参照。

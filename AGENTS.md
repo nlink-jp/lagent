@@ -51,7 +51,11 @@ same pass caught this list going stale again:** `internal/termimg` entire
 (only the ADR renumbering and the provenance line differ), the segment lane
 in `internal/tui` — `Segment`, `emitSegments`, `drawImage`, `maxImageRows` —
 and the intake's draw condition in `cmd/mcpresult.go` (`isImageBlock` and
-the saved-AND-described gate). A defect in any of them is fixed in both
+the saved-AND-described gate). **Added 2026-09-29 by ADR-0025:**
+`internal/diagram`'s scanner and picture path (gem-agent's minus its box
+art), `renderReply`, `pictureSegments` and `bandRows` in `internal/tui`,
+`termimg`'s `DiagramBox`, `Bands` and `CellAspect`, and `cmd/diagramfont.go`.
+A defect in any of them is fixed in both
 runtimes in the same piece of work; the probe's device-attributes question
 and the drawn-implies-described predicate were both fixed that way.
 
@@ -241,6 +245,9 @@ internal/session/  JSONL transcript: logger + resume loader; usage records in th
                    gem-usage-lens shape; LAGENT_SESSION_ID is exported at startup
 internal/repl/     paste-safe input reader (plain REPL, non-TTY fallback)
 internal/tui/      Bubble Tea inline TUI: model, approval gate, settings panel
+internal/diagram/  mermaid fences in a reply drawn as pictures where images draw
+                   (ADR-0025): the fence scanner and the mermaid-render Picture;
+                   no box art — without a Picture every fence stays source
 internal/termimg/  inline images in a DECLARED box (ADR-0020): capability
                    detection before Bubble Tea owns stdin, iTerm2/kitty
                    payloads carrying the box, Fit clamping the width. The

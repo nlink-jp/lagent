@@ -21,7 +21,7 @@ import (
 //
 // Ported from gem-agent internal/tui/inert.go at 8d7c78085a84b9b0d97948ea9bdcb238751e934c (v0.85.1),
 // ADR-0001; the box-art hold is not carried, since this runtime draws no
-// diagrams (ADR-0002).
+// box-art diagrams (ADR-0020 A1; ADR-0025 draws them only as pictures).
 
 // ownPkg is this package's import path: only its message types are
 // rewritten. Bubble Tea's own messages carry the operator's keys and the

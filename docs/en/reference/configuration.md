@@ -42,6 +42,7 @@ Unknown keys are errors (strict decode).
 | `[tui].theme` | `auto` | `auto`, `dark`, `light`, or `plain` |
 | `[tui].language` | `auto` | `auto` (from `LC_ALL` / `LC_MESSAGES` / `LANG`), `ja`, or `en` |
 | `[tui].show_thoughts` | `true` | show the server's reasoning deltas in the live area; display-only |
+| `[tui.diagram].font` / `font_name` / `bold_font` / `bold_font_name` | Hiragino Sans W3 / W6 | the font mermaid diagrams are drawn in where images draw (ADR-0025): a .ttf/.otf/.ttc file and a face in it by full or PostScript name; `bold_font` (entity names, frame titles) defaults to the body face. Read once at start, only when images draw; a value that does not load is a banner warning and the default font, never a refusal to start. User config only |
 | `[tui].images` | `auto` | inline images — what the model shows with `show_image` and what you ask for with `/show` (PNG or JPEG, up to 2 MiB): `auto` (ask the terminal before the UI starts), `off`, or a forced protocol — `iterm` or `kitty` (ADR-0020/0022). Inside tmux or screen `auto` resolves to off |
 | `[approval].pin_trusted_files` | `true` | trust is given to content: a trusted project's agent-facing files are pinned by digest and a changed one asks again |
 | `[approval].tools` | (unset) | per-tool policy: `"always"` (always ask; a floor auto-approve cannot lift) or `"never"` (never ask; blocked shell patterns and credential reads still ask). `--allow` does the same for one run |

@@ -7,7 +7,7 @@
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
 | Triggered by | gem-agent ADR-0093: モデルの文字列がエスケープシーケンスを保ったまま端末に届いており、gem-agent のリリース前の独立レビューがそれを見つけた。AGENTS.md: 両ランタイムにある機構の欠陥は両方で直す。このランタイムの `internal/tui` は同じ経路（`case TextDelta` が生のチャンクを追記する）を持ち、したがって同じ欠陥を持っていた。操作者が移植を承認した |
-| Relates to | gem-agent ADR-0093（決定と 2 本のレビューパス。ここに移植する）、RFP §2「Input / Output」（**本記録で修正**）、[ADR-0002](0002-features-not-reproduced.ja.md)（図を描かないので罫線アートの抑えは無い）、[ADR-0020](0020-inline-images-declare-their-height.ja.md)（紛れ込んだ画像エスケープが壊す、宣言した行数の会計） |
+| Relates to | gem-agent ADR-0093（決定と 2 本のレビューパス。ここに移植する）、RFP §2「Input / Output」（**本記録で修正**）、[ADR-0020](0020-inline-images-declare-their-height.ja.md) A1（罫線の図を描かないので罫線アートの抑えは無い）、[ADR-0020](0020-inline-images-declare-their-height.ja.md)（紛れ込んだ画像エスケープが壊す、宣言した行数の会計） |
 
 ## Context（背景）
 
@@ -54,11 +54,12 @@ gem-agent の `tools/escprobe` を計測のためにこのツリーへ写し、�
 
 ### gem-agent との違い
 
-- **罫線アートの抑えは無い。** このランタイムは図を描かない（ADR-0002）ので、変換は glamour
-  だけであり、`inertArt` は持ち込まない。
-- **`Output` メッセージも、riskbook・圧縮・絵・セルの縦横比のコールバックも無い** — ADR-0002 が
-  再現しない gem-agent の機能なので、テストのメッセージと `Options` の登録簿はこのランタイム
-  自身の一覧である。
+- **罫線アートの抑えは無い。** このランタイムは罫線の図を描かない（ADR-0020 A1。ADR-0025 は図を
+  絵としてだけ描く）ので、変換は glamour だけであり、`inertArt` は持ち込まない。
+- **`Output` メッセージも、riskbook・圧縮のコールバックも無い** — このランタイムに無い gem-agent の
+  機能なので、テストのメッセージと `Options` の登録簿はこのランタイム自身の一覧である。*（ADR-0025 で
+  改める: 絵とセルの縦横比のコールバックは移植した。`Picture` は画像と、抑えた描画関数を通してだけ見える
+  理由を返し、`CellAspect` は数を返す。どちらもその理由で除外する。）*
 
 ### 外に残るもの、およびそれを受け入れる理由
 

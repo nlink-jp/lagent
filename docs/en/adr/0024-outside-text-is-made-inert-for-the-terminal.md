@@ -7,7 +7,7 @@
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
 | Triggered by | gem-agent ADR-0093: the model's text reached the terminal with its escape sequences intact, and an independent pre-release review of gem-agent found it. AGENTS.md: a defect in a mechanism both runtimes have is fixed in both, and this runtime's `internal/tui` has the same path — `case TextDelta` appends the raw chunk — so it had the same defect. The operator approved the port |
-| Relates to | gem-agent ADR-0093 (the decision and its two review passes, ported here), RFP §2 "Input / Output" (**amended here**), [ADR-0002](0002-features-not-reproduced.md) (no diagrams, so no box-art hold), [ADR-0020](0020-inline-images-declare-their-height.md) (the declared-row account a stray image escape breaks) |
+| Relates to | gem-agent ADR-0093 (the decision and its two review passes, ported here), RFP §2 "Input / Output" (**amended here**), [ADR-0020](0020-inline-images-declare-their-height.md) A1 (no box-art diagrams, so no box-art hold), [ADR-0020](0020-inline-images-declare-their-height.md) (the declared-row account a stray image escape breaks) |
 
 ## Context
 
@@ -65,11 +65,15 @@ The mechanism is gem-agent ADR-0093's, ported from gem-agent v0.85.1
 
 ### What differs from gem-agent
 
-- **No box-art hold.** This runtime draws no diagrams (ADR-0002), so the one
-  transform is glamour; `inertArt` is not carried.
-- **No `Output` message and no riskbook, compaction, picture or cell-aspect
-  callbacks** — they are gem-agent features ADR-0002 does not reproduce, so
-  the tests' message and `Options` registries are this runtime's own lists.
+- **No box-art hold.** This runtime draws no box-art diagrams (ADR-0020
+  A1; ADR-0025 draws them only as pictures), so the one transform is glamour;
+  `inertArt` is not carried.
+- **No `Output` message and no riskbook or compaction callbacks** — gem-agent
+  features this runtime does not have, so the tests' message and `Options`
+  registries are this runtime's own lists. *(Amended by ADR-0025: the picture
+  and cell-aspect callbacks are ported; `Picture` returns an image and a
+  reason shown only through the held renderer, `CellAspect` a number, and
+  both are exempt with those reasons.)*
 
 ### What stays outside, and why that is accepted
 

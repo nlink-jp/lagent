@@ -186,7 +186,8 @@ excepted).
   row count's sake rather than the renderer's. What differs from the other
   side is the lane: `newGlamourRenderer` renders the reply as one piece, so
   this creates a segment lane with an image as its only member, and porting
-  `internal/diagram` is explicitly not part of it. **What may be drawn is
+  `internal/diagram` is explicitly not part of it (ADR-0025 later partitioned
+  the reply, for diagrams drawn as pictures). **What may be drawn is
   NOT settled here**: that decision was written and refuted three times — a
   model-named path bypasses `PathJudged`, the intake's path can be
   pre-empted by a symlink because `write` short-circuits on `os.Stat` and
@@ -277,15 +278,16 @@ excepted).
   Markdown renderer's output is held to the SGR it writes and closed at the
   reply's end because goldmark decodes `&#27;`, and the plain REPL and `-p`
   go inert only when the stream is a terminal (the RFP's stdout contract
-  amended). No box-art hold: this runtime draws no diagrams
+  amended). No box-art hold: this runtime draws no box-art diagrams
 - [`ADR-0025`](adr/0025-mermaid-fences-render-as-pictures.md) —
   mermaid fences render as pictures where the terminal can draw them
-  (**Proposed**; ported from gem-agent ADR-0092): on iTerm2 and kitty a fence
+  (**Accepted**; ported from gem-agent ADR-0092): on iTerm2 and kitty a fence
   in a reply is drawn by mermaid-render from the source as written, one em of
   diagram text per terminal line, the width from the cell aspect read with an
   ioctl; tall pictures scroll, in bands on kitty only. Every failure is the
   source with a note. Elsewhere the fence stays source — no box-art lane is
-  added. The reply is now partitioned (ADR-0020 §3 amended), and a payload
+  added. Where pictures draw the reply is partitioned (ADR-0020 amended, its
+  A3 answered), and a payload
   reaches the terminal beside the renderer's ADR-0024 hold, as a tool image
   does. The font is `[tui.diagram]`, read only where images draw; a bad
   setting is a banner warning. Known limitation: narrowing the window loses

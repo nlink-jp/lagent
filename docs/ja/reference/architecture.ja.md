@@ -18,6 +18,7 @@ cmd/            flags, config load, project resolution, wiring, REPL/TUI
   |-- internal/tools       the ten file/shell/image built-ins + Register
   |-- internal/agent       the turn loop, approval dispatch, the round ladder
   |-- internal/tui         Bubble Tea inline UI (or internal/repl, non-TTY)
+  |-- internal/diagram     返答中の mermaid フェンスを絵として描く（ADR-0025）
   `-- internal/termimg     宣言したボックス内のインライン画像（ADR-0020）
 ```
 
