@@ -652,6 +652,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Shrink-only (gem-agent ADR-0021 §9, ADR-0026): a growth re-wraps
 		// nothing of the frame into more rows, so there is nothing to erase.
 		resized := m.sized && width < m.width
+		// E runs on a width change only: its reason — the terminal runs
+		// ahead of the width it reported — says nothing about a report
+		// that changes the height alone (a split, a tab bar toggled).
+		widthChanged := m.sized && width != m.width
 		first := !m.sized
 		m.sized = true
 		m.width = width
@@ -681,6 +685,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case resized:
 			m.shrinkSweep(msg.Width)
 			return m, m.resizeUnderway()
+		}
+		if !widthChanged {
+			return m, nil
 		}
 		return m, m.resizeUnderway()
 
