@@ -13,7 +13,7 @@ import (
 const flowFence = "```mermaid\nflowchart TD\n    A([開始]) --> B{判定}\n    B -- はい --> C[完了]\n```"
 
 // With a Picture, a fence becomes a picture segment holding its source; a
-// refusal is the source with the note (there is no box art here); an
+// refusal is the source with the note (never box art, ADR-0027); an
 // unsupported type is the source, silently; a panic is a refusal.
 func TestSplitWithPicture(t *testing.T) {
 	var got []string
@@ -38,7 +38,7 @@ func TestSplitWithPicture(t *testing.T) {
 		t.Errorf("text around the picture = %q, %q", segs[0].Text, segs[2].Text)
 	}
 	// The source as written reaches the engine: ([…]) and {…} shapes and
-	// the `-- text -->` form, which the art table would have rewritten.
+	// the `-- text -->` form, as written.
 	if len(got) != 1 || got[0] != "flowchart TD\n    A([開始]) --> B{判定}\n    B -- はい --> C[完了]" {
 		t.Errorf("the engine got %q", got)
 	}
@@ -57,7 +57,7 @@ func TestSplitWithPicture(t *testing.T) {
 			}()
 			segs = Split(fence, pic)
 		}()
-		if len(segs) != 1 || segs[0].Img != nil || !strings.HasPrefix(segs[0].Text, fence) {
+		if len(segs) != 1 || segs[0].Img != nil || segs[0].Art || !strings.HasPrefix(segs[0].Text, fence) {
 			t.Errorf("%q: %+v", src, segs)
 			continue
 		}
@@ -125,12 +125,16 @@ func TestEmptyPictureStillHasANote(t *testing.T) {
 	}
 }
 
-// Without a Picture the reply is whole: this runtime has no art lane, so
-// a terminal without images shows every fence as source (ADR-0025 §1).
-func TestSplitWithoutPictureIsWhole(t *testing.T) {
+// Without a Picture a fence is box art between the text around it
+// (ADR-0027), never a picture.
+func TestSplitWithoutPictureDrawsArt(t *testing.T) {
 	md := "a\n\n" + flowFence + "\n\nb"
-	if segs := Split(md, nil); len(segs) != 1 || segs[0].Text != md {
-		t.Errorf("segments: %+v", segs)
+	segs := Split(md, nil)
+	if len(segs) != 3 || !segs[1].Art || segs[1].Img != nil || !strings.Contains(segs[1].Text, "判定") {
+		t.Fatalf("segments: %+v", segs)
+	}
+	if segs[0].Text != "a\n" || segs[2].Text != "\nb" {
+		t.Errorf("text around the art: %q %q", segs[0].Text, segs[2].Text)
 	}
 }
 

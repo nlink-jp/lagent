@@ -115,8 +115,10 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
 - **Diagrams as pictures:** a mermaid fence in a reply (flowchart / graph,
   sequenceDiagram, erDiagram, pie, stateDiagram, gantt, mindmap, CJK labels included) is drawn as a picture
   where the terminal draws images, one em of its text per terminal line;
-  anything that cannot be drawn right stays source with a one-line note, and
-  elsewhere the fence stays source. `[tui.diagram]` picks the font. Narrowing
+  anything that cannot be drawn right stays source with a one-line note.
+  Elsewhere flowchart, sequence and ER fences are drawn as box art by the
+  same engine, and the other types stay source (ADR-0027). The plain REPL
+  and `-p` always show the source. `[tui.diagram]` picks the font. Narrowing
   the window keeps the pictures on screen (ADR-0026).
 - **Not here:** web search and fetch, media uploads, audit-log export,
   history compaction — see the RFP and

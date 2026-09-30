@@ -1,32 +1,44 @@
 // Package diagram draws mermaid fences in a reply as pictures where the
-// terminal draws images (ADR-0025). It is a view-layer concern and
-// nothing else: the model is never told about it, the transcript keeps
-// the source the model wrote, and a fence that cannot be drawn right is
-// shown as source with a one-line note.
+// terminal draws images (ADR-0025), and as box art where it does not
+// (ADR-0027). It is a view-layer concern and nothing else: the model is
+// never told about it, the transcript keeps the source the model wrote,
+// and a fence that cannot be drawn right is shown as source with a
+// one-line note.
 //
-// This runtime has no box-art lane (ADR-0025 §1, A1): without a Picture
-// every fence stays source.
+// Both come from mermaid-render, from the same parse: the art is the
+// picture's layout on a grid of cells, checked on the grid every time.
+// Art bypasses the Markdown renderer — glamour word-wraps code-block
+// lines at spaces, which shears box art — so Split returns it as its own
+// segments for the TUI to emit verbatim.
 //
 // Ported from gem-agent internal/diagram at 8d7c78085a84b9b0d97948ea9bdcb238751e934c (v0.85.1), ADR-0001:
-// the fence scanner, the note and the picture path; the box-art renderer,
-// its translation table and its guards are not ported.
+// the fence scanner, the note and the picture path. The art path is
+// gem-agent ADR-0095's (mermaid-render's RenderText); mermaid-ascii, its
+// translation table and its guards were never ported.
 package diagram
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"regexp"
 	"strings"
+
+	"github.com/charmbracelet/x/ansi"
+	mr "github.com/nlink-jp/mermaid-render"
+	"github.com/nlink-jp/mermaid-render/raster"
 )
 
 var fenceOpen = regexp.MustCompile("^(`{3,}|~{3,})\\s*([A-Za-z0-9_+-]*)")
 
-// Segment is one run of a reply: markdown for the Markdown renderer, or a
-// picture. Source is the fence as the model wrote it, so a failure after
-// this point still shows the source (WithNote) — the picture never
-// disappears together with it.
+// Segment is one run of a reply: markdown for the Markdown renderer,
+// finished box art the TUI must emit verbatim (Art), or a picture. Source
+// is a picture's fence as the model wrote it, so a failure after this
+// point still shows the source (WithNote) — the picture never disappears
+// together with it.
 type Segment struct {
 	Text   string
+	Art    bool
 	Img    image.Image
 	Source string
 }
@@ -51,9 +63,11 @@ func WithNote(source, why string) string {
 // enclosing fence (an example inside a ````markdown block) is data, not a
 // diagram — a closing fence carries no info string, so a labeled opener
 // inside an open fence can never be its close. An unclosed fence (a reply
-// cut off mid-diagram) is text. A nil pic returns the markdown whole.
+// cut off mid-diagram) is text. Without a pic (the session draws no
+// images) a fence is drawn as box art instead (ADR-0027); nothing falls
+// back from a picture to art.
 func Split(markdown string, pic Picture) []Segment {
-	if pic == nil || !strings.Contains(strings.ToLower(markdown), "mermaid") {
+	if !strings.Contains(strings.ToLower(markdown), "mermaid") {
 		return []Segment{{Text: markdown}}
 	}
 	lines := strings.Split(markdown, "\n")
@@ -99,6 +113,20 @@ func Split(markdown string, pic Picture) []Segment {
 		}
 		src := strings.Join(lines[i+1:end], "\n")
 		block := strings.Join(lines[i:end+1], "\n")
+		if pic == nil {
+			art, why, attempted := render(src)
+			switch {
+			case attempted && why == "":
+				flush()
+				segs = append(segs, Segment{Text: art, Art: true})
+			case attempted:
+				md = append(md, WithNote(block, why))
+			default:
+				md = append(md, block)
+			}
+			i = end
+			continue
+		}
 		img, why, attempted := drawPicture(pic, src)
 		switch {
 		case attempted && why == "" && img != nil:
@@ -143,3 +171,33 @@ func closesFence(line, opener string) bool {
 // noteSafe keeps a reason from breaking the note's emphasis markup —
 // a renderer error can contain any character.
 var noteSafe = strings.NewReplacer("*", "＊", "_", "＿", "`", "'").Replace
+
+// render draws one mermaid source as box art (ADR-0027). attempted is
+// false for a diagram type the engine does not draw as text (a gantt in
+// the chat is not an error). For an attempted draw, why is empty on
+// success and names the refusal otherwise — wrongness only, never size.
+// A panic in the engine is a refusal: it runs on the UI's update path,
+// and a defect in it must cost a drawing, not the session.
+func render(src string) (art, why string, attempted bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			art, why, attempted = "", fmt.Sprintf("the diagram renderer failed: %v", r), true
+		}
+	}()
+	d, err := mr.Parse(src)
+	if err == nil {
+		art, err = raster.RenderText(d, raster.TextOptions{Width: cellWidth})
+	}
+	if err != nil {
+		var e *mr.Error
+		if errors.As(err, &e) && e.Kind == mr.UnsupportedType {
+			return "", "", false
+		}
+		return "", strings.ReplaceAll(err.Error(), "\n", " "), true
+	}
+	return art, "", true
+}
+
+// cellWidth is a character's width as the TUI measures it, so the art's
+// columns and the rest of the screen agree.
+func cellWidth(r rune) int { return ansi.StringWidth(string(r)) }

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Box art where no picture draws** (ADR-0027). On a terminal without
+  images (Terminal.app, a multiplexer), flowchart, sequence and ER fences
+  in a reply are drawn as box art instead of shown as source. mermaid-render
+  draws them from the same parse as the pictures, places them by the TUI's
+  own cell widths, and checks them on the grid every time. Japanese labels
+  are included. The plain REPL and `-p` still show the source.
+
 ## [0.15.1] - 2026-09-30
 
 ### Changed

@@ -21,6 +21,9 @@
 読むセルの寸法から導く（問い合わせはしない）。A1 の「図が来るなら、ここで作るレーンに加わる」はそのとおりに
 なった。*
 
+*ADR-0027 による修正: A1 の「図が来るなら、ここで作るレーンに加わる」— 罫線が独立した
+逐語の区切りとして加わる。*
+
 ## Context（背景）
 
 ADR-0005 は、画像が**モデル**へ届く道を決めた。ドロップされたパスは添付され、
@@ -30,16 +33,16 @@ ADR-0005 は、画像が**モデル**へ届く道を決めた。ドロップさ�
 
 ### カウンタに見えるもの、見えないもの
 
-`emit`（[model.go:961](../../../internal/tui/model.go)）は 1 行を scrollback へ印字し、
+`emit`（[model.go:964](../../../internal/tui/model.go)）は 1 行を scrollback へ印字し、
 その物理行数を数える。bottom pin はその数に乗っている。`go.mod:11` が固定している版 —
 gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.6 で実測すると、
 `ansi.StringWidth` は iTerm2 の `OSC 1337 File=`、kitty の `APC _G`、sixel の `DCS q` の
 いずれにも **0** を返し、`ansi.Strip` は空文字を返す。`ansi.Hardwrap` は 3 方式とも
-バイト同一で通すので、`wrapForScrollback`（[model.go:1214](../../../internal/tui/model.go)）は
+バイト同一で通すので、`wrapForScrollback`（[model.go:1217](../../../internal/tui/model.go)）は
 何も切り刻まない。
 
 ただしカウンタは盲目ではない。`physicalRows`
-（[model.go:1227](../../../internal/tui/model.go)）は `rows, cells := 1, 0` から始まるので、
+（[model.go:1230](../../../internal/tui/model.go)）は `rows, cells := 1, 0` から始まるので、
 画像の行はちょうど **1 行**と計上される。端末が N 行進める間に、である。不足は `N` では
 なく `N-1` である。
 
@@ -49,7 +52,7 @@ gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.
 **移植しない。** それらが測るのは端末であってランタイムではなく、このリポジトリに
 `tools/` は無い。`pinprobe` は向こうのランタイムの本番 Model をその本番 emit 経路で
 駆動するが、それはこちらの emit 経路でもある — 関数ごとに同一である
-（[model.go:961, :1214, :1227](../../../internal/tui/model.go) が gem-agent の :872・:1130・
+（[model.go:964, :1217, :1230](../../../internal/tui/model.go) が gem-agent の :872・:1130・
 :1143 に対応し、後ろ 2 つは `diff` が空を返す）。
 
 領域は仮定ではなく構成する。pin の padding は `height − printed − view − 1` で、正の分岐は
@@ -205,7 +208,7 @@ view 層の読み取りを開く）は、いまや先送りした決定に属す
 この一文だけが立っているのを見つけた。この一文自身の規則により、それは「現時点では」に
 すぎない。テストは後から書かれ、いまこの一文は意図ではなく実在を述べている。これは既存の
 面を塞いだと主張するものではない。非テストコードで `ansi.Strip` が呼ばれるのは 1 箇所
-（[model.go:1232](../../../internal/tui/model.go)）、`physicalRows` の中で幅を**測る**ためだけ
+（[model.go:1235](../../../internal/tui/model.go)）、`physicalRows` の中で幅を**測る**ためだけ
 である。シェル出力の生エスケープは既に端末へ届いている。既存であり、ここで広がらず、
 ここで直しもしない。
 

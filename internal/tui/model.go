@@ -498,12 +498,13 @@ func newGlamourRenderer(width int, style string) func(string) string {
 // renderReply turns a reply into the segments that reach scrollback
 // (ADR-0025 §2). Mermaid fences are a view-layer transform; the transcript
 // keeps the model's source verbatim either way. Where this session draws
-// images a fence becomes a picture in a declared box; elsewhere — and
-// whenever it cannot be drawn — it is source, with a note when a draw was
-// refused. There is no box art here. Text goes through the Markdown
-// renderer and its ADR-0024 hold; a picture's payload goes beside it, as a
-// tool image's does. Parts are separated by one blank line, as the
-// Markdown renderer separates paragraphs.
+// images a fence becomes a picture in a declared box; elsewhere it is box
+// art (ADR-0027); whenever it cannot be drawn it is source, with a note
+// when a draw was refused. Text goes through the Markdown renderer and its
+// ADR-0024 hold; art goes past the renderer, held to no escapes at all; a
+// picture's payload goes beside it, as a tool image's does. Parts are
+// separated by one blank line, as the Markdown renderer separates
+// paragraphs.
 func (m *Model) renderReply(text string) []Segment {
 	var pic diagram.Picture
 	if m.images != termimg.None {
@@ -520,6 +521,8 @@ func (m *Model) renderReply(text string) []Segment {
 		switch {
 		case seg.Img != nil:
 			add(m.pictureSegments(seg)...)
+		case seg.Art:
+			add(Segment{Text: inertArt(seg.Text)})
 		case strings.TrimSpace(seg.Text) != "":
 			// Trimmed here too: the blank line between parts is add's. A
 			// part that renders to nothing (a comment, a link definition)

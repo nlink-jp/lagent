@@ -134,6 +134,10 @@ func inertRenderer(mk func(int) func(string) string, plain bool) func(int) func(
 	}
 }
 
+// inertArt holds box art to no escapes at all (ADR-0027 §3): the engine
+// writes none, so any it produced came from the text it drew.
+func inertArt(s string) string { return inert.String(s) }
+
 // inertStrings wraps a callback that returns candidates: completion names
 // files and skills the model or a project can have created.
 func inertStrings(f func(string) []string) func(string) []string {

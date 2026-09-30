@@ -55,7 +55,9 @@ the saved-AND-described gate). **Added 2026-09-29 by ADR-0025:**
 `internal/diagram`'s scanner and picture path (gem-agent's minus its box
 art), `renderReply`, `pictureSegments` and `bandRows` in `internal/tui`,
 `termimg`'s `DiagramBox`, `Bands` and `CellAspect`, and `cmd/diagramfont.go`.
-A defect in any of them is fixed in both
+**Added 2026-09-30 by ADR-0027:** `internal/diagram`'s art path (`render`,
+`cellWidth`, `Segment.Art`, the same as gem-agent's after its ADR-0095)
+and `inertArt`. A defect in any of them is fixed in both
 runtimes in the same piece of work; the probe's device-attributes question
 and the drawn-implies-described predicate were both fixed that way.
 
@@ -251,7 +253,7 @@ internal/tui/      Bubble Tea inline TUI: model, approval gate, settings panel;
                    its text and draws the frame narrow until width-changing reports stop
 internal/diagram/  mermaid fences in a reply drawn as pictures where images draw
                    (ADR-0025): the fence scanner and the mermaid-render Picture;
-                   no box art — without a Picture every fence stays source
+                   box art via mermaid-render's RenderText elsewhere (ADR-0027)
 internal/termimg/  inline images in a DECLARED box (ADR-0020): capability
                    detection before Bubble Tea owns stdin, iTerm2/kitty
                    payloads carrying the box, Fit clamping the width. The

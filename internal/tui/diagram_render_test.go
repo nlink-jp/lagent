@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/nlink-jp/lagent/internal/diagram"
 	"github.com/nlink-jp/lagent/internal/termimg"
 )
 
@@ -67,18 +68,18 @@ func TestReplyDrawsPicture(t *testing.T) {
 	}
 }
 
-// A session without an image protocol shows the fence as source whatever
-// Picture holds — there is no art lane here (ADR-0025 §1); a refusal shows
-// the source with the note.
+// A session without an image protocol draws the fence as box art whatever
+// Picture holds (ADR-0027 §1); a refusal where images draw shows the
+// source with the note, never art.
 func TestReplyPictureOnlyWhereImagesDraw(t *testing.T) {
 	src := "```mermaid\nflowchart TD\n  A[alpha] --> B[beta]\n```"
 	out := replyText(replyModel(Options{Picture: fakePicture}).renderReply(src))
-	if !strings.Contains(out, "A[alpha] --> B[beta]") || strings.Contains(out, "diagram shown as source") {
-		t.Errorf("no protocol: want the source, note-free, got\n%s", out)
+	if strings.Contains(out, "A[alpha]") || strings.Contains(out, "\x1b]1337") || !strings.Contains(out, "┌") || !strings.Contains(out, "alpha") {
+		t.Errorf("no protocol: want box art, got\n%s", out)
 	}
 	refused := "```mermaid\nflowchart TD\n  A[refuse] --> B\n```"
 	out = replyText(replyModel(Options{Images: termimg.Kitty, Picture: fakePicture}).renderReply(refused))
-	if !strings.Contains(out, "A[refuse]") || !strings.Contains(out, "diagram shown as source: syntax error: refused") {
+	if !strings.Contains(out, "A[refuse]") || strings.Contains(out, "┌") || !strings.Contains(out, "diagram shown as source: syntax error: refused") {
 		t.Errorf("refusal: want the source and the note, got\n%s", out)
 	}
 }
@@ -212,5 +213,33 @@ func TestReplyRenderingToNothingPrintsNothing(t *testing.T) {
 				t.Errorf("images %v, %q: %d rows, writes %q", images, reply, got, c.printed)
 			}
 		}
+	}
+}
+
+// Box art reaches scrollback as the engine drew it, past glamour (which
+// wraps code lines at spaces and would shear a wide drawing), and held to
+// no escapes (ADR-0027 §2–§3).
+func TestReplyArtBypassesTheRenderer(t *testing.T) {
+	md := "```mermaid\ngraph LR\n  A[Parse config] --> B[Resolve project] --> C[Connect MCP] --> D[Discover skills] --> E[Build prompt] --> F[Start TUI]\n```\n"
+	var art string
+	for _, seg := range diagram.Split(md, nil) {
+		if seg.Art {
+			art = seg.Text
+		}
+	}
+	if art == "" {
+		t.Fatal("no art segment for the wide chain")
+	}
+	if out := replyText(replyModel(Options{}).renderReply(md)); !strings.Contains(out, art) {
+		t.Fatalf("wide art did not pass through verbatim at width 80:\n%s", out)
+	}
+	hostile := "```mermaid\nsequenceDiagram\n  A->>B: x\x1b]0;PWN\x07y\n```\n"
+	for _, seg := range diagram.Split(hostile, nil) {
+		if seg.Art {
+			t.Fatalf("the engine drew a control character:\n%q", seg.Text)
+		}
+	}
+	if got := inertArt("┌─┐\x1b]0;PWN\x07"); strings.ContainsRune(got, 0x1b) || strings.ContainsRune(got, 0x07) {
+		t.Errorf("inertArt kept an escape: %q", got)
 	}
 }

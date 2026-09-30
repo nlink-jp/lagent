@@ -24,6 +24,9 @@ arrive inside a reply" no longer hold, and A3 is answered: a diagram's box is
 derived from its pixels and the cell size, read with an ioctl, never a query.
 A1's "diagrams, if they come, join the lane this creates" is what happened.*
 
+*Amended by ADR-0027: A1's "diagrams, if they come, join the lane this
+creates" — box art joins it as its own verbatim segment.*
+
 ## Context
 
 ADR-0005 settled how an image reaches the **model**: a dropped path attaches,
@@ -33,17 +36,17 @@ server saved is, on this surface, a path in a line of text.
 
 ### What the counter can and cannot see
 
-`emit` ([model.go:961](../../../internal/tui/model.go)) prints one line into
+`emit` ([model.go:964](../../../internal/tui/model.go)) prints one line into
 scrollback and counts its physical rows; the bottom pinning rests on that
 count. Measured against `charmbracelet/x/ansi` v0.11.6 — the version
 `go.mod:11` pins, the same one gem-agent pins — `ansi.StringWidth` returns
 **0** and `ansi.Strip` the empty string for an iTerm2 `OSC 1337 File=`, a
 kitty `APC _G` and a sixel `DCS q` alike, and `ansi.Hardwrap` leaves all
 three byte-identical, so `wrapForScrollback`
-([model.go:1214](../../../internal/tui/model.go)) shears nothing.
+([model.go:1217](../../../internal/tui/model.go)) shears nothing.
 
 The counter is not blind, though. `physicalRows`
-([model.go:1227](../../../internal/tui/model.go)) starts at `rows, cells :=
+([model.go:1230](../../../internal/tui/model.go)) starts at `rows, cells :=
 1, 0`, so an image line is credited with exactly **one** row while the
 terminal advances N. The shortfall is `N-1`, not `N`.
 
@@ -53,8 +56,8 @@ The measurements live in gem-agent (`tools/rowprobe`, `tools/pinprobe`,
 `tools/imgpayload`) and are **not ported**: they measure a terminal, not a
 runtime, and this repository has no `tools/` directory. `pinprobe` drives
 that runtime's real model through its real emit path — which is this
-runtime's emit path too, function for function ([model.go:961, :1214,
-:1227](../../../internal/tui/model.go) against gem-agent's :872, :1130,
+runtime's emit path too, function for function ([model.go:964, :1217,
+:1230](../../../internal/tui/model.go) against gem-agent's :872, :1130,
 :1143; `diff` returns nothing on the last two).
 
 The regime is arranged, not assumed. The pin's padding is
@@ -246,7 +249,7 @@ the sentence standing alone, which by the rule in it makes the claim "as of
 today"; the test was written afterwards, and the sentence now describes what
 exists rather than what was intended. This does not close the existing surface:
 `ansi.Strip` is called at one site in non-test code
-([model.go:1232](../../../internal/tui/model.go)), inside `physicalRows`, to
+([model.go:1235](../../../internal/tui/model.go)), inside `physicalRows`, to
 *measure* — so raw escapes from shell output already reach the terminal.
 Pre-existing, not widened here, not repaired here.
 
