@@ -9,6 +9,9 @@
 | Triggered by | 運用者:「画像はトランスクリプトの描画として使う。モデルのツールではなくランタイムの描画機能に」— gem-agent と lagent の両方に（mermaid-render の RFP）。gem-agent ADR-0092 が gem-agent v0.85.0 で出荷した |
 | Relates to | gem-agent ADR-0092（決定・実測・運用者の判断・レビューをここへ移植）、[ADR-0020](0020-inline-images-declare-their-height.ja.md)（宣言するボックスのレーン。**Context の「応答が分割されることはなく」と §3 の「画像は応答の中からは届かない」をここで改め、A3 に答え、A1 を果たす**）、[ADR-0022](0022-showing-is-an-act-of-output.ja.md)、[ADR-0024](0024-outside-text-is-made-inert-for-the-terminal.ja.md)（無害化の入口と描画関数の出力の抑え。**「絵・セルの縦横比のコールバックも無い」をここで改める**）、[ADR-0001](0001-porting-sources-pinned.ja.md)（移植元の固定） |
 
+*ADR-0027 による修正: §1 の「罫線のレーンは足さない」と A1 を置き換える — 絵を描かない
+場所では、flowchart・sequence・ER のフェンスを mermaid-render が罫線で描く。絵の経路はそのまま。*
+
 ## Context
 
 分析・代替案・運用者の判断・iTerm2 と kitty での実測は gem-agent ADR-0092 にあり、ここでは繰り返さない。

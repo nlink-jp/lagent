@@ -9,6 +9,9 @@
 | Triggered by | gem-agent ADR-0093: the model's text reached the terminal with its escape sequences intact, and an independent pre-release review of gem-agent found it. AGENTS.md: a defect in a mechanism both runtimes have is fixed in both, and this runtime's `internal/tui` has the same path — `case TextDelta` appends the raw chunk — so it had the same defect. The operator approved the port |
 | Relates to | gem-agent ADR-0093 (the decision and its two review passes, ported here), RFP §2 "Input / Output" (**amended here**), [ADR-0020](0020-inline-images-declare-their-height.md) A1 (no box-art diagrams, so no box-art hold), [ADR-0020](0020-inline-images-declare-their-height.md) (the declared-row account a stray image escape breaks) |
 
+*Amended by ADR-0027: "No box-art hold" no longer holds — box art is drawn
+where no picture draws, and `inertArt` holds it to no escapes.*
+
 ## Context
 
 gem-agent ADR-0093 holds the analysis, the alternatives and the two review

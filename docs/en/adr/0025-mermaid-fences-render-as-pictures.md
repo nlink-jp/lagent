@@ -9,6 +9,10 @@
 | Triggered by | Operator: "use images as a rendering of the transcript — a runtime feature, not a model tool", for gem-agent and lagent alike (mermaid-render RFP); gem-agent ADR-0092 shipped it in gem-agent v0.85.0 |
 | Relates to | gem-agent ADR-0092 (the decision, its measurements, the operator's decisions and its reviews, ported here), [ADR-0020](0020-inline-images-declare-their-height.md) (the declared-box lane; **the Context's "a reply is never partitioned" and §3's "an image does not arrive inside a reply" are amended here, A3 is answered, and A1 is fulfilled**), [ADR-0022](0022-showing-is-an-act-of-output.md), [ADR-0024](0024-outside-text-is-made-inert-for-the-terminal.md) (the inert ingress and the renderer's hold; **its "no picture or cell-aspect callbacks" is amended here**), [ADR-0001](0001-porting-sources-pinned.md) (porting provenance) |
 
+*Amended by ADR-0027: §1's "No box-art lane is added" and A1 are superseded —
+where no picture draws, flowchart, sequence and ER fences are box art from
+mermaid-render. The picture path is unchanged.*
+
 ## Context
 
 gem-agent ADR-0092 holds the analysis, the alternatives, the operator's

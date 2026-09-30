@@ -302,3 +302,12 @@ excepted).
   drawn narrow, because the terminal runs ahead of the width it reports.
   Resolves ADR-0025's known limitation. The writer's measurement surface,
   read only by gem-agent's probe, is not ported
+- [`ADR-0027`](adr/0027-box-art-where-no-picture-draws.md) —
+  box art where no picture draws (**Accepted**, implemented; the counterpart of gem-agent
+  ADR-0095): where the TUI draws no images, a flowchart, sequence or ER fence
+  is drawn as text art by mermaid-render's `raster.RenderText`, with the TUI's
+  cell measure. That engine is organization code and checks every render on
+  its grid, so ADR-0025's two reasons for declining a box-art lane are gone.
+  The art is its own segment past glamour and is held to no escapes
+  (`inertArt`, amending ADR-0024's "no box-art hold"). Pictures are unchanged
+  where images draw; `-p` and the plain REPL stay source

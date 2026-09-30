@@ -9,6 +9,9 @@
 | Triggered by | gem-agent ADR-0093: モデルの文字列がエスケープシーケンスを保ったまま端末に届いており、gem-agent のリリース前の独立レビューがそれを見つけた。AGENTS.md: 両ランタイムにある機構の欠陥は両方で直す。このランタイムの `internal/tui` は同じ経路（`case TextDelta` が生のチャンクを追記する）を持ち、したがって同じ欠陥を持っていた。操作者が移植を承認した |
 | Relates to | gem-agent ADR-0093（決定と 2 本のレビューパス。ここに移植する）、RFP §2「Input / Output」（**本記録で修正**）、[ADR-0020](0020-inline-images-declare-their-height.ja.md) A1（罫線の図を描かないので罫線アートの抑えは無い）、[ADR-0020](0020-inline-images-declare-their-height.ja.md)（紛れ込んだ画像エスケープが壊す、宣言した行数の会計） |
 
+*ADR-0027 による修正: 「罫線の抑えは無い」はもう当たらない — 絵を描かない場所で罫線を描き、
+`inertArt` がエスケープを一切通さない。*
+
 ## Context（背景）
 
 分析・代替案・2 本のレビューパスは gem-agent ADR-0093 にあり、本記録は繰り返さない。
