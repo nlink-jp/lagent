@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-30
+
 ### Added
 
 - **Box art where no picture draws** (ADR-0027). On a terminal without
