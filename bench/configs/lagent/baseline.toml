@@ -16,3 +16,4 @@ call_timeout_sec = 30
 
 [approval.tools]
 "mcp__geo__*" = "never"
+"mcp__tickets__*" = "never"
