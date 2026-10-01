@@ -400,6 +400,45 @@ echo fixed
 	}
 }
 
+// A suite run's trace lands beside the run even when --out is relative:
+// the runtime runs in the project, so a relative trace path put the
+// requests inside the project and the payload check read an empty
+// directory.
+func TestSuiteTraceIsBesideTheRunWithARelativeOut(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	bin := filepath.Join(dir, "fake-runtime")
+	script := `#!/bin/sh
+case "$1" in trust) exit 0;; esac
+printf '{"marker":"PAYLOAD-7"}' > "$LAGENT_LLM_TRACE/001-request.json"
+echo done
+`
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(dir, "tasks", "s", "task.toml"),
+		"prompt = \"go\"\nsuite = \"x\"\npayload_marker = \"PAYLOAD-7\"\n[[expect.answer]]\nregex = 'done'\n")
+	writeFile(t, filepath.Join(dir, "tasks", "s", "testdata", "f"), "")
+	tasks, err := loadTasks(filepath.Join(dir, "tasks"), []string{"s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(dir, "c.toml")
+	writeFile(t, cfg, "")
+	r := &runner{Runtime: runtimes["lagent"], Bin: bin, OutDir: "rel-results",
+		Timeout: 30 * time.Second, Progress: &bytes.Buffer{}}
+	res, err := r.runOne(cell{Task: tasks[0], Config: configRef{Name: "c", Path: cfg}, Rep: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "rel-results", "s", "c", "rep1", "trace", "001-request.json")); err != nil {
+		t.Errorf("the trace is not beside the run: %v", err)
+	}
+	if !res.Completed {
+		t.Errorf("the payload check must find the marker: %+v", res.Failures)
+	}
+}
+
 func TestRunOneTimesOut(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "slow")

@@ -150,7 +150,13 @@ func (r *runner) runOne(c cell) (result, error) {
 		// exactly like one where it arrived and was ignored
 		// (ADR-0018 §6). Kept off the everyday sweep — the trace writes
 		// every request and raw stream to disk.
-		traceDir := filepath.Join(dir, "trace")
+		// Absolute: the runtime runs in the project, so a relative
+		// --out put the trace inside the project and left this
+		// directory empty — and the payload check reading it.
+		traceDir, err := filepath.Abs(filepath.Join(dir, "trace"))
+		if err != nil {
+			return result{}, err
+		}
 		if err := os.MkdirAll(traceDir, 0o700); err == nil {
 			override[r.Runtime.TraceEnv] = traceDir
 		}
