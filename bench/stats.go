@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/nlink-jp/lagent/internal/session"
@@ -19,7 +20,16 @@ type stats struct {
 	Prompt, Output, Cached int
 	// Answer is the last assistant text in the transcript.
 	Answer string
+	// ArgErrors counts tool results the fixture refused as invalid
+	// arguments (ADR-0028 §Acceptance) — the tickets persona opens every
+	// such refusal with argErrorMarker.
+	ArgErrors int
 }
+
+// argErrorMarker is bench/mcpfixture's ArgErrorMarker; the two packages
+// are separate commands, so the string is repeated and a test holds
+// them together.
+const argErrorMarker = "invalid arguments:"
 
 // transcriptStats reads a session file with the runtime's own scanner.
 // Only the envelope fields it needs are decoded; the record shapes are
@@ -38,6 +48,9 @@ func transcriptStats(path string) (stats, error) {
 			}
 			if err := json.Unmarshal(data, &m); err != nil {
 				return nil // a torn line is skipped, as Load does
+			}
+			if m.Role == "tool" && strings.Contains(m.Content, argErrorMarker) {
+				st.ArgErrors++
 			}
 			if m.Role != "assistant" {
 				return nil

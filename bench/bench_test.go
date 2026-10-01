@@ -179,6 +179,8 @@ func TestTranscriptStats(t *testing.T) {
 		`{"ts":"2026-09-12T00:00:02Z","kind":"usage","data":{"source":"main","prompt":100,"output":5,"cached":80}}`,
 		`{"ts":"2026-09-12T00:00:02Z","kind":"message","data":{"role":"assistant","tool_calls":[{"id":"1","name":"read_file","args":{}},{"id":"2","name":"read_file","args":{}}]}}`,
 		`{"ts":"2026-09-12T00:00:03Z","kind":"message","data":{"role":"tool","tool_name":"read_file","content":"x"}}`,
+		`{"ts":"2026-09-12T00:00:03Z","kind":"message","data":{"role":"tool","tool_name":"read_file","content":"error: invalid arguments: arguments.limit: want an integer"}}`,
+		`{"ts":"2026-09-12T00:00:03Z","kind":"message","data":{"role":"user","content":"invalid arguments: a user's words are not a refusal"}}`,
 		`{"ts":"2026-09-12T00:00:04Z","kind":"usage","data":{"source":"main","prompt":150,"output":7}}`,
 		`{"ts":"2026-09-12T00:00:04Z","kind":"message","data":{"role":"assistant","tool_calls":[{"id":"3","name":"edit_file","args":{}}]}}`,
 		`{"ts":"2026-09-12T00:00:05Z","kind":"usage","data":{"source":"risk","prompt":999,"output":1}}`,
@@ -199,20 +201,58 @@ func TestTranscriptStats(t *testing.T) {
 	if st.Answer != "done: 57" {
 		t.Errorf("answer: %q", st.Answer)
 	}
+	if st.ArgErrors != 1 {
+		t.Errorf("arg errors count tool results only: %d", st.ArgErrors)
+	}
+}
+
+// TestArgErrorMarkerMatchesFixture: the stats count the string the
+// fixture writes; the two are separate commands, so this holds them
+// together.
+func TestArgErrorMarkerMatchesFixture(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join("mcpfixture", "tickets.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(src), `ArgErrorMarker = "`+argErrorMarker+`"`) {
+		t.Errorf("bench/mcpfixture's ArgErrorMarker is not %q", argErrorMarker)
+	}
+}
+
+func TestWriteMCPConfigPersona(t *testing.T) {
+	dir := t.TempDir()
+	for _, c := range []struct{ persona, want string }{
+		{"", `{"mcpServers":{"geo":{"command":"/bin/fixture"}}}`},
+		{"tickets", `{"mcpServers":{"tickets":{"args":["tickets"],"command":"/bin/fixture"}}}`},
+	} {
+		path := filepath.Join(dir, "mcp-"+c.persona+".json")
+		if err := writeMCPConfig(path, "/bin/fixture", c.persona); err != nil {
+			t.Fatal(err)
+		}
+		data, _ := os.ReadFile(path)
+		var v any
+		if err := json.Unmarshal(data, &v); err != nil {
+			t.Fatal(err)
+		}
+		got, _ := json.Marshal(v)
+		if string(got) != c.want {
+			t.Errorf("persona %q: %s", c.persona, got)
+		}
+	}
 }
 
 func TestReportMediansAndRates(t *testing.T) {
 	results := []result{
-		{Task: "a", Config: "base", Completed: true, Rounds: 2, ToolCalls: 3, Prompt: 100, WallSec: 10},
+		{Task: "a", Config: "base", Completed: true, Rounds: 2, ToolCalls: 3, Prompt: 100, WallSec: 10, ArgErrors: 2},
 		{Task: "a", Config: "base", Completed: false, Rounds: 0, ToolCalls: 0, Prompt: 50, WallSec: 4},
-		{Task: "a", Config: "base", Completed: true, Rounds: 4, ToolCalls: 6, Prompt: 300, WallSec: 20},
+		{Task: "a", Config: "base", Completed: true, Rounds: 4, ToolCalls: 6, Prompt: 300, WallSec: 20, ArgErrors: 1},
 		{Task: "a", Config: "alt", Completed: true, Rounds: 1, ToolCalls: 1, Prompt: 80, WallSec: 6},
 	}
 	out := report(results)
-	if !strings.Contains(out, "| a | alt | 1 | 1/1 | 0/1 | 1 | 1 | 80 | 6 |") {
+	if !strings.Contains(out, "| a | alt | 1 | 1/1 | 0/1 | 0 | 1 | 1 | 80 | 6 |") {
 		t.Errorf("alt row:\n%s", out)
 	}
-	if !strings.Contains(out, "| a | base | 3 | 2/3 | 1/3 | 2 | 3 | 100 | 10 |") {
+	if !strings.Contains(out, "| a | base | 3 | 2/3 | 1/3 | 3 | 2 | 3 | 100 | 10 |") {
 		t.Errorf("base row (medians of 3):\n%s", out)
 	}
 	if m := median([]float64{4, 1, 3, 2}); m != 2.5 {

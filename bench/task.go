@@ -19,6 +19,10 @@ type task struct {
 	Dir    string `toml:"-"`
 	Prompt string `toml:"prompt"`
 	MCP    bool   `toml:"mcp"` // needs the bench MCP fixture server
+	// MCPServer picks the fixture's persona: "" is "geo" (one lookup
+	// tool), "tickets" the argument-discipline tracker (ADR-0028). The
+	// run's mcp.json names the server after the persona.
+	MCPServer string `toml:"mcp_server"`
 	// Suite keeps a task out of the default selection. An empty suite
 	// is the everyday set that `bench run` takes with no --tasks; a
 	// named one runs only when --tasks names the task or the suite.

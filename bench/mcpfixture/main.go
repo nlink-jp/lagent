@@ -1,8 +1,11 @@
-// Command bench-mcp is the bench's stdio MCP server (ADR-0006 §3): one
-// tool, lookup_ip, answering from a canned table, so the MCP task class
-// needs neither the network nor an operator's server. Protocol: JSON-RPC
-// over stdio, one message per line, the subset lagent's client speaks
-// (initialize, notifications/initialized, tools/list, tools/call).
+// Command bench-mcp is the bench's stdio MCP server (ADR-0006 §3),
+// answering from canned tables so the MCP task class needs neither the
+// network nor an operator's server. With no argument it is "geo": one
+// tool, lookup_ip. With the argument "tickets" it is a ticket tracker
+// whose schemas exercise argument discipline (ADR-0028 §Acceptance).
+// Protocol: JSON-RPC over stdio, one message per line, the subset
+// lagent's client speaks (initialize, notifications/initialized,
+// tools/list, tools/call).
 package main
 
 import (
@@ -14,7 +17,11 @@ import (
 )
 
 func main() {
-	if err := serve(os.Stdin, os.Stdout); err != nil {
+	h := handle
+	if len(os.Args) > 1 && os.Args[1] == "tickets" {
+		h = handleTickets
+	}
+	if err := serveWith(os.Stdin, os.Stdout, h); err != nil {
 		fmt.Fprintln(os.Stderr, "bench-mcp:", err)
 		os.Exit(1)
 	}
@@ -36,6 +43,12 @@ var records = map[string]map[string]any{
 const instructions = "Answers where an IP address is located: call lookup_ip with the address and read country, asn and org from the result."
 
 func serve(in io.Reader, out io.Writer) error {
+	return serveWith(in, out, handle)
+}
+
+// serveWith answers each request line with h; notifications and noise
+// get no reply.
+func serveWith(in io.Reader, out io.Writer, h func(request) map[string]any) error {
 	sc := bufio.NewScanner(in)
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	w := bufio.NewWriter(out)
@@ -48,7 +61,7 @@ func serve(in io.Reader, out io.Writer) error {
 		if err := json.Unmarshal(line, &req); err != nil || req.ID == nil {
 			continue // a notification, or noise
 		}
-		resp := handle(req)
+		resp := h(req)
 		data, err := json.Marshal(resp)
 		if err != nil {
 			return err

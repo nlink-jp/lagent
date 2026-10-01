@@ -24,7 +24,7 @@ go run ./bench report bench/_results/<timestamp>
 | `--reps` | タスク×構成ごとの反復数（既定 3） |
 | `--timeout` | 実行ごとの期限（既定 10m）。超えた実行は timed out として記録し、ベンチは次へ進む |
 | `--out` | 結果ディレクトリ（既定 `bench/_results/<timestamp>`、git は無視） |
-| `--mcp-bin` | `mcp-lookup` タスク用のフィクスチャ MCP サーバ（既定 `dist/bench-mcp`） |
+| `--mcp-bin` | フィクスチャ MCP サーバ（既定 `dist/bench-mcp`）: `mcp-lookup` タスクでは `geo`、`mcp_server = "tickets"` のタスクでは `tickets` として動く |
 
 順序: ケースを外側、構成を内側 — タスクと反復ごとに全構成を連続で走らせる
 ので、サーバの状態（キャッシュ、負荷）の揺れは全構成に等しく当たる。実行が
@@ -153,6 +153,26 @@ go run ./bench report bench/_results/<timestamp>
 先のスイープは 3 回中 1 回の従属で、ここでは 7 回中 6 回である。同じモデルの同じ
 タスクである。
 
+### mcp-load スイート
+
+`suite = "mcp-load"` と `mcp_server = "tickets"` を持つ 6 タスク。ADR-0028 の問い —
+サーバのスキーマを文として与えられたモデル（`[mcp].load_into = "conversation"`）は、
+ツール一覧で与えられたモデルと同じ正確さでツールを呼べるか — のためにある。
+フィクスチャの `tickets` 役はチケット管理で、9 つのツールのスキーマには必須と任意の
+項目、列挙値、範囲付きの整数、配列、入れ子のオブジェクト、日付が混ざり、厳密に
+検証される。断るときは必ず `invalid arguments:` で始まり、ランナーはそれを
+`arg_errors` として数える。作成と状態変更は引数そのものから導いた id を返すので、
+正しい呼び出しだけが答えに届く。
+
+| タスク | 正しい呼び出しに要るもの | 完了の条件 |
+|---|---|---|
+| `mcp-tk-list` | 列挙値の絞り込み・並び順・件数を付けた `list_tickets` | 答えが `ALPHA-17` と `ALPHA-12` を挙げる |
+| `mcp-tk-search` | `list_tickets` ではなく `search_tickets`、日付は `YYYY-MM-DD` | 答えが `BETA-8` と `BETA-11` を挙げる |
+| `mcp-tk-bulk` | 配列を渡す `get_tickets` | 答えが 3 人の担当者を挙げる |
+| `mcp-tk-create` | 入れ子の `fields` オブジェクト・ラベルの配列・日付を付けた `create_ticket` | 答えが `BETA-606` |
+| `mcp-tk-close` | 閉じるときに必須になる resolution を付けた `update_status` | 答えが `EV-4199` |
+| `mcp-tk-late` | 34 KB のログを読んだ後の `mcp-tk-list` の呼び出し（読み込みが遅く来る） | 答えが `ALPHA-17` と `ALPHA-12` を挙げる |
+
 ## 計測するもの
 
 実行ごとに、ランタイム自身のスキャナでセッション transcript から読む:
@@ -163,8 +183,9 @@ go run ./bench report bench/_results/<timestamp>
 home、project が残る。
 
 `bench report` はタスク×構成ごとに Markdown 1 行を出す: 実行数、完了数、
-no-tool answers（ツールを呼ばずに答えた実行）、ラウンド数・ツール呼び出し数・
-prompt トークン・壁時計秒の中央値。
+no-tool answers（ツールを呼ばずに答えた実行）、arg errors（フィクスチャが
+`invalid arguments:` で断ったツール結果を実行全体で合計したもの）、ラウンド数・
+ツール呼び出し数・prompt トークン・壁時計秒の中央値。
 
 ## 計測結果
 

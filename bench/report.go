@@ -31,12 +31,12 @@ func report(results []result) string {
 	sort.Strings(order)
 
 	var b strings.Builder
-	b.WriteString("| task | config | runs | completed | no-tool answers | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |\n")
-	b.WriteString("|---|---|---|---|---|---|---|---|---|\n")
+	b.WriteString("| task | config | runs | completed | no-tool answers | arg errors | rounds (med) | calls (med) | prompt tok (med) | wall s (med) |\n")
+	b.WriteString("|---|---|---|---|---|---|---|---|---|---|\n")
 	for _, key := range order {
 		g := groups[key]
 		n := len(g.Runs)
-		completed, noTool := 0, 0
+		completed, noTool, argErrors := 0, 0, 0
 		var rounds, calls, prompt, wall []float64
 		for _, r := range g.Runs {
 			if r.Completed {
@@ -45,16 +45,18 @@ func report(results []result) string {
 			if r.ToolCalls == 0 {
 				noTool++
 			}
+			argErrors += r.ArgErrors
 			rounds = append(rounds, float64(r.Rounds))
 			calls = append(calls, float64(r.ToolCalls))
 			prompt = append(prompt, float64(r.Prompt))
 			wall = append(wall, r.WallSec)
 		}
-		fmt.Fprintf(&b, "| %s | %s | %d | %d/%d | %d/%d | %.0f | %.0f | %.0f | %.0f |\n",
-			g.Task, g.Config, n, completed, n, noTool, n,
+		fmt.Fprintf(&b, "| %s | %s | %d | %d/%d | %d/%d | %d | %.0f | %.0f | %.0f | %.0f |\n",
+			g.Task, g.Config, n, completed, n, noTool, n, argErrors,
 			median(rounds), median(calls), median(prompt), median(wall))
 	}
 	b.WriteString("\nno-tool answers: runs where the model replied without calling any tool.\n")
+	b.WriteString("arg errors: tool results the MCP fixture refused as invalid arguments, summed over the runs.\n")
 	b.WriteString("Failures per run are in runs.jsonl (`failures`); stdout/stderr and the transcript sit beside each run.\n")
 	return b.String()
 }

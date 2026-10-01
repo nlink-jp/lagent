@@ -1,0 +1,10 @@
+prompt = "Read notes.md in this directory, then do the follow-up it asks the on-call to do, using the tickets MCP server. Answer with the ticket ids the follow-up asks for."
+mcp = true
+mcp_server = "tickets"
+suite = "mcp-load"
+[expect]
+min_tool_calls = 2
+[[expect.answer]]
+regex = 'ALPHA-17\b'
+[[expect.answer]]
+regex = 'ALPHA-12\b'

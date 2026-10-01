@@ -41,6 +41,7 @@ type result struct {
 	Rounds     int            `json:"rounds"`
 	ToolCalls  int            `json:"tool_calls"`
 	ByTool     map[string]int `json:"by_tool"`
+	ArgErrors  int            `json:"arg_errors"`
 	Prompt     int            `json:"prompt_tokens"`
 	Output     int            `json:"output_tokens"`
 	Cached     int            `json:"cached_tokens"`
@@ -95,7 +96,7 @@ func (r *runner) runOne(c cell) (result, error) {
 		return result{}, fmt.Errorf("configuration %s: %w", c.Config.Name, err)
 	}
 	if c.Task.MCP {
-		if err := writeMCPConfig(filepath.Join(cfgDir, "mcp.json"), r.MCPBin); err != nil {
+		if err := writeMCPConfig(filepath.Join(cfgDir, "mcp.json"), r.MCPBin, c.Task.MCPServer); err != nil {
 			return result{}, err
 		}
 	}
@@ -207,6 +208,7 @@ func (r *runner) runOne(c cell) (result, error) {
 			return result{}, serr
 		}
 		res.Rounds, res.ToolCalls, res.ByTool = st.Rounds, st.ToolCalls, st.ByTool
+		res.ArgErrors = st.ArgErrors
 		res.Prompt, res.Output, res.Cached = st.Prompt, st.Output, st.Cached
 		res.Answer = st.Answer
 	}
@@ -255,11 +257,16 @@ func isolatedEnv(parent []string, override map[string]string) []string {
 }
 
 // writeMCPConfig points the run's global mcp.json at the bench fixture
-// server, as the server "geo".
-func writeMCPConfig(path, mcpBin string) error {
-	cfg := map[string]any{"mcpServers": map[string]any{
-		"geo": map[string]any{"command": mcpBin},
-	}}
+// server: as "geo" by default, or as the persona a task names, which the
+// fixture takes as its argument.
+func writeMCPConfig(path, mcpBin, persona string) error {
+	server := map[string]any{"command": mcpBin}
+	name := "geo"
+	if persona != "" {
+		name = persona
+		server["args"] = []string{persona}
+	}
+	cfg := map[string]any{"mcpServers": map[string]any{name: server}}
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err

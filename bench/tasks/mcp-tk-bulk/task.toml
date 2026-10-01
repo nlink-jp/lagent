@@ -1,0 +1,12 @@
+prompt = "Using the tickets MCP server, fetch tickets ALPHA-3, BETA-8 and ALPHA-17 in a single call and tell me who each one is assigned to."
+mcp = true
+mcp_server = "tickets"
+suite = "mcp-load"
+[expect]
+min_tool_calls = 2
+[[expect.answer]]
+regex = '(?i)kato'
+[[expect.answer]]
+regex = '(?i)ueda'
+[[expect.answer]]
+regex = '(?i)mori'

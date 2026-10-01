@@ -263,7 +263,7 @@ internal/termimg/  inline images in a DECLARED box (ADR-0020): capability
                    model's show_image, or the operator's /show (ADR-0022,
                    which withdrew the MCP intake as the source)
 bench/             the task bench (ADR-0006): runner + report (package main), configs/<runtime>/*.toml,
-                   tasks/<name>/{task.toml,testdata/}, mcpfixture/ (the stdio MCP fixture server);
+                   tasks/<name>/{task.toml,testdata/}, mcpfixture/ (the stdio MCP fixture server: "geo", or "tickets" for the mcp-load suite);
                    _results/ is ignored by git (and by go's ./..., which is why the underscore)
 scripts/           codesign-darwin.sh / notarize-darwin.sh (org templates, verbatim),
                    docs-mirror-check.sh, verify-release-selftest.sh (make check)

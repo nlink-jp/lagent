@@ -25,7 +25,7 @@ is about two minutes on the reference machine).
 | `--reps` | repetitions per task and configuration (default 3) |
 | `--timeout` | deadline per run (default 10m); a run past it is recorded as timed out and the bench moves on |
 | `--out` | results directory (default `bench/_results/<timestamp>`, ignored by git) |
-| `--mcp-bin` | the fixture MCP server for the `mcp-lookup` task (default `dist/bench-mcp`) |
+| `--mcp-bin` | the fixture MCP server (default `dist/bench-mcp`): as `geo` for the `mcp-lookup` task, as `tickets` for a task with `mcp_server = "tickets"` |
 
 Order: cases outside, configurations inside — for each task and
 repetition, every configuration runs back to back, so the server's
@@ -173,6 +173,28 @@ One more reason not to quote a rate from this layer: an earlier sweep of
 the current level at three repetitions scored 1 obeyed in 3, against 6
 in 7 here. Both are the same task on the same model.
 
+### The mcp-load suite
+
+Six tasks carrying `suite = "mcp-load"` and `mcp_server = "tickets"`,
+for ADR-0028's question: does a model given a server's schemas as text
+(`[mcp].load_into = "conversation"`) call its tools as accurately as one
+given them in the tool list? The fixture's `tickets` persona is a ticket
+tracker of nine tools whose schemas mix required and optional fields,
+enums, bounded integers, arrays, a nested object and dates, validated
+strictly; every refusal opens with `invalid arguments:`, which the
+runner counts as `arg_errors`. A create or a status change returns an id
+derived from the exact arguments, so only the right call reaches the
+answer.
+
+| Task | The right call needs | Completed when |
+|---|---|---|
+| `mcp-tk-list` | `list_tickets` with an enum filter, a sort and a limit | the answer names `ALPHA-17` and `ALPHA-12` |
+| `mcp-tk-search` | `search_tickets`, not `list_tickets`, with a date written `YYYY-MM-DD` | the answer names `BETA-8` and `BETA-11` |
+| `mcp-tk-bulk` | `get_tickets` with an array | the answer names the three assignees |
+| `mcp-tk-create` | `create_ticket` with the nested `fields` object, a label array and a date | the answer is `BETA-606` |
+| `mcp-tk-close` | `update_status` with the resolution closing requires | the answer is `EV-4199` |
+| `mcp-tk-late` | `mcp-tk-list`'s call after reading a 34 KB log, so the load comes late | the answer names `ALPHA-17` and `ALPHA-12` |
+
 ## What is measured
 
 Per run, read from the session transcript with the runtime's own
@@ -184,8 +206,9 @@ keeps its `stdout.txt`, `stderr.txt`, transcript, home and project.
 
 `bench report` prints one Markdown row per task and configuration:
 runs, completed, no-tool answers (the model replied without calling a
-tool), and the medians of rounds, tool calls, prompt tokens and wall
-seconds.
+tool), arg errors (tool results the fixture refused as `invalid arguments:`,
+summed over the runs), and the medians of rounds, tool calls, prompt
+tokens and wall seconds.
 
 ## Measurements
 

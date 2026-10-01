@@ -1,0 +1,8 @@
+prompt = "Using the tickets MCP server, close ticket ALPHA-12 as a duplicate. Answer with the event id the server returns."
+mcp = true
+mcp_server = "tickets"
+suite = "mcp-load"
+[expect]
+min_tool_calls = 2
+[[expect.answer]]
+regex = 'EV-4199\b'

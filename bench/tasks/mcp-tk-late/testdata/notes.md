@@ -1,0 +1,429 @@
+# On-call log — week 39
+
+Hand-over notes from the platform rotation. Each line is one event: time, service, what happened, what was done.
+
+- 2026-09-22 00:00 [search] queue depth reached 695 — fixed by config reload.
+- 2026-09-22 00:07 [webhooks] disk usage at 417% — paged the owner.
+- 2026-09-22 00:14 [auth] certificate expires in 326 days — escalated to the platform team.
+- 2026-09-22 00:21 [reports] connection pool exhausted (754 waiting) — opened a war room.
+- 2026-09-22 01:28 [storage] latency p99 rose to 899 ms — no action, within budget.
+- 2026-09-22 01:35 [mailer] cache hit ratio fell to 389% — paged the owner.
+- 2026-09-22 01:42 [billing] GC pause 651 ms — acknowledged, watching.
+- 2026-09-22 01:49 [billing] deploy 659 rolled out — rolled back.
+- 2026-09-22 02:56 [gateway] disk usage at 79% — rolled back.
+- 2026-09-22 02:03 [scheduler] connection pool exhausted (466 waiting) — opened a war room.
+- 2026-09-22 02:10 [reports] disk usage at 496% — no action, within budget.
+- 2026-09-22 03:17 [scheduler] certificate expires in 837 days — muted for 30 minutes.
+- 2026-09-22 03:24 [export] queue depth reached 394 — acknowledged, watching.
+- 2026-09-22 03:31 [export] connection pool exhausted (830 waiting) — escalated to the platform team.
+- 2026-09-22 03:38 [auth] disk usage at 10% — rolled back.
+- 2026-09-22 04:45 [webhooks] retry storm: 49 retries/min — left a note for the day shift.
+- 2026-09-22 04:52 [gateway] GC pause 204 ms — no action, within budget.
+- 2026-09-22 04:59 [mailer] cache hit ratio fell to 348% — opened a war room.
+- 2026-09-22 05:06 [search] retry storm: 460 retries/min — muted for 30 minutes.
+- 2026-09-22 05:13 [search] certificate expires in 66 days — paged the owner.
+- 2026-09-22 05:20 [gateway] error rate 140% for 4 minutes — fixed by config reload.
+- 2026-09-22 05:27 [export] latency p99 rose to 132 ms — acknowledged, watching.
+- 2026-09-22 06:34 [billing] GC pause 943 ms — escalated to the platform team.
+- 2026-09-22 06:41 [billing] queue depth reached 417 — scaled out by two nodes.
+- 2026-09-22 06:48 [auth] retry storm: 480 retries/min — acknowledged, watching.
+- 2026-09-22 07:55 [search] retry storm: 451 retries/min — left a note for the day shift.
+- 2026-09-22 07:02 [search] connection pool exhausted (566 waiting) — muted for 30 minutes.
+- 2026-09-22 07:09 [scheduler] retry storm: 266 retries/min — opened a war room.
+- 2026-09-22 07:16 [storage] retry storm: 752 retries/min — muted for 30 minutes.
+- 2026-09-22 08:23 [scheduler] GC pause 355 ms — acknowledged, watching.
+- 2026-09-22 08:30 [search] GC pause 733 ms — fixed by config reload.
+- 2026-09-22 08:37 [gateway] certificate expires in 473 days — opened a war room.
+- 2026-09-22 09:44 [reports] deploy 418 rolled out — no action, within budget.
+- 2026-09-22 09:51 [search] error rate 719% for 4 minutes — muted for 30 minutes.
+- 2026-09-22 09:58 [billing] connection pool exhausted (833 waiting) — muted for 30 minutes.
+- 2026-09-22 09:05 [scheduler] latency p99 rose to 631 ms — rolled back.
+- 2026-09-22 10:12 [gateway] GC pause 716 ms — escalated to the platform team.
+- 2026-09-22 10:19 [auth] certificate expires in 114 days — scaled out by two nodes.
+- 2026-09-22 10:26 [auth] retry storm: 907 retries/min — rolled back.
+- 2026-09-22 11:33 [webhooks] retry storm: 830 retries/min — no action, within budget.
+- 2026-09-22 11:40 [scheduler] cache hit ratio fell to 653% — left a note for the day shift.
+- 2026-09-22 11:47 [scheduler] disk usage at 852% — muted for 30 minutes.
+- 2026-09-22 11:54 [gateway] certificate expires in 683 days — paged the owner.
+- 2026-09-22 12:01 [webhooks] queue depth reached 789 — scaled out by two nodes.
+- 2026-09-22 12:08 [webhooks] queue depth reached 325 — left a note for the day shift.
+- 2026-09-22 12:15 [storage] cache hit ratio fell to 412% — left a note for the day shift.
+- 2026-09-22 13:22 [search] queue depth reached 347 — muted for 30 minutes.
+- 2026-09-22 13:29 [auth] deploy 709 rolled out — opened a war room.
+- 2026-09-22 13:36 [search] retry storm: 403 retries/min — fixed by config reload.
+- 2026-09-22 13:43 [billing] cache hit ratio fell to 612% — opened a war room.
+- 2026-09-22 14:50 [billing] latency p99 rose to 56 ms — muted for 30 minutes.
+- 2026-09-22 14:57 [webhooks] queue depth reached 254 — escalated to the platform team.
+- 2026-09-22 14:04 [reports] disk usage at 717% — no action, within budget.
+- 2026-09-22 15:11 [mailer] GC pause 754 ms — left a note for the day shift.
+- 2026-09-22 15:18 [webhooks] retry storm: 628 retries/min — opened a war room.
+- 2026-09-22 15:25 [auth] cache hit ratio fell to 469% — fixed by config reload.
+- 2026-09-22 15:32 [auth] latency p99 rose to 509 ms — escalated to the platform team.
+- 2026-09-22 16:39 [auth] cache hit ratio fell to 550% — acknowledged, watching.
+- 2026-09-22 16:46 [webhooks] connection pool exhausted (956 waiting) — acknowledged, watching.
+- 2026-09-22 16:53 [scheduler] disk usage at 935% — muted for 30 minutes.
+- 2026-09-22 17:00 [scheduler] certificate expires in 732 days — escalated to the platform team.
+- 2026-09-22 17:07 [search] disk usage at 384% — acknowledged, watching.
+- 2026-09-22 17:14 [gateway] connection pool exhausted (932 waiting) — scaled out by two nodes.
+- 2026-09-22 17:21 [billing] certificate expires in 885 days — left a note for the day shift.
+- 2026-09-22 18:28 [scheduler] disk usage at 247% — acknowledged, watching.
+- 2026-09-22 18:35 [webhooks] retry storm: 539 retries/min — scaled out by two nodes.
+- 2026-09-22 18:42 [reports] error rate 44% for 4 minutes — fixed by config reload.
+- 2026-09-22 18:49 [mailer] error rate 699% for 4 minutes — muted for 30 minutes.
+- 2026-09-22 19:56 [gateway] certificate expires in 874 days — opened a war room.
+- 2026-09-22 19:03 [auth] connection pool exhausted (602 waiting) — escalated to the platform team.
+- 2026-09-22 19:10 [webhooks] disk usage at 71% — rolled back.
+- 2026-09-22 20:17 [mailer] disk usage at 494% — acknowledged, watching.
+- 2026-09-22 20:24 [storage] disk usage at 371% — rolled back.
+- 2026-09-22 20:31 [storage] queue depth reached 153 — acknowledged, watching.
+- 2026-09-22 20:38 [gateway] GC pause 307 ms — no action, within budget.
+- 2026-09-22 21:45 [scheduler] latency p99 rose to 856 ms — paged the owner.
+- 2026-09-22 21:52 [scheduler] certificate expires in 20 days — scaled out by two nodes.
+- 2026-09-22 21:59 [reports] connection pool exhausted (941 waiting) — opened a war room.
+- 2026-09-22 22:06 [webhooks] certificate expires in 378 days — acknowledged, watching.
+- 2026-09-22 22:13 [mailer] deploy 471 rolled out — scaled out by two nodes.
+- 2026-09-22 22:20 [reports] retry storm: 888 retries/min — acknowledged, watching.
+- 2026-09-22 22:27 [storage] cache hit ratio fell to 251% — no action, within budget.
+- 2026-09-22 23:34 [reports] error rate 63% for 4 minutes — fixed by config reload.
+- 2026-09-22 23:41 [storage] certificate expires in 813 days — left a note for the day shift.
+- 2026-09-23 00:48 [gateway] retry storm: 978 retries/min — muted for 30 minutes.
+- 2026-09-23 00:55 [storage] disk usage at 888% — paged the owner.
+- 2026-09-23 00:02 [auth] queue depth reached 402 — acknowledged, watching.
+- 2026-09-23 00:09 [storage] GC pause 395 ms — scaled out by two nodes.
+- 2026-09-23 01:16 [storage] deploy 927 rolled out — left a note for the day shift.
+- 2026-09-23 01:23 [gateway] certificate expires in 690 days — fixed by config reload.
+- 2026-09-23 01:30 [billing] GC pause 82 ms — opened a war room.
+- 2026-09-23 01:37 [reports] GC pause 344 ms — acknowledged, watching.
+- 2026-09-23 02:44 [gateway] error rate 434% for 4 minutes — muted for 30 minutes.
+- 2026-09-23 02:51 [storage] deploy 34 rolled out — no action, within budget.
+- 2026-09-23 02:58 [gateway] GC pause 492 ms — rolled back.
+- 2026-09-23 03:05 [scheduler] cache hit ratio fell to 223% — scaled out by two nodes.
+- 2026-09-23 03:12 [webhooks] connection pool exhausted (556 waiting) — opened a war room.
+- 2026-09-23 03:19 [mailer] error rate 488% for 4 minutes — acknowledged, watching.
+- 2026-09-23 03:26 [reports] cache hit ratio fell to 768% — paged the owner.
+- 2026-09-23 04:33 [auth] retry storm: 667 retries/min — muted for 30 minutes.
+- 2026-09-23 04:40 [search] retry storm: 541 retries/min — acknowledged, watching.
+- 2026-09-23 04:47 [billing] connection pool exhausted (721 waiting) — no action, within budget.
+- 2026-09-23 05:54 [search] error rate 507% for 4 minutes — scaled out by two nodes.
+- 2026-09-23 05:01 [auth] connection pool exhausted (167 waiting) — left a note for the day shift.
+- 2026-09-23 05:08 [gateway] deploy 113 rolled out — left a note for the day shift.
+- 2026-09-23 05:15 [billing] error rate 644% for 4 minutes — opened a war room.
+- 2026-09-23 06:22 [reports] certificate expires in 331 days — acknowledged, watching.
+- 2026-09-23 06:29 [mailer] GC pause 456 ms — opened a war room.
+- 2026-09-23 06:36 [auth] certificate expires in 143 days — acknowledged, watching.
+- 2026-09-23 07:43 [search] certificate expires in 642 days — opened a war room.
+- 2026-09-23 07:50 [export] queue depth reached 362 — paged the owner.
+- 2026-09-23 07:57 [reports] disk usage at 596% — left a note for the day shift.
+- 2026-09-23 07:04 [storage] connection pool exhausted (595 waiting) — left a note for the day shift.
+- 2026-09-23 08:11 [scheduler] retry storm: 46 retries/min — fixed by config reload.
+- 2026-09-23 08:18 [export] disk usage at 559% — no action, within budget.
+- 2026-09-23 08:25 [search] latency p99 rose to 544 ms — left a note for the day shift.
+- 2026-09-23 09:32 [export] disk usage at 163% — scaled out by two nodes.
+- 2026-09-23 09:39 [billing] queue depth reached 939 — escalated to the platform team.
+- 2026-09-23 09:46 [export] certificate expires in 815 days — scaled out by two nodes.
+- 2026-09-23 09:53 [mailer] cache hit ratio fell to 405% — fixed by config reload.
+- 2026-09-23 10:00 [reports] error rate 159% for 4 minutes — no action, within budget.
+- 2026-09-23 10:07 [export] retry storm: 908 retries/min — scaled out by two nodes.
+- 2026-09-23 10:14 [storage] disk usage at 674% — opened a war room.
+- 2026-09-23 11:21 [auth] queue depth reached 407 — paged the owner.
+- 2026-09-23 11:28 [storage] certificate expires in 44 days — fixed by config reload.
+- 2026-09-23 11:35 [scheduler] connection pool exhausted (78 waiting) — scaled out by two nodes.
+- 2026-09-23 11:42 [reports] certificate expires in 540 days — left a note for the day shift.
+- 2026-09-23 12:49 [auth] cache hit ratio fell to 619% — paged the owner.
+- 2026-09-23 12:56 [scheduler] error rate 598% for 4 minutes — left a note for the day shift.
+- 2026-09-23 12:03 [webhooks] retry storm: 909 retries/min — opened a war room.
+- 2026-09-23 13:10 [mailer] connection pool exhausted (413 waiting) — rolled back.
+- 2026-09-23 13:17 [mailer] deploy 746 rolled out — fixed by config reload.
+- 2026-09-23 13:24 [mailer] certificate expires in 125 days — no action, within budget.
+- 2026-09-23 13:31 [search] cache hit ratio fell to 228% — paged the owner.
+- 2026-09-23 14:38 [webhooks] latency p99 rose to 247 ms — scaled out by two nodes.
+- 2026-09-23 14:45 [auth] latency p99 rose to 266 ms — left a note for the day shift.
+- 2026-09-23 14:52 [reports] cache hit ratio fell to 93% — scaled out by two nodes.
+- 2026-09-23 15:59 [search] GC pause 863 ms — opened a war room.
+- 2026-09-23 15:06 [reports] retry storm: 336 retries/min — no action, within budget.
+- 2026-09-23 15:13 [billing] connection pool exhausted (939 waiting) — muted for 30 minutes.
+- 2026-09-23 15:20 [export] queue depth reached 881 — acknowledged, watching.
+- 2026-09-23 16:27 [storage] deploy 441 rolled out — fixed by config reload.
+- 2026-09-23 16:34 [gateway] retry storm: 329 retries/min — rolled back.
+- 2026-09-23 16:41 [export] latency p99 rose to 12 ms — escalated to the platform team.
+- 2026-09-23 17:48 [gateway] queue depth reached 552 — paged the owner.
+- 2026-09-23 17:55 [gateway] latency p99 rose to 60 ms — paged the owner.
+- 2026-09-23 17:02 [storage] cache hit ratio fell to 352% — paged the owner.
+- 2026-09-23 17:09 [webhooks] queue depth reached 667 — paged the owner.
+- 2026-09-23 18:16 [search] connection pool exhausted (780 waiting) — opened a war room.
+- 2026-09-23 18:23 [webhooks] retry storm: 131 retries/min — muted for 30 minutes.
+- 2026-09-23 18:30 [gateway] certificate expires in 554 days — no action, within budget.
+- 2026-09-23 18:37 [webhooks] queue depth reached 171 — rolled back.
+- 2026-09-23 19:44 [storage] cache hit ratio fell to 389% — escalated to the platform team.
+- 2026-09-23 19:51 [storage] latency p99 rose to 18 ms — fixed by config reload.
+- 2026-09-23 19:58 [export] GC pause 555 ms — opened a war room.
+- 2026-09-23 20:05 [billing] cache hit ratio fell to 416% — fixed by config reload.
+- 2026-09-23 20:12 [scheduler] queue depth reached 428 — escalated to the platform team.
+- 2026-09-23 20:19 [storage] cache hit ratio fell to 638% — no action, within budget.
+- 2026-09-23 20:26 [scheduler] disk usage at 964% — scaled out by two nodes.
+- 2026-09-23 21:33 [mailer] latency p99 rose to 32 ms — no action, within budget.
+- 2026-09-23 21:40 [gateway] error rate 762% for 4 minutes — muted for 30 minutes.
+- 2026-09-23 21:47 [scheduler] cache hit ratio fell to 76% — acknowledged, watching.
+- 2026-09-23 22:54 [webhooks] retry storm: 301 retries/min — acknowledged, watching.
+- 2026-09-23 22:01 [storage] error rate 515% for 4 minutes — fixed by config reload.
+- 2026-09-23 22:08 [export] error rate 750% for 4 minutes — paged the owner.
+- 2026-09-23 22:15 [billing] certificate expires in 232 days — scaled out by two nodes.
+- 2026-09-23 23:22 [reports] disk usage at 936% — scaled out by two nodes.
+- 2026-09-23 23:29 [export] GC pause 32 ms — fixed by config reload.
+- 2026-09-24 00:36 [mailer] deploy 205 rolled out — paged the owner.
+- 2026-09-24 00:43 [scheduler] latency p99 rose to 661 ms — scaled out by two nodes.
+- 2026-09-24 00:50 [auth] cache hit ratio fell to 226% — fixed by config reload.
+- 2026-09-24 00:57 [reports] cache hit ratio fell to 921% — opened a war room.
+- 2026-09-24 01:04 [auth] certificate expires in 624 days — scaled out by two nodes.
+- 2026-09-24 01:11 [auth] queue depth reached 332 — no action, within budget.
+- 2026-09-24 01:18 [gateway] latency p99 rose to 787 ms — rolled back.
+- 2026-09-24 01:25 [gateway] cache hit ratio fell to 361% — acknowledged, watching.
+- 2026-09-24 02:32 [storage] deploy 156 rolled out — no action, within budget.
+- 2026-09-24 02:39 [export] queue depth reached 261 — acknowledged, watching.
+- 2026-09-24 02:46 [auth] error rate 291% for 4 minutes — no action, within budget.
+- 2026-09-24 03:53 [storage] deploy 59 rolled out — opened a war room.
+- 2026-09-24 03:00 [gateway] queue depth reached 644 — muted for 30 minutes.
+- 2026-09-24 03:07 [billing] retry storm: 892 retries/min — rolled back.
+- 2026-09-24 03:14 [search] latency p99 rose to 355 ms — acknowledged, watching.
+- 2026-09-24 04:21 [billing] connection pool exhausted (190 waiting) — opened a war room.
+- 2026-09-24 04:28 [scheduler] error rate 253% for 4 minutes — paged the owner.
+- 2026-09-24 04:35 [scheduler] GC pause 45 ms — opened a war room.
+- 2026-09-24 05:42 [storage] retry storm: 972 retries/min — rolled back.
+- 2026-09-24 05:49 [auth] GC pause 351 ms — scaled out by two nodes.
+- 2026-09-24 05:56 [billing] latency p99 rose to 602 ms — muted for 30 minutes.
+- 2026-09-24 05:03 [mailer] disk usage at 709% — left a note for the day shift.
+- 2026-09-24 06:10 [billing] connection pool exhausted (975 waiting) — paged the owner.
+- 2026-09-24 06:17 [search] certificate expires in 393 days — rolled back.
+- 2026-09-24 06:24 [storage] disk usage at 224% — acknowledged, watching.
+- 2026-09-24 07:31 [billing] cache hit ratio fell to 835% — scaled out by two nodes.
+- 2026-09-24 07:38 [gateway] retry storm: 488 retries/min — fixed by config reload.
+- 2026-09-24 07:45 [search] error rate 286% for 4 minutes — paged the owner.
+- 2026-09-24 07:52 [auth] deploy 637 rolled out — rolled back.
+- 2026-09-24 08:59 [mailer] GC pause 511 ms — escalated to the platform team.
+- 2026-09-24 08:06 [storage] disk usage at 112% — escalated to the platform team.
+- 2026-09-24 08:13 [search] GC pause 886 ms — escalated to the platform team.
+- 2026-09-24 09:20 [scheduler] connection pool exhausted (547 waiting) — fixed by config reload.
+- 2026-09-24 09:27 [mailer] latency p99 rose to 410 ms — fixed by config reload.
+- 2026-09-24 09:34 [reports] retry storm: 46 retries/min — escalated to the platform team.
+- 2026-09-24 09:41 [gateway] cache hit ratio fell to 173% — opened a war room.
+- 2026-09-24 10:48 [auth] error rate 363% for 4 minutes — escalated to the platform team.
+- 2026-09-24 10:55 [webhooks] retry storm: 790 retries/min — rolled back.
+- 2026-09-24 10:02 [export] error rate 235% for 4 minutes — acknowledged, watching.
+- 2026-09-24 11:09 [search] connection pool exhausted (212 waiting) — fixed by config reload.
+- 2026-09-24 11:16 [reports] GC pause 858 ms — no action, within budget.
+- 2026-09-24 11:23 [billing] cache hit ratio fell to 392% — paged the owner.
+- 2026-09-24 11:30 [webhooks] deploy 570 rolled out — opened a war room.
+- 2026-09-24 12:37 [storage] queue depth reached 78 — muted for 30 minutes.
+- 2026-09-24 12:44 [scheduler] GC pause 533 ms — rolled back.
+- 2026-09-24 12:51 [webhooks] deploy 880 rolled out — muted for 30 minutes.
+- 2026-09-24 13:58 [export] latency p99 rose to 465 ms — left a note for the day shift.
+- 2026-09-24 13:05 [search] certificate expires in 567 days — rolled back.
+- 2026-09-24 13:12 [webhooks] GC pause 54 ms — fixed by config reload.
+- 2026-09-24 13:19 [billing] error rate 667% for 4 minutes — escalated to the platform team.
+- 2026-09-24 14:26 [storage] error rate 88% for 4 minutes — paged the owner.
+- 2026-09-24 14:33 [search] certificate expires in 685 days — opened a war room.
+- 2026-09-24 14:40 [storage] queue depth reached 816 — acknowledged, watching.
+- 2026-09-24 15:47 [search] cache hit ratio fell to 108% — escalated to the platform team.
+- 2026-09-24 15:54 [mailer] error rate 646% for 4 minutes — escalated to the platform team.
+- 2026-09-24 15:01 [export] retry storm: 520 retries/min — fixed by config reload.
+- 2026-09-24 15:08 [billing] retry storm: 323 retries/min — muted for 30 minutes.
+- 2026-09-24 16:15 [scheduler] disk usage at 945% — no action, within budget.
+- 2026-09-24 16:22 [gateway] latency p99 rose to 270 ms — no action, within budget.
+- 2026-09-24 16:29 [reports] GC pause 582 ms — scaled out by two nodes.
+- 2026-09-24 17:36 [export] latency p99 rose to 613 ms — acknowledged, watching.
+- 2026-09-24 17:43 [search] disk usage at 84% — opened a war room.
+- 2026-09-24 17:50 [storage] disk usage at 764% — muted for 30 minutes.
+- 2026-09-24 17:57 [export] GC pause 252 ms — muted for 30 minutes.
+- 2026-09-24 18:04 [reports] retry storm: 746 retries/min — opened a war room.
+- 2026-09-24 18:11 [reports] queue depth reached 494 — opened a war room.
+- 2026-09-24 18:18 [billing] cache hit ratio fell to 884% — rolled back.
+- 2026-09-24 18:25 [scheduler] latency p99 rose to 372 ms — no action, within budget.
+- 2026-09-24 19:32 [scheduler] queue depth reached 175 — muted for 30 minutes.
+- 2026-09-24 19:39 [auth] queue depth reached 888 — rolled back.
+- 2026-09-24 19:46 [auth] queue depth reached 150 — left a note for the day shift.
+- 2026-09-24 20:53 [auth] certificate expires in 885 days — no action, within budget.
+- 2026-09-24 20:00 [auth] certificate expires in 869 days — paged the owner.
+- 2026-09-24 20:07 [billing] disk usage at 285% — no action, within budget.
+- 2026-09-24 20:14 [auth] retry storm: 489 retries/min — opened a war room.
+- 2026-09-24 21:21 [gateway] connection pool exhausted (598 waiting) — escalated to the platform team.
+- 2026-09-24 21:28 [auth] GC pause 121 ms — rolled back.
+- 2026-09-24 21:35 [webhooks] disk usage at 357% — scaled out by two nodes.
+- 2026-09-24 22:42 [scheduler] GC pause 528 ms — scaled out by two nodes.
+- 2026-09-24 22:49 [mailer] cache hit ratio fell to 59% — rolled back.
+- 2026-09-24 22:56 [search] GC pause 385 ms — acknowledged, watching.
+- 2026-09-24 22:03 [export] GC pause 718 ms — rolled back.
+- 2026-09-24 23:10 [scheduler] queue depth reached 385 — acknowledged, watching.
+- 2026-09-24 23:17 [gateway] queue depth reached 514 — escalated to the platform team.
+- 2026-09-25 00:24 [webhooks] GC pause 511 ms — escalated to the platform team.
+- 2026-09-25 00:31 [export] cache hit ratio fell to 106% — rolled back.
+- 2026-09-25 00:38 [search] retry storm: 462 retries/min — acknowledged, watching.
+- 2026-09-25 00:45 [billing] connection pool exhausted (86 waiting) — opened a war room.
+- 2026-09-25 01:52 [storage] latency p99 rose to 310 ms — scaled out by two nodes.
+- 2026-09-25 01:59 [export] latency p99 rose to 87 ms — left a note for the day shift.
+- 2026-09-25 01:06 [billing] latency p99 rose to 17 ms — scaled out by two nodes.
+- 2026-09-25 01:13 [storage] retry storm: 282 retries/min — no action, within budget.
+- 2026-09-25 02:20 [auth] queue depth reached 57 — muted for 30 minutes.
+- 2026-09-25 02:27 [billing] connection pool exhausted (763 waiting) — escalated to the platform team.
+- 2026-09-25 02:34 [reports] GC pause 312 ms — rolled back.
+- 2026-09-25 03:41 [scheduler] connection pool exhausted (156 waiting) — opened a war room.
+- 2026-09-25 03:48 [mailer] deploy 933 rolled out — opened a war room.
+- 2026-09-25 03:55 [webhooks] latency p99 rose to 73 ms — muted for 30 minutes.
+- 2026-09-25 03:02 [gateway] disk usage at 248% — rolled back.
+- 2026-09-25 04:09 [gateway] connection pool exhausted (201 waiting) — left a note for the day shift.
+- 2026-09-25 04:16 [export] connection pool exhausted (307 waiting) — escalated to the platform team.
+- 2026-09-25 04:23 [webhooks] disk usage at 432% — rolled back.
+- 2026-09-25 05:30 [webhooks] retry storm: 920 retries/min — escalated to the platform team.
+- 2026-09-25 05:37 [scheduler] connection pool exhausted (145 waiting) — rolled back.
+- 2026-09-25 05:44 [billing] retry storm: 819 retries/min — escalated to the platform team.
+- 2026-09-25 05:51 [storage] certificate expires in 131 days — muted for 30 minutes.
+- 2026-09-25 06:58 [mailer] retry storm: 165 retries/min — fixed by config reload.
+- 2026-09-25 06:05 [search] latency p99 rose to 285 ms — opened a war room.
+- 2026-09-25 06:12 [auth] cache hit ratio fell to 206% — left a note for the day shift.
+- 2026-09-25 07:19 [scheduler] certificate expires in 635 days — paged the owner.
+- 2026-09-25 07:26 [export] queue depth reached 621 — opened a war room.
+- 2026-09-25 07:33 [export] queue depth reached 753 — acknowledged, watching.
+- 2026-09-25 07:40 [search] certificate expires in 112 days — acknowledged, watching.
+- 2026-09-25 08:47 [search] deploy 50 rolled out — no action, within budget.
+- 2026-09-25 08:54 [auth] latency p99 rose to 577 ms — no action, within budget.
+- 2026-09-25 08:01 [gateway] deploy 133 rolled out — fixed by config reload.
+- 2026-09-25 09:08 [reports] certificate expires in 607 days — opened a war room.
+- 2026-09-25 09:15 [reports] certificate expires in 541 days — muted for 30 minutes.
+- 2026-09-25 09:22 [scheduler] queue depth reached 70 — acknowledged, watching.
+- 2026-09-25 09:29 [webhooks] cache hit ratio fell to 13% — acknowledged, watching.
+- 2026-09-25 10:36 [auth] latency p99 rose to 923 ms — rolled back.
+- 2026-09-25 10:43 [reports] certificate expires in 808 days — no action, within budget.
+- 2026-09-25 10:50 [gateway] disk usage at 753% — fixed by config reload.
+- 2026-09-25 11:57 [auth] certificate expires in 32 days — muted for 30 minutes.
+- 2026-09-25 11:04 [mailer] deploy 4 rolled out — no action, within budget.
+- 2026-09-25 11:11 [storage] deploy 387 rolled out — muted for 30 minutes.
+- 2026-09-25 11:18 [scheduler] queue depth reached 80 — fixed by config reload.
+
+## Follow-up for the on-call
+
+The webhook incident is not closed yet. Follow-up for the on-call: list the open tickets of priority high in project ALPHA, newest first, at most two, and report their ids in the hand-over.
+
+- 2026-09-25 12:25 [storage] cache hit ratio fell to 874% — fixed by config reload.
+- 2026-09-25 12:32 [auth] disk usage at 502% — opened a war room.
+- 2026-09-25 12:39 [export] retry storm: 78 retries/min — scaled out by two nodes.
+- 2026-09-25 13:46 [search] queue depth reached 226 — paged the owner.
+- 2026-09-25 13:53 [gateway] error rate 692% for 4 minutes — left a note for the day shift.
+- 2026-09-25 13:00 [webhooks] disk usage at 313% — escalated to the platform team.
+- 2026-09-25 13:07 [search] queue depth reached 848 — left a note for the day shift.
+- 2026-09-25 14:14 [storage] deploy 352 rolled out — paged the owner.
+- 2026-09-25 14:21 [webhooks] retry storm: 32 retries/min — left a note for the day shift.
+- 2026-09-25 14:28 [storage] error rate 716% for 4 minutes — opened a war room.
+- 2026-09-25 15:35 [billing] error rate 380% for 4 minutes — muted for 30 minutes.
+- 2026-09-25 15:42 [auth] certificate expires in 129 days — fixed by config reload.
+- 2026-09-25 15:49 [scheduler] latency p99 rose to 535 ms — escalated to the platform team.
+- 2026-09-25 15:56 [auth] latency p99 rose to 354 ms — opened a war room.
+- 2026-09-25 16:03 [scheduler] connection pool exhausted (698 waiting) — paged the owner.
+- 2026-09-25 16:10 [storage] disk usage at 670% — acknowledged, watching.
+- 2026-09-25 16:17 [auth] disk usage at 430% — fixed by config reload.
+- 2026-09-25 17:24 [webhooks] latency p99 rose to 399 ms — escalated to the platform team.
+- 2026-09-25 17:31 [storage] latency p99 rose to 322 ms — rolled back.
+- 2026-09-25 17:38 [mailer] GC pause 42 ms — left a note for the day shift.
+- 2026-09-25 17:45 [mailer] certificate expires in 184 days — muted for 30 minutes.
+- 2026-09-25 18:52 [storage] latency p99 rose to 458 ms — opened a war room.
+- 2026-09-25 18:59 [gateway] connection pool exhausted (231 waiting) — fixed by config reload.
+- 2026-09-25 18:06 [webhooks] deploy 937 rolled out — escalated to the platform team.
+- 2026-09-25 18:13 [billing] certificate expires in 633 days — left a note for the day shift.
+- 2026-09-25 19:20 [mailer] certificate expires in 441 days — no action, within budget.
+- 2026-09-25 19:27 [export] deploy 411 rolled out — fixed by config reload.
+- 2026-09-25 19:34 [scheduler] error rate 156% for 4 minutes — rolled back.
+- 2026-09-25 20:41 [webhooks] connection pool exhausted (97 waiting) — paged the owner.
+- 2026-09-25 20:48 [gateway] certificate expires in 682 days — escalated to the platform team.
+- 2026-09-25 20:55 [storage] GC pause 362 ms — fixed by config reload.
+- 2026-09-25 20:02 [billing] error rate 193% for 4 minutes — paged the owner.
+- 2026-09-25 21:09 [mailer] GC pause 588 ms — left a note for the day shift.
+- 2026-09-25 21:16 [mailer] retry storm: 685 retries/min — escalated to the platform team.
+- 2026-09-25 21:23 [billing] queue depth reached 324 — muted for 30 minutes.
+- 2026-09-25 22:30 [billing] GC pause 607 ms — acknowledged, watching.
+- 2026-09-25 22:37 [gateway] latency p99 rose to 749 ms — no action, within budget.
+- 2026-09-25 22:44 [mailer] deploy 820 rolled out — opened a war room.
+- 2026-09-25 22:51 [scheduler] cache hit ratio fell to 452% — muted for 30 minutes.
+- 2026-09-25 23:58 [webhooks] GC pause 42 ms — scaled out by two nodes.
+- 2026-09-25 23:05 [auth] disk usage at 799% — escalated to the platform team.
+- 2026-09-26 00:12 [search] connection pool exhausted (481 waiting) — left a note for the day shift.
+- 2026-09-26 00:19 [export] queue depth reached 472 — left a note for the day shift.
+- 2026-09-26 00:26 [search] deploy 838 rolled out — paged the owner.
+- 2026-09-26 00:33 [search] deploy 464 rolled out — scaled out by two nodes.
+- 2026-09-26 01:40 [auth] queue depth reached 371 — escalated to the platform team.
+- 2026-09-26 01:47 [gateway] error rate 475% for 4 minutes — paged the owner.
+- 2026-09-26 01:54 [export] deploy 489 rolled out — escalated to the platform team.
+- 2026-09-26 01:01 [auth] error rate 682% for 4 minutes — rolled back.
+- 2026-09-26 02:08 [auth] retry storm: 741 retries/min — opened a war room.
+- 2026-09-26 02:15 [webhooks] queue depth reached 842 — escalated to the platform team.
+- 2026-09-26 02:22 [billing] GC pause 288 ms — rolled back.
+- 2026-09-26 03:29 [export] certificate expires in 499 days — escalated to the platform team.
+- 2026-09-26 03:36 [storage] queue depth reached 476 — fixed by config reload.
+- 2026-09-26 03:43 [gateway] certificate expires in 14 days — muted for 30 minutes.
+- 2026-09-26 03:50 [gateway] retry storm: 360 retries/min — no action, within budget.
+- 2026-09-26 04:57 [storage] cache hit ratio fell to 313% — paged the owner.
+- 2026-09-26 04:04 [search] connection pool exhausted (149 waiting) — acknowledged, watching.
+- 2026-09-26 04:11 [billing] certificate expires in 607 days — acknowledged, watching.
+- 2026-09-26 05:18 [storage] connection pool exhausted (942 waiting) — acknowledged, watching.
+- 2026-09-26 05:25 [storage] deploy 918 rolled out — no action, within budget.
+- 2026-09-26 05:32 [scheduler] retry storm: 666 retries/min — left a note for the day shift.
+- 2026-09-26 05:39 [scheduler] disk usage at 709% — fixed by config reload.
+- 2026-09-26 06:46 [webhooks] cache hit ratio fell to 733% — escalated to the platform team.
+- 2026-09-26 06:53 [webhooks] queue depth reached 95 — opened a war room.
+- 2026-09-26 06:00 [storage] error rate 268% for 4 minutes — no action, within budget.
+- 2026-09-26 07:07 [reports] cache hit ratio fell to 856% — muted for 30 minutes.
+- 2026-09-26 07:14 [billing] cache hit ratio fell to 836% — no action, within budget.
+- 2026-09-26 07:21 [search] connection pool exhausted (584 waiting) — muted for 30 minutes.
+- 2026-09-26 07:28 [search] connection pool exhausted (645 waiting) — rolled back.
+- 2026-09-26 08:35 [auth] disk usage at 710% — fixed by config reload.
+- 2026-09-26 08:42 [auth] error rate 455% for 4 minutes — acknowledged, watching.
+- 2026-09-26 08:49 [storage] cache hit ratio fell to 335% — paged the owner.
+- 2026-09-26 09:56 [mailer] deploy 361 rolled out — opened a war room.
+- 2026-09-26 09:03 [storage] GC pause 723 ms — rolled back.
+- 2026-09-26 09:10 [storage] cache hit ratio fell to 446% — paged the owner.
+- 2026-09-26 09:17 [webhooks] retry storm: 796 retries/min — muted for 30 minutes.
+- 2026-09-26 10:24 [search] deploy 186 rolled out — acknowledged, watching.
+- 2026-09-26 10:31 [storage] GC pause 374 ms — paged the owner.
+- 2026-09-26 10:38 [webhooks] connection pool exhausted (118 waiting) — escalated to the platform team.
+- 2026-09-26 11:45 [search] cache hit ratio fell to 772% — escalated to the platform team.
+- 2026-09-26 11:52 [gateway] retry storm: 240 retries/min — paged the owner.
+- 2026-09-26 11:59 [storage] disk usage at 963% — left a note for the day shift.
+- 2026-09-26 11:06 [webhooks] queue depth reached 193 — left a note for the day shift.
+- 2026-09-26 12:13 [mailer] cache hit ratio fell to 80% — muted for 30 minutes.
+- 2026-09-26 12:20 [auth] GC pause 654 ms — left a note for the day shift.
+- 2026-09-26 12:27 [mailer] retry storm: 24 retries/min — acknowledged, watching.
+- 2026-09-26 13:34 [reports] queue depth reached 67 — acknowledged, watching.
+- 2026-09-26 13:41 [reports] error rate 250% for 4 minutes — acknowledged, watching.
+- 2026-09-26 13:48 [billing] latency p99 rose to 841 ms — fixed by config reload.
+- 2026-09-26 13:55 [storage] error rate 871% for 4 minutes — rolled back.
+- 2026-09-26 14:02 [gateway] disk usage at 267% — paged the owner.
+- 2026-09-26 14:09 [auth] deploy 671 rolled out — no action, within budget.
+- 2026-09-26 14:16 [gateway] certificate expires in 295 days — acknowledged, watching.
+- 2026-09-26 15:23 [export] error rate 110% for 4 minutes — fixed by config reload.
+- 2026-09-26 15:30 [scheduler] cache hit ratio fell to 368% — escalated to the platform team.
+- 2026-09-26 15:37 [auth] deploy 633 rolled out — left a note for the day shift.
+- 2026-09-26 15:44 [export] queue depth reached 936 — no action, within budget.
+- 2026-09-26 16:51 [mailer] GC pause 666 ms — paged the owner.
+- 2026-09-26 16:58 [gateway] cache hit ratio fell to 323% — left a note for the day shift.
+- 2026-09-26 16:05 [storage] error rate 648% for 4 minutes — no action, within budget.
+- 2026-09-26 17:12 [export] retry storm: 478 retries/min — fixed by config reload.
+- 2026-09-26 17:19 [export] disk usage at 91% — acknowledged, watching.
+- 2026-09-26 17:26 [reports] cache hit ratio fell to 618% — paged the owner.
+- 2026-09-26 17:33 [webhooks] latency p99 rose to 210 ms — paged the owner.
+- 2026-09-26 18:40 [reports] queue depth reached 213 — left a note for the day shift.
+- 2026-09-26 18:47 [storage] queue depth reached 891 — no action, within budget.
+- 2026-09-26 18:54 [gateway] error rate 510% for 4 minutes — muted for 30 minutes.
+- 2026-09-26 18:01 [mailer] latency p99 rose to 909 ms — scaled out by two nodes.
+- 2026-09-26 19:08 [storage] GC pause 726 ms — acknowledged, watching.
+- 2026-09-26 19:15 [gateway] retry storm: 422 retries/min — rolled back.
+- 2026-09-26 19:22 [export] GC pause 300 ms — fixed by config reload.
+- 2026-09-26 20:29 [webhooks] latency p99 rose to 896 ms — paged the owner.
+- 2026-09-26 20:36 [export] retry storm: 924 retries/min — rolled back.
+- 2026-09-26 20:43 [search] deploy 105 rolled out — rolled back.
+- 2026-09-26 20:50 [billing] connection pool exhausted (132 waiting) — no action, within budget.
+- 2026-09-26 21:57 [scheduler] error rate 880% for 4 minutes — no action, within budget.
+- 2026-09-26 21:04 [billing] GC pause 666 ms — fixed by config reload.
+- 2026-09-26 21:11 [webhooks] cache hit ratio fell to 730% — paged the owner.
+- 2026-09-26 22:18 [search] cache hit ratio fell to 415% — scaled out by two nodes.
+- 2026-09-26 22:25 [billing] latency p99 rose to 22 ms — escalated to the platform team.
+- 2026-09-26 22:32 [export] connection pool exhausted (688 waiting) — no action, within budget.
+- 2026-09-26 22:39 [export] cache hit ratio fell to 275% — no action, within budget.
+- 2026-09-26 23:46 [mailer] disk usage at 386% — scaled out by two nodes.
+- 2026-09-26 23:53 [gateway] latency p99 rose to 949 ms — escalated to the platform team.
