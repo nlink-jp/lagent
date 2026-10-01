@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-10-02
+
 ### Fixed
 
 - The bench writes a suite run's request trace beside the run when
