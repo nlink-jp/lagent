@@ -311,3 +311,9 @@ excepted).
   The art is its own segment past glamour and is held to no escapes
   (`inertArt`, amending ADR-0024's "no box-art hold"). Pictures are unchanged
   where images draw; `-p` and the plain REPL stay source
+- [`ADR-0028`](adr/0028-loaded-schemas-ride-the-conversation.md) —
+  a loaded server's schemas can ride the conversation (**Proposed**,
+  prototype on `exp/mcp-load-inline`): `[mcp].load_into = "conversation"`
+  keeps the tool block constant, returns the schemas in `mcp_load`'s result
+  and unwraps a `mcp_call` proxy before any gate; accepted or rejected by the
+  bench's argument-discipline tasks
