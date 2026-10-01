@@ -195,6 +195,46 @@ interplay (Decision), a per-call rate instead of three runs (§Acceptance),
 and the gem-agent statement. Kept as known residuals: server guidance
 inside the wrapper, and the load marked inside Run (§Consequences).
 
+## Measurement (2026-10-02)
+
+Prototype `21d0b80`, LM Studio, Gemma 4 26B A4B QAT, M2 Max.
+
+**Whole runs** (`mcp-load` suite, 3 runs per task and lane): both lanes
+completed 18/18, with no argument refusals and no runtime call
+refusals. Most tasks took the same time (17–22 s per run). On
+`mcp-tk-late`, where the load comes after a 34 KB read, the median run
+fell from 87 s to 62 s.
+
+**First-call accuracy on the fixture** (the post-load request replayed
+30 times as captured): 180/180 in both lanes. **This layer did not
+discriminate**: at the server's default sampling, 8 of the 12 cells
+produced one identical call 30 times, and the fixture's prompts name
+their arguments plainly.
+
+**Stress check on a real server**, added because the layer above was
+blind: the captured `mcp_load github` request (44 tools), six prompts,
+20 samples each at temperature 1.0. The conversation lane was sent its
+own texts (§5). Each first call was scored against the captured schema
+without contacting GitHub: unknown keys, missing required fields, enum
+values and types.
+
+| prompt | tool list | conversation | the conversation lane's misses |
+|---|---|---|---|
+| 3 most recent open issues | 16/20 | 0/20 strict, 10/20 if `search_issues` counts | 15× `search_issues` (10 valid); 5× `list_issues` with `query`/`sort` |
+| search issues for "timeout" | 17/20 | 20/20 | — |
+| README on main | 20/20 | 19/20 | one `pullNumber` |
+| open PRs, newest first | 11/20 | 6/20 strict, 16/20 if `search_pull_requests` counts | 11× `search_pull_requests` (10 valid) |
+| who am I | 20/20 | 19/20 | one call without a tool name |
+| last 5 commits on main | 20/20 | 16/20 | 4× `list_commits` with `query` |
+| **all** | **104/120** | **80/120 strict, 100/120 lenient** | |
+
+With the schemas as text, the model mixes up arguments between sibling
+tools (`list_*` and `search_*`). This is the failure ADR-0004 predicted.
+On the fixture's distinct, plainly named tools it does not appear. By
+§Acceptance, the stress check fails on two prompts (by 30 and 20
+points) and overall. A real server ignores an unknown key silently: a
+`list_commits` call with `query` runs, unfiltered.
+
 ## References
 
 - ADR-0004 — the load, and the alternative this revisits
