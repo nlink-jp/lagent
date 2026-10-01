@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- The bench writes a suite run's request trace beside the run when
+  `--out` is a relative path. Before, the trace landed inside the run's
+  project, and the injection suite's payload check read an empty
+  directory.
+
+### Added
+
+- Bench: a `tickets` persona for the MCP fixture (nine tools with
+  strictly validated schemas), the `mcp-load` suite that uses it, and an
+  `arg errors` column in `bench report`.
+
+### Documentation
+
+- ADR-0028, rejected: putting a loaded server's schemas into the
+  conversation, called through a `mcp_call` proxy, keeps the prompt
+  cache. On a real server's sibling tools the model then mixed up
+  arguments. Measured on a prototype that was not merged.
+
 ## [0.16.0] - 2026-09-30
 
 ### Added
