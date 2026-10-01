@@ -2,7 +2,7 @@
 // answering from canned tables so the MCP task class needs neither the
 // network nor an operator's server. With no argument it is "geo": one
 // tool, lookup_ip. With the argument "tickets" it is a ticket tracker
-// whose schemas exercise argument discipline (ADR-0028 §Acceptance).
+// whose strict schemas check that MCP calls are made correctly (ADR-0028).
 // Protocol: JSON-RPC over stdio, one message per line, the subset
 // lagent's client speaks (initialize, notifications/initialized,
 // tools/list, tools/call).

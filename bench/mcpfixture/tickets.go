@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// The "tickets" persona (ADR-0028 §Acceptance): a ticket tracker whose
+// The "tickets" persona (ADR-0028, rejected; kept as a check): a ticket tracker whose
 // schemas mix required and optional fields, enums, bounded integers,
 // arrays, a nested object and date strings, validated strictly. Every
 // refusal starts with ArgErrorMarker, which the bench counts. Answers are

@@ -21,7 +21,7 @@ type stats struct {
 	// Answer is the last assistant text in the transcript.
 	Answer string
 	// ArgErrors counts tool results the fixture refused as invalid
-	// arguments (ADR-0028 §Acceptance) — the tickets persona opens every
+	// arguments (ADR-0028) — the tickets persona opens every
 	// such refusal with argErrorMarker.
 	ArgErrors int
 }

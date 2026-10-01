@@ -122,7 +122,9 @@ gem-usage-lens.
   writes arguments from prose it read rather than a schema the
   template renders, and a local model's argument discipline is the
   part that most needs the template. Rejected; revisit if loads prove
-  to churn the cache in practice.
+  to churn the cache in practice. Revisited in ADR-0028 and measured:
+  loads do churn the cache, and the proxy does cost argument discipline
+  on a real server's sibling tools — rejected again, closed.
 - **Trim the set by hand** (`[mcp].exclude`, today) — remains
   available and composes with this; rejected as the only answer
   because it asks the operator to predict the session.

@@ -312,8 +312,9 @@ excepted).
   (`inertArt`, amending ADR-0024's "no box-art hold"). Pictures are unchanged
   where images draw; `-p` and the plain REPL stay source
 - [`ADR-0028`](adr/0028-loaded-schemas-ride-the-conversation.md) —
-  a loaded server's schemas can ride the conversation (**Proposed**,
-  prototype on `exp/mcp-load-inline`): `[mcp].load_into = "conversation"`
-  keeps the tool block constant, returns the schemas in `mcp_load`'s result
-  and unwraps a `mcp_call` proxy before any gate; accepted or rejected by the
-  bench's argument-discipline tasks
+  a loaded server's schemas riding the conversation (**Rejected**, measured
+  on an unmerged prototype): returning the schemas in `mcp_load`'s result and
+  calling through a `mcp_call` proxy keeps the prompt cache, but on github's
+  44 tools the model mixed up sibling tools' arguments (104/120 against
+  80/120). ADR-0004's proxy alternative is closed; the bench keeps the
+  `tickets` persona and the `mcp-load` suite

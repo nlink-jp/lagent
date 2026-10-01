@@ -176,9 +176,11 @@ in 7 here. Both are the same task on the same model.
 ### The mcp-load suite
 
 Six tasks carrying `suite = "mcp-load"` and `mcp_server = "tickets"`,
-for ADR-0028's question: does a model given a server's schemas as text
-(`[mcp].load_into = "conversation"`) call its tools as accurately as one
-given them in the tool list? The fixture's `tickets` persona is a ticket
+built for ADR-0028 (rejected): they check that the model calls an MCP
+server with strict schemas correctly after loading it. They did not
+separate ADR-0028's two lanes (both 180/180); confusion between sibling
+tools shows only on a real server's schemas, so measure that there. The
+fixture's `tickets` persona is a ticket
 tracker of nine tools whose schemas mix required and optional fields,
 enums, bounded integers, arrays, a nested object and dates, validated
 strictly; every refusal opens with `invalid arguments:`, which the

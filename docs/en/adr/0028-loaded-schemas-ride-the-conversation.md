@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Proposed** (2026-10-02) — prototype on `exp/mcp-load-inline`; accepted or rejected by the measurement in §Acceptance |
+| Status | **Rejected** (2026-10-02) — measured on a prototype (`b60f212`, `21d0b80`) that was not merged; see §Measurement and §Outcome |
 | Date | 2026-10-02 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
@@ -234,6 +234,25 @@ On the fixture's distinct, plainly named tools it does not appear. By
 §Acceptance, the stress check fails on two prompts (by 30 and 20
 points) and overall. A real server ignores an unknown key silently: a
 `list_commits` call with `query` runs, unfiltered.
+
+## Outcome
+
+Rejected by §Acceptance. The cache gain is real, and so is the cost in
+argument discipline. On a real server's sibling tools the cost is a call
+that runs wrong without an error, which is worse than waiting. ADR-0004's
+proxy alternative is closed by measurement. The two-step variant is not
+pursued: it would still give the model a schema as text.
+
+What stays from the work:
+
+- the bench's `tickets` fixture persona and the `mcp-load` suite, as a
+  check that strict MCP schemas are called correctly. It is not a
+  discriminator of argument discipline: it did not separate the lanes;
+- the runner's `arg_errors` column;
+- the fix that keeps a suite run's trace beside the run.
+
+The lane itself — `[mcp].load_into`, `mcp_call` and the agent's unwrap —
+is not in the runtime.
 
 ## References
 
