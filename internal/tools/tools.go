@@ -4,6 +4,8 @@
 // and tests can swap the execution strategy.
 //
 // Ported from gem-agent internal/tools at be7609980022e38314268c58ca94a6517e6f5d28 (v0.74.0), ADR-0001.
+// The partial-view changes (byte windows, the shell spool, the search
+// skip tally) are ported from gem-agent at 33b1bbb654ed6f41d03a809eba25d83d647b7507, ADR-0029.
 package tools
 
 import (
