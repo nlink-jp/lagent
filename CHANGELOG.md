@@ -10,6 +10,9 @@
   it really began. It now reads `- resumed: <day>; the conversation above began
   on <day>`. The date is also captured once per session, so an MCP reload after
   midnight no longer states a new one.
+- When `/clear` cannot open a new transcript and clears the history in place,
+  a fresh facts message is sent: the clear had changed the isolation tag
+  without telling the model its new name.
 
 ### Documentation
 

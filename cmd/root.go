@@ -1155,12 +1155,22 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// to Open.
 		if sessionDirErr != nil {
 			ag.Reset()
+			// Cleared in place: the dates start over (the conversation the
+			// resume line named is gone), and Reset changed the isolation
+			// tag, which only a fresh facts message tells the model.
+			dates = sessionDates{Start: time.Now()}
+			ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
 			note("history cleared; a new session could not be started (%v) — the conversation continues in this session", sessionDirErr)
 			return render()
 		}
 		newLog, err := openSessionLog(sessionDir, "", projectDir, cfg.LLM.Model, cmd.Root().Version)
 		if err != nil {
 			ag.Reset()
+			// Cleared in place: the dates start over (the conversation the
+			// resume line named is gone), and Reset changed the isolation
+			// tag, which only a fresh facts message tells the model.
+			dates = sessionDates{Start: time.Now()}
+			ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
 			note("history cleared; a new session could not be started (%v) — the conversation continues in this session", err)
 			return render()
 		}

@@ -43,6 +43,10 @@ position is kept; only what the line says changes.
 
 - On resume the new facts message agrees with the restored one.
 - An MCP reload no longer moves the date.
+- When `/clear` cannot open a new transcript and clears the history in
+  place, the dates start over and a fresh facts message is sent. That
+  also fixes an older omission found in review: the clear changed the
+  isolation tag without telling the model its new name.
 
 ## References
 
