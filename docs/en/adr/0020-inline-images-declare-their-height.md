@@ -124,7 +124,7 @@ result's binary blocks through `base64.StdEncoding.DecodeString`
 `:575` is the `Content` carrier an earlier draft cited instead),
 and the intake **writes an image into the session work directory** and hands
 the model `[image saved at <path> … use view_image on that path]`
-([mcpresult.go:200](../../../cmd/mcpresult.go)). The first draft said such
+([mcpresult.go:231](../../../cmd/mcpresult.go)). The first draft said such
 blocks were "forwarded to the model"; they are not — the bytes never ride
 back inline.
 
@@ -219,11 +219,11 @@ Written three times, refuted three times, each time the worst finding of its
 round: a path the model names bypasses the enforcers, which are keyed on
 tool name (`PathJudged`, [risk.go:323](../../../internal/risk/risk.go)); the
 path the intake wrote can be pre-empted, because `write` short-circuits on
-`os.Stat` ([mcpresult.go:236](../../../cmd/mcpresult.go)) and every call
+`os.Stat` ([mcpresult.go:267](../../../cmd/mcpresult.go)) and every call
 hands the server the work directory in `_meta`
 ([client.go:639](../../../internal/mcp/client.go)); and the third draft's
 decoded bytes have no carrier at all — `render` returns a `string`
-([mcpresult.go:53](../../../cmd/mcpresult.go)) and `Tool.Run` is
+([mcpresult.go:57](../../../cmd/mcpresult.go)) and `Tool.Run` is
 `func(ctx, args) (string, error)` ([tools.go:67](../../../internal/tools/tools.go)).
 
 Three drafts in one place is one mistake: **the source cannot be named until

@@ -76,7 +76,10 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   by byte `offset`/`length` (a negative offset counts from the end), so the
   tail of a long single-line file — a tool result saved to the work
   directory — is in reach; a read cut at 200 KB says where to read on
-  (ADR-0029).
+  (ADR-0029). An MCP result too large to hold inline is saved whole to
+  the session work directory and previewed by its first 600 and last 200
+  characters — metadata a server appends, such as `"truncated": true`,
+  comes last — with the byte spans shown and the route to the rest.
 - **Confinement:** file tools stay inside the project (and the session
   work directory), and a credential file — `.env`, a private key, a
   token store — is read only when you approve it, every time, never

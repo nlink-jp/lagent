@@ -107,7 +107,7 @@ gem-agent は描画前に応答を分割する。`diagram.Split` が art segment
 材料の残り半分は既にここにある。`mcp.Client` はツール結果のバイナリブロックを `base64.StdEncoding.DecodeString` に通し
 （[client.go:669](../../../internal/mcp/client.go)。`:575` は以前の稿が代わりに引いた
 `Content` の運搬体である）、intake は画像を**セッションの work dir へ書き出して**、モデルには `[image saved at <path> … use view_image on that path]` を渡す
-（[mcpresult.go:200](../../../cmd/mcpresult.go)）。初稿はそれらを「モデルへ転送される」と
+（[mcpresult.go:231](../../../cmd/mcpresult.go)）。初稿はそれらを「モデルへ転送される」と
 書いたが、そうではない。バイトはインラインで戻らない。
 
 **こちら側固有の訂正。** 初稿は、決定 7 の根拠となる危険が「継承ではなくこのコードに
@@ -185,10 +185,10 @@ gem-agent の iTerm2 で計測: 行数の宣言は既に正しいのに、画像
 3 度書かれ、3 度反証された。いずれもそのラウンドの最悪の指摘だった。モデルが名指すパスは
 ツール名で引かれる強制者を迂回し（`PathJudged`、[risk.go:323](../../../internal/risk/risk.go)）、
 intake が書いたパスは先回りされうる。`write` が `os.Stat` で短絡し
-（[mcpresult.go:236](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに work dir を
+（[mcpresult.go:267](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに work dir を
 `_meta` で渡すからである（[client.go:639](../../../internal/mcp/client.go)）。そして第 3 稿の
 デコード済みバイト列には運搬体が無い。`render` は `string` を返し
-（[mcpresult.go:53](../../../cmd/mcpresult.go)）、`Tool.Run` は
+（[mcpresult.go:57](../../../cmd/mcpresult.go)）、`Tool.Run` は
 `func(ctx, args) (string, error)` である（[tools.go:67](../../../internal/tools/tools.go)）。
 
 同じ場所の 3 稿は 1 つの誤りである。**配管が存在するまで、供給源は名指せない。** [ADR-0021](0021-an-images-bytes-never-become-a-path.ja.md) へ先送りし、3 稿すべてに
