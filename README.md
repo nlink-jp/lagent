@@ -83,7 +83,9 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   `shell_exec` output past 20,000 bytes keeps its first 15,000 and last
   5,000 bytes — a script's totals come last — and is saved whole to the
   work directory (up to 32 MiB; not in the operator lane, which may read
-  credentials).
+  credentials). `search_files` counts every file it did not search — over
+  2 MB (named), binary, image, unreadable — so "no match" says what was not
+  looked at.
 - **Confinement:** file tools stay inside the project (and the session
   work directory), and a credential file — `.env`, a private key, a
   token store — is read only when you approve it, every time, never

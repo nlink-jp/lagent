@@ -174,7 +174,9 @@ the list raises the prompt and the kernel is the boundary: a path the
 list does not recognise is refused at the open and that refusal reaches
 the operator as the same question. `search_files`, `list_files` and
 `list_tree` do not ask and hide nothing — the kernel lists names and
-refuses content — and `search_files` names what it could not read.
+refuses content — and `search_files` names what it could not read, and
+counts every other file it did not search: over 2 MB (named, up to five),
+binary, image, unreadable, and directories it could not list (ADR-0029).
 Where the cage could not be installed on this machine — the startup
 warning says so, and `/settings` carries the state under
 `safety / file reads` — the covered reads run in this process: the
