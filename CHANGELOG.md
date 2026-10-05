@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A resumed session is told when it began** (ADR-0030, from gem-agent
+  ADR-0097). The facts message sent on resume said "session started" on the
+  resume day, beside the restored conversation's own facts message with the day
+  it really began. It now reads `- resumed: <day>; the conversation above began
+  on <day>`. The date is also captured once per session, so an MCP reload after
+  midnight no longer states a new one.
+
 ### Documentation
 
 - The README says where an operator's procedures go: a skill arrives as

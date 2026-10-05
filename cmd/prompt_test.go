@@ -105,7 +105,7 @@ func TestSystemPromptIsIdenticalAcrossSessions(t *testing.T) {
 // intermediates in the project.
 func TestSessionFactsNameTheWorkDirectory(t *testing.T) {
 	work := "/state/lagent/proj/work/sess-1"
-	got := sessionFacts(work, nil)
+	got := sessionFacts(work, sessionDates{}, nil)
 	if !strings.Contains(got, work) {
 		t.Error("the work directory is not named in the facts")
 	}
@@ -123,7 +123,7 @@ func TestSessionFactsNameTheWorkDirectory(t *testing.T) {
 }
 
 func TestSessionFactsOmitTheDirectoryWhenNone(t *testing.T) {
-	got := sessionFacts("", nil)
+	got := sessionFacts("", sessionDates{}, nil)
 	if strings.Contains(got, "work directory") {
 		t.Error("a session with no work directory should not be told it has one")
 	}
@@ -185,8 +185,33 @@ func TestSystemPromptSaysNothingAboutDiagrams(t *testing.T) {
 // The MCP catalog rides the facts message after the work directory and
 // the date, line by line as the inventory rendered it.
 func TestSessionFactsCarryTheCatalog(t *testing.T) {
-	got := sessionFacts("", []string{"- MCP servers connected this session.", "  - tor-exit (2 tools: check_ip, update_list)"})
+	got := sessionFacts("", sessionDates{}, []string{"- MCP servers connected this session.", "  - tor-exit (2 tools: check_ip, update_list)"})
 	if !strings.Contains(got, "tor-exit (2 tools") || strings.Index(got, "session started:") > strings.Index(got, "MCP servers") {
 		t.Errorf("catalog missing or out of order:\n%s", got)
+	}
+}
+
+// ADR-0030: a fresh session states its start day; a resumed one states
+// the resume day and the day its conversation began, so the new facts
+// message no longer contradicts the restored one.
+func TestDateFactFreshAndResumed(t *testing.T) {
+	jst := time.FixedZone("JST", 9*3600)
+	start := time.Date(2026, 10, 5, 9, 0, 0, 0, jst)
+	if got := dateFact(sessionDates{Start: start}); got != "- session started: 2026-10-05 (Monday, JST)\n" {
+		t.Errorf("fresh = %q", got)
+	}
+	began := time.Date(2026, 10, 1, 16, 0, 0, 0, time.UTC) // 10/2 in JST
+	got := dateFact(sessionDates{Start: start, ResumedFrom: began})
+	if got != "- resumed: 2026-10-05 (Monday, JST); the conversation above began on 2026-10-02\n" {
+		t.Errorf("resumed = %q", got)
+	}
+	if !strings.Contains(sessionFacts("", sessionDates{Start: start, ResumedFrom: began}, nil), got) {
+		t.Error("the facts message does not carry the resumed line")
+	}
+	// Captured, not recomputed: the same dates give the same facts.
+	first := sessionFacts("", sessionDates{Start: start}, nil)
+	time.Sleep(time.Millisecond)
+	if again := sessionFacts("", sessionDates{Start: start}, nil); again != first || !strings.Contains(first, "2026-10-05") {
+		t.Error("the facts moved between two sends")
 	}
 }

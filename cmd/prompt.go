@@ -53,15 +53,42 @@ func loadInstructions(projectDir string, grant projectGrant) (section string, la
 //
 // The SESSION-START date, deliberately: a per-request timestamp would
 // change the message every turn and bust the prefix cache the same way.
-func sessionFacts(workDir string, catalog []string) string {
-	now := time.Now()
-	zone, _ := now.Zone()
+// sessionDates are the session's dates as the facts message states them
+// (ADR-0030, from gem-agent ADR-0097). Start is captured once, when the
+// session begins — process start, or /clear starting a new one — so a
+// facts message re-sent mid-session (an MCP reload) never moves it.
+// ResumedFrom is when a resumed session's conversation began; zero for
+// a fresh one.
+type sessionDates struct {
+	Start       time.Time
+	ResumedFrom time.Time
+}
+
+// dateFact is the facts line for the session's date. A resumed session
+// states both dates: a "session started" line with the resume day sat
+// beside the restored conversation's own "session started" line with the
+// day it really began. The resume day is called that, not "today",
+// which stops being true at midnight.
+func dateFact(d sessionDates) string {
+	start := d.Start
+	if start.IsZero() {
+		start = time.Now()
+	}
+	zone, _ := start.Zone()
+	day := fmt.Sprintf("%s (%s, %s)", start.Format("2006-01-02"), start.Weekday(), zone)
+	if d.ResumedFrom.IsZero() {
+		return "- session started: " + day + "\n"
+	}
+	return fmt.Sprintf("- resumed: %s; the conversation above began on %s\n", day, d.ResumedFrom.In(start.Location()).Format("2006-01-02"))
+}
+
+func sessionFacts(workDir string, dates sessionDates, catalog []string) string {
 	var b strings.Builder
 	if workDir != "" {
 		b.WriteString("- session work directory: " + workDir + "\n")
 		b.WriteString("  Use it for anything that is not part of the project: intermediate data, a report you are assembling, a file you only need for the next step. It is outside the project, so writing there does not dirty the user's working copy; the file tools can read and write it, and shell commands see it as $LAGENT_WORK_DIR (a shell command that writes there needs access: \"write\"). An MCP tool that takes a workspace or output directory should be given this path — write it out in full, since nothing expands variables inside a tool argument. Results too large to return inline are saved here for you, and the reply says where.\n")
 	}
-	fmt.Fprintf(&b, "- session started: %s (%s, %s)\n", now.Format("2006-01-02"), now.Weekday(), zone)
+	b.WriteString(dateFact(dates))
 	for _, line := range catalog {
 		b.WriteString(line)
 		b.WriteString("\n")

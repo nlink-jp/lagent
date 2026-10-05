@@ -46,7 +46,7 @@ bytes ([mcpresult.go:33](../../../cmd/mcpresult.go)), and the tool contract is
 
 The channel this needs already exists here too, and it is the same one:
 the agent loop talks to the UI **during** a tool call —
-`prog.Send(tui.ToolCall{…})` at [root.go:822](../../../cmd/root.go). Nothing
+`prog.Send(tui.ToolCall{…})` at [root.go:824](../../../cmd/root.go). Nothing
 about the string contract has to move.
 
 ### The cost

@@ -342,6 +342,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 
 	var restored []llm.Message
 	resumedID := ""
+	var resumedFrom time.Time // when a resumed conversation began (ADR-0030)
 	if flagContinue || flagResume != "" {
 		if sessionDirErr != nil {
 			return fmt.Errorf("cannot resume: %w", sessionDirErr)
@@ -351,6 +352,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		resumedID = meta.ID
+		resumedFrom = meta.Started
 		// restored is loaded below, AFTER Reopen holds the flock.
 	}
 
@@ -893,10 +895,13 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			ag.RefreshTools()
 		}
 	}
+	// The session's dates are captured once (ADR-0030): a facts message
+	// re-sent mid-session states the same day; /clear captures a new one.
+	dates := sessionDates{Start: time.Now(), ResumedFrom: resumedFrom}
 	// The per-session facts open the conversation (after SetHistory: the
 	// isolation tag is fresh, and the restored history's own opening
 	// message named the old one). The MCP catalog rides with them.
-	ag.AnnounceSession(sessionFacts(workDir, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
+	ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
 	// Session-start hooks (ADR-0014 §4): the output rides the next
 	// turn's user message as a data attachment — never the system
 	// prompt (ADR-0003), never the typed input.
@@ -1025,7 +1030,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// The catalog changed with the server set: the model is told
 		// through a fresh facts message (ADR-0003's lane), never through
 		// the system prompt.
-		ag.AnnounceSession(sessionFacts(workDir, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
+		ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
 		return out
 	}
 	loadMCP := func(server string) (string, bool) {
@@ -1213,9 +1218,11 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		if cfg.MCP.Enabled {
 			extra.WriteString(reconnectMCP(false))
 		}
+		// A new session: a new start day, and no longer a resumed one.
+		dates = sessionDates{Start: time.Now()}
 		// Told last, once everything it names is in place: the work
 		// directory and the catalog ride one fresh facts message.
-		ag.AnnounceSession(sessionFacts(workDir, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
+		ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
 		// A cleared conversation is a fresh start to the operator's
 		// scripts (ADR-0014 §2): its output rides the first new turn.
 		sessionStartHooks("clear")
