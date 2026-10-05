@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-05
+
 ### Changed
 
 - **A saved MCP result shows its tail as well as its head** (ADR-0029,
