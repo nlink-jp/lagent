@@ -326,3 +326,9 @@ excepted).
   head and tail and saves the whole output to the work directory (not in the
   operator lane); `search_files` counts every file it did not search. Part B
   is not ported — gem-agent measured it and found no room
+- [`ADR-0030`](adr/0030-a-resumed-session-says-when-it-began.md) —
+  the session's date is captured once, and a resumed session says when its
+  conversation began (**Accepted**, ported from gem-agent ADR-0097): the facts
+  message re-sent on resume said "session started" on the resume day beside the
+  restored one's real start, and an MCP reload re-read the clock. Now a resumed
+  session reads `- resumed: <day>; the conversation above began on <day>`

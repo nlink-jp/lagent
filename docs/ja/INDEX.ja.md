@@ -245,3 +245,9 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   出力全体を作業ディレクトリに保存する（operator レーンを除く）。`search_files`
   は検索しなかったファイルをすべて数える。Part B は移植しない — gem-agent が
   測って余地が無かった
+- [`ADR-0030`](adr/0030-a-resumed-session-says-when-it-began.ja.md) —
+  セッションの日付は 1 回だけ取り込み、再開したセッションは会話がいつ始まったかを言う
+  （**Accepted**、gem-agent ADR-0097 から移植）: 再開時に送り直す事実のメッセージは、
+  復元したものの本当の開始日の隣で、再開日に「session started」と言っていた。MCP の
+  再読み込みも時計を読み直していた。再開したセッションは `- resumed: <日>; the
+  conversation above began on <日>` と読む
