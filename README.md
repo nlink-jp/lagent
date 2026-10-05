@@ -72,6 +72,11 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   catalog, and advertised per server once it calls `mcp_load` (a local
   model cannot afford 243 schemas on every turn; `[mcp].preload` and
   `[mcp].advertise = "all"` are the operator's levers).
+- **Partial results are reachable:** `read_file` reads by line window or
+  by byte `offset`/`length` (a negative offset counts from the end), so the
+  tail of a long single-line file — a tool result saved to the work
+  directory — is in reach; a read cut at 200 KB says where to read on
+  (ADR-0029).
 - **Confinement:** file tools stay inside the project (and the session
   work directory), and a credential file — `.env`, a private key, a
   token store — is read only when you approve it, every time, never
