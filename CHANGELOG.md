@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Documentation
+
+- The README says where an operator's procedures go: a skill arrives as
+  instructions, every tool result — a knowledge-vault server's notes
+  included — as data, so a procedure meant to be followed is a skill
+  (from gem-agent ADR-0096 §7).
+
 ## [0.17.0] - 2026-10-05
 
 ### Changed

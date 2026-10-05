@@ -119,7 +119,11 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   `~/.config/lagent/skills/<name>/` and a trusted project's
   `.claude/skills/<name>/`. One line per skill tells the model what
   each is for; it loads one with `load_skill`, and you invoke one by
-  hand with `/skill <name>` (ADR-0011).
+  hand with `/skill <name>` (ADR-0011). A skill arrives as instructions;
+  everything a tool returns — a knowledge-vault server's notes included —
+  arrives as data the model is told never to obey, so a procedure you want
+  followed belongs in a skill, not in a note read through MCP (gem-agent's
+  integration reference, "Where an operator's procedures go").
 - **Inline images:** the model shows you a picture with `show_image`, and
   you ask for one with `/show <path>` (PNG or JPEG, up to 2 MiB; the path may
   hold spaces, be quoted, or be a file dragged into the window) — drawn in the terminal when it can
