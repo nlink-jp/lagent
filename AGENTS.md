@@ -281,6 +281,14 @@ answers.
 
 ## Gotchas
 
+- **`shell_exec`'s saved output is written by the runtime, never by the
+  command, and never for the operator lane** (ADR-0029). The runtime holds
+  the pipe, so the read lane still writes nothing but its scratch; the
+  operator lane may read credentials, and a copy in the work directory
+  would be readable by `read_file` without approval. The capping writer is
+  `bounded.HeadTail` — `internal/bounded` stays the one place output is
+  capped.
+
 - **A tool with no path argument is invisible to the rule layer.**
   `risk.credentialRead` judges a `path` (or `file_info`'s `paths`), so
   `search_files` — which takes a pattern and walks — is `Safe` and never

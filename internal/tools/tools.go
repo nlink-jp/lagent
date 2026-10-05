@@ -1212,29 +1212,6 @@ func truncate(s string, limit int) string {
 	return cut + fmt.Sprintf("\n[output truncated: %d of %d bytes shown]", len(cut), len(s))
 }
 
-// boundedOutput is an io.Writer that keeps the first limit bytes and
-// counts the rest, so a process may print without end and the tool
-// holds one cap's worth. String renders what was kept with the
-// truncation note the whole-output path would have produced.
-type boundedOutput struct {
-	w     *bounded.Writer
-	limit int
-}
-
-func newBoundedOutput(limit int) *boundedOutput {
-	return &boundedOutput{w: bounded.NewWriter(limit), limit: limit}
-}
-
-func (b *boundedOutput) Write(p []byte) (int, error) { return b.w.Write(p) }
-
-func (b *boundedOutput) String() string {
-	data, more := b.w.Bytes()
-	if !more {
-		return string(data)
-	}
-	return string(data) + fmt.Sprintf("\n[output truncated: %d of %d bytes shown]", len(data), b.w.Total())
-}
-
 // cutRunes truncates s to at most n bytes without splitting a UTF-8
 // sequence (review after v0.68.2: a byte cut through a Japanese
 // character left a broken tail in what the model was sent).
@@ -1579,7 +1556,7 @@ func (r *Registry) shellExec() *Tool {
 			"Declare \"write\" up front for anything that changes files, installs, commits or uses the network; it may write the project and $LAGENT_WORK_DIR and is approval-gated. " +
 			"Declare \"operator\" only when the command must change AGENTS.md/CLAUDE.md/.mcp.json/.claude/ or .git hooks/config (git init, clone, remote add), or read credential files; the user always decides. " +
 			"A command refused in a lane with 'Operation not permitted' needs the wider lane it names, not a retry. " +
-			"Output is truncated when large; the exit status is reported when non-zero.",
+			"Long output keeps its head and tail and is saved whole in the work directory (not in the operator lane); the note names the bytes shown and the file. The exit status is reported when non-zero.",
 		Parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -1629,9 +1606,14 @@ func (r *Registry) shellExec() *Tool {
 			// The output is bounded as it arrives (gem-agent ADR-0072 §4.5):
 			// CombinedOutput held everything until exit, so a command
 			// printing without end exhausted memory before the cap ran.
-			out := newBoundedOutput(OutputCap)
+			// Past the cap it keeps head and tail and saves the whole
+			// (gem-agent ADR-0096 §3).
+			open, noSave, release := r.shellSpoolOpener(lane == sandbox.LaneOperator)
+			defer release()
+			out := newShellOutput(OutputCap, shellSpoolCap, open, noSave)
 			cmd.Stdout, cmd.Stderr = out, out
 			err = cmd.Run()
+			out.Close()
 			result := out.String()
 			if cctx.Err() == context.DeadlineExceeded {
 				return result + fmt.Sprintf("\n[command timed out after %s]", r.shellTimeout), nil
