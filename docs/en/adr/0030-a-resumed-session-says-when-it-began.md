@@ -23,8 +23,11 @@ gem-agent found in its system-prompt line:
   and each send reads the clock again; a reload after midnight states a
   new "session started" day.
 
-This runtime already states the date at the resume point, near the work —
-the position gem-agent measures separately. That is unchanged here.
+This runtime already states the date at the resume point, near the work.
+gem-agent measured that position the same day (gem-agent ADR-0097 §4): with
+the date only in its system prompt, 0 of 5 resumed runs dated new work
+today; with the same fact appended at the resume point, 5 of 5 did. The
+position is kept; only what the line says changes.
 
 ## Decision
 
