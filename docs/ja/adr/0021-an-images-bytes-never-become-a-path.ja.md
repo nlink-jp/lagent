@@ -33,7 +33,7 @@ content-addressed の名前へ symlink を置ける。するとランタイム�
 work dir の getter とバイト上限とプレビュー長だけで（[mcpresult.go:33](../../../cmd/mcpresult.go)）、
 一度も持ったことが無いのがバイト列であり、
 ツール契約は `Run func(ctx, args) (string, error)` である
-（[tools.go:67](../../../internal/tools/tools.go)）。
+（[tools.go:69](../../../internal/tools/tools.go)）。
 
 必要な経路はこちらにも既にあり、しかも同じものである。エージェントループはツールコールの
 **最中に** UI へ話しかけている — `prog.Send(tui.ToolCall{…})`

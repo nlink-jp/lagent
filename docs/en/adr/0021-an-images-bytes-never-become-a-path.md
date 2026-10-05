@@ -42,7 +42,7 @@ work-directory getter, a byte cap and a preview length — the sink this
 decision added is withdrawn by ADR-0022, and what it has never kept is the
 bytes ([mcpresult.go:33](../../../cmd/mcpresult.go)), and the tool contract is
 `Run func(ctx, args) (string, error)`
-([tools.go:67](../../../internal/tools/tools.go)).
+([tools.go:69](../../../internal/tools/tools.go)).
 
 The channel this needs already exists here too, and it is the same one:
 the agent loop talks to the UI **during** a tool call —

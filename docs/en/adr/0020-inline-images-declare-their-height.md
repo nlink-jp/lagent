@@ -224,7 +224,7 @@ hands the server the work directory in `_meta`
 ([client.go:639](../../../internal/mcp/client.go)); and the third draft's
 decoded bytes have no carrier at all — `render` returns a `string`
 ([mcpresult.go:57](../../../cmd/mcpresult.go)) and `Tool.Run` is
-`func(ctx, args) (string, error)` ([tools.go:67](../../../internal/tools/tools.go)).
+`func(ctx, args) (string, error)` ([tools.go:69](../../../internal/tools/tools.go)).
 
 Three drafts in one place is one mistake: **the source cannot be named until
 the plumbing exists.** It is deferred to [ADR-0021](0021-an-images-bytes-never-become-a-path.md),
