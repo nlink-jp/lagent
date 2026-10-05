@@ -318,3 +318,11 @@ excepted).
   44 tools the model mixed up sibling tools' arguments (104/120 against
   80/120). ADR-0004's proxy alternative is closed; the bench keeps the
   `tickets` persona and the `mcp-load` suite
+- [`ADR-0029`](adr/0029-what-was-not-shown-is-reachable.md) —
+  what the runtime did not show is reachable and countable (**Accepted**,
+  ported from gem-agent ADR-0096 Part A): a spilled MCP result is previewed
+  by head and tail with byte spans; `read_file` reads by byte `offset`/`length`,
+  so the tail of a saved single-line result is reachable; `shell_exec` keeps
+  head and tail and saves the whole output to the work directory (not in the
+  operator lane); `search_files` counts every file it did not search. Part B
+  is not ported — gem-agent measured it and found no room
