@@ -18,7 +18,7 @@ ADR-0020 はレーンを作り、供給源を開いたまま残し、反証さ�
 
 それが素直な設計を排除する。MCP intake は既に画像をセッションの work dir へ書き出し、モデルには
 `[image saved at <path> … use view_image on that path]` を渡している
-（[mcpresult.go:231](../../../cmd/mcpresult.go)）。つまりパスはそこにある。しかし `write` は
+（[mcpresult.go:244](../../../cmd/mcpresult.go)）。つまりパスはそこにある。しかし `write` は
 `os.Stat` で短絡し（[mcpresult.go:267](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに
 work dir を `_meta[workdir.MetaKey]` で渡す（[client.go:639](../../../internal/mcp/client.go)）。
 ローカルのサーバ子は自分の名前・ツール名・返すバイト列・ディレクトリを知るので、応答の前に
@@ -30,7 +30,7 @@ content-addressed の名前へ symlink を置ける。するとランタイム�
 
 反証された第 3 稿は、view 層に「intake が既に保持しているバイト列」を渡すと書いた。渡せない。
 `render` は `string` を返し（[mcpresult.go:57](../../../cmd/mcpresult.go)）、`mcpIntake` が持つのは
-work dir の getter とバイト上限とプレビュー長だけで（[mcpresult.go:50](../../../cmd/mcpresult.go)）、
+work dir の getter とバイト上限とプレビュー長だけで（[mcpresult.go:33](../../../cmd/mcpresult.go)）、
 一度も持ったことが無いのがバイト列であり、
 ツール契約は `Run func(ctx, args) (string, error)` である
 （[tools.go:67](../../../internal/tools/tools.go)）。

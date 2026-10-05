@@ -44,8 +44,11 @@ Part A of gem-agent ADR-0096, as it is there:
    quarter, and the stream is saved to the session work directory (up to
    32 MiB) by the runtime, which holds the pipe — no lane's reach changes.
    The operator lane is not saved: it may read credentials, and a copy in
-   the work directory would be readable without approval. The writer is
-   `bounded.HeadTail`.
+   the work directory would be readable without approval. Neither is any
+   lane when the shell runs without the sandbox, where every lane can read
+   credentials. The saved file is private (`0600`). The writer is
+   `bounded.HeadTail`; the lane hint reads the command's own text, not the
+   runtime's note after it.
 4. **`search_files` counts every file it did not search**, by reason —
    over 2 MB (named, up to five), binary, image, unreadable, unlistable
    directory — and refusals past the five named.

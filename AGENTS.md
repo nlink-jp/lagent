@@ -282,10 +282,12 @@ answers.
 ## Gotchas
 
 - **`shell_exec`'s saved output is written by the runtime, never by the
-  command, and never for the operator lane** (ADR-0029). The runtime holds
-  the pipe, so the read lane still writes nothing but its scratch; the
-  operator lane may read credentials, and a copy in the work directory
-  would be readable by `read_file` without approval. The capping writer is
+  command, and never for the operator lane or an unsandboxed shell**
+  (ADR-0029). The runtime holds the pipe, so the read lane still writes
+  nothing but its scratch; the operator lane — and every lane without the
+  sandbox — may read credentials, and a copy in the work directory would be
+  readable by `read_file` without approval. The file is `0600`. The lane
+  hint reads `CommandText`, not the note after it. The capping writer is
   `bounded.HeadTail` — `internal/bounded` stays the one place output is
   capped.
 

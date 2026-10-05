@@ -107,7 +107,7 @@ gem-agent は描画前に応答を分割する。`diagram.Split` が art segment
 材料の残り半分は既にここにある。`mcp.Client` はツール結果のバイナリブロックを `base64.StdEncoding.DecodeString` に通し
 （[client.go:669](../../../internal/mcp/client.go)。`:575` は以前の稿が代わりに引いた
 `Content` の運搬体である）、intake は画像を**セッションの work dir へ書き出して**、モデルには `[image saved at <path> … use view_image on that path]` を渡す
-（[mcpresult.go:231](../../../cmd/mcpresult.go)）。初稿はそれらを「モデルへ転送される」と
+（[mcpresult.go:244](../../../cmd/mcpresult.go)）。初稿はそれらを「モデルへ転送される」と
 書いたが、そうではない。バイトはインラインで戻らない。
 
 **こちら側固有の訂正。** 初稿は、決定 7 の根拠となる危険が「継承ではなくこのコードに

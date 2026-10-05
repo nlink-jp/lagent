@@ -21,7 +21,7 @@ agent's decision nor ADR-0016's sandboxed child, and the path-judging list
 That rules out the obvious design. The MCP intake already writes an image
 into the session work directory and hands the model
 `[image saved at <path> … use view_image on that path]`
-([mcpresult.go:231](../../../cmd/mcpresult.go)), so a path is sitting
+([mcpresult.go:244](../../../cmd/mcpresult.go)), so a path is sitting
 there — but `write` short-circuits on `os.Stat`
 ([mcpresult.go:267](../../../cmd/mcpresult.go)) while every call hands the
 server the work directory as `_meta[workdir.MetaKey]`
@@ -40,7 +40,7 @@ intake already holds". It cannot: `render` returns a `string`
 ([mcpresult.go:57](../../../cmd/mcpresult.go)), `mcpIntake` keeps a
 work-directory getter, a byte cap and a preview length — the sink this
 decision added is withdrawn by ADR-0022, and what it has never kept is the
-bytes ([mcpresult.go:50](../../../cmd/mcpresult.go)), and the tool contract is
+bytes ([mcpresult.go:33](../../../cmd/mcpresult.go)), and the tool contract is
 `Run func(ctx, args) (string, error)`
 ([tools.go:67](../../../internal/tools/tools.go)).
 

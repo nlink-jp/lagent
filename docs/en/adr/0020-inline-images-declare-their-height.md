@@ -124,7 +124,7 @@ result's binary blocks through `base64.StdEncoding.DecodeString`
 `:575` is the `Content` carrier an earlier draft cited instead),
 and the intake **writes an image into the session work directory** and hands
 the model `[image saved at <path> … use view_image on that path]`
-([mcpresult.go:231](../../../cmd/mcpresult.go)). The first draft said such
+([mcpresult.go:244](../../../cmd/mcpresult.go)). The first draft said such
 blocks were "forwarded to the model"; they are not — the bytes never ride
 back inline.
 

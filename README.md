@@ -82,8 +82,8 @@ rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
   comes last — with the byte spans shown and the route to the rest.
   `shell_exec` output past 20,000 bytes keeps its first 15,000 and last
   5,000 bytes — a script's totals come last — and is saved whole to the
-  work directory (up to 32 MiB; not in the operator lane, which may read
-  credentials). `search_files` counts every file it did not search — over
+  work directory (up to 32 MiB, private; not in the operator lane or without
+  the sandbox, where commands may read credentials). `search_files` counts every file it did not search — over
   2 MB (named), binary, image, unreadable — so "no match" says what was not
   looked at.
 - **Confinement:** file tools stay inside the project (and the session

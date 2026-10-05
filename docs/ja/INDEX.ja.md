@@ -238,7 +238,7 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
 - [`ADR-0027`](adr/0027-box-art-where-no-picture-draws.ja.md) — 絵を描かない場所では罫線で描く（**Accepted**、実装済み。gem-agent ADR-0095 の対）: TUI が画像を描かない場所では、flowchart・sequence・ER のフェンスを mermaid-render の `raster.RenderText` が TUI のセルの測り方で罫線に描く。エンジンは組織のコードで、描くたびに格子で確かめるので、ADR-0025 が罫線のレーンを断った 2 つの理由は無くなった。罫線は glamour を通さない独立した区切りで、エスケープを一切通さない（`inertArt`。ADR-0024 の「罫線の抑えは無い」を改める）。画像を描く場所の絵はそのまま。`-p` と素の REPL はソースのまま
 - [`ADR-0028`](adr/0028-loaded-schemas-ride-the-conversation.ja.md) — 読み込んだサーバのスキーマを会話に載せる（**Rejected**、マージしなかった試作で計測）: スキーマを `mcp_load` の結果で返し `mcp_call` の代理で呼べばプロンプトのキャッシュは保てるが、github の 44 ツールではモデルが兄弟ツールの引数を取り違えた（104/120 に対して 80/120）。ADR-0004 の代理の代替案は閉じる。ベンチには `tickets` 役と `mcp-load` スイートを残す
 - [`ADR-0029`](adr/0029-what-was-not-shown-is-reachable.ja.md) —
-  ランタイムが見せなかった部分は、たどり着けて数えられるようにする（**採択**、
+  ランタイムが見せなかった部分は、たどり着けて数えられるようにする（**Accepted**、
   gem-agent ADR-0096 Part A から移植）: 退避した MCP の結果は先頭と末尾で、
   バイト範囲とともにプレビューする。`read_file` はバイト単位の `offset`/`length`
   で読め、保存された 1 行の結果の末尾に届く。`shell_exec` は先頭と末尾を残し、
