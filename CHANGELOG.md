@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-10-06
+
 ### Fixed
 
 - **A resumed session is told when it began** (ADR-0030, from gem-agent
