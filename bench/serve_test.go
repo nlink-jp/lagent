@@ -43,7 +43,8 @@ func TestServeSSEFirstTokenSkipsTheRoleChunk(t *testing.T) {
 // A reasoning delta is the first token too: with thinking on, the
 // server has finished reading the prompt when it starts to think.
 func TestServeSSEReasoningCountsAsFirstToken(t *testing.T) {
-	stream := `data: {"choices":[{"delta":{"reasoning_content":"hm"}}]}` + "\n" + `data: [DONE]`
+	stream := `data: {"choices":[{"delta":{"reasoning_content":"hm"}}]}` + "\n" +
+		`data: {"choices":[{"delta":{},"finish_reason":"stop"}]}` + "\n" + `data: [DONE]`
 	start := time.Unix(0, 0)
 	tick := start
 	now := func() time.Time { tick = tick.Add(time.Second); return tick }
@@ -129,7 +130,9 @@ func TestServeSummaryShowsFinishAndHidesUntimedRates(t *testing.T) {
 
 func TestServeReportRecountsTheRawLog(t *testing.T) {
 	dir := t.TempDir()
-	log := `{"label":"decode","size":1000,"rep":1,"status":200,"prompt_tokens":977,"cached_tokens":0,"completion_tokens":2,"finish_reason":"stop","first_token_s":0.6,"total_s":0.6001,"decode_tps":19990}` + "\n"
+	log := `{"label":"decode","size":1000,"rep":1,"status":200,"prompt_tokens":977,"cached_tokens":0,"completion_tokens":2,"finish_reason":"stop","first_token_s":0.6,"total_s":0.6001,"decode_tps":19990}` + "\n" +
+		// A row logged before cut streams were errors: a 200, no tokens, no finish.
+		`{"label":"conv2-read","size":35000,"rep":1,"status":200,"total_s":24}` + "\n"
 	if err := os.WriteFile(filepath.Join(dir, "requests.jsonl"), []byte(log), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -137,10 +140,47 @@ func TestServeReportRecountsTheRawLog(t *testing.T) {
 	if err := cmdServeReport([]string{dir}, &out); err != nil {
 		t.Fatal(err)
 	}
+	if !strings.Contains(out.String(), "| conv2-read | 35000 | 1 | 1 |") {
+		t.Errorf("a cut stream in an old log must recount as failed:\n%s", out.String())
+	}
 	if strings.Contains(out.String(), "19990") || !strings.Contains(out.String(), "| – |") {
 		t.Errorf("the old rate survived the recount:\n%s", out.String())
 	}
 	if b, _ := os.ReadFile(filepath.Join(dir, "summary.md")); string(b) != out.String() {
 		t.Error("summary.md not rewritten")
+	}
+}
+
+// A stream cut before it says how it ended is a failure: a server
+// restarting mid-run left a 200 with no tokens that read as a success.
+func TestServeSSECutStreamIsAnError(t *testing.T) {
+	start := time.Unix(0, 0)
+	var s serveSample
+	err := serveSSE(strings.NewReader(`data: {"choices":[{"delta":{"role":"assistant","content":""}}]}`+"\n"), start, func() time.Time { return start.Add(24 * time.Second) }, &s)
+	if err == nil {
+		t.Fatalf("a cut stream was recorded as a success: %+v", s)
+	}
+}
+
+// Two streams together are counted over the window they share, not as
+// the sum of their own rates (A2 rep 1: 168 by sum, 143 by window).
+func TestPairBothIsCountedOverTheSharedWindow(t *testing.T) {
+	got := withPairSums([]serveSample{
+		{Label: "pair-1", Size: 1000, Rep: 1, CompletionTokens: 300, FirstTokenSec: 1, TotalSec: 4, DecodeTPS: 99.7},
+		{Label: "pair-2", Size: 1000, Rep: 1, CompletionTokens: 300, FirstTokenSec: 2, TotalSec: 5, DecodeTPS: 99.7},
+		{Label: "pair-1", Size: 1000, Rep: 2, Error: "refused"},
+		{Label: "cold", Size: 1000, Rep: 1},
+	})
+	var both []serveSample
+	for _, s := range got {
+		if s.Label == pairSumLabel {
+			both = append(both, s)
+		}
+	}
+	if len(both) != 1 {
+		t.Fatalf("want one pair-both row (rep 2 has a failed stream): %+v", both)
+	}
+	if both[0].CompletionTokens != 600 || both[0].DecodeTPS != 150 { // 600 tokens over 1 s..5 s
+		t.Errorf("pair-both %+v, want 600 tokens at 150 tok/s", both[0])
 	}
 }

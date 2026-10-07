@@ -241,8 +241,13 @@ as it completes, with the server's own `timings` when it sends one, and
 `summary.md` holds the medians and how each measurement ended (`finish`:
 a `decode` that ends in `stop` is the model ending its answer, not the
 server's speed at that size). An answer shorter than 16 tokens gets no
-rate (`–`): a one-word reply arrives in one instant. `bench serve-report
-<dir>` recounts `summary.md` from `requests.jsonl`. A size class is a target: the padding
+rate (`–`): a one-word reply arrives in one instant. `pair-both` is the
+two streams together — all their tokens over the window from the first
+one's first token to the last one's end; the sum of the two `pair-N`
+rates overstates a server that starts the second stream only after the
+first one's prompt. A stream that ends without a finish reason or usage
+is a failure, not an empty answer. `bench serve-report <dir>` recounts
+`summary.md` from `requests.jsonl`. A size class is a target: the padding
 assumes 2.8 characters a token (Qwen 3.6 on this source), and each row
 records the count the server reported.
 

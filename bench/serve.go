@@ -126,7 +126,19 @@ func serveSSE(r io.Reader, start time.Time, now func() time.Time, s *serveSample
 	}
 	s.TotalSec = now().Sub(start).Seconds()
 	s.DecodeTPS = decodeRate(s.CompletionTokens, s.FirstTokenSec, s.TotalSec)
+	// A stream that ends without saying how it ended was cut, not
+	// answered: a server restarting mid-run left a 200 with no tokens
+	// that counted as a success (measured, 2026-10-07).
+	if cutStream(*s) {
+		return errCutStream
+	}
 	return nil
+}
+
+var errCutStream = errors.New("stream ended without a finish reason or usage")
+
+func cutStream(s serveSample) bool {
+	return s.FinishReason == "" && s.CompletionTokens == 0
 }
 
 // padding builds about `chars` characters of real source text from the
@@ -403,6 +415,9 @@ func cmdServeReport(args []string, out io.Writer) error {
 		// The rate is recomputed, so a log written before a change to
 		// decodeRate reads as if measured today.
 		s.DecodeTPS = decodeRate(s.CompletionTokens, s.FirstTokenSec, s.TotalSec)
+		if s.Error == "" && cutStream(s) {
+			s.Error = errCutStream.Error()
+		}
 		all = append(all, s)
 	}
 	if err := sc.Err(); err != nil {
@@ -411,6 +426,48 @@ func cmdServeReport(args []string, out io.Writer) error {
 	summary := serveSummary(all)
 	fmt.Fprint(out, summary)
 	return os.WriteFile(filepath.Join(args[0], "summary.md"), []byte(summary), 0o644)
+}
+
+// pairSumLabel is the summary row for two streams together: all their
+// completion tokens over the window from the first stream's first
+// token to the last stream's end. Adding the per-stream rates instead
+// overstates a server that starts the second stream only after the
+// first one's prompt (measured: 168 by sum against 143 by window).
+const pairSumLabel = "pair-both"
+
+func withPairSums(all []serveSample) []serveSample {
+	byRep := map[int][]serveSample{}
+	var reps []int
+	for _, s := range all {
+		if !strings.HasPrefix(s.Label, "pair-") || s.Label == pairSumLabel || s.Error != "" {
+			continue
+		}
+		if _, ok := byRep[s.Rep]; !ok {
+			reps = append(reps, s.Rep)
+		}
+		byRep[s.Rep] = append(byRep[s.Rep], s)
+	}
+	sort.Ints(reps)
+	out := all
+	for _, rep := range reps {
+		g := byRep[rep]
+		if len(g) < 2 {
+			continue
+		}
+		sum := serveSample{Label: pairSumLabel, Size: g[0].Size, Rep: rep, FirstTokenSec: g[0].FirstTokenSec}
+		for _, s := range g {
+			sum.PromptTokens += s.PromptTokens
+			sum.CompletionTokens += s.CompletionTokens
+			sum.FirstTokenSec = min(sum.FirstTokenSec, s.FirstTokenSec)
+			sum.TotalSec = max(sum.TotalSec, s.TotalSec)
+		}
+		sum.FinishReason = "both"
+		if sum.TotalSec > sum.FirstTokenSec {
+			sum.DecodeTPS = float64(sum.CompletionTokens) / (sum.TotalSec - sum.FirstTokenSec)
+		}
+		out = append(out, sum)
+	}
+	return out
 }
 
 // serveSummary folds the samples into one table: per measurement and
@@ -422,7 +479,7 @@ func serveSummary(all []serveSample) string {
 	}
 	groups := map[key][]serveSample{}
 	var order []key
-	for _, s := range all {
+	for _, s := range withPairSums(all) {
 		k := key{s.Label, s.Size}
 		if _, ok := groups[k]; !ok {
 			order = append(order, k)
