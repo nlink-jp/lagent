@@ -212,6 +212,36 @@ tool), arg errors (tool results the fixture refused as `invalid arguments:`,
 summed over the runs), and the medians of rounds, tool calls, prompt
 tokens and wall seconds.
 
+## The server measurement
+
+`bench serve` measures the model server, not the agent: what a backend
+decision quotes (ADR-0031).
+
+```bash
+go run ./bench serve --base-url http://localhost:11234/v1 \
+  --model <id> --label <name> [--sizes 1k,12k,35k,69k] [--reps 2]
+```
+
+Per size class it sends a prompt of the repository's own Go source and
+records four requests: `cold` (a prefix no earlier request sent — every
+run opens its prompts with its own nonce), `resend` (the same request
+again), `next-turn` (the same prefix plus one more exchange) and
+`decode` (the same prefix, asked to count until `--decode-tokens` stops
+it). Then `--convs` distinct prompts of the middle size are read and
+asked again in turn (`convN-read`, `convN-back`: does the server still
+hold the first when the last has been read?), and two decode streams of
+the smallest size run at once (`pair-1`, `pair-2`).
+
+Thinking is off by default (`--reasoning-effort none`) so the decode
+figure is generation speed and not the length of a thought. The first
+token is the first content, reasoning or tool-call delta — a role-only
+chunk does not count; decode speed is the completion tokens after the
+first over the time after it. Every request lands in `requests.jsonl`
+as it completes, with the server's own `timings` when it sends one, and
+`summary.md` holds the medians. A size class is a target: the padding
+assumes 2.8 characters a token (Qwen 3.6 on this source), and each row
+records the count the server reported.
+
 ## Measurements
 
 Baseline, 2026-09-12: lagent v0.1.0 (`acd6c4c`), LM Studio,

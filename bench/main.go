@@ -6,6 +6,11 @@
 //
 //	go run ./bench run --bin dist/lagent --configs baseline [--reps 3]
 //	go run ./bench report bench/_results/<dir>
+//	go run ./bench serve --base-url <url> --model <id> --label <name>
+//
+// serve measures the model server rather than the agent: cold prompt
+// reading, reuse on a resend or a next turn, generation speed, two
+// streams at once (ADR-0031).
 //
 // Nothing here ships in the lagent binary. Runs cost real minutes on
 // the local model server, so the bench is run by hand, never by
@@ -38,6 +43,8 @@ func run(args []string, out, errOut io.Writer) int {
 		err = cmdRun(args[1:], out)
 	case "report":
 		err = cmdReport(args[1:], out)
+	case "serve":
+		err = cmdServe(args[1:], out)
 	case "-h", "--help", "help":
 		fmt.Fprintln(out, usage)
 		return 0
@@ -55,6 +62,8 @@ const usage = `usage:
   bench run    --bin <path> --configs <name[=file],...> [--runtime lagent|gem-agent]
                [--tasks a,b] [--reps N] [--timeout 10m] [--out DIR] [--mcp-bin <path>]
   bench report <results dir>
+  bench serve  --base-url <url> --model <id> --label <name> [--sizes 1k,12k,35k,69k]
+               [--reps N] [--reasoning-effort none] [--convs 5] [--pair=true] [--out DIR]
 
 A configuration name resolves to bench/configs/<runtime>/<name>.toml;
 name=/path/to/config.toml uses a file of your own (the reference
