@@ -1,0 +1,22 @@
+# bench (ADR-0031): mlx-serve's own build of Qwen 3.6 (with its MTP
+# head), as daily use runs it.
+# Thinking is set explicitly because the
+# servers' defaults differ: mlx-serve thinks only for a model whose
+# per-model settings say so, and treats every value but "none" as on;
+# LM Studio validates the OpenAI vocabulary and maps it to the model.
+[llm]
+provider = "mlxserve"
+base_url = "http://localhost:11234/v1"
+model    = "ddalcu/Qwen3.6-35B-A3B-MLX-Serve-4bit"
+reasoning_effort = "medium"
+
+[agent]
+max_turns = 30
+shell_timeout_sec = 60
+
+[mcp]
+call_timeout_sec = 30
+
+[approval.tools]
+"mcp__geo__*" = "never"
+"mcp__tickets__*" = "never"
