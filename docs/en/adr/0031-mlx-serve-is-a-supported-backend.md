@@ -55,7 +55,9 @@ residual risk rather than settled by lagent.
 1. **`[llm].provider = "mlxserve"`.** The context window is read from
    the model's entry in `/v1/models`. A model the list does not carry is
    an error naming the cause, since this lookup is the only place a
-   mistyped id can surface (implemented, `fbb786a`).
+   mistyped id can surface (implemented, `fbb786a`). The lookup runs only
+   when `[model].context_window` is 0, so the operator leaves it unset
+   for this provider; a hand-set window skips the check.
 2. **The default stays `lmstudio`.** Changing it would break every
    configuration that relies on the default, which the cli-series
    stability contract (ADR-0023) forbids outside the breaking-change
@@ -83,7 +85,11 @@ disk. "MTP" is mlx-serve's own build (`ddalcu/Qwen3.6-35B-A3B-MLX-Serve-4bit`)
 with its multi-token-prediction head, the configuration daily use runs.
 mlx-serve ran with the operator's settings (prefill partly offloaded to
 the Neural Engine, prefix cache 2 GB in memory plus disk); LM Studio with
-262k context and 4 parallel slots. One server was loaded at a time.
+262k context and 4 parallel slots (mlx-serve serves one request at a
+time, `max_concurrent = 1`). One server was loaded at a time. The first
+mlx-serve run lost its conversation and two-stream rows to a server
+restart (the operator rebinding it to `127.0.0.1`); those rows were
+measured again.
 
 **The task bench** (seven tasks — the six of ADR-0006 and `skill-follow`
 — three repetitions, thinking on via `reasoning_effort = "medium"`,
@@ -91,36 +97,38 @@ the Neural Engine, prefix cache 2 GB in memory plus disk); LM Studio with
 
 | configuration | completed | wall time, 21 runs | the failures |
 |---|---|---|---|
-| mlx-serve, MTP | 19/21 | 294 s | `read-edit` 1 (fix described, not made), `view-image` 1 (answered with the untrusted-data tag name) |
-| mlx-serve, same weights | 19/21 | 337 s | `read-edit` 1, `multi-file-rename` 1 (both: change described, not made) |
+| mlx-serve, MTP | 19/21 | 295 s | `read-edit` 1 (fix described, not made), `view-image` 1 (answered with the untrusted-data tag name) |
+| mlx-serve, same weights | 19/21 | 338 s | `read-edit` 1, `multi-file-rename` 1 (both: change described, not made) |
 | LM Studio, same weights | 14/21 | 324 s | `skill-follow` 3 (the right line after two blank lines — the format check is anchored), `read-edit` 2, `multi-file-rename` 2 (one answer was only `\n\n`) |
 
 Repeated on the MTP configuration, `read-edit` completed 5/6 and
 `view-image` 6/6: the tag-name answer is 1 in 9 and has not recurred.
 "Described, not made" is the class ADR-0008 measured on Gemma 4; it is a
-model behaviour, seen under both servers. No run on mlx-serve returned
-an empty completion, a malformed tool call or an argument error.
+model behaviour, seen under both servers. Empty completions occurred on
+both servers — 8 on mlx-serve (3, 4 and 1 in the repeat) and 4 on LM
+Studio — and every one was answered on ADR-0007's re-send; none ended a
+run. No run returned a malformed tool call or an argument error.
 
-**The server** (`bench serve`, medians of two; prompt tokens as
-reported — the size classes 1k/12k/35k/69k came to 966, 11,185, 31,694
-and 60,333):
+**The server** (`bench serve`, medians of two; times are to the first
+token; prompt tokens as reported — the size classes 1k/12k/35k/69k came
+to 966, 11,185, 31,694 and 60,333):
 
 | | mlx-serve, MTP | mlx-serve, same weights | LM Studio, same weights |
 |---|---|---|---|
-| cold read, 11k | 11.5 s | 11.4 s | 15.5 s |
+| cold read, 11k | 11.4 s | 11.4 s | 15.5 s |
 | cold read, 32k | 46.0 s | 45.4 s | 49.0 s |
 | cold read, 60k | 124.4 s | 122.9 s | 110.6 s |
 | resend, 60k | 0.9 s | 0.8 s | 1.5 s |
 | next turn, 60k | 1.3 s | 1.2 s | 1.5 s |
 | decode, 1k | 158 tok/s | 106 tok/s | 85 tok/s |
-| decode, 11k | 110 tok/s | 93 tok/s | 81 tok/s |
+| decode, 11k | 110 tok/s | 93 tok/s | 80 tok/s |
 | decode, 60k | 65 tok/s | 61 tok/s | 57 tok/s |
-| two streams at once, 1k (sum) | 168 tok/s | 115 tok/s | 125 tok/s |
-| back to the first of five 32k conversations | 27.7 s (16k reused) | 27.6 s (16k reused) | 1.1 s |
+| two streams at once, 1k (over their shared window) | 144 tok/s | 103 tok/s | 125 tok/s |
+| back to each of five 32k conversations | 27.7 s (16k reused) | 27.6 s (16k reused) | 1.1 s |
 
 - **The runtime itself is not where the speed comes from.** Under the same
   weights, mlx-serve reads prompts up to ~32k faster and LM Studio reads
-  60k faster; generation is 7–25 % faster under mlx-serve. The large gap
+  60k faster; generation is 8–25 % faster under mlx-serve. The large gap
   is the MTP head of mlx-serve's own build: 1.9× LM Studio's generation
   at 1k, 1.4× at 11k, converging at 60k (1.1×).
 - **Long context holds.** A cold 122,019-token prompt completed on
@@ -132,13 +140,17 @@ and 60,333):
   only), five 32k conversations do not fit and a 122k one does not fit
   once: a resend reused 81,920 of 122,019 tokens (207 s), the next turn
   98,304 (131 s), and going back to the first of five conversations took
-  27.7 s. Qwen 3.6 keeps about 26 KB a token (attention KV on 10 of 40
-  layers plus the linear-attention state), so 122k is about 3.1 GB. The
-  same server with `--prefix-cache-mem 8GB` (the app's "Prefix cache
-  memory cap") — one run, everything else the operator's — resent the
-  122k prompt in 1.2 s, took the next turn in 2.1 s, and went back to
-  each of the five conversations in 0.4–0.5 s, faster than LM Studio's
-  1.1 s; the cache peaked at 5.0 GB.
+  27.7 s. A cache entry of Qwen 3.6 is about 27 KB a token (attention KV
+  on 10 of 40 layers plus the linear-attention state; the server logged
+  the 122k entry at 3.3 GB). The same server with `--prefix-cache-mem 8GB`
+  (the app's "Prefix cache memory cap") — one run, everything else the
+  operator's — resent the 122k prompt in 1.1 s, took the next turn in
+  2.1 s, and went back to each of the five conversations in 0.4–0.5 s,
+  faster than LM Studio's 1.1 s. The 8 GB filled during that run and
+  evicted the least recently used entries 49 times — 122k entries too,
+  while the 122k measurement still ran, since each of its turns stored a
+  new 3.3 GB entry and the reuse came from the newest. 8 GB holds this
+  pattern, not every session an operator keeps.
 - mlx-serve reports `cached_tokens`; LM Studio does not, so its records
   show 0 cached although it reuses the prefix.
 
@@ -166,12 +178,20 @@ lagent cannot settle these; the operator who runs the server takes them on.
    `reasoning_tokens`), so the same work records more output under
    mlx-serve than under LM Studio.
 5. **The prefix cache's default budget re-reads long sessions.** Below
-   2 GB of cache — about 80k tokens of Qwen 3.6 — nothing changes; past
+   2 GB of cache — about 75k tokens of Qwen 3.6 — nothing changes; past
    it, every turn re-reads tens of thousands of tokens. The operator sets
    the memory cap (8 GB measured) where the RAM allows; lagent cannot.
 6. **A mistyped model id runs against the loaded model.** The provider
    reports it at startup as a notice; the session still starts, as it
-   does when any provider's window lookup fails.
+   does when any provider's window lookup fails. With
+   `[model].context_window` set, nothing reports it.
+7. **The window shown may be larger than the one served.** `/v1/models`
+   carries the window the server documents for discovery clients. Under
+   the app it matched what the server served (262,144, as its `/props`
+   said); launched from the command line with the window left to
+   memory, the server pinned 148,480 while its model declared 262,144.
+   Only the footer's gauge reads the number; a prompt past the served
+   window is a 400 that names both counts.
 
 ## References
 

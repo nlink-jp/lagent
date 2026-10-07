@@ -14,7 +14,8 @@
 #   lmstudio — LM Studio (context length from /api/v0/models)
 #   mlxserve — mlx-serve (context length from /v1/models; a model id
 #              it does not list is reported at startup, since it
-#              answers any name with the model it has loaded)
+#              answers any name with the model it has loaded — keep
+#              [model].context_window at 0, or that check is skipped)
 #   ollama   — Ollama (context length from /api/show)
 #   openai   — any other OpenAI-compatible server (set [model].context_window)
 # Also settable via LAGENT_PROVIDER.
