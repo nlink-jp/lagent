@@ -7,6 +7,7 @@
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
 | Triggered by | ベンチの `read-edit` タスクが 2/3、次いで 2/8 で「何も運ばない completion」により失敗し、生ストリームがその理由を示した |
+| Amended | 2026-10-07（ADR-0031）: 空白だけのテキストも空とみなす。LM Studio の下で Qwen 3.6 の回答は思考の後の空行で始まり、ベンチの 1 回では最終回答の全体が `\n\n` だった — 空の判定はそれを回答として通していた |
 
 ## Context
 

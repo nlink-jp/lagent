@@ -7,6 +7,7 @@
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
 | Triggered by | The bench's `read-edit` task failed 2/3 and then 2/8 on a completion that carried nothing — and the raw stream showed why |
+| Amended | 2026-10-07 (ADR-0031): text that is only whitespace counts as empty. Under LM Studio, Qwen 3.6 answers begin with the blank lines after its thinking, and one bench run's whole final answer was `\n\n`, which the empty check let through as the answer |
 
 ## Context
 

@@ -787,7 +787,10 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 		// tool-call opener that the server routed into the reasoning
 		// channel — a coin flip at some points, deterministic at others,
 		// and answered normally once nudged), and reported after that.
-		if resp.Content == "" && len(resp.ToolCalls) == 0 {
+		// Whitespace is nothing too: LM Studio passes on the blank lines
+		// Qwen 3.6 writes after its thinking, and one run's whole final
+		// answer was "\n\n" (ADR-0031).
+		if strings.TrimSpace(resp.Content) == "" && len(resp.ToolCalls) == 0 {
 			retry := emptyAsked < maxEmptyRetries && ctx.Err() == nil
 			a.logRecord("assistant_empty", map[string]any{
 				"round": round, "finish_reason": resp.FinishReason,

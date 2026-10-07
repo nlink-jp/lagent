@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A completion of only blank lines is asked again**, as an empty one is
+  (ADR-0007, amended by ADR-0031). Under LM Studio, Qwen 3.6 starts its answer
+  with the blank lines after its thinking; one bench run's entire final answer
+  was `\n\n`, which was returned as the answer.
+
 ### Added
 
 - **`[llm].provider = "mlxserve"`** for

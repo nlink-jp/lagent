@@ -410,6 +410,25 @@ func TestEmptyResponseIsAskedAgain(t *testing.T) {
 	}
 }
 
+// A completion of blank lines is as empty as no text: LM Studio passed
+// "\n\n" through as a whole final answer (ADR-0031).
+func TestWhitespaceOnlyResponseIsAskedAgain(t *testing.T) {
+	mb := &mockBackend{responses: []*llm.Response{
+		{Content: "\n\n", FinishReason: "stop"},
+		{Content: "done"},
+	}}
+	a, _ := newAgent(t, mb, &approveAll{}, 5)
+	out, err := a.Run(context.Background(), "fix it", nil)
+	if err != nil || out != "done" {
+		t.Fatalf("a blank answer must be asked again: %q %v", out, err)
+	}
+	for i, m := range a.history {
+		if m.Role == llm.RoleAssistant && strings.TrimSpace(m.Content) == "" && len(m.ToolCalls) == 0 {
+			t.Fatalf("history[%d] stored a blank assistant turn", i)
+		}
+	}
+}
+
 func TestResetClearsHistory(t *testing.T) {
 	mb := &mockBackend{responses: []*llm.Response{{Content: "a"}, {Content: "b"}}}
 	a, _ := newAgent(t, mb, &approveAll{}, 5)
