@@ -242,6 +242,10 @@ type Messages struct {
 	// EmptyRetried: the model returned nothing and the same request
 	// is being sent once more (ADR-0007).
 	EmptyRetried string
+	// RiskReviewFailedFmt: the model tier's judgment failed (ADR-0032);
+	// said once a session, since a server that rejects the judge's model
+	// or reasoning_effort fails every judgment. %v = the error.
+	RiskReviewFailedFmt string
 	// RemoteFaultFmt: server, tool, identical failures in a row.
 	RemoteFaultFmt string
 	// RoundLimitContinuedFmt / RoundLoopContinuedFmt: the progress
@@ -429,6 +433,7 @@ keys:
 	TranscriptFailedFmt:    "session transcript write failed (%s) — recording stopped, so this session can no longer be resumed in full; restart lagent to record again",
 	TruncatedFmt:           "the response was cut off mid-generation (%s) — ask for the rest, or narrow the request",
 	EmptyRetried:           "the model returned an empty response — sending the same request again",
+	RiskReviewFailedFmt:    "risk review failed, so write-lane commands are asked about (check [llm].risk_model and [llm].risk_reasoning_effort): %v",
 	PromptHookAttachedFmt:  "user_prompt_submit hook attached %d bytes of context as data",
 	RemoteFaultFmt:         "MCP server %q: %s failed %d times in a row with the same error — /mcp reload, or fix the server",
 	RoundLimitContinuedFmt: "round limit reached at %d rounds — continued at your request",
@@ -585,6 +590,7 @@ var ja = Messages{
 	TranscriptFailedFmt:    "セッション記録の書き込みに失敗しました（%s）。記録が停止したため、このセッションは完全な形では再開できません。記録を再開するには lagent を起動し直してください",
 	TruncatedFmt:           "応答が生成途中で打ち切られました（%s）— 続きを求めるか、要求を絞ってください",
 	EmptyRetried:           "モデルが空の応答を返しました — 同じ要求をもう一度送ります",
+	RiskReviewFailedFmt:    "リスク判定に失敗したため、write レーンのコマンドは確認します（[llm].risk_model と [llm].risk_reasoning_effort を確認してください）: %v",
 	PromptHookAttachedFmt:  "user_prompt_submit フックが %d バイトのコンテキストをデータとして添付しました",
 	RemoteFaultFmt:         "MCP サーバー %q: %s が同じエラーで %d 回連続して失敗しました — /mcp reload、またはサーバー側を修正してください",
 	RoundLimitContinuedFmt: "ラウンド上限 %d に達しました — あなたの指示で継続しました",

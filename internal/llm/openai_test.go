@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -389,7 +390,7 @@ func TestContextWindowPerProvider(t *testing.T) {
 	// mlx-serve answers a chat request for any name with the model it has
 	// loaded, so the window lookup is where a typo has to surface.
 	o, _ = NewOpenAI(srv.URL+"/v1", "ddalcu/qwen3.6-typo", "", ProviderMLXServe)
-	if _, err := o.ContextWindow(context.Background()); err == nil || !strings.Contains(err.Error(), "does not list") {
+	if _, err := o.ContextWindow(context.Background()); err == nil || !strings.Contains(err.Error(), "does not list") || !errors.Is(err, ErrModelNotListed) {
 		t.Errorf("an unlisted mlxserve model must be named as such: %v", err)
 	}
 	o, _ = NewOpenAI(srv.URL, "with-num-ctx", "", ProviderOllama)

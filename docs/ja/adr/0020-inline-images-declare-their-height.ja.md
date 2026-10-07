@@ -214,7 +214,7 @@ view 層の読み取りを開く）は、いまや先送りした決定に属す
 
 ### 7. 描画は TUI 限定。能力の検出は 1 度だけ
 
-`tea.NewProgram` が構築されるのは 1 箇所（[root.go:1418](../../../cmd/root.go)）。
+`tea.NewProgram` が構築されるのは 1 箇所（[root.go:1455](../../../cmd/root.go)）。
 one-shot `-p` と素の REPL はそれを作らず、描かない。探針はその構築の**前**に走りキャッシュ
 される。理由は `newGlamourRenderer` が `WithAutoStyle` について記録しているとおりで、これは
 移植元から継承した記述であり、ここでも真である。探針は問い合わせ前に排出し、応答が無いことを
@@ -250,7 +250,7 @@ device attributes 要求を載せる。VT 互換の端末は必ずこれに答�
 追加し、この性質を述べるテストは最初の実装に対して 3 つの判定すべてで失敗する。
 
 選択は `theme`・`language` と並ぶ `[tui] images = "auto"`
-（[config.go:196](../../../internal/config/config.go)。`theme` と `language` は `:180` と `:184`）。多重化端末の中では **off** である。
+（[config.go:202](../../../internal/config/config.go)。`theme` と `language` は `:180` と `:184`）。多重化端末の中では **off** である。
 payload を描くと測定された唯一の多重化端末が画像 1 枚ごとにフレームを取り残したからであって、
 passthrough が他人の設定だからではない。
 

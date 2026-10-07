@@ -24,6 +24,8 @@ Unknown keys are errors (strict decode).
 | `[llm].model` | (required) | model id as the server lists it; there is no default — startup fails without it (or `LAGENT_MODEL` / `--model`) |
 | `[llm].api_key` | (unset) | bearer token for a server that requires one; local servers need none |
 | `[llm].reasoning_effort` | (unset) | sent verbatim as the request's `reasoning_effort`; unset sends nothing. The OpenAI vocabulary (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`); LM Studio validates it and maps it to the model — for Gemma 4, `none` is thinking off and anything else is on (its log notes the mapping). mlx-serve validates nothing: `none` is off and every other value, `off` included, is on (ADR-0031) |
+| `[llm].risk_model` | (unset) | the model the model tier asks, on the same server; unset is `[llm].model`. With `mlxserve`, an id its `/v1/models` does not list stops startup (ADR-0032) |
+| `[llm].risk_reasoning_effort` | `none` | the judge's `reasoning_effort`, sent verbatim; `""` sends nothing. A server that rejects the value fails every judgment — the first failure is shown with this key's name — and the commands are asked about |
 | `[model].context_window` | `0` | context window in tokens; `0` detects it from the provider at startup (LM Studio `/api/v0/models`, mlx-serve `/v1/models`, Ollama `/api/show`; `openai` needs an explicit value). mlx-serve answers a chat request for any model name with the model it has loaded, so a `[llm].model` its `/v1/models` does not list is reported here at startup — leave the key at `0` with `mlxserve`, since a set window skips that check |
 | `[sandbox].enabled` | `true` | wrap `shell_exec` in sandbox-exec; the lane the model declares is enforced by the kernel. Off, every shell call is yours to approve |
 | `[sandbox].read_lane_deny_exec` | (unset) | programs the read lane may not launch, added to the built-in list |
@@ -45,6 +47,7 @@ Unknown keys are errors (strict decode).
 | `[tui.diagram].font` / `font_name` / `bold_font` / `bold_font_name` | Hiragino Sans W3 / W6 | the font mermaid diagrams are drawn in where images draw (ADR-0025): a .ttf/.otf/.ttc file and a face in it by full or PostScript name; `bold_font` (entity names, frame titles) defaults to the body face. Read once at start, only when images draw; a value that does not load is a banner warning and the default font, never a refusal to start. User config only |
 | `[tui].images` | `auto` | inline images — what the model shows with `show_image` and what you ask for with `/show` (PNG or JPEG, up to 2 MiB): `auto` (ask the terminal before the UI starts), `off`, or a forced protocol — `iterm` or `kitty` (ADR-0020/0022). Inside tmux or screen `auto` resolves to off |
 | `[approval].pin_trusted_files` | `true` | trust is given to content: a trusted project's agent-facing files are pinned by digest and a changed one asks again |
+| `[approval].model_tier` | `off` | `shell` has a judge model decide, under auto-approve, the write-lane `shell_exec` calls the rule tier leaves at Review (ADR-0032): approved at confidence 0.8 in both of gem-agent's rounds, otherwise asked with the judge's reason. Nothing else reaches it — MCP calls, the operator lane and every other Review still ask. Global only |
 | `[approval].tools` | (unset) | per-tool policy: `"always"` (always ask; a floor auto-approve cannot lift) or `"never"` (never ask; blocked shell patterns and credential reads still ask). `--allow` does the same for one run |
 | `[approval].trusted_projects` | (unset) | projects whose own `.lagent.toml` may remove approvals (`"never"` entries). The startup trust prompt only loads a project's files; nothing but this list lets a project loosen the gate |
 
@@ -53,6 +56,14 @@ answers the gate, `read_only` decides what the session may reach at
 all. Both can be on. A project's `.lagent.toml` carries neither — it
 holds `[approval.tools]` and `[mcp].exclude` only, so a cloned
 repository cannot switch the gate off.
+
+**The risk rulebook.** `risk-rules.md` beside `config.toml` is yours, in
+your words: what you approve and what you never want run unasked ("never
+resolve or fetch a domain under investigation from this machine"). With
+`[approval].model_tier = "shell"` the judge reads it on every judgment as
+evidence about your risk posture, never as instructions; lagent reads it
+at startup and never writes it. It is capped at 4,000 characters, and a
+longer file is cut with a notice. Global only, like the tier.
 
 ### `[hooks]` — pre-tool hooks
 

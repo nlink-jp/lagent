@@ -594,6 +594,36 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	}
 	backend.SetReasoningEffort(cfg.LLM.ReasoningEffort)
 
+	// --- the model tier (ADR-0032): its own backend on the same server,
+	// because the judge's reasoning_effort is its own even on the main
+	// model; the operator's rulebook beside config.toml.
+	var riskBackend llm.Backend
+	var rulebook string
+	var tierNotes []string
+	riskModel := cfg.LLM.RiskModel
+	if riskModel == "" {
+		riskModel = cfg.LLM.Model
+	}
+	if cfg.Approval.ModelTier == "shell" {
+		rb, err := llm.NewOpenAI(cfg.LLM.BaseURL, riskModel, cfg.LLM.APIKey, cfg.LLM.Provider)
+		if err != nil {
+			return err
+		}
+		rb.SetReasoningEffort(cfg.LLM.RiskReasoningEffort)
+		if err := checkRiskModel(ctx, rb, cfg.LLM.Provider, cfg.LLM.RiskModel); err != nil {
+			return err
+		}
+		riskBackend = rb
+		text, clipped, err := config.LoadRulebook(cfgPath)
+		switch {
+		case err != nil:
+			tierNotes = append(tierNotes, fmt.Sprintf("risk rulebook not loaded, judging without it: %v", err))
+		case clipped:
+			tierNotes = append(tierNotes, fmt.Sprintf("%s is longer than %d characters; the judge sees the first %d", config.RulebookPath(cfgPath), config.RulebookCap, config.RulebookCap))
+		}
+		rulebook = text
+	}
+
 	// The TUI needs a real terminal on both ends (gem-agent ADR-0002); piped use
 	// falls back to the plain line REPL so scripts and smoke pipelines
 	// keep working.
@@ -728,6 +758,9 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			return
 		}
 		fmt.Fprintf(stderr, "[⚠ %s]\n", msg)
+	}
+	for _, n := range tierNotes {
+		notice(n)
 	}
 	// --- pre-tool hooks (ADR-0012): the operator's floor before the
 	// ladder. What a hook learns about the session: the transcript path
@@ -876,6 +909,10 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		InstructionTools: []string{skills.ToolName},
 		AutoApprove:      autoOn,
 		Ceiling:          ceiling,
+		ModelTier:        riskBackend != nil,
+		RiskBackend:      riskBackend,
+		RiskModel:        riskModel,
+		Rulebook:         rulebook,
 		OnAutoDecision: func(tc llm.ToolCall, d agent.AutoDecision) {
 			if !d.Approved {
 				return // the escalation shows up in the approval prompt

@@ -198,7 +198,7 @@ Each item is adopted or rejected by ADR on the strength of Phase 1
 measurements.
 
 - history compaction (designed after measuring the KV-cache discard cost)
-- the model tier of auto-approval — measured and not adopted (ADR-0010)
+- the model tier of auto-approval — measured and not adopted (ADR-0010); adopted for write-lane shell commands only, opt-in (ADR-0032)
 - skills — adopted, in Claude Code's format from lagent's own directory (ADR-0011)
 - hooks — adopted: pre-tool (ADR-0012), session start, prompt submit and session end (ADR-0014), on Claude Code's measured contracts
 - agent memory — adopted; recall rides the runtime-facts message, measured (ADR-0013)

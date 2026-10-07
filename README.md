@@ -66,7 +66,12 @@ lagent
 
 The first start asks whether to trust the project's own AGENTS.md /
 CLAUDE.md / .mcp.json. Mutating tools ask before running; `--auto` lets
-rule-tier Safe calls run unasked; `-p "…"` runs one prompt and exits.
+rule-tier Safe calls run unasked, and with `[approval].model_tier =
+"shell"` a judge model decides write-lane shell commands too (about half
+of them ran unasked on a month of real prompts, and no exfiltration or
+injection case passed —
+[ADR-0032](docs/en/adr/0032-the-model-tier-judges-write-lane-shell.md));
+`-p "…"` runs one prompt and exits.
 `/help` lists the slash commands.
 
 ## What it does

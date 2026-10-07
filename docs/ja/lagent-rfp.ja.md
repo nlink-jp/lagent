@@ -179,7 +179,7 @@ Phase 2 で計測してから採否を決める。
 各項目は Phase 1 の計測結果を根拠に ADR で採否を決める。
 
 - 履歴圧縮（KV キャッシュ破棄コストを計測してから設計）
-- 自動承認のモデル層 — 計測のうえ採らず（ADR-0010）
+- 自動承認のモデル層 — 計測のうえ採らず（ADR-0010）。write レーンのシェルコマンドに限り、オプトインで採用（ADR-0032）
 - skills — 採用、Claude Code の形式のまま lagent 自身のディレクトリから（ADR-0011）
 - hooks — 採用: pre-tool（ADR-0012）、session start・prompt submit・session end（ADR-0014）、Claude Code の計測済み契約で
 - agent memory — 採用。想起は runtime-facts メッセージに乗る、計測済み（ADR-0013）

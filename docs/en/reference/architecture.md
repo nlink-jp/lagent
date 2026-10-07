@@ -157,8 +157,10 @@ ADR-0012) may refuse a call outright: a deny is a floor no mode, row or
 allowlist lifts, and the reason goes to the model as the tool result.
 The rule tier (`internal/risk`) then classifies every call: Safe runs under
 `--auto` without asking, Block always asks, Review asks the operator.
-There is no model tier here: gem-agent's second model call judging the
-proposed call was measured and not adopted (ADR-0010). The session ceiling
+With `[approval].model_tier = "shell"`, a write-lane shell command at
+Review goes to gem-agent's model tier instead — a judge model, two
+rounds, approved only above confidence 0.8 in both — and every other
+Review still asks (ADR-0032, narrowing ADR-0010). The session ceiling
 (`--read-only`) caps the lane a call may reach; lifting it is the
 operator's act. Operator-only files — the instruction files, `.mcp.json`,
 `.lagent.toml`, and the sibling runtime's `.gem-agent.toml` — are never
@@ -224,7 +226,8 @@ policy and MCP exclusions, nothing else.
 signatures, safety settings, the summary model and the delegated file
 search are gem-agent features bound to Vertex AI (ADR-0002). History
 compaction is the one Phase 2 item left (RFP §4); the model tier was
-measured and not adopted (ADR-0010); skills (ADR-0011), pre-tool hooks
+measured and not adopted (ADR-0010), then adopted for write-lane shell
+commands only (ADR-0032); skills (ADR-0011), pre-tool hooks
 (ADR-0012) and memory (ADR-0013) are in.
 
 ## Skills

@@ -212,16 +212,35 @@ type Agent struct {
 	// have it stripped before execution — an argument a server declared
 	// itself belongs to that server.
 	purposeTools map[string]bool
+
+	// The model tier (ADR-0032): on for write-lane shell commands when
+	// modelTier is set. riskBE is the judge's backend, nil for the main
+	// one; riskModel names the model it bills against; rulebook is the
+	// operator's risk-rules.md. riskFailNoticed is set by the first
+	// failed judgment, which is the one that says so.
+	modelTier       bool
+	riskBE          llm.Backend
+	riskModel       string
+	rulebook        string
+	riskFailNoticed bool
 }
 
 // Options configures New.
 type Options struct {
-	Backend  llm.Backend
-	Registry *tools.Registry
-	Gate     Approver
-	Log      SessionLog // optional
-	System   string
-	MaxTurns int
+	Backend llm.Backend
+	// ModelTier turns on the model tier for write-lane shell commands
+	// (ADR-0032). RiskBackend is the judge's backend (nil: Backend);
+	// RiskModel names its model for the records (empty: Model);
+	// Rulebook is the operator's risk rules, already clipped.
+	ModelTier   bool
+	RiskBackend llm.Backend
+	RiskModel   string
+	Rulebook    string
+	Registry    *tools.Registry
+	Gate        Approver
+	Log         SessionLog // optional
+	System      string
+	MaxTurns    int
 	// PreToolHook, when set, is consulted before every tool call, ahead
 	// of the approval ladder (ADR-0012). A deny is a deterministic
 	// floor — neither auto-approve, a policy row nor the session
@@ -347,6 +366,11 @@ func New(opts Options) *Agent {
 		toolDefs:      defs,
 
 		purposeTools: purposeTools,
+
+		modelTier: opts.ModelTier,
+		riskBE:    opts.RiskBackend,
+		riskModel: opts.RiskModel,
+		rulebook:  opts.Rulebook,
 
 		policy:    opts.Policy,
 		advertise: opts.Advertise,
@@ -1307,6 +1331,16 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 				// what the operator wants.
 				"key": a.learnKey(tc),
 			}
+			if d.ModelConsulted {
+				// What the model tier answered and the bar it was held to
+				// (gem-agent's record shape): "model" above says the tier
+				// ran, evaluator_model which model ran it.
+				rec["evaluator_model"] = a.riskModelName()
+				rec["min_confidence"] = minConfidence
+				if d.ConfidenceKnown {
+					rec["confidence"] = d.Confidence
+				}
+			}
 			a.logRecord("auto_decision", rec)
 			// A cancel that landed before the verdict must not reach
 			// the gate: the TUI's auto-'n' would record a gate_decision
@@ -1647,11 +1681,17 @@ func (a *Agent) notify(msg string) {
 // added later — because a tally that lives only in memory is gone when
 // the process exits, and the API never reports cost.
 func (a *Agent) logUsage(source string, u llm.Usage) {
+	a.logUsageAs(source, a.model, u)
+}
+
+// logUsageAs is logUsage for a call that ran on another model — the
+// model tier's judge (ADR-0032), which bills against its own.
+func (a *Agent) logUsageAs(source, model string, u llm.Usage) {
 	if u.Empty() {
 		return
 	}
 	a.logRecord(session.KindUsage, session.UsageRecord{
-		Source: source, Model: a.model,
+		Source: source, Model: model,
 		Prompt: u.Prompt, Output: u.Output, Thoughts: u.Thoughts,
 		Cached: u.Cached, ToolPrompt: u.ToolPrompt, Total: u.Total,
 	})

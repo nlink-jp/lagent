@@ -397,10 +397,16 @@ answers.
   operator's `/remember` bypasses no gate because the operator is the
   gate. A memory that is meant to drive behaviour is written as a
   pointer (a file, a command, a tool), the shape that measured.
-- **There is no model tier, by decision** (ADR-0010).
-  `agent.AutoDecision.ModelConsulted` is always false and stays for
-  record-shape parity; the round checkpoint asks the operator or stops.
-  Reopening it takes the measurement ADR-0010 names, not a flag.
+- **The model tier judges write-lane shell commands and nothing else**
+  (ADR-0032). `modelTierJudges` in `internal/agent/riskreview.go` is the
+  scope: `shell_exec`, `write` lane, sandbox confining, Review without
+  `OperatorOnly`. Widening it to MCP was measured and refused (a vault
+  write approved; stating the fact turned every MCP read into an
+  escalation) — reopening takes held-out cases fixed before any wording.
+  The prompt, the two rounds and the 0.8 bar are gem-agent's at
+  `e858bb9`, minus the addenda for features this runtime does not have;
+  a fix to the composition is made in both runtimes. The judge gets a
+  fresh tag per call, as nlk/guard requires.
 - **The OpenAI client reads are bounded by hand** — `io.LimitReader` on
   error bodies and the probe, a 16 MiB scanner buffer on the stream —
   and `internal/archtest` allowlists them by name with the reason.

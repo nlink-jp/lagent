@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+
+- **A model tier for write-lane shell commands** (ADR-0032), opt-in with
+  `[approval].model_tier = "shell"`. Under auto-approve, a judge model on the
+  same server decides the `shell_exec` calls in the write lane that the rule
+  tier leaves at Review, with gem-agent's prompt, two rounds and 0.8
+  confidence bar: approved ones run unasked, the rest are asked about with the
+  judge's reason. MCP calls, the operator lane and every other Review still
+  ask. The judge reads your `risk-rules.md` beside `config.toml`;
+  `[llm].risk_model` and `[llm].risk_reasoning_effort` (default `none`) set its
+  model and thinking. Records follow gem-agent's: `auto_decision` names the
+  judge's model, the bar and the confidence, and the judgment's tokens are a
+  `risk` usage record. Measured on a month of the operator's own write-lane
+  prompts: about half would have run unasked, and no exfiltration, injection
+  or operator-refused case passed.
+
 ## [0.18.0] - 2026-10-08
 
 ### Added

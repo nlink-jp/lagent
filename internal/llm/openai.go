@@ -750,6 +750,11 @@ func (o *OpenAI) lmStudioWindow(ctx context.Context) (int, error) {
 	return 0, fmt.Errorf("llm: LM Studio reports no context length for %s", o.model)
 }
 
+// ErrModelNotListed is the model-list lookup's answer for an id the
+// server does not carry (mlx-serve), distinguishable from a server that
+// could not be asked.
+var ErrModelNotListed = errors.New("the server does not list this model")
+
 // mlxServeWindow reads the model's entry in /v1/models. A name the
 // list does not carry is an error, not a zero window: mlx-serve answers
 // a chat request for any model name with whatever model it has loaded
@@ -774,7 +779,7 @@ func (o *OpenAI) mlxServeWindow(ctx context.Context) (int, error) {
 		}
 		return 0, fmt.Errorf("llm: mlx-serve reports no context length for %s; set [model].context_window", o.model)
 	}
-	return 0, fmt.Errorf("llm: mlx-serve does not list model %q, and it answers an unknown name with whatever model it has loaded; use an id from its /v1/models", o.model)
+	return 0, fmt.Errorf("llm: mlx-serve does not list model %q, and it answers an unknown name with whatever model it has loaded; use an id from its /v1/models: %w", o.model, ErrModelNotListed)
 }
 
 func (o *OpenAI) ollamaWindow(ctx context.Context) (int, error) {

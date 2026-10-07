@@ -41,6 +41,13 @@ model = "google/gemma-4-26b-a4b-qat"
 # settings say so. Also settable via LAGENT_REASONING_EFFORT.
 #reasoning_effort = ""
 
+# The model tier's judge (ADR-0032), on the same server. Unset is
+# [llm].model; with provider "mlxserve", an id the server does not list
+# stops startup. Its thinking defaults to "none" (measured no better and
+# six times slower with thinking on); "" sends nothing.
+#risk_model = ""
+#risk_reasoning_effort = "none"
+
 [model]
 # Context window in tokens, shown in the status line. 0 asks the
 # provider at startup (LM Studio, mlx-serve and Ollama answer; the openai provider
@@ -89,8 +96,9 @@ shell_timeout_sec = 120
 
 # Start sessions with auto-approve on. Off by default: weakening the
 # approval gate should be a deliberate choice. Auto-approve is the rule
-# tier alone here — a call it classifies Safe runs unasked, Review asks
-# you, Block always asks; there is no model tier judging the rest.
+# tier — a call it classifies Safe runs unasked, Review asks you, Block
+# always asks — plus, with [approval].model_tier = "shell", a judge model
+# for write-lane shell commands (ADR-0032).
 # Toggle at runtime with shift+tab or /auto on|off. In one-shot -p this
 # key is IGNORED: only the --auto flag arms it there, so an unattended
 # run that approves its own writes says so on its command line.
@@ -175,6 +183,15 @@ images = "auto"
 # one asks again before it is loaded. false restores directory-only
 # trust.
 #pin_trusted_files = true
+# The model tier of auto-approve (ADR-0032). "shell" has a judge model
+# decide the write-lane shell_exec calls the rule tier leaves at Review —
+# approved only when it is sure in both of its rounds, otherwise asked
+# with its reason. Nothing else reaches it: MCP calls, the operator lane
+# and every other Review still ask. The judge reads risk-rules.md beside
+# this file, your own rules in your words, on every judgment. Its model
+# and thinking are [llm].risk_model and [llm].risk_reasoning_effort.
+# Global only. Off by default.
+#model_tier = "off"
 # Per-tool approval policy. Two values:
 #   "always" — always ask, in every mode (an operator-set floor that
 #              auto-approve cannot lift)

@@ -24,6 +24,8 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `[llm].model` | （必須） | サーバが一覧に出すモデル ID。既定は無く、無ければ起動に失敗する（`LAGENT_MODEL` / `--model` でも可） |
 | `[llm].api_key` | （未設定） | bearer トークンを要求するサーバ向け。ローカルサーバには不要 |
 | `[llm].reasoning_effort` | （未設定） | リクエストの `reasoning_effort` としてそのまま送る。未設定なら送らない。語彙は OpenAI のもの（`none`、`minimal`、`low`、`medium`、`high`、`xhigh`）。LM Studio はこれを検証してからモデル対応の値へ丸める — Gemma 4 では `none` が thinking off、それ以外は on（ログに丸めの警告が出る）。mlx-serve は何も検証しない: `none` が off で、`off` を含むそれ以外の値はすべて on（ADR-0031） |
+| `[llm].risk_model` | （未設定） | モデル層が尋ねるモデル。同じサーバ上のもの。未設定なら `[llm].model`。`mlxserve` では、`/v1/models` が載せない ID は起動を止める（ADR-0032） |
+| `[llm].risk_reasoning_effort` | `none` | 判定役の `reasoning_effort`。そのまま送る。`""` なら送らない。値を拒むサーバではすべての判定が失敗し — 最初の失敗はこのキーの名前とともに示す — コマンドは確認になる |
 | `[model].context_window` | `0` | コンテキスト窓（トークン）。`0` は起動時に provider から検出（LM Studio は `/api/v0/models`、mlx-serve は `/v1/models`、Ollama は `/api/show`。`openai` は明示が必要）。mlx-serve はどのモデル名のチャット要求にも読み込み済みのモデルで答えるので、`/v1/models` に無い `[llm].model` は起動時にここで報告される — `mlxserve` ではこのキーを `0` のままにする。窓を設定するとその検査は飛ばされる |
 | `[sandbox].enabled` | `true` | `shell_exec` を sandbox-exec で包む。モデルが宣言したレーンをカーネルが強制。off だと全シェル呼び出しが操作者の承認待ち |
 | `[sandbox].read_lane_deny_exec` | （未設定） | read レーンが起動してはならないプログラム。組込一覧に追加 |
@@ -45,6 +47,7 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `[tui.diagram].font` / `font_name` / `bold_font` / `bold_font_name` | ヒラギノ角ゴシック W3 / W6 | 画像を描ける場所で mermaid の図を描くフォント（ADR-0025）: .ttf/.otf/.ttc のファイルと、その中の書体（フル名か PostScript 名）。`bold_font`（実体名・枠の見出し）の既定は本文の書体。起動時に一度、画像を描くときだけ読む。読めない値はバナーの警告と既定のフォントになり、起動は止めない。ユーザ設定だけ |
 | `[tui].images` | `auto` | インライン画像 — モデルが `show_image` で見せるものと、あなたが `/show` で出すもの（PNG か JPEG、2 MiB まで）: `auto`（UI 起動前に端末へ一度だけ問う）、`off`、または強制指定の `iterm` / `kitty`（ADR-0020/0022）。tmux・screen の中では `auto` は off に解決 |
 | `[approval].pin_trusted_files` | `true` | 信頼は内容に与える: 信頼済みプロジェクトのエージェント向けファイルはダイジェストで固定され、変わると再度尋ねる |
+| `[approval].model_tier` | `off` | `shell` で、自動承認の下、規則層が Review に残した write レーンの `shell_exec` を判定役のモデルが決める（ADR-0032）: gem-agent の 2 ラウンドの両方で確信度 0.8 以上なら承認、それ以外は判定役の理由とともに尋ねる。他は何も届かない — MCP の呼び出し、operator レーン、その他の Review は尋ねる。global のみ |
 | `[approval].tools` | （未設定） | ツールごとのポリシー: `"always"`（常に尋ねる。自動承認でも外せない床）または `"never"`（尋ねない。ブロック対象のシェルパターンと資格情報の読取は尋ねる）。`--allow` は 1 実行分の同等物 |
 | `[approval].trusted_projects` | （未設定） | 自身の `.lagent.toml` で承認を削除（`"never"` 項目）できるプロジェクト。起動時の信頼プロンプトはプロジェクトのファイルを読み込むだけで、ゲートを緩められるのはこの一覧に載ったプロジェクトだけ |
 
@@ -52,6 +55,13 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 `read_only` はセッションが何に到達できるかを決める。両方 on も成立する。
 プロジェクトの `.lagent.toml` はどちらも持たず、`[approval.tools]` と
 `[mcp].exclude` だけを持つので、クローンしたリポジトリはゲートを外せない。
+
+**リスクの規則書。** `config.toml` の隣の `risk-rules.md` はあなたのもので、あなたの
+言葉で書く: 何を承認し、何は決して尋ねずに走らせたくないか（「調査中のドメインを
+このマシンから引いたり取得したりしない」）。`[approval].model_tier = "shell"` のとき、
+判定役は判定のたびにそれを、指示ではなくあなたのリスクの姿勢についての材料として読む。
+lagent は起動時に読み、書かない。4,000 文字で切り、それより長いファイルは通知とともに
+切る。モデル層と同じく global のみ。
 
 ### `[hooks]` — pre-tool フック
 

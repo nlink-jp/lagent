@@ -9,11 +9,10 @@ import (
 
 // AutoDecision is the outcome of the auto-approve ladder for one call.
 //
-// The ladder here is the rule tier alone (RFP §3): Safe runs, anything
-// else is asked. gem-agent's model tier — a second model call judging
-// the proposed call — is a Phase 2 measurement, because on one local
-// model every review costs a full prompt pass; the field it would fill
-// is kept so the transcript record and the UI keep one shape.
+// The ladder is the rule tier, and — with [approval].model_tier =
+// "shell" — gem-agent's model tier for the write-lane shell commands the
+// rule tier leaves at Review (ADR-0032). Every other call keeps the rule
+// tier's answer: Safe runs, anything else is asked.
 type AutoDecision struct {
 	Approved bool
 	// Tier is the logical verdict that started the ladder.
@@ -21,16 +20,23 @@ type AutoDecision struct {
 	// Reason is operator-facing: why it auto-ran, or why it is being
 	// asked about.
 	Reason string
-	// ModelConsulted reports whether a model tier ran. Always false
-	// here; the field stays so the record shape matches gem-agent's.
+	// ModelConsulted reports whether the model tier ran.
 	ModelConsulted bool
+	// Confidence is the number the model tier returned, and
+	// ConfidenceKnown says whether there is one: the tier can run and
+	// still produce none (a transport error, an unparseable verdict).
+	Confidence      float64
+	ConfidenceKnown bool
 }
 
 // EscalationReason renders why auto mode is asking instead of running,
 // naming the tier that objected.
 func EscalationReason(d AutoDecision) string {
-	if d.Tier == risk.Block {
+	switch {
+	case d.Tier == risk.Block:
 		return "auto-approve blocked by rule (always asks): " + d.Reason
+	case d.ModelConsulted:
+		return "auto-approve escalated by risk review: " + d.Reason
 	}
 	return "auto-approve escalated: " + d.Reason
 }
@@ -38,7 +44,7 @@ func EscalationReason(d AutoDecision) string {
 // decideAuto runs the ladder for one tool call. Every uncertain path
 // returns Approved=false: the human gate is the backstop, never
 // bypassed on doubt.
-func (a *Agent) decideAuto(_ context.Context, tc llm.ToolCall) AutoDecision {
+func (a *Agent) decideAuto(ctx context.Context, tc llm.ToolCall) AutoDecision {
 	d := a.decide(tc)
 	if d.Tool == nil {
 		return AutoDecision{Reason: "unknown tool"}
@@ -53,10 +59,14 @@ func (a *Agent) decideAuto(_ context.Context, tc llm.ToolCall) AutoDecision {
 	}
 	// Review: a write into the instruction files or the runtime's
 	// configuration persists into what every later session trusts, and
-	// the rule tier marks it as the operator's alone; every other Review
-	// is the operator's too, with no model tier to answer in their place.
+	// the rule tier marks it as the operator's alone.
 	if v.OperatorOnly {
 		return AutoDecision{Tier: v.Tier, Reason: v.Reason}
+	}
+	// A write-lane shell command is the model tier's when it is on
+	// (ADR-0032); every other Review is the operator's.
+	if a.modelTierJudges(tc, d) {
+		return a.judge(ctx, tc, v)
 	}
 	return AutoDecision{Tier: v.Tier, Reason: v.Reason}
 }

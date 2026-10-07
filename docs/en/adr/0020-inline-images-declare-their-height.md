@@ -256,7 +256,7 @@ Pre-existing, not widened here, not repaired here.
 ### 7. Drawing is TUI-only, and the capability is probed once
 
 `tea.NewProgram` is constructed at one site
-([root.go:1418](../../../cmd/root.go)); one-shot `-p` and the plain REPL
+([root.go:1455](../../../cmd/root.go)); one-shot `-p` and the plain REPL
 never build it and never draw. The probe runs **before** that construction
 and is cached, for the reason `newGlamourRenderer` records about
 `WithAutoStyle` — inherited from the porting source, and true here. It
@@ -303,7 +303,7 @@ terminal; it now has pseudo-terminal tests, and the one that states this
 property fails on the first implementation for all three verdicts.
 
 `[tui] images = "auto"` selects it
-([config.go:196](../../../internal/config/config.go)), beside `theme` and
+([config.go:202](../../../internal/config/config.go)), beside `theme` and
 `language` (`:180` and `:184`). Inside a multiplexer
 the answer is **off** — because the one measured rendering a payload
 stranded a frame for every image, not because passthrough is someone else's

@@ -143,9 +143,10 @@ user ロールのメッセージとして会話を開く（`Agent.AnnounceSessio
 を丸ごと拒める: 拒否はどのモードも行も許可リストも外せない床で、理由は
 ツール結果としてモデルへ行く。次に規則層（`internal/risk`）が全呼び出しを
 分類する: Safe は `--auto` 下で尋ねずに走り、Block は常に尋ね、Review は
-操作者に尋ねる。モデル層はここに
-無い: 提案された呼び出しを裁く gem-agent の 2 つ目のモデル呼び出しは
-計測のうえ採らなかった（ADR-0010）。セッション天井（`--read-only`）は呼び出しが
+操作者に尋ねる。`[approval].model_tier = "shell"` なら、Review の write レーンの
+シェルコマンドは代わりに gem-agent のモデル層へ行く — 判定役のモデル、2 ラウンド、
+両方で確信度 0.8 を超えたときだけ承認 — その他の Review は尋ねる（ADR-0032、ADR-0010 を
+狭める）。セッション天井（`--read-only`）は呼び出しが
 届けるレーンを上限で抑え、解除は操作者の行為。操作者専用ファイル —
 指示ファイル、`.mcp.json`、`.lagent.toml`、同居ランタイムの
 `.gem-agent.toml` — は常置の承認では決して答えられない。資格情報は read
@@ -202,7 +203,8 @@ MCP の除外だけを持ち、他は何も持たない。
 `web_search`、`web_fetch`、メディアアップロード、Cloud Logging、thought
 signature、safety 設定、要約モデル、委任ファイル探索は Vertex AI に
 縛られた gem-agent の機能（ADR-0002）。Phase 2 の残りは履歴圧縮のみ
-（RFP §4）。モデル層は計測のうえ採らず（ADR-0010）、skills（ADR-0011）、
+（RFP §4）。モデル層は計測のうえ採らず（ADR-0010）、その後 write レーンの
+シェルコマンドに限って採った（ADR-0032）。skills（ADR-0011）、
 pre-tool hooks（ADR-0012）、memory（ADR-0013）は入った。
 
 ## スキル
