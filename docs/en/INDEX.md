@@ -332,3 +332,12 @@ excepted).
   message re-sent on resume said "session started" on the resume day beside the
   restored one's real start, and an MCP reload re-read the clock. Now a resumed
   session reads `- resumed: <day>; the conversation above began on <day>`
+- [`ADR-0031`](adr/0031-mlx-serve-is-a-supported-backend.md) —
+  mlx-serve is a supported backend (**Proposed**; the provider is
+  implemented, adoption waits on the measurements): `[llm].provider =
+  "mlxserve"` reads the window from `/v1/models` and reports a model id the
+  list does not carry, since the server answers any name with the model it
+  has loaded. The default stays `lmstudio`. Records the wire as measured
+  (whole-call tool deltas, `cached_tokens`, no `reasoning_tokens`,
+  `reasoning_effort` unvalidated) and the residual risk of running a
+  community server
