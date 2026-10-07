@@ -333,11 +333,14 @@ excepted).
   restored one's real start, and an MCP reload re-read the clock. Now a resumed
   session reads `- resumed: <day>; the conversation above began on <day>`
 - [`ADR-0031`](adr/0031-mlx-serve-is-a-supported-backend.md) —
-  mlx-serve is a supported backend (**Proposed**; the provider is
-  implemented, adoption waits on the measurements): `[llm].provider =
+  mlx-serve is a supported backend (**Accepted**, implemented, on the task bench
+  and a server measurement with the same weights under both servers):
+  `[llm].provider =
   "mlxserve"` reads the window from `/v1/models` and reports a model id the
   list does not carry, since the server answers any name with the model it
   has loaded. The default stays `lmstudio`. Records the wire as measured
   (whole-call tool deltas, `cached_tokens`, no `reasoning_tokens`,
-  `reasoning_effort` unvalidated) and the residual risk of running a
-  community server
+  `reasoning_effort` unvalidated), the measurements (the speed is the MTP
+  head of mlx-serve's own build, not the runtime; long context holds) and the
+  residual risk of running a community server. Amends ADR-0007: a
+  whitespace-only completion is empty

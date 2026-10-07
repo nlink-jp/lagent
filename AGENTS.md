@@ -281,6 +281,14 @@ answers.
 
 ## Gotchas
 
+- **mlx-serve answers any model name** with the model it has loaded (status
+  200), so `provider = "mlxserve"` is the only place a mistyped `[llm].model`
+  shows — `mlxServeWindow` errors on an id `/v1/models` does not list, and
+  that must stay an error, not a zero window. Its `reasoning_effort` is
+  unvalidated (`none` off, every other word on, `off` included), and it sends
+  no `reasoning_tokens`, so output tokens include thinking (ADR-0031).
+  Measure a server with `bench serve`, one server loaded at a time.
+
 - **`shell_exec`'s saved output is written by the runtime, never by the
   command, and never for the operator lane or an unsandboxed shell**
   (ADR-0029). The runtime holds the pipe, so the read lane still writes

@@ -11,6 +11,16 @@
 
 ### Added
 
+- **mlx-serve is a supported backend** (ADR-0031), adopted on the task bench and
+  a server measurement with the same Qwen 3.6 weights under mlx-serve and LM
+  Studio: the speed comes from the MTP head of mlx-serve's own model builds, not
+  the runtime; a 122k-token prompt completes. The ADR records the residual risk
+  of running it — chiefly that 26.10.1 listens on every interface with no key
+  by default — and that its default 2 GB prefix cache re-reads long sessions
+  every turn: with an 8 GB cap a 122k resend took 1.2 s instead of 207 s.
+- **`bench serve`** measures a model server: cold prompt reading per size,
+  reuse on a resend and the next turn, decode speed, alternating conversations
+  and two streams at once, logged raw; `bench serve-report` recounts a run.
 - **`[llm].provider = "mlxserve"`** for
   [mlx-serve](https://github.com/ddalcu/mlx-serve). The context window is
   read from its `/v1/models` at startup, so `[model].context_window` is no

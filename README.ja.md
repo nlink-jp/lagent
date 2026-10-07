@@ -28,7 +28,11 @@ English: [README.md](README.md)
 - OpenAI 互換 API を持つローカル LLM サーバ:
   [LM Studio](https://lmstudio.ai/)（検証済みバックエンド、モデル
   `google/gemma-4-26b-a4b-qat`）、
-  [mlx-serve](https://github.com/ddalcu/mlx-serve)（`provider = "mlxserve"`）、
+  [mlx-serve](https://github.com/ddalcu/mlx-serve)（`provider = "mlxserve"`。
+  Qwen 3.6 35B-A3B で計測済み — 既定で全インタフェースを待ち受けるので、
+  `127.0.0.1` に絞るか API キーを設定する。長いセッションを毎ターン読み直さない
+  よう、前置きキャッシュのメモリ上限も上げる（計測したのは 8 GB）:
+  [ADR-0031](docs/ja/adr/0031-mlx-serve-is-a-supported-backend.ja.md)）、
   または Ollama
 - 資格情報は不要
 

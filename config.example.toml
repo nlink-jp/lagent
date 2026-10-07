@@ -35,7 +35,9 @@ model = "google/gemma-4-26b-a4b-qat"
 # OpenAI one — none, minimal, low, medium, high, xhigh — which LM Studio
 # validates and then maps to what the model supports: for Gemma 4,
 # "none" is thinking off and anything else is on (its log notes the
-# mapping). Also settable via LAGENT_REASONING_EFFORT.
+# mapping). mlx-serve validates nothing: "none" is off and every other
+# value, "off" included, is on; unset, a model thinks if its per-model
+# settings say so. Also settable via LAGENT_REASONING_EFFORT.
 #reasoning_effort = ""
 
 [model]

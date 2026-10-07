@@ -252,9 +252,10 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   再読み込みも時計を読み直していた。再開したセッションは `- resumed: <日>; the
   conversation above began on <日>` と読む
 - [`ADR-0031`](adr/0031-mlx-serve-is-a-supported-backend.ja.md) —
-  mlx-serve を対応バックエンドとする（**Proposed**。provider は実装済みで、採否は
-  計測を待つ）: `[llm].provider = "mlxserve"` は `/v1/models` から窓を読み、一覧に無い
+  mlx-serve を対応バックエンドとする（**Accepted**、実装済み。両サーバで同じ重みを使った
+  タスクベンチとサーバの計測に基づく）: `[llm].provider = "mlxserve"` は `/v1/models` から窓を読み、一覧に無い
   モデル ID を報告する — サーバはどの名前にも読み込み済みのモデルで答えるからである。
   既定は `lmstudio` のまま。実測した通信路（呼び出し丸ごとのツール差分、`cached_tokens`
-  あり、`reasoning_tokens` なし、`reasoning_effort` は未検証）と、コミュニティ製の
-  サーバを動かすことの残余リスクを記録する
+  あり、`reasoning_tokens` なし、`reasoning_effort` は未検証）、計測（速さはランタイムでは
+  なく mlx-serve 独自ビルドの MTP ヘッドから来る。長い文脈は持ちこたえる）、コミュニティ製の
+  サーバを動かすことの残余リスクを記録する。ADR-0007 を改める: 空白だけの completion は空

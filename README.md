@@ -30,7 +30,11 @@ Japanese: [README.ja.md](README.ja.md)
 - A local LLM server with an OpenAI-compatible API:
   [LM Studio](https://lmstudio.ai/) (the tested backend, model
   `google/gemma-4-26b-a4b-qat`),
-  [mlx-serve](https://github.com/ddalcu/mlx-serve) (`provider = "mlxserve"`)
+  [mlx-serve](https://github.com/ddalcu/mlx-serve) (`provider = "mlxserve"`;
+  measured with Qwen 3.6 35B-A3B — bind it to `127.0.0.1` or set its API key,
+  since it listens on every interface by default, and raise its prefix cache
+  memory cap (8 GB measured) so long sessions are not re-read every turn:
+  [ADR-0031](docs/en/adr/0031-mlx-serve-is-a-supported-backend.md))
   or Ollama
 - No credentials
 
