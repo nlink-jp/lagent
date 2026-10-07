@@ -261,8 +261,8 @@ type MCPConfig struct {
 // LLMConfig names the local server and the model. Every conversation
 // goes through the OpenAI-compatible chat/completions endpoint at
 // BaseURL; Provider selects only where the context length is detected
-// from (LM Studio's /api/v0/models, Ollama's /api/show, or nowhere —
-// "openai" needs [model].context_window).
+// from (LM Studio's /api/v0/models, mlx-serve's /v1/models, Ollama's
+// /api/show, or nowhere — "openai" needs [model].context_window).
 type LLMConfig struct {
 	Provider string `toml:"provider"`
 	BaseURL  string `toml:"base_url"`
@@ -583,9 +583,9 @@ func (c *Config) validate() error {
 		return fmt.Errorf("missing required config: %s", strings.Join(missing, "; "))
 	}
 	switch c.LLM.Provider {
-	case "lmstudio", "ollama", "openai":
+	case "lmstudio", "mlxserve", "ollama", "openai":
 	default:
-		return fmt.Errorf("[llm].provider must be lmstudio, ollama, or openai (got %q)", c.LLM.Provider)
+		return fmt.Errorf("[llm].provider must be lmstudio, mlxserve, ollama, or openai (got %q)", c.LLM.Provider)
 	}
 	// An explicit `base_url = ""` in the file overwrites the default and
 	// would surface as a dial error far from its cause — the failure the

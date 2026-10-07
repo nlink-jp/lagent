@@ -1,7 +1,7 @@
 # lagent
 
 **ローカル LLM** で動くサンドボックス付き CLI エージェントランタイム。
-OpenAI 互換 API（LM Studio、Ollama）を通してモデルに接続し、ファイルの
+OpenAI 互換 API（LM Studio、mlx-serve、Ollama）を通してモデルに接続し、ファイルの
 読み書き、サンドボックス内のシェルコマンド、MCP サーバを扱う。変更を伴う
 呼び出しは操作者が承認する。
 
@@ -27,7 +27,9 @@ English: [README.md](README.md)
 - Apple silicon の macOS（隔離は `sandbox-exec` に基づく）
 - OpenAI 互換 API を持つローカル LLM サーバ:
   [LM Studio](https://lmstudio.ai/)（検証済みバックエンド、モデル
-  `google/gemma-4-26b-a4b-qat`）または Ollama
+  `google/gemma-4-26b-a4b-qat`）、
+  [mlx-serve](https://github.com/ddalcu/mlx-serve)（`provider = "mlxserve"`）、
+  または Ollama
 - 資格情報は不要
 
 ## 設定
@@ -38,7 +40,7 @@ English: [README.md](README.md)
 
 ```toml
 [llm]
-provider = "lmstudio"        # lmstudio | ollama | openai
+provider = "lmstudio"        # lmstudio | mlxserve | ollama | openai
 base_url = "http://localhost:1234/v1"
 model    = "google/gemma-4-26b-a4b-qat"
 

@@ -15,13 +15,22 @@ import (
 //
 //	LAGENT_LIVE_BASE_URL=http://localhost:1234/v1 LAGENT_LIVE_MODEL=google/gemma-4-26b-a4b-qat \
 //	  go test -tags live -run Live ./internal/llm/
+//
+// LAGENT_LIVE_PROVIDER names another server kind (default lmstudio):
+//
+//	LAGENT_LIVE_PROVIDER=mlxserve LAGENT_LIVE_BASE_URL=http://localhost:11234/v1 \
+//	  LAGENT_LIVE_MODEL=ddalcu/Qwen3.6-35B-A3B-MLX-Serve-4bit go test -tags live -run Live ./internal/llm/
 func TestLiveToolRoundTrip(t *testing.T) {
 	base := os.Getenv("LAGENT_LIVE_BASE_URL")
 	model := os.Getenv("LAGENT_LIVE_MODEL")
 	if base == "" || model == "" {
 		t.Skip("LAGENT_LIVE_BASE_URL / LAGENT_LIVE_MODEL unset")
 	}
-	o, err := NewOpenAI(base, model, "", ProviderLMStudio)
+	provider := os.Getenv("LAGENT_LIVE_PROVIDER")
+	if provider == "" {
+		provider = ProviderLMStudio
+	}
+	o, err := NewOpenAI(base, model, "", provider)
 	if err != nil {
 		t.Fatal(err)
 	}

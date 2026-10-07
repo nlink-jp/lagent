@@ -1,7 +1,7 @@
 # AGENTS.md — lagent
 
 Sandboxed CLI agent runtime on a local LLM served over an
-OpenAI-compatible API (LM Studio, Ollama). A separate product line from
+OpenAI-compatible API (LM Studio, mlx-serve, Ollama). A separate product line from
 gem-agent built on the same design; gem-agent is the porting source
 (ADR-0001), and the features it has that lagent does not reproduce are
 listed in ADR-0002. A cli-series tool since ADR-0023 (promoted from

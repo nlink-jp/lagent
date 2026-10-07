@@ -1,7 +1,7 @@
 # lagent
 
 Sandboxed CLI agent runtime on a **local LLM**, served over an
-OpenAI-compatible API (LM Studio, Ollama). File read/write, sandboxed
+OpenAI-compatible API (LM Studio, mlx-serve, Ollama). File read/write, sandboxed
 shell commands and MCP servers, with mutating calls gated by the
 operator.
 
@@ -29,7 +29,9 @@ Japanese: [README.ja.md](README.ja.md)
 - macOS on Apple silicon (isolation is built on `sandbox-exec`)
 - A local LLM server with an OpenAI-compatible API:
   [LM Studio](https://lmstudio.ai/) (the tested backend, model
-  `google/gemma-4-26b-a4b-qat`) or Ollama
+  `google/gemma-4-26b-a4b-qat`),
+  [mlx-serve](https://github.com/ddalcu/mlx-serve) (`provider = "mlxserve"`)
+  or Ollama
 - No credentials
 
 ## Configuration
@@ -40,7 +42,7 @@ Japanese: [README.ja.md](README.ja.md)
 
 ```toml
 [llm]
-provider = "lmstudio"        # lmstudio | ollama | openai
+provider = "lmstudio"        # lmstudio | mlxserve | ollama | openai
 base_url = "http://localhost:1234/v1"
 model    = "google/gemma-4-26b-a4b-qat"
 

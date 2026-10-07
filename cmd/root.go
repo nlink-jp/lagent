@@ -81,7 +81,7 @@ var rootCmd = &cobra.Command{
 	Use:   "lagent [first message]",
 	Short: "Sandboxed CLI agent runtime on a local LLM (OpenAI-compatible API)",
 	Long: `lagent is a sandboxed CLI agent backed by a local language model served
-over an OpenAI-compatible API (LM Studio, Ollama): file read/write,
+over an OpenAI-compatible API (LM Studio, mlx-serve, Ollama): file read/write,
 sandboxed shell commands and MCP servers, with mutating calls asking for
 your approval. It reads a project's AGENTS.md / CLAUDE.md and Claude
 Code-format .mcp.json as they are — no lagent-specific setup.

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`[llm].provider = "mlxserve"`** for
+  [mlx-serve](https://github.com/ddalcu/mlx-serve). The context window is
+  read from its `/v1/models` at startup, so `[model].context_window` is no
+  longer needed for it. A `[llm].model` that list does not carry is reported
+  at startup: mlx-serve answers a chat request for any model name with the
+  model it has loaded, so a mistyped id otherwise runs silently against
+  whatever is resident.
+
 ## [0.17.1] - 2026-10-06
 
 ### Fixed

@@ -22,7 +22,7 @@ import (
 )
 
 // OpenAI is the backend for any server speaking the OpenAI-compatible
-// chat/completions API: LM Studio, Ollama, or another. The HTTP layer
+// chat/completions API: LM Studio, mlx-serve, Ollama, or another. The HTTP layer
 // is stdlib only and the SSE reader is hand-written (the llm-cli
 // approach; org supply-chain policy — no SDK, no community client).
 //
@@ -74,6 +74,7 @@ const (
 // Providers ContextWindow knows how to ask.
 const (
 	ProviderLMStudio = "lmstudio"
+	ProviderMLXServe = "mlxserve"
 	ProviderOllama   = "ollama"
 	ProviderOpenAI   = "openai"
 )
@@ -88,9 +89,9 @@ func NewOpenAI(baseURL, model, apiKey, provider string) (*OpenAI, error) {
 		return nil, fmt.Errorf("llm: base_url %q is not an absolute URL", baseURL)
 	}
 	switch provider {
-	case ProviderLMStudio, ProviderOllama, ProviderOpenAI:
+	case ProviderLMStudio, ProviderMLXServe, ProviderOllama, ProviderOpenAI:
 	default:
-		return nil, fmt.Errorf("llm: provider %q is not one of lmstudio, ollama, openai", provider)
+		return nil, fmt.Errorf("llm: provider %q is not one of lmstudio, mlxserve, ollama, openai", provider)
 	}
 	if model == "" {
 		return nil, errors.New("llm: model is empty")
@@ -682,14 +683,18 @@ func retryCause(err error) string {
 
 // ContextWindow asks the provider for the loaded model's context length.
 // LM Studio answers on its native /api/v0/models/<id> (loaded length
-// first, the model's maximum as the fallback); Ollama on /api/show
-// (num_ctx from the parameters when the model sets one, else the
-// architecture's context_length). A plain OpenAI-compatible server has
-// no such endpoint: the window must be configured.
+// first, the model's maximum as the fallback); mlx-serve on its
+// OpenAI-compatible /v1/models, whose entries carry context_length;
+// Ollama on /api/show (num_ctx from the parameters when the model sets
+// one, else the architecture's context_length). A plain
+// OpenAI-compatible server has no such endpoint: the window must be
+// configured.
 func (o *OpenAI) ContextWindow(ctx context.Context) (int, error) {
 	switch o.provider {
 	case ProviderLMStudio:
 		return o.lmStudioWindow(ctx)
+	case ProviderMLXServe:
+		return o.mlxServeWindow(ctx)
 	case ProviderOllama:
 		return o.ollamaWindow(ctx)
 	default:
@@ -743,6 +748,33 @@ func (o *OpenAI) lmStudioWindow(ctx context.Context) (int, error) {
 		return info.Max, nil
 	}
 	return 0, fmt.Errorf("llm: LM Studio reports no context length for %s", o.model)
+}
+
+// mlxServeWindow reads the model's entry in /v1/models. A name the
+// list does not carry is an error, not a zero window: mlx-serve answers
+// a chat request for any model name with whatever model it has loaded
+// (measured, 26.10.1), so this lookup is the one place a mistyped
+// [llm].model surfaces.
+func (o *OpenAI) mlxServeWindow(ctx context.Context) (int, error) {
+	var list struct {
+		Data []struct {
+			ID            string `json:"id"`
+			ContextLength int    `json:"context_length"`
+		} `json:"data"`
+	}
+	if err := o.getJSON(ctx, http.MethodGet, o.baseURL+"/models", nil, &list); err != nil {
+		return 0, fmt.Errorf("llm: mlx-serve model list: %w", err)
+	}
+	for _, m := range list.Data {
+		if m.ID != o.model {
+			continue
+		}
+		if m.ContextLength > 0 {
+			return m.ContextLength, nil
+		}
+		return 0, fmt.Errorf("llm: mlx-serve reports no context length for %s; set [model].context_window", o.model)
+	}
+	return 0, fmt.Errorf("llm: mlx-serve does not list model %q, and it answers an unknown name with whatever model it has loaded; use an id from its /v1/models", o.model)
 }
 
 func (o *OpenAI) ollamaWindow(ctx context.Context) (int, error) {

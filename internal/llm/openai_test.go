@@ -354,6 +354,13 @@ func TestContextWindowPerProvider(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v0/models/google/gemma-4-26b-a4b-qat":
 			fmt.Fprint(w, `{"id":"google/gemma-4-26b-a4b-qat","max_context_length":262144,"loaded_context_length":32768}`)
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/models":
+			// mlx-serve 26.10.1's shape, trimmed: a listed model without a
+			// declared length carries null.
+			fmt.Fprint(w, `{"object":"list","data":[`+
+				`{"id":"ddalcu/Qwen3.6-35B-A3B-MLX-Serve-4bit","loaded":true,"context_length":262144},`+
+				`{"id":"lmstudio-community/Qwen3.6-35B-A3B-MLX-4bit","loaded":false,"context_length":131072},`+
+				`{"id":"mlx-community/gemma-4-31b-it-4bit","loaded":false,"context_length":null}]}`)
 		case r.Method == http.MethodPost && r.URL.Path == "/api/show":
 			var body map[string]string
 			_ = json.NewDecoder(r.Body).Decode(&body)
@@ -370,6 +377,20 @@ func TestContextWindowPerProvider(t *testing.T) {
 	o, _ := NewOpenAI(srv.URL+"/v1", "google/gemma-4-26b-a4b-qat", "", ProviderLMStudio)
 	if n, err := o.ContextWindow(context.Background()); err != nil || n != 32768 {
 		t.Errorf("lmstudio: %d %v (loaded length wins)", n, err)
+	}
+	o, _ = NewOpenAI(srv.URL+"/v1", "lmstudio-community/Qwen3.6-35B-A3B-MLX-4bit", "", ProviderMLXServe)
+	if n, err := o.ContextWindow(context.Background()); err != nil || n != 131072 {
+		t.Errorf("mlxserve: %d %v (the named model's entry, loaded or not)", n, err)
+	}
+	o, _ = NewOpenAI(srv.URL+"/v1", "mlx-community/gemma-4-31b-it-4bit", "", ProviderMLXServe)
+	if _, err := o.ContextWindow(context.Background()); err == nil || !strings.Contains(err.Error(), "context_window") {
+		t.Errorf("mlxserve with no declared length must ask for the config key: %v", err)
+	}
+	// mlx-serve answers a chat request for any name with the model it has
+	// loaded, so the window lookup is where a typo has to surface.
+	o, _ = NewOpenAI(srv.URL+"/v1", "ddalcu/qwen3.6-typo", "", ProviderMLXServe)
+	if _, err := o.ContextWindow(context.Background()); err == nil || !strings.Contains(err.Error(), "does not list") {
+		t.Errorf("an unlisted mlxserve model must be named as such: %v", err)
 	}
 	o, _ = NewOpenAI(srv.URL, "with-num-ctx", "", ProviderOllama)
 	if n, err := o.ContextWindow(context.Background()); err != nil || n != 16384 {

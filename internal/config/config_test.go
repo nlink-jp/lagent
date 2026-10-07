@@ -273,6 +273,14 @@ func TestLLMSectionIsValidated(t *testing.T) {
 	if cfg.LLM.Provider != "openai" || cfg.LLM.APIKey != "k" || cfg.Model.ContextWindow != 8192 {
 		t.Errorf("config = %+v", cfg.LLM)
 	}
+	// mlxserve detects its window, so it needs no context_window.
+	cfg, err = Load(writeConfig(t, "[llm]\nmodel = \"m\"\nprovider = \"mlxserve\"\nbase_url = \"http://localhost:11234/v1\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.LLM.Provider != "mlxserve" || cfg.Model.ContextWindow != 0 {
+		t.Errorf("config = %+v", cfg.LLM)
+	}
 }
 
 func TestLoadProjectReadsApprovalPolicyOnly(t *testing.T) {

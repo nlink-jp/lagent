@@ -12,6 +12,9 @@
 # detected from; every conversation goes through the OpenAI-compatible
 # chat/completions endpoint.
 #   lmstudio — LM Studio (context length from /api/v0/models)
+#   mlxserve — mlx-serve (context length from /v1/models; a model id
+#              it does not list is reported at startup, since it
+#              answers any name with the model it has loaded)
 #   ollama   — Ollama (context length from /api/show)
 #   openai   — any other OpenAI-compatible server (set [model].context_window)
 # Also settable via LAGENT_PROVIDER.
@@ -37,7 +40,7 @@ model = "google/gemma-4-26b-a4b-qat"
 
 [model]
 # Context window in tokens, shown in the status line. 0 asks the
-# provider at startup (LM Studio and Ollama answer; the openai provider
+# provider at startup (LM Studio, mlx-serve and Ollama answer; the openai provider
 # cannot, so set it there).
 context_window = 0
 
