@@ -349,7 +349,9 @@ excepted).
   the model tier judges write-lane shell commands, and nothing else
   (**Proposed**): gem-agent's evaluation and two-round composition, opt-in
   with `[approval].model_tier = "shell"` on the same server, the operator's
-  `risk-rules.md`, gem-agent's records. Measured first: on mlx-serve the
-  judgment kept the conversation cached and escalated every dangerous
-  command and injection, but approved an MCP vault write — and stating the
-  missing fact made it escalate MCP reads too — so MCP stays the operator's
+  `risk-rules.md`, gem-agent's records. Judged by what auto mode is for:
+  on the operator's own month of write-lane prompts it would have approved
+  47 % and passed none of the exfiltration, injection or refused cases;
+  MCP stays the operator's (a vault write was approved). Accepts, with
+  reasons, that ADR-0015/0017's "the operator sees every write-lane
+  command" no longer holds with the tier on
