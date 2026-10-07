@@ -71,7 +71,8 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
 - [`ADR-0010`](adr/0010-no-model-tier.ja.md) — 自動承認のモデル層は
   採らない: ベンチの Review 呼び出しは今や read レーンが走らせる write
   レーンの検証で、判定はローカルモデル 1 つが自分を裁いて呼び出しごとに
-  数秒かかり、操作者の行とレーンが既に覆っている
+  数秒かかり、操作者の行とレーンが既に覆っている。write レーンのシェル
+  コマンドについては ADR-0032 が置き換える
 - [`ADR-0011`](adr/0011-skills.ja.md) — スキルは Claude Code の形式の
   まま lagent 自身のディレクトリから読み込む: `~/.config/lagent/skills` と
   プロジェクトの `.claude/skills`（信頼済み・ピン留め）、facts メッセージに
@@ -259,3 +260,10 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   あり、`reasoning_tokens` なし、`reasoning_effort` は未検証）、計測（速さはランタイムでは
   なく mlx-serve 独自ビルドの MTP ヘッドから来る。長い文脈は持ちこたえる）、コミュニティ製の
   サーバを動かすことの残余リスクを記録する。ADR-0007 を改める: 空白だけの completion は空
+- [`ADR-0032`](adr/0032-the-model-tier-judges-write-lane-shell.ja.md) —
+  モデル層は write レーンのシェルコマンドを判定し、それ以外は判定しない（**Proposed**）:
+  gem-agent の評価と 2 ラウンドの合成を、同じサーバ上で `[approval].model_tier = "shell"`
+  によるオプトインで、運用者の `risk-rules.md` と gem-agent の記録とともに。先に計測した:
+  mlx-serve では判定が会話をキャッシュに残したまま、危険なコマンドと注入をすべて止めたが、
+  MCP の保管庫への書き込みを承認した — 欠けていた事実を述べると MCP の読み出しまで止めた —
+  ので、MCP は運用者のものに残す

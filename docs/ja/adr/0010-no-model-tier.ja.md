@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Accepted** |
+| Status | **Accepted**。write レーンの `shell_exec` については [ADR-0032](0032-the-model-tier-judges-write-lane-shell.ja.md) が置き換える（2026-10-08） |
 | Date | 2026-09-12 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |

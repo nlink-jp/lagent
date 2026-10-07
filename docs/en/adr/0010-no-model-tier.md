@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Accepted** |
+| Status | **Accepted**; superseded for write-lane `shell_exec` by [ADR-0032](0032-the-model-tier-judges-write-lane-shell.md) (2026-10-08) |
 | Date | 2026-09-12 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |

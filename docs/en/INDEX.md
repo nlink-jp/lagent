@@ -79,7 +79,8 @@ excepted).
   auto-approval is not adopted: the bench's Review-tier calls were
   write-lane verifications the read lane now runs, a verdict would cost
   seconds per call on one local model that would be judging itself,
-  and the operator's rows and lanes already cover them
+  and the operator's rows and lanes already cover them. Superseded for
+  write-lane shell commands by ADR-0032
 - [`ADR-0011`](adr/0011-skills.md) — skills are loaded, in Claude
   Code's format, from lagent's own directory: `~/.config/lagent/skills`
   and the project's `.claude/skills` (trusted and pinned), one catalog
@@ -344,3 +345,11 @@ excepted).
   head of mlx-serve's own build, not the runtime; long context holds) and the
   residual risk of running a community server. Amends ADR-0007: a
   whitespace-only completion is empty
+- [`ADR-0032`](adr/0032-the-model-tier-judges-write-lane-shell.md) —
+  the model tier judges write-lane shell commands, and nothing else
+  (**Proposed**): gem-agent's evaluation and two-round composition, opt-in
+  with `[approval].model_tier = "shell"` on the same server, the operator's
+  `risk-rules.md`, gem-agent's records. Measured first: on mlx-serve the
+  judgment kept the conversation cached and escalated every dangerous
+  command and injection, but approved an MCP vault write — and stating the
+  missing fact made it escalate MCP reads too — so MCP stays the operator's
