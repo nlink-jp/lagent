@@ -75,6 +75,12 @@ type ApprovalConfig struct {
 	// gem-agent ADR-0023 behaviour (a trusted directory stays trusted whatever
 	// its files come to contain).
 	PinTrustedFiles bool `toml:"pin_trusted_files"`
+	// ModelTier turns on the model tier of auto-approve (ADR-0032):
+	// "shell" has a judge model decide the write-lane shell commands the
+	// rule tier puts at Review; "off" (default) asks the operator about
+	// every Review call, as before. Global only — ProjectApproval has no
+	// such field, so a checked-out repository cannot switch it on.
+	ModelTier string `toml:"model_tier"`
 }
 
 // ProjectConfig is <project>/.lagent.toml — the project-scoped half
@@ -281,6 +287,13 @@ type LLMConfig struct {
 	// the mapping. Measured on the bench before it is set by default
 	// (ADR-0009).
 	ReasoningEffort string `toml:"reasoning_effort"`
+	// RiskModel names the model the model tier asks (ADR-0032), on the
+	// same server; empty means Model.
+	RiskModel string `toml:"risk_model"`
+	// RiskReasoningEffort is the judge's reasoning_effort, sent verbatim;
+	// "none" by default (thinking measured no better and six times
+	// slower), empty sends nothing.
+	RiskReasoningEffort string `toml:"risk_reasoning_effort"`
 }
 
 // ModelConfig holds what is known about the model itself.
@@ -374,9 +387,9 @@ func DefaultPath() (string, error) {
 
 func defaults() Config {
 	return Config{
-		LLM:      LLMConfig{Provider: "lmstudio", BaseURL: "http://localhost:1234/v1"},
+		LLM:      LLMConfig{Provider: "lmstudio", BaseURL: "http://localhost:1234/v1", RiskReasoningEffort: "none"},
 		Sandbox:  SandboxConfig{Enabled: true, ScratchCaches: map[string]string{"GOCACHE": "go-build"}},
-		Approval: ApprovalConfig{PinTrustedFiles: true},
+		Approval: ApprovalConfig{PinTrustedFiles: true, ModelTier: "off"},
 		Agent:    AgentConfig{MaxTurns: 50, ShellTimeoutSec: 120},
 		MCP:      MCPConfig{Enabled: true, CallTimeoutSec: 60, StartupTimeoutSec: 30, Advertise: "deferred"},
 		TUI:      TUIConfig{Theme: "auto", Language: "auto", ShowThoughts: true, Images: "auto"},
@@ -519,10 +532,11 @@ type HookEntry struct {
 // trackedKeys are the settings /settings displays with provenance.
 var trackedKeys = []string{
 	"llm.provider", "llm.base_url", "llm.model", "llm.api_key", "llm.reasoning_effort",
+	"llm.risk_model", "llm.risk_reasoning_effort",
 	"model.context_window",
 	"sandbox.enabled", "sandbox.read_lane_deny_exec", "sandbox.read_lane_prompts",
 	"sandbox.scratch_caches",
-	"approval.pin_trusted_files",
+	"approval.pin_trusted_files", "approval.model_tier",
 	"agent.max_turns", "agent.shell_timeout_sec", "agent.auto_approve",
 	"agent.read_only",
 	"mcp.enabled", "mcp.call_timeout_sec", "mcp.startup_timeout_sec", "mcp.advertise", "mcp.preload",
@@ -604,6 +618,11 @@ func (c *Config) validate() error {
 	}
 	if c.MCP.StartupTimeoutSec <= 0 {
 		return fmt.Errorf("[mcp].startup_timeout_sec must be positive")
+	}
+	switch c.Approval.ModelTier {
+	case "off", "shell":
+	default:
+		return fmt.Errorf("[approval].model_tier must be off or shell (got %q)", c.Approval.ModelTier)
 	}
 	switch c.MCP.Advertise {
 	case "deferred", "all":
