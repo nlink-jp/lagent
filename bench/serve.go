@@ -50,10 +50,16 @@ type serveSample struct {
 	Timings json.RawMessage `json:"timings,omitempty"`
 }
 
+// minRateTokens is the shortest answer a decode speed is read from. A
+// one-word answer arrives as one or two chunks in the same instant, and
+// its "rate" is the network's, not the model's (measured: 48,000 tok/s
+// on a two-token reply).
+const minRateTokens = 16
+
 // decodeRate is completion tokens after the first over the seconds
-// after the first. Zero when there is nothing to divide.
+// after the first. Zero when the answer is too short to time.
 func decodeRate(completion int, firstSec, totalSec float64) float64 {
-	if completion < 2 || totalSec <= firstSec {
+	if completion < minRateTokens || totalSec <= firstSec {
 		return 0
 	}
 	return float64(completion-1) / (totalSec - firstSec)
@@ -375,6 +381,38 @@ func cmdServe(args []string, out io.Writer) error {
 	return os.WriteFile(filepath.Join(*outDir, "summary.md"), []byte(summary), 0o644)
 }
 
+// cmdServeReport recounts a results directory from its raw log, so a
+// change to the summary never needs the measurement run again.
+func cmdServeReport(args []string, out io.Writer) error {
+	if len(args) != 1 {
+		return errors.New("usage: bench serve-report <results dir>")
+	}
+	f, err := os.Open(filepath.Join(args[0], "requests.jsonl"))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	var all []serveSample
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 64<<10), 4<<20)
+	for sc.Scan() {
+		var s serveSample
+		if err := json.Unmarshal(sc.Bytes(), &s); err != nil {
+			return fmt.Errorf("requests.jsonl: %w", err)
+		}
+		// The rate is recomputed, so a log written before a change to
+		// decodeRate reads as if measured today.
+		s.DecodeTPS = decodeRate(s.CompletionTokens, s.FirstTokenSec, s.TotalSec)
+		all = append(all, s)
+	}
+	if err := sc.Err(); err != nil {
+		return err
+	}
+	summary := serveSummary(all)
+	fmt.Fprint(out, summary)
+	return os.WriteFile(filepath.Join(args[0], "summary.md"), []byte(summary), 0o644)
+}
+
 // serveSummary folds the samples into one table: per measurement and
 // size, the medians a decision quotes, and how many requests failed.
 func serveSummary(all []serveSample) string {
@@ -392,17 +430,19 @@ func serveSummary(all []serveSample) string {
 		groups[k] = append(groups[k], s)
 	}
 	var b strings.Builder
-	b.WriteString("| measurement | size | n | failed | prompt tok | cached tok | first token s (med) | total s (med) | decode tok/s (med) |\n")
-	b.WriteString("|---|---|---|---|---|---|---|---|---|\n")
+	b.WriteString("| measurement | size | n | failed | finish | prompt tok | cached tok | first token s (med) | total s (med) | decode tok/s (med) |\n")
+	b.WriteString("|---|---|---|---|---|---|---|---|---|---|\n")
 	for _, k := range order {
 		g := groups[k]
 		var prompt, cached, first, total, dec []float64
 		failed := 0
+		finish := map[string]int{}
 		for _, s := range g {
 			if s.Error != "" {
 				failed++
 				continue
 			}
+			finish[s.FinishReason]++
 			prompt = append(prompt, float64(s.PromptTokens))
 			cached = append(cached, float64(s.CachedTokens))
 			first = append(first, s.FirstTokenSec)
@@ -411,8 +451,17 @@ func serveSummary(all []serveSample) string {
 				dec = append(dec, s.DecodeTPS)
 			}
 		}
-		fmt.Fprintf(&b, "| %s | %d | %d | %d | %.0f | %.0f | %.2f | %.2f | %.1f |\n",
-			k.label, k.size, len(g), failed, median(prompt), median(cached), median(first), median(total), median(dec))
+		var reasons []string
+		for r, n := range finish {
+			reasons = append(reasons, fmt.Sprintf("%s %d", r, n))
+		}
+		sort.Strings(reasons)
+		rate := "–"
+		if len(dec) > 0 {
+			rate = fmt.Sprintf("%.1f", median(dec))
+		}
+		fmt.Fprintf(&b, "| %s | %d | %d | %d | %s | %.0f | %.0f | %.2f | %.2f | %s |\n",
+			k.label, k.size, len(g), failed, strings.Join(reasons, ", "), median(prompt), median(cached), median(first), median(total), rate)
 	}
 	return b.String()
 }

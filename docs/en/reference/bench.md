@@ -238,7 +238,11 @@ token is the first content, reasoning or tool-call delta — a role-only
 chunk does not count; decode speed is the completion tokens after the
 first over the time after it. Every request lands in `requests.jsonl`
 as it completes, with the server's own `timings` when it sends one, and
-`summary.md` holds the medians. A size class is a target: the padding
+`summary.md` holds the medians and how each measurement ended (`finish`:
+a `decode` that ends in `stop` is the model ending its answer, not the
+server's speed at that size). An answer shorter than 16 tokens gets no
+rate (`–`): a one-word reply arrives in one instant. `bench serve-report
+<dir>` recounts `summary.md` from `requests.jsonl`. A size class is a target: the padding
 assumes 2.8 characters a token (Qwen 3.6 on this source), and each row
 records the count the server reported.
 

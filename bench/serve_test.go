@@ -16,7 +16,7 @@ func TestServeSSEFirstTokenSkipsTheRoleChunk(t *testing.T) {
 		`data: {"choices":[{"delta":{"content":"1"}}]}`,
 		`data: {"choices":[{"delta":{"content":"\n2"}}]}`,
 		`data: {"choices":[{"delta":{},"finish_reason":"length"}]}`,
-		`data: {"choices":[],"usage":{"prompt_tokens":1200,"completion_tokens":11,"prompt_tokens_details":{"cached_tokens":1100}},"timings":{"prompt_ms":5.0}}`,
+		`data: {"choices":[],"usage":{"prompt_tokens":1200,"completion_tokens":21,"prompt_tokens_details":{"cached_tokens":1100}},"timings":{"prompt_ms":5.0}}`,
 		`data: [DONE]`,
 	}, "\n")
 	start := time.Unix(0, 0)
@@ -29,11 +29,11 @@ func TestServeSSEFirstTokenSkipsTheRoleChunk(t *testing.T) {
 	if s.FirstTokenSec != 1 || s.TotalSec != 2 {
 		t.Errorf("first %v total %v, want 1 and 2", s.FirstTokenSec, s.TotalSec)
 	}
-	if s.PromptTokens != 1200 || s.CachedTokens != 1100 || s.CompletionTokens != 11 || s.FinishReason != "length" {
+	if s.PromptTokens != 1200 || s.CachedTokens != 1100 || s.CompletionTokens != 21 || s.FinishReason != "length" {
 		t.Errorf("sample %+v", s)
 	}
-	if s.DecodeTPS != 10 { // 10 tokens after the first, in one second
-		t.Errorf("decode %v, want 10", s.DecodeTPS)
+	if s.DecodeTPS != 20 { // 20 tokens after the first, in one second
+		t.Errorf("decode %v, want 20", s.DecodeTPS)
 	}
 	if string(s.Timings) != `{"prompt_ms":5.0}` {
 		t.Errorf("timings %s", s.Timings)
@@ -57,8 +57,8 @@ func TestServeSSEReasoningCountsAsFirstToken(t *testing.T) {
 }
 
 func TestDecodeRateGuards(t *testing.T) {
-	if r := decodeRate(1, 1, 2); r != 0 {
-		t.Errorf("one token has no rate: %v", r)
+	if r := decodeRate(2, 0.611196, 0.611215); r != 0 {
+		t.Errorf("a two-token reply has no rate (measured: it read as 48,000 tok/s): %v", r)
 	}
 	if r := decodeRate(10, 2, 2); r != 0 {
 		t.Errorf("no time after the first token: %v", r)
@@ -108,5 +108,39 @@ func TestPaddingIsDeterministicAndSkipsResults(t *testing.T) {
 	}
 	if !strings.HasPrefix(one, "=== a.go ===\npackage a\n\n=== b.go ===\npackage b\n\n=== a.go") {
 		t.Errorf("want a.go then b.go, repeated, by relative path: %q", one)
+	}
+}
+
+// The summary says how a measurement ended, so a decode the model
+// stopped by itself is not read as generation speed at that size.
+func TestServeSummaryShowsFinishAndHidesUntimedRates(t *testing.T) {
+	got := serveSummary([]serveSample{
+		{Label: "decode", Size: 35000, FinishReason: "stop", CompletionTokens: 2, FirstTokenSec: 1, TotalSec: 1.0001},
+		{Label: "decode", Size: 35000, FinishReason: "length", CompletionTokens: 300, FirstTokenSec: 1, TotalSec: 5, DecodeTPS: 74.75},
+		{Label: "next-turn", Size: 35000, FinishReason: "stop", CompletionTokens: 2},
+	})
+	if !strings.Contains(got, "| decode | 35000 | 2 | 0 | length 1, stop 1 |") {
+		t.Errorf("finish column missing:\n%s", got)
+	}
+	if !strings.Contains(got, "| next-turn | 35000 | 1 | 0 | stop 1 | 0 | 0 | 0.00 | 0.00 | – |") {
+		t.Errorf("an untimed rate must read as a dash:\n%s", got)
+	}
+}
+
+func TestServeReportRecountsTheRawLog(t *testing.T) {
+	dir := t.TempDir()
+	log := `{"label":"decode","size":1000,"rep":1,"status":200,"prompt_tokens":977,"cached_tokens":0,"completion_tokens":2,"finish_reason":"stop","first_token_s":0.6,"total_s":0.6001,"decode_tps":19990}` + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "requests.jsonl"), []byte(log), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	if err := cmdServeReport([]string{dir}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "19990") || !strings.Contains(out.String(), "| – |") {
+		t.Errorf("the old rate survived the recount:\n%s", out.String())
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "summary.md")); string(b) != out.String() {
+		t.Error("summary.md not rewritten")
 	}
 }

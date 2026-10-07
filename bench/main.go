@@ -45,6 +45,8 @@ func run(args []string, out, errOut io.Writer) int {
 		err = cmdReport(args[1:], out)
 	case "serve":
 		err = cmdServe(args[1:], out)
+	case "serve-report":
+		err = cmdServeReport(args[1:], out)
 	case "-h", "--help", "help":
 		fmt.Fprintln(out, usage)
 		return 0
@@ -64,6 +66,7 @@ const usage = `usage:
   bench report <results dir>
   bench serve  --base-url <url> --model <id> --label <name> [--sizes 1k,12k,35k,69k]
                [--reps N] [--reasoning-effort none] [--convs 5] [--pair=true] [--out DIR]
+  bench serve-report <results dir>
 
 A configuration name resolves to bench/configs/<runtime>/<name>.toml;
 name=/path/to/config.toml uses a file of your own (the reference
