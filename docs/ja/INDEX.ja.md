@@ -261,7 +261,7 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   なく mlx-serve 独自ビルドの MTP ヘッドから来る。長い文脈は持ちこたえる）、コミュニティ製の
   サーバを動かすことの残余リスクを記録する。ADR-0007 を改める: 空白だけの completion は空
 - [`ADR-0032`](adr/0032-the-model-tier-judges-write-lane-shell.ja.md) —
-  モデル層は write レーンのシェルコマンドを判定し、それ以外は判定しない（**Proposed**）:
+  モデル層は write レーンのシェルコマンドを判定し、それ以外は判定しない（**Accepted**、実装済み）:
   gem-agent の評価と 2 ラウンドの合成を、同じサーバ上で `[approval].model_tier = "shell"`
   によるオプトインで、運用者の `risk-rules.md` と gem-agent の記録とともに。auto モードの目的で
   判断した: 運用者自身の 1 か月分の write レーンの確認では 47 % を承認し、持ち出し・注入・拒否された

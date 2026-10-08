@@ -347,7 +347,7 @@ excepted).
   whitespace-only completion is empty
 - [`ADR-0032`](adr/0032-the-model-tier-judges-write-lane-shell.md) —
   the model tier judges write-lane shell commands, and nothing else
-  (**Proposed**): gem-agent's evaluation and two-round composition, opt-in
+  (**Accepted**, implemented): gem-agent's evaluation and two-round composition, opt-in
   with `[approval].model_tier = "shell"` on the same server, the operator's
   `risk-rules.md`, gem-agent's records. Judged by what auto mode is for:
   on the operator's own month of write-lane prompts it would have approved

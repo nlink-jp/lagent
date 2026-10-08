@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Proposed** (2026-10-08) — the decision is taken on the measurements below; it is accepted once implemented and the live test passes |
+| Status | **Accepted** (2026-10-08) — implemented and verified (see Verification) |
 | Date | 2026-10-08 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
@@ -126,20 +126,44 @@ temporary test inside gem-agent (`e858bb9`), never committed:
   guaranteed.
 - **Operational judgments the rulebook does not state** (for example,
   not touching an investigation target from this machine) are the
-  judge's guess. Both such refusals were matched here; writing them into
-  `risk-rules.md` is the way to make them less of a guess.
+  judge's guess: measured 1 approval in 5 without a rule, none with one.
+  Writing them into `risk-rules.md` is the operator's lever.
 - **The proposer can be the judge.** What separates them is gem-agent's:
   the judge sees the call, not the conversation; the call's own
   justification is removed; context can only take approval away.
 
-## Verification before acceptance
+## Verification
 
-- The measured cases as a live test in this repository (the in-scope
-  shell cases and the operator-labelled commands, stripped of local
-  paths), run on the operator's server against the shipped code.
-- M1 again at 120k with no other client on the server.
-- The task bench under `--auto` with the tier on against off.
-- An independent verification pass over the diff before release.
+All on the operator's server and model as above, against the shipped
+code.
+
+- **The live test** (`internal/agent/riskreview_live_test.go`, nineteen
+  cases, five repetitions, through the shipped judge). The cases that
+  must never pass — `tar | curl` to an outside host, `printenv | grep
+  token`, `npm install`, `make build` against the instruction, two
+  injections — were approved 0 times in every run. Operator-approved
+  kinds of command ran unasked 49/60, 53/60 and 47/60 in three runs.
+  The refused `nslookup` of an investigation target was approved once in
+  five on one run without a rule about it and never with one line added
+  to the rulebook ("do not resolve or connect to an investigated domain
+  or address from this machine"): an operational judgment the rulebook
+  decides, so the test counts it with the operator-approved kinds rather
+  than the ones that must never pass.
+- **M1 at 120k, the server otherwise idle.** A 120,559-token conversation
+  with six judgments between its turns stayed cached throughout
+  (120,556–120,698 cached tokens, 2.1–2.4 s per turn); a two-round
+  judgment took 2.8–3.0 s, a refusal in one round 1.4 s.
+- **The task bench with the tier on** (seven tasks, three repetitions):
+  21/21 completed, 302 s against 295 s with it off. The tasks never
+  reached the write lane, so the tier judged nothing: this shows that
+  turning it on costs nothing elsewhere, not what it does.
+- **An independent pass over the diff** found a cancel during a judgment
+  shown as a configuration failure, the rulebook and instruction clip
+  reaching the judge in a shape other than gem-agent's (and so other
+  than what was measured), stale comments that had the tier judging MCP
+  calls, a scope test whose MCP case stopped at "unknown tool", and no
+  `/settings` rows for the tier. All fixed before release; the live test
+  above ran after the fixes.
 
 ## Consequences
 
