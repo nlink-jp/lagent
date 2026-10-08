@@ -147,6 +147,14 @@ func (s *settingsStore) data() tui.SettingsData {
 		"sent verbatim as reasoning_effort (none/minimal/low/medium/high/xhigh; LM Studio maps it to the model's on/off) — "+needsRestart)
 	ro("backend", "model.context_window", contextWindowLabel(s.cfg.Model.ContextWindow),
 		"model.context_window", "asked of the provider when unset")
+	// The model tier (ADR-0032): whether a judge decides write-lane shell
+	// commands under auto, and which model it is.
+	ro("approval", "approval.model_tier", s.cfg.Approval.ModelTier, "approval.model_tier",
+		"shell: a judge model decides write-lane shell commands under auto; off: they ask — "+needsRestart)
+	ro("approval", "llm.risk_model", unsetLabel(s.cfg.LLM.RiskModel), "llm.risk_model",
+		"the judge's model on the same server; unset is llm.model — "+needsRestart)
+	ro("approval", "llm.risk_reasoning_effort", unsetLabel(s.cfg.LLM.RiskReasoningEffort), "llm.risk_reasoning_effort",
+		"the judge's reasoning_effort — "+needsRestart)
 	// The measured state, not the configured one: --no-sandbox is never
 	// folded back into cfg, and a failed write-lane probe leaves the
 	// setting true while the runtime is unconfined. Two documents send

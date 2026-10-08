@@ -52,14 +52,10 @@ type Decision struct {
 	// MCP write with no prompt at all while the banner said it changed
 	// nothing (independent review).
 	//
-	// It does NOT take the call away from the model tier. gem-agent ADR-0080 §5
-	// puts the mode in front of that tier on purpose, and it was
-	// measured escalating an MCP write and passing an MCP read; making
-	// these operator-only would remove the judgment the ADR chose and
-	// stop every lookup in a read-only session. §5 is a judgment, §3 is
-	// the kernel denial, and the ADR says not to blur them — the
-	// documents that promised "every MCP call asks you" were the ones
-	// in the wrong.
+	// In gem-agent it does NOT take the call away from the model tier
+	// (gem-agent ADR-0080 §5 puts the mode in front of that tier on
+	// purpose). lagent's model tier never sees an MCP call (ADR-0032 §1),
+	// so here such a call is the operator's: the gate asks it.
 	CeilingUnbounded bool
 }
 
@@ -179,9 +175,9 @@ func laneOrDefault(tc llm.ToolCall) sandbox.Lane {
 //
 // An MCP tool is never over the ceiling here. The rule tier cannot read
 // another server's effects (gem-agent ADR-0077), and a ceiling that guessed would
-// be guessing about the one place no profile reaches; gem-agent ADR-0080 §5 states
-// the ceiling to the model tier instead, which is a judgment and is
-// documented as one.
+// be guessing about the one place no profile reaches. gem-agent ADR-0080 §5
+// states the ceiling to its model tier instead; lagent's tier does not
+// judge MCP calls (ADR-0032 §1), and CeilingUnbounded makes the gate ask.
 func overCeiling(name string, mutating bool, declared, ceiling sandbox.Lane) (ceilingKind, string) {
 	if ceiling >= sandbox.LaneOperator {
 		return ceilingWithin, "" // no ceiling in force

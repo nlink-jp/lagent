@@ -28,6 +28,14 @@ func tierAgent(t *testing.T, b *autoBackend, gate Approver, log SessionLog, enf 
 	reg.SetLaneExec(func(ctx context.Context, c string, _ sandbox.Lane) *exec.Cmd {
 		return exec.CommandContext(ctx, "/bin/bash", "-c", c)
 	}, enf)
+	// A registered MCP write, so the scope test reaches the ladder with
+	// it rather than stopping at "unknown tool".
+	if err := reg.Register(&tools.Tool{Name: "mcp__obsidian__create_vault_file", Mutating: true,
+		Description: "Create a file in the user's Obsidian vault.",
+		Parameters:  map[string]any{"type": "object", "properties": map[string]any{}},
+		Run:         func(context.Context, map[string]any) (string, error) { return "ok", nil }}); err != nil {
+		t.Fatal(err)
+	}
 	var decisions []AutoDecision
 	var notices []string
 	a := New(Options{
@@ -195,33 +203,71 @@ func TestModelTierOffAsksTheOperator(t *testing.T) {
 }
 
 // The records are gem-agent's: auto_decision names the judge's model,
-// the bar and the confidence; the judgment's tokens are a risk usage
-// record under the judge's model, not the main one.
+// the bar and the confidence; each round's tokens are a risk usage
+// record under the judge's model, written by the judgment itself.
 func TestModelTierRecords(t *testing.T) {
-	b := &autoBackend{verdict: `{"approve": true, "confidence": 0.95, "reason": "fine"}`}
+	b := &autoBackend{verdict: `{"approve": true, "confidence": 0.95, "reason": "fine"}`,
+		verdictUsage: &llm.Response{PromptTokens: 900, OutputTokens: 40, TotalTokens: 940}}
 	log := &capturingLog{}
 	a, _, _ := tierAgent(t, b, &recordingGate{}, log, confined)
 	runOne(t, a, b, writeLane("go test ./..."), "続けて")
 	var rec map[string]any
+	risks := 0
 	for i, k := range log.kinds {
 		if k == "auto_decision" {
 			rec = log.data[i].(map[string]any)
+		}
+		if u, ok := log.data[i].(session.UsageRecord); ok && k == session.KindUsage && u.Source == session.UsageRisk {
+			risks++
+			if u.Model != "judge-model" || u.Prompt != 900 {
+				t.Errorf("risk usage record = %+v", u)
+			}
 		}
 	}
 	if rec == nil || rec["model"] != true || rec["evaluator_model"] != "judge-model" ||
 		rec["min_confidence"] != minConfidence || rec["confidence"] != 0.95 {
 		t.Errorf("auto_decision = %v", rec)
 	}
-	// autoBackend reports no usage; one judgment with usage is logged
-	// against the judge's model.
-	a.logUsageAs(session.UsageRisk, a.riskModelName(), llm.Usage{Prompt: 900, Output: 40, Total: 940})
-	found := false
-	for i, k := range log.kinds {
-		if u, ok := log.data[i].(session.UsageRecord); ok && k == session.KindUsage && u.Source == session.UsageRisk {
-			found = u.Model == "judge-model"
-		}
+	if risks != 2 {
+		t.Errorf("want one risk usage record per round, got %d", risks)
 	}
-	if !found {
-		t.Error("the risk usage record must name the judge's model")
+}
+
+// A confidence outside [0, 1] is no verdict: it escalates.
+func TestModelTierConfidenceOutOfRangeEscalates(t *testing.T) {
+	b := &autoBackend{verdict: `{"approve": true, "confidence": 1.5, "reason": "certain"}`}
+	gate := &recordingGate{}
+	a, _, _ := tierAgent(t, b, gate, nil, confined)
+	runOne(t, a, b, writeLane("go test ./..."), "続けて")
+	if len(gate.asked) != 1 || !strings.Contains(gate.asked[0], "confidence out of range") {
+		t.Errorf("gate %v", gate.asked)
+	}
+}
+
+// A cancel during a judgment is the operator's act: no notice sending
+// them to config keys, and the once-a-session notice is not spent.
+func TestModelTierCancelIsNotAFailureNotice(t *testing.T) {
+	b := &autoBackend{verdictErr: context.Canceled}
+	a, _, notices := tierAgent(t, b, &recordingGate{}, nil, confined)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	tc := writeLane("go test ./...")
+	got := a.judge(ctx, tc, a.decide(tc).Verdict)
+	if got.Approved || got.Reason != "risk evaluation interrupted" || len(*notices) != 0 || a.riskFailNoticed {
+		t.Errorf("decision %+v, notices %v, spent %v", got, *notices, a.riskFailNoticed)
+	}
+}
+
+// A new session (/clear) gets its own notice of a failing judge.
+func TestModelTierNoticeIsPerSession(t *testing.T) {
+	b := &autoBackend{verdictErr: errors.New("API error 400")}
+	a, _, notices := tierAgent(t, b, &recordingGate{}, nil, confined)
+	tc := writeLane("go test ./...")
+	a.judge(context.Background(), tc, a.decide(tc).Verdict)
+	a.judge(context.Background(), tc, a.decide(tc).Verdict)
+	a.Restart(nil)
+	a.judge(context.Background(), tc, a.decide(tc).Verdict)
+	if len(*notices) != 2 {
+		t.Errorf("want one notice per session, got %v", *notices)
 	}
 }

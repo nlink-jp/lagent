@@ -81,7 +81,7 @@ func clipRunes(s string, max int) string {
 	if len(r) <= max {
 		return s
 	}
-	return string(r[:max]) + "…"
+	return string(r[:max]) + "… [clipped]"
 }
 
 // modelTierJudges reports whether the model tier decides this call: a
@@ -102,14 +102,14 @@ func (a *Agent) modelTierJudges(tc llm.ToolCall, d Decision) bool {
 func (a *Agent) judge(ctx context.Context, tc llm.ToolCall, v risk.Verdict) AutoDecision {
 	baseline, err := a.evaluateRisk(ctx, tc, false)
 	if err != nil {
-		return a.judgeFailed(v, err)
+		return a.judgeFailed(ctx, v, err)
 	}
 	if !baseline.Approve || baseline.Confidence < minConfidence {
 		return escalation(v, baseline)
 	}
 	verdict, err := a.evaluateRisk(ctx, tc, true)
 	if err != nil {
-		return a.judgeFailed(v, err)
+		return a.judgeFailed(ctx, v, err)
 	}
 	if verdict.Approve && verdict.Confidence >= minConfidence {
 		return AutoDecision{Approved: true, Tier: v.Tier, ModelConsulted: true,
@@ -123,7 +123,13 @@ func (a *Agent) judge(ctx context.Context, tc llm.ToolCall, v risk.Verdict) Auto
 // so once a session: a server that rejects the judge's model or its
 // reasoning_effort fails every judgment, and without the notice the
 // tier would be silently useless.
-func (a *Agent) judgeFailed(v risk.Verdict, err error) AutoDecision {
+func (a *Agent) judgeFailed(ctx context.Context, v risk.Verdict, err error) AutoDecision {
+	// A cancel is the operator's own act, not a misconfiguration: say
+	// nothing and spend nothing. The call site's ctx.Err() check keeps
+	// the call from the gate.
+	if ctx.Err() != nil {
+		return AutoDecision{Tier: v.Tier, ModelConsulted: true, Reason: "risk evaluation interrupted"}
+	}
 	a.mu.Lock()
 	first := !a.riskFailNoticed
 	a.riskFailNoticed = true

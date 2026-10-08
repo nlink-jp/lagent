@@ -430,6 +430,8 @@ func (a *Agent) Restart(log SessionLog) {
 	a.epoch++
 	a.log = log
 	a.logDead = false
+	// A new session gets its own notice of a failing judge (ADR-0032).
+	a.riskFailNoticed = false
 	// An abandoned call's late note (gem-agent ADR-0065 §2) answers the model's
 	// own "result discarded" — a conversation that never made the
 	// call has nothing to correct; the tool_late_return record and
@@ -1295,8 +1297,9 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 		mustPrompt := a.callPolicy(tc) == policy.AlwaysAsk
 		// No standing shortcut answers a call the ceiling cannot bound:
 		// the allowlist may not, and `gated` below refuses a `never`
-		// policy the same way. The model tier still judges it — that is
-		// gem-agent ADR-0080 §5, and it is a judgment rather than a guarantee.
+		// policy the same way. In gem-agent the model tier still judges
+		// it (gem-agent ADR-0080 §5); here no model tier sees an MCP call
+		// (ADR-0032 §1), so the operator answers it.
 		if d.Floor() {
 			mustPrompt = true
 			// Shown on the prompt, so the operator sees why an

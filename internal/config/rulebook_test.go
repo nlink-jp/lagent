@@ -16,7 +16,10 @@ func TestLoadRulebook(t *testing.T) {
 	if err := os.WriteFile(RulebookPath(cfg), []byte("- `go test` は承認してよい\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if text, clipped, err := LoadRulebook(cfg); err != nil || !strings.Contains(text, "go test") || clipped {
+	// gem-agent's composition of the base layer: trimmed, under its
+	// provenance header — the shape that was measured (ADR-0032).
+	if text, clipped, err := LoadRulebook(cfg); err != nil || clipped ||
+		text != "== base rules (hand-written by the operator) ==\n- `go test` は承認してよい" {
 		t.Fatalf("got %q %v %v", text, clipped, err)
 	}
 	long := strings.Repeat("規", RulebookCap+10)
@@ -24,8 +27,14 @@ func TestLoadRulebook(t *testing.T) {
 		t.Fatal(err)
 	}
 	text, clipped, err := LoadRulebook(cfg)
-	if err != nil || !clipped || len([]rune(text)) != RulebookCap {
-		t.Fatalf("clip by runes: %d %v %v", len([]rune(text)), clipped, err)
+	if err != nil || !clipped || !strings.HasSuffix(text, "\n[clipped: 10 more runes not shown]") {
+		t.Fatalf("a clip is stated to the judge too: %q… %v %v", text[len(text)-60:], clipped, err)
+	}
+	if err := os.WriteFile(RulebookPath(cfg), []byte("  \n\t\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if text, _, err := LoadRulebook(cfg); err != nil || text != "" {
+		t.Errorf("a blank rulebook is no rulebook: %q %v", text, err)
 	}
 }
 

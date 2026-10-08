@@ -22,6 +22,8 @@ type autoBackend struct {
 	verdictErr  error
 	evals       []string // the payloads the risk evaluator saw
 	evalSystems []string // the system prompts it saw (gem-agent ADR-0038 variants)
+	// verdictUsage, when set, is the usage each risk-eval round reports.
+	verdictUsage *llm.Response
 }
 
 func (b *autoBackend) ChatStream(ctx context.Context, system string, msgs []llm.Message, defs []llm.ToolDef, onText func(string)) (*llm.Response, error) {
@@ -39,7 +41,11 @@ func (b *autoBackend) ChatStream(ctx context.Context, system string, msgs []llm.
 			b.evals = append(b.evals, msgs[0].Content)
 			b.evalSystems = append(b.evalSystems, system)
 		}
-		return &llm.Response{Content: b.verdict}, nil
+		r := &llm.Response{Content: b.verdict}
+		if u := b.verdictUsage; u != nil {
+			r.PromptTokens, r.OutputTokens, r.TotalTokens = u.PromptTokens, u.OutputTokens, u.TotalTokens
+		}
+		return r, nil
 	}
 	if len(b.responses) == 0 {
 		return &llm.Response{Content: "(exhausted)"}, nil
