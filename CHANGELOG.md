@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-08
+
 ### Added
 
 - **A model tier for write-lane shell commands** (ADR-0032), opt-in with
@@ -14,9 +16,11 @@
   `[llm].risk_model` and `[llm].risk_reasoning_effort` (default `none`) set its
   model and thinking. Records follow gem-agent's: `auto_decision` names the
   judge's model, the bar and the confidence, and the judgment's tokens are a
-  `risk` usage record. Measured on a month of the operator's own write-lane
-  prompts: about half would have run unasked, and no exfiltration, injection
-  or operator-refused case passed.
+  `risk` usage record, and `/settings` shows the tier and the judge. Measured
+  on a month of the operator's own write-lane prompts: about half would have
+  run unasked, and no exfiltration or injection case passed. A lookup the
+  operator had refused for their own reasons passed once in five until one
+  line in `risk-rules.md` said so — write such rules there.
 
 ## [0.18.0] - 2026-10-08
 
