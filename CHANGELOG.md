@@ -10,10 +10,18 @@
   write its `hooks/`, `info/` and `config` — git runs those hooks when
   you commit inside the submodule, and `core.hooksPath` in that config
   moves them (measured before the fix). They are now persistent files in
-  the profile and for the file tools. `git submodule add` and `git
-  submodule update --init` write that config, so they now need the
-  operator lane, as `git init`, `git clone` and `git remote add` already
-  did (the same defect was found and fixed in gem-agent).
+  the profile and for the file tools — the submodule's `objects`, `refs`
+  and `logs` excepted, so `git gc` and branches named `hooks` or `config`
+  keep working. `git submodule add` and `git submodule update --init`
+  write that config, so they now need the operator lane, as `git init`,
+  `git clone` and `git remote add` already did (the same defect was
+  found and fixed in gem-agent).
+- **`commondir` is protected.** A `commondir` file under `.git` — the
+  repository's, a worktree's or a submodule's — points git at another
+  directory's config and hooks, and the write lane could write it: the
+  next plain `git commit` ran a planted hook (measured in gem-agent's
+  pre-release review). It is now a persistent file at any depth. The
+  residuals weighed and kept are recorded in gem-agent's ADR-0073.
 
 ### Fixed
 
