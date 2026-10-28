@@ -312,6 +312,13 @@ answers.
 
 - **macOS-only by design** — isolation is built on sandbox-exec, as in
   gem-agent. Do not add linux/windows targets to the Makefile.
+- **The credential block is a lane profile's last file-read rule** —
+  Seatbelt is last-match-wins, so a `(allow file-read* …)` written after
+  `writeCredentialBlock` re-opens every credential name inside that tree:
+  the read lane's `~/Library` toolchain re-allow once followed it, and
+  `~/Library/Caches/.env` was readable unasked. Any new read re-allow
+  goes before `writeCredentialBlock`;
+  `TestCredentialBlockIsTheLastReadRule` fails the build otherwise.
 - **gem-agent is a source, not an upstream.** Bring a package over with
   its commit recorded; do not add a feature because gem-agent has it.
   Anything in ADR-0002's list stays out — code, config keys, error text
