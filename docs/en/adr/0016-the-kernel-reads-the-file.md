@@ -10,6 +10,15 @@
 | Amends | ADR-0015 (§2 is withdrawn: names are not withheld, and the enumeration tools carry no credential code) |
 | Relates to | gem-agent ADR-0073 (the lanes, and the domain argument this applies), gem-agent ADR-0072 §4 (`os.Root` confinement, unchanged), ADR-0001 (the porting source), ADR-0008 (a skip names the route), ADR-0010 (no model tier: the operator is the only judge), ADR-0017 (the same question where no kernel exists) |
 
+*Amended 2026-10-29: the child's profile denies `file-read-data`, not
+`file-read*`, and the `.env.example` family is no longer re-allowed
+after the credential deny. `CredentialFilters` carves the templates out
+of its name filter with `require-not` and returns no allow, because a
+trailing allow beats every deny before it: in the read lane it re-opened
+templates inside the trees denied for reach. A template inside a home
+credential directory (`~/.ssh/.env.example`) is now refused here too, as
+`CredentialPath` already judged it.*
+
 ## Context
 
 gem-agent ADR-0073, which lagent's lanes are ported from, withdrew the
