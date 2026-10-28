@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Security
+
+- **A submodule's hooks, info and config are protected like the
+  project's.** A submodule's git directory lives under
+  `.git/modules/<name>/` (the name may nest), and the write lane could
+  write its `hooks/`, `info/` and `config` — git runs those hooks when
+  you commit inside the submodule, and `core.hooksPath` in that config
+  moves them (measured before the fix). They are now persistent files in
+  the profile and for the file tools. `git submodule add` and `git
+  submodule update --init` write that config, so they now need the
+  operator lane, as `git init`, `git clone` and `git remote add` already
+  did (the same defect was found and fixed in gem-agent).
+
 ## [0.19.1] - 2026-10-29
 
 ### Security

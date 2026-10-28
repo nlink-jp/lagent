@@ -1562,7 +1562,7 @@ const readLaneDeniedNote = "\n[the read lane denied an operation — the sandbox
 // clone`, `git remote add` (they write .git/config and hooks) and an
 // edit of AGENTS.md need the operator lane, and the model is told
 // rather than left to retry (agent-board review of gem-agent ADR-0073).
-const writeLaneDeniedNote = "\n[the write lane denied a write — inside the project it denies only the instruction/configuration files (AGENTS.md, CLAUDE.md, .mcp.json, .lagent.toml, .claude/) and .git/hooks, .git/info, .git/config (so git init, clone and remote add land here), renaming or removing a directory that contains one of those files, plus credential reads and anything outside the project and work directory; if the command must do that, call shell_exec again with access: \"operator\", which asks the user]"
+const writeLaneDeniedNote = "\n[the write lane denied a write — inside the project it denies only the instruction/configuration files (AGENTS.md, CLAUDE.md, .mcp.json, .lagent.toml, .claude/) and .git/hooks, .git/info, .git/config and their copies under .git/modules/ (so git init, clone, remote add and git submodule add/update --init land here), renaming or removing a directory that contains one of those files, plus credential reads and anything outside the project and work directory; if the command must do that, call shell_exec again with access: \"operator\", which asks the user]"
 
 func (r *Registry) shellExec() *Tool {
 	return &Tool{
@@ -1571,7 +1571,7 @@ func (r *Registry) shellExec() *Tool {
 			"The OS sandbox enforces the lane you declare with `access`. " +
 			"Declare \"read\" (default) for inspection — ls, cat, grep, git status/diff/log, jq — and for compiling, vetting and testing (go run, go vet, go test): it runs without approval, the toolchain cache lives in its own temporary directory ($TMPDIR), and it can write nothing else — no project or work-directory writes (a build that writes its binary into the project needs \"write\"), no network, no IPC or system settings. " +
 			"Declare \"write\" up front for anything that changes files, installs, commits or uses the network; it may write the project and $LAGENT_WORK_DIR and is approval-gated. " +
-			"Declare \"operator\" only when the command must change AGENTS.md/CLAUDE.md/.mcp.json/.claude/ or .git hooks/config (git init, clone, remote add), or read credential files; the user always decides. " +
+			"Declare \"operator\" only when the command must change AGENTS.md/CLAUDE.md/.mcp.json/.claude/ or .git hooks/config, a submodule's included (git init, clone, remote add, git submodule add or update --init), or read credential files; the user always decides. " +
 			"A command refused in a lane with 'Operation not permitted' needs the wider lane it names, not a retry. " +
 			"Long output keeps its head and tail and is saved whole in the work directory (not in the operator lane); the note names the bytes shown and the file. The exit status is reported when non-zero.",
 		Parameters: map[string]any{
