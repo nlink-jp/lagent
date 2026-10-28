@@ -281,7 +281,7 @@ func TestMemoryWritesStayReview(t *testing.T) {
 
 // A single-file read tool on credential material is a Review only the
 // operator answers (ADR-0015 §1); the enumeration tools never prompt
-// (§2: they skip and say so); the template re-allow holds; PathJudged
+// (§2: they skip and say so); the template exemption holds; PathJudged
 // names exactly the tools whose paths Agent.decide resolves first.
 func TestCredentialReadsAreOperatorOnly(t *testing.T) {
 	credential := []string{".env", ".env.local", "config/.env.production", "keys/id_rsa", "sub/credentials.json",

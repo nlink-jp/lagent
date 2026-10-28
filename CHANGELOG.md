@@ -13,6 +13,16 @@
   lane profiles, and a test holds that order. The write lane was not
   affected (it has no read re-allow), and other credential paths were
   denied as before (the same defect was found and fixed in gem-agent).
+- **`.env` templates are carved out of the credential rule, not re-allowed
+  after it.** A trailing `(allow …)` for `.env.example`, `.env.sample`,
+  `.env.template` and `.env.dist` would beat every deny before it, so with
+  the block moved last such a template would have become readable inside
+  the trees the read lane denies (`/Volumes`, `/Network`, the rest of
+  `~/Library`). The name rule now excludes templates itself, so no allow
+  follows the credential block in any profile, the file-read child's
+  included. One change in behaviour: a template inside a home credential
+  directory (`~/.ssh/.env.example`) is now denied in the read and write
+  lanes and in the file-read child, as the file tools already judged it.
 
 ## [0.19.0] - 2026-10-08
 
