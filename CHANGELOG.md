@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.19.2] - 2026-10-29
+
 ### Security
 
 - **A submodule's hooks, info and config are protected like the
