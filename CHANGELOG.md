@@ -15,6 +15,19 @@
   operator lane, as `git init`, `git clone` and `git remote add` already
   did (the same defect was found and fixed in gem-agent).
 
+### Fixed
+
+- **The project's persistent-file report says when its walk was cut.**
+  A session can fill the project past the walk's 20,000-entry cap and
+  then add a nested `AGENTS.md` the walk never reaches; the report at
+  `/clear` and exit ignored the cut and said nothing (measured). It now
+  notes the cut, records `cut` in `persistent_changes`, and names
+  nothing past the cut as removed.
+- **Saving the persistent-file snapshot no longer races another session
+  of the same project.** Both wrote through one fixed temporary name;
+  measured, 145 of 200 concurrent saves failed. Each save now uses a
+  temporary file of its own.
+
 ## [0.19.1] - 2026-10-29
 
 ### Security
