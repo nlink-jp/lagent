@@ -355,3 +355,15 @@ excepted).
   MCP stays the operator's (a vault write was approved). Accepts, with
   reasons, that ADR-0015/0017's "the operator sees every write-lane
   command" no longer holds with the tier on
+- [`ADR-0033`](adr/0033-the-conversation-is-compacted-before-it-overflows.md) —
+  the conversation is compacted before it overflows (**Accepted**,
+  implemented): gem-agent ADR-0006's summary-in-place-of-history, fail safe
+  and recorded, with `/compact` and `[agent].auto_compact` /
+  `compact_at_pct`. Triggered by the projected size of the request about to
+  be sent — the last measurement plus the estimated change since — so one
+  round's tool results and a loaded server's schemas are seen in time. The
+  session facts cross the cut verbatim, a summary naming the session tag
+  is refused, a compaction that cannot get under the threshold is
+  declined, the summariser's input is bounded to half the window, and a
+  resume re-loads every server the session loaded. Records the measured
+  cost of discarding the server's cache
