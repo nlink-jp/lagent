@@ -218,9 +218,44 @@ cache. See Measurement.
 
 ## Measurement
 
-To be filled from the implementation run on mlx-serve (Qwen 3.6 35B
-A3B, M2 Max): summariser call time, the cold request after it, and the
-prompt size before and after.
+mlx-serve (Qwen 3.6 35B A3B 4-bit with its MTP head, prefix cache 8 GB),
+M2 Max 64 GB, 2026-11-01. A copy of a real recorded session — a
+fact-checking conversation whose last request measured 86,427 tokens on
+a 167,936-token window — resumed in one-shot with `--mcp off` and
+`compact_at_pct = 40`, so the first request is the one judged. A
+different tool block makes that request's prefix cold either way.
+
+| | prompt tokens | time |
+|---|---|---|
+| Without compaction: the resumed request, cold | 85,265 | 266 s (prefill 320 tok/s) |
+| Summariser call, cold | 22,640 in, 5,447 out (thinking included) | 96 s |
+| The request after it, cold | 10,295 | 14 s |
+| Compaction path, total | | 111 s |
+
+- The projection said 56 % of the window (about 94k by the estimate)
+  for a request the server counted at 85k — about 10 % high, the side
+  the estimate is meant to err on.
+- The summariser's rendered transcript was 71 KB for 52 messages: about
+  a quarter of the history it replaced, inside the half-window bound
+  with the loosest clip.
+- 52 messages became one 2.8 KB summary; the 6 most recent stayed
+  verbatim; the answer after it drew on both.
+- Against a warm cache — a session that just ran its last request — the
+  same compaction costs about 111 s where an uncompacted request would
+  take seconds. That is the price stated in the notice, paid once per
+  compaction and only past the threshold.
+- The first attempt of this run did not get that far: during the cold
+  85k prefill (before this ADR's one-shot window fix, so uncompacted)
+  macOS aborted the GPU command buffer
+  (`kIOGPUCommandBufferCallbackErrorImpactingInteractivity`) after
+  about 5 minutes, and mlx-serve failed the next request too. The
+  summariser's failure was handled as designed — history unchanged —
+  and the run finished on ADR-0007's re-send. A long cold prefill is
+  fragile on this machine; a compaction that keeps the request small
+  avoids exactly that.
+- The same run found that one-shot started its turn before the window
+  lookup returned, so its first request went out unjudged. One-shot now
+  settles the window before the turn.
 
 ## References
 
