@@ -60,7 +60,7 @@ func TestReadFileByteWindowDefaultsAndCaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(out, "[bytes 0–"+itoa(OutputCap)+" of "+itoa(len(body))+"]") {
+	if !strings.HasSuffix(out, "[bytes 0–"+itoa(OutputCap)+" of "+itoa(len(body))+" — offset="+itoa(OutputCap)+" reads on]") {
 		t.Errorf("default length note = %q", out[len(out)-60:])
 	}
 	// length over readCap is held to readCap.
@@ -68,7 +68,7 @@ func TestReadFileByteWindowDefaultsAndCaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(out, "[bytes 10–"+itoa(10+readCap)+" of "+itoa(len(body))+"]") {
+	if !strings.HasSuffix(out, "[bytes 10–"+itoa(10+readCap)+" of "+itoa(len(body))+" — offset="+itoa(10+readCap)+" reads on]") {
 		t.Errorf("capped length note = %q", out[len(out)-60:])
 	}
 	// length alone reads from the start.
@@ -76,7 +76,7 @@ func TestReadFileByteWindowDefaultsAndCaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out != "aaaaa\n[bytes 0–5 of "+itoa(len(body))+"]" {
+	if out != "aaaaa\n[bytes 0–5 of "+itoa(len(body))+" — offset=5 reads on]" {
 		t.Errorf("length-only = %q", out)
 	}
 }
@@ -91,7 +91,7 @@ func TestReadFileByteWindowClampsAndSaysSo(t *testing.T) {
 		{map[string]any{"offset": float64(-100)}, "0123456789\n[bytes 0–10 of 10 (offset -100 is before the start; read from 0)]"},
 		{map[string]any{"offset": float64(50)}, "\n[bytes 10–10 of 10 (offset 50 is past the end)]"},
 		{map[string]any{"offset": float64(8), "length": float64(100)}, "89\n[bytes 8–10 of 10]"},
-		{map[string]any{"offset": float64(-3), "length": float64(2)}, "78\n[bytes 7–9 of 10]"},
+		{map[string]any{"offset": float64(-3), "length": float64(2)}, "78\n[bytes 7–9 of 10 — offset=9 reads on]"},
 	}
 	for _, c := range cases {
 		c.args["path"] = "s.txt"
@@ -134,7 +134,7 @@ func TestReadFileByteWindowKeepsRunesWhole(t *testing.T) {
 		t.Fatal(err)
 	}
 	// [1,8) → start advances to 3, end retreats to 6.
-	if out != "い\n[bytes 3–6 of 15]" {
+	if out != "い\n[bytes 3–6 of 15 — offset=6 reads on]" {
 		t.Errorf("rune-safe window = %q", out)
 	}
 	if !utf8.ValidString(out) {
@@ -151,7 +151,7 @@ func TestReadFileByteWindowNeverReturnsNothingMidText(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out != "あ\n[bytes 0–3 of 9]" {
+	if out != "あ\n[bytes 0–3 of 9 — offset=3 reads on]" {
 		t.Errorf("out = %q", out)
 	}
 }
@@ -161,7 +161,7 @@ func TestReadFileByteWindowAcceptsZeroLineArgs(t *testing.T) {
 	r := newRegistry(t)
 	writeProjectFile(t, r, "s.txt", "0123456789")
 	out, err := run(t, r, "read_file", map[string]any{"path": "s.txt", "offset": float64(2), "length": float64(3), "start_line": float64(0)})
-	if err != nil || out != "234\n[bytes 2–5 of 10]" {
+	if err != nil || out != "234\n[bytes 2–5 of 10 — offset=5 reads on]" {
 		t.Errorf("out = %q err = %v", out, err)
 	}
 }

@@ -106,7 +106,7 @@ func registerMCPTools(registry *tools.Registry, client mcpCaller, list []mcp.Too
 					}
 					return "", re
 				}
-				text := intake.render(client.Name(), remoteName, blocks)
+				text := intake.within(tools.Allot(ctx)).render(client.Name(), remoteName, blocks)
 				if isErr {
 					return "", &tools.RemoteError{Server: client.Name(), Tool: remoteName, Kind: tools.RemoteResult, Text: text, Sent: true}
 				}

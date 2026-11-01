@@ -266,7 +266,7 @@ func (r *Registry) listTree() *Tool {
 			if s := tally.summary(); s != "" {
 				foot.WriteString(s + "\n")
 			}
-			out := truncate(strings.TrimRight(body, "\n"), OutputCap)
+			out := truncateNarrow(strings.TrimRight(body, "\n"), capFor(ctx, OutputCap))
 			if f := strings.TrimRight(foot.String(), "\n"); f != "" {
 				out += "\n" + f
 			}
@@ -540,7 +540,7 @@ func (r *Registry) searchFiles() *Tool {
 			if s := skips.summary(); s != "" {
 				foot.WriteString("\n" + s)
 			}
-			out := truncate(body, OutputCap) + foot.String()
+			out := truncateNarrow(body, capFor(ctx, OutputCap)) + foot.String()
 			if n := rules.Note(); n != "" {
 				out = n + "\n" + out
 			}

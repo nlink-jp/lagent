@@ -131,5 +131,11 @@ func readBytes(f *os.File, w byteWindow) (string, error) {
 		end += int64(len(kept) - len(buf))
 		buf = kept
 	}
-	return string(buf) + fmt.Sprintf("\n[bytes %d–%d of %d%s]", start, end, size, clamped), nil
+	// The route to the rest rides the note (ADR-0034 §3): with the
+	// runtime's allotment a window is cut short more often than asked.
+	route := ""
+	if end < size {
+		route = fmt.Sprintf(" — offset=%d reads on", end)
+	}
+	return string(buf) + fmt.Sprintf("\n[bytes %d–%d of %d%s%s]", start, end, size, clamped, route), nil
 }

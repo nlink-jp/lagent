@@ -316,3 +316,26 @@ func TestHeadAndTailOfAShortStringIsWhole(t *testing.T) {
 		t.Errorf("got %q %q", p, shown)
 	}
 }
+
+// ADR-0034 §3: under the runtime's allotment the response budget and
+// the spill preview shrink with it, and the route — the saved file's
+// path — still rides the result.
+func TestIntakeAppliesTheAllotment(t *testing.T) {
+	work := t.TempDir()
+	in := newMCPIntake(fixedDir(work)).within(2048, true)
+	big := strings.Repeat("あ", tools.OutputCap)
+	out := in.render("srv", "tool", textBlock(big))
+	if len(out) > 2048 {
+		t.Fatalf("rendered %d bytes under a 2048-byte allotment", len(out))
+	}
+	path := extractPath(t, out, work)
+	if saved, err := os.ReadFile(path); err != nil || string(saved) != big {
+		t.Fatalf("the whole result was not saved: %v", err)
+	}
+	if !strings.HasPrefix(out, "あ") {
+		t.Errorf("the preview is gone: %q", out[:min(len(out), 40)])
+	}
+	if got := newMCPIntake(fixedDir(work)).within(0, false); got.cap != tools.OutputCap || got.headRunes != 600 {
+		t.Errorf("no allotment changed the intake: %+v", got)
+	}
+}

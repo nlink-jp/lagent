@@ -1046,6 +1046,10 @@ func readWindowLines(ctx context.Context, f io.Reader, start, end, cap int) (con
 	var kept []string
 	keptBytes := 0
 	total := 0
+	// Whole lines only, so the window ends on a line and the rest of it
+	// is one start_line away (ADR-0034 §3); the first line is kept even
+	// when it alone is past the cap (readLineCapped cuts it, and says so).
+	nextLine := 0
 	for {
 		if total%1024 == 0 {
 			if err := ctx.Err(); err != nil {
@@ -1061,7 +1065,10 @@ func readWindowLines(ctx context.Context, f io.Reader, start, end, cap int) (con
 		}
 		total++
 		if total >= start && (end == 0 || total <= end) {
-			if keptBytes > cap {
+			if nextLine > 0 || (len(kept) > 0 && keptBytes+len(line) > cap) {
+				if nextLine == 0 {
+					nextLine = total
+				}
 				dropped++ // in the window, past the cap: counted, not shown
 				continue
 			}
@@ -1078,7 +1085,13 @@ func readWindowLines(ctx context.Context, f io.Reader, start, end, cap int) (con
 	if end == 0 || end > total {
 		end = total
 	}
+	if nextLine > 0 {
+		end = nextLine - 1
+	}
 	note = fmt.Sprintf("\n[showing lines %d–%d of %d]", start, end, total)
+	if nextLine > 0 {
+		note += fmt.Sprintf(" [start_line=%d reads on]", nextLine)
+	}
 	return strings.Join(kept, "\n"), note, cutLines, dropped, nil
 }
 
@@ -1289,7 +1302,13 @@ func (r *Registry) listFiles() *Tool {
 			if len(names) == 0 {
 				return "(empty directory)", nil
 			}
-			return strings.Join(names, "\n"), nil
+			// Bounded by entries on its own; the allotment (ADR-0034)
+			// bounds it by bytes when the runtime set one.
+			out := strings.Join(names, "\n")
+			if n, ok := Allot(ctx); ok {
+				out = truncateNarrow(out, n)
+			}
+			return out, nil
 		},
 	}
 }
@@ -1300,7 +1319,9 @@ func (r *Registry) readFile() *Tool {
 		Description: "Read a file inside the project and return its content. " +
 			"Pass start_line/end_line (1-based, inclusive) to read a window instead of the whole " +
 			"file — pair with search_files results (path:line) and prefer windows for large files: " +
-			"everything read here is replayed on every later round. Large reads are truncated. " +
+			"everything read here is replayed on every later round. Large reads are truncated, " +
+			"and shorter than usual while the conversation is filling the context window; " +
+			"the note at the end says where to read on. " +
 			"Pass offset/length (bytes) instead to read by position — a negative offset counts " +
 			"from the end; this reaches every byte of a long single-line file, such as a saved tool result. " +
 			"A credential file (.env, a private key, a token store) is read only with the operator's " +
@@ -1357,18 +1378,22 @@ func (r *Registry) readFile() *Tool {
 			if err != nil {
 				return "", err
 			}
+			// The runtime's allotment (ADR-0034) bounds every path below
+			// its own cap; the route to the rest rides each cut.
+			limit := capFor(ctx, readCap)
 			if bw.set {
+				bw.length = min(bw.length, limit)
 				return readBytes(f, bw)
 			}
 			// Streamed, never held whole (review after v0.68.0): the
 			// window and the cap apply as the file is read, so a huge or
 			// sparse file costs bounded memory whatever its size.
-			content, note, err := readWindow(ctx, f, intArg(args, "start_line"), intArg(args, "end_line"), readCap)
+			content, note, err := readWindow(ctx, f, intArg(args, "start_line"), intArg(args, "end_line"), limit)
 			if err != nil {
 				return "", err
 			}
 			out := content
-			if len(content) > readCap {
+			if len(content) > limit {
 				// offset=N names a byte of the FILE, which the cut content
 				// is only on the whole-file path: a line window starts
 				// elsewhere and re-joins its lines.
@@ -1379,7 +1404,7 @@ func (r *Registry) readFile() *Tool {
 				if st, err := f.Stat(); err == nil && st.Size() > total {
 					total = st.Size()
 				}
-				cut := cutRunes(content, readCap)
+				cut := cutRunes(content, limit)
 				// The route to the rest rides with the cut (gem-agent ADR-0096 §2):
 				// offset reaches what a line window cannot — the tail of
 				// one long line.
@@ -1627,7 +1652,7 @@ func (r *Registry) shellExec() *Tool {
 			// (gem-agent ADR-0096 §3).
 			open, noSave, release := r.shellSpoolOpener(lane == sandbox.LaneOperator, r.Confined())
 			defer release()
-			out := newShellOutput(OutputCap, shellSpoolCap, open, noSave)
+			out := newShellOutput(capFor(ctx, OutputCap), shellSpoolCap, open, noSave)
 			cmd.Stdout, cmd.Stderr = out, out
 			err = cmd.Run()
 			out.Close()

@@ -56,8 +56,12 @@ func TestFileChildUnderTheRealProfile(t *testing.T) {
 		}
 	}
 	profile := sandbox.FileReadProfile(filepath.Dir(proj))
-	run := func(tool string, args map[string]any) (string, int) {
-		req, err := json.Marshal(fileChildRequest{ProjectDir: proj, Tool: tool, Args: args})
+	run := func(tool string, args map[string]any, allot ...int) (string, int) {
+		creq := fileChildRequest{ProjectDir: proj, Tool: tool, Args: args}
+		if len(allot) > 0 {
+			creq.Allot = &allot[0]
+		}
+		req, err := json.Marshal(creq)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -126,6 +130,12 @@ func TestFileChildUnderTheRealProfile(t *testing.T) {
 	out, code = run("read_file", map[string]any{"path": "spill.json", "offset": float64(-len(tail))})
 	if code != 0 || !strings.HasPrefix(out, tail) || !strings.Contains(out, "[bytes ") {
 		t.Errorf("byte window through the child exited %d: %q", code, out)
+	}
+	// ADR-0034 §2: the allotment crosses into the child explicitly — a
+	// context value would not — and the read applies it with its route.
+	out, code = run("read_file", map[string]any{"path": "spill.json"}, 4096)
+	if code != 0 || len(out) > 4096+600 || !strings.Contains(out, "offset=4096 reads on") {
+		t.Errorf("allotted read through the child exited %d, %d bytes: %q", code, len(out), out[max(len(out)-120, 0):])
 	}
 	out, code = run("search_files", map[string]any{"pattern": "needle"})
 	if code != 0 || !strings.Contains(out, "[not searched: 1 binary]") {

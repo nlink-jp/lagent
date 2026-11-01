@@ -76,7 +76,7 @@ func (r *Registry) fileInfo() *Tool {
 				}
 				out = append(out, info)
 			}
-			return truncate(strings.Join(out, "\n\n"), OutputCap), nil
+			return truncateNarrow(strings.Join(out, "\n\n"), capFor(ctx, OutputCap)), nil
 		},
 	}
 }

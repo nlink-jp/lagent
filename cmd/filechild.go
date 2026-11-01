@@ -68,6 +68,10 @@ type fileChildRequest struct {
 	WorkDir    string         `json:"work_dir"`
 	Tool       string         `json:"tool"`
 	Args       map[string]any `json:"args"`
+	// Allot is the runtime's allotment for this call (ADR-0034 §2), in
+	// bytes; absent when the runtime set none. It rides here because a
+	// context value never crosses into the child process.
+	Allot *int `json:"allot,omitempty"`
 }
 
 func newFileChildCmd() *cobra.Command {
@@ -109,7 +113,11 @@ func newFileChildCmd() *cobra.Command {
 			if !ok {
 				return fmt.Errorf("%s: unknown tool %q", fileChildCommand, req.Tool)
 			}
-			out, runErr := tool.Run(cmd.Context(), req.Args)
+			ctx := cmd.Context()
+			if req.Allot != nil {
+				ctx = tools.WithAllot(ctx, *req.Allot)
+			}
+			out, runErr := tool.Run(ctx, req.Args)
 			if runErr != nil {
 				fmt.Fprint(cmd.ErrOrStderr(), runErr.Error())
 				if errors.Is(runErr, fs.ErrPermission) {
@@ -128,9 +136,11 @@ func newFileChildCmd() *cobra.Command {
 func fileChildRunner(self, profileHome string, projectDir func() string, workDir func() string) tools.FileChildFunc {
 	profile := sandbox.FileReadProfile(profileHome)
 	return func(ctx context.Context, tool string, args map[string]any) (string, error) {
-		req, err := json.Marshal(fileChildRequest{
-			ProjectDir: projectDir(), WorkDir: workDir(), Tool: tool, Args: args,
-		})
+		creq := fileChildRequest{ProjectDir: projectDir(), WorkDir: workDir(), Tool: tool, Args: args}
+		if n, ok := tools.Allot(ctx); ok {
+			creq.Allot = &n
+		}
+		req, err := json.Marshal(creq)
 		if err != nil {
 			return "", err
 		}

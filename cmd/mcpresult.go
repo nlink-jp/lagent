@@ -328,3 +328,20 @@ func extForMIME(mime, blockType string) string {
 	}
 	return ".bin"
 }
+
+// within is the intake for one call under the runtime's allotment
+// (ADR-0034 §3), as tools.Allot reports it: the response budget shrinks
+// to it, and so does the spill preview — head and tail in their 3:1
+// proportion, sized for half the allotment at three bytes a rune — so a
+// spilled block still shows its preview and path rather than dropping
+// to the bare path line.
+func (in mcpIntake) within(n int, ok bool) mcpIntake {
+	if !ok || n >= in.cap {
+		return in
+	}
+	in.cap = n
+	runes := n / 6
+	in.headRunes = min(in.headRunes, runes*3/4)
+	in.tailRunes = min(in.tailRunes, runes/4)
+	return in
+}
