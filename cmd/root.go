@@ -812,6 +812,8 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	}
 	defer sessionEndHooks("exit")
 	ag = agent.New(agent.Options{
+		// resolveWindow below always answers, a configured window included.
+		WindowLookup: true,
 		// The operator's language for the notices the agent writes
 		// mid-turn (gem-agent ADR-0029 §3: they are chrome, not error chains).
 		Msgs: msgs,

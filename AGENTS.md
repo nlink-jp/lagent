@@ -195,10 +195,12 @@ internal/config/   strict-decode TOML + env/flag precedence ([llm], [model], [sa
 internal/llm/      Backend interface + the OpenAI-compatible client (stdlib net/http,
                    hand-written SSE, tool-call assembly, retry, per-provider context probe)
 internal/agent/    tool-calling loop, approval dispatch, nonce wrapping, history,
-                   the rule-tier auto-approve ladder, the round ladder
+                   the rule-tier auto-approve ladder, the round ladder, compaction
+                   and the round budget (ADR-0033, ADR-0034)
 internal/tools/    the ten built-in tools (list_files, list_tree, search_files, read_file,
                    file_info, view_image, show_image, write_file, edit_file, shell_exec), path
-                   confinement, lane-aware exec injection, Register
+                   confinement, lane-aware exec injection, Register, the per-call
+                   allotment (ADR-0034)
 internal/inert/    the one predicate that makes outside text inert for a terminal
                    (ADR-0024, ported from gem-agent ADR-0093): control characters out,
                    nothing else; Styled holds a renderer's output to SGR (goldmark
@@ -423,6 +425,21 @@ answers.
   before `isFacts`); the first judgment waits once for the window
   (`awaitWindow`); a `compaction` record carries `before`, which the
   loader checks instead of refusing on any earlier unreadable line.
+- **One round is bounded by the window** (ADR-0034,
+  `internal/agent/roundbudget.go`, `internal/tools/allot.go`). Before
+  each tool call the runtime allots bytes from the round's budget
+  (`tailBound`, re-judged per call, 2 bytes per token, floor `minAllot`)
+  and hands it to the tool with `tools.WithAllot`; the file child gets
+  it as `fileChildRequest.Allot`, never through the context. A tool
+  applies it with `capFor` and names its route in the cut — a new
+  built-in tool must be classified in
+  `TestEveryToolIsClassifiedForTheAllotment`. A result past
+  allotment + `allotSlack` is cut by `bounded` ("the rest was not
+  kept"); load_skill and gate denials are never cut. `compactCut` takes
+  the same `tailBound` as `maxTail`, so the retained tail is sized, not
+  only counted; the §6 decline is judged on the cut `planCompaction`
+  returns. `Options.WindowLookup` makes the first round wait for the
+  window; without it nothing waits (tests).
 - **The model tier judges write-lane shell commands and nothing else**
   (ADR-0032). `modelTierJudges` in `internal/agent/riskreview.go` is the
   scope: `shell_exec`, `write` lane, sandbox confining, Review without

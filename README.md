@@ -86,7 +86,7 @@ injection case passed —
 - **Partial results are reachable:** `read_file` reads by line window or
   by byte `offset`/`length` (a negative offset counts from the end), so the
   tail of a long single-line file — a tool result saved to the work
-  directory — is in reach; a read cut at 200 KB says where to read on
+  directory — is in reach; a read cut short says where to read on
   (ADR-0029). An MCP result too large to hold inline is saved whole to
   the session work directory and previewed by its first 600 and last 200
   characters — metadata a server appends, such as `"truncated": true`,
@@ -132,7 +132,11 @@ injection case passed —
   it by hand. The size is judged for the request about to be sent, so one
   round of large tool results or a loaded MCP server is seen in time. On
   a local server the summary and the request after it re-read their input
-  cold — a wait you are told about (ADR-0033).
+  cold — a wait you are told about (ADR-0033). One round of tool results
+  shares a budget sized to the window: on a small window large reads come
+  back shorter, each saying where to read on, so a single round cannot
+  overflow it; a session stuck on an oversized round recovers once you
+  write again (ADR-0034).
 - **Skills:** Claude Code's `SKILL.md` format, read as-is from
   `~/.config/lagent/skills/<name>/` and a trusted project's
   `.claude/skills/<name>/`. One line per skill tells the model what

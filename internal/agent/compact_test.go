@@ -73,7 +73,7 @@ func TestCompactCutNeverLandsOnAToolResult(t *testing.T) {
 	}
 	for name, h := range histories {
 		t.Run(name, func(t *testing.T) {
-			cut := compactCut(h, keepRecent)
+			cut := compactCut(h, keepRecent, 0)
 			if cut == 0 {
 				return // "no safe boundary" is a valid answer
 			}
@@ -94,7 +94,7 @@ func TestCompactCutHandlesALoopWithNoLaterUserMessage(t *testing.T) {
 	for range 8 {
 		h = append(h, toolCall("read_file"), toolResult("read_file", "x"))
 	}
-	cut := compactCut(h, keepRecent)
+	cut := compactCut(h, keepRecent, 0)
 	if cut == 0 {
 		t.Fatal("a long tool loop could not be compacted at all")
 	}
@@ -551,7 +551,7 @@ func TestFitHeadBoundsTheSummarisersInput(t *testing.T) {
 		h = append(h, user(fmt.Sprintf("u%d %s", i, strings.Repeat("q", 2000))),
 			toolCall("read_file"), toolResult("read_file", strings.Repeat("r", 3000)))
 	}
-	cut := compactCut(h, keepRecent)
+	cut := compactCut(h, keepRecent, 0)
 
 	// A large window takes the whole head at the loosest clip.
 	if got, _, err := fitHead(h, cut, 1_000_000); err != nil || got != cut {
@@ -598,7 +598,7 @@ func TestCompactCutIsStableUnderGrowth(t *testing.T) {
 		}
 		h = append(h, assistant(fmt.Sprintf("a%d", i)))
 	}
-	cut := compactCut(h, keepRecent)
+	cut := compactCut(h, keepRecent, 0)
 	if cut != len(h)-keepRecent {
 		t.Fatalf("cut = %d, want exactly len-keepRecent when no tool result is in the way", cut)
 	}
@@ -687,7 +687,7 @@ func TestTheFirstRequestWaitsForTheWindow(t *testing.T) {
 	mb := &mockBackend{responses: []*llm.Response{{Content: "SUMMARY"}, {Content: "done"}}}
 	_, reg := newAgent(t, mb, &approveAll{}, 5)
 	a := New(Options{Backend: mb, Registry: reg, Gate: &approveAll{}, System: "s", MaxTurns: 5,
-		AutoCompact: true, CompactAtPct: 80})
+		AutoCompact: true, CompactAtPct: 80, WindowLookup: true})
 	a.toolDefs = nil
 	a.SetHistory(tenMessages())
 	for range 4 {

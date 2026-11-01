@@ -304,6 +304,12 @@ type Options struct {
 	// still needs a known window; see SetContextWindow.
 	AutoCompact  bool
 	CompactAtPct int
+	// WindowLookup says a lookup will report the context window through
+	// SetContextWindow. Until it answers, the first round waits for it
+	// (at most windowWait, once): compaction and the round budget
+	// (ADR-0034 §7) both judge against the window. Without it the window
+	// is only what SetContextWindow is told, and nothing waits.
+	WindowLookup bool
 	// OnAutoDecision, when set, observes each auto-mode verdict so the
 	// UI can show what ran without asking, and why.
 	OnAutoDecision func(tc llm.ToolCall, d AutoDecision)
@@ -426,8 +432,18 @@ func New(opts Options) *Agent {
 		preToolHook: opts.PreToolHook,
 		promptHook:  opts.PromptHook,
 		tag:         guard.NewTagWithPrefix("tool_output"),
-		windowSet:   make(chan struct{}),
+		windowSet:   windowSet(opts.WindowLookup),
 	}
+}
+
+// windowSet is the channel awaitWindow waits on: open until the lookup
+// answers when one is coming, closed from the start when none is.
+func windowSet(lookup bool) chan struct{} {
+	ch := make(chan struct{})
+	if !lookup {
+		close(ch)
+	}
+	return ch
 }
 
 // Reset clears the conversation history (REPL /clear). The isolation
@@ -515,7 +531,13 @@ func (a *Agent) SetContextWindow(tokens int) {
 	a.mu.Lock()
 	a.window = tokens
 	a.mu.Unlock()
-	a.windowOnce.Do(func() { close(a.windowSet) })
+	a.windowOnce.Do(func() {
+		select {
+		case <-a.windowSet: // no lookup was coming: already closed
+		default:
+			close(a.windowSet)
+		}
+	})
 }
 
 // Usage returns a snapshot of the session's accounting (gem-agent ADR-0019).
@@ -778,6 +800,13 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 	if !a.noMentions {
 		lim := mention.DefaultLimits()
 		lim.Clipboard = a.clipboard
+		// One message's attachments share the round's bound (ADR-0034
+		// §5): their limits were carried over from a 1M-token window.
+		if w := a.awaitWindow(ctx); w > 0 {
+			bound := max(a.tailBound(w)*allotBytesPerToken, minAllot)
+			lim.TotalBytes = min(lim.TotalBytes, bound)
+			lim.PerFileBytes = min(lim.PerFileBytes, bound)
+		}
 		atts, problems = mention.Expand(ctx, input, a.registry.ProjectDir(), a.registry.WorkDir(), lim)
 		if a.onAttach != nil && (len(atts) > 0 || len(problems) > 0) {
 			a.onAttach(atts, problems)
@@ -919,7 +948,11 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 		}
 
 		stopAfterRound := ""
-		for _, tc := range resp.ToolCalls {
+		// The round's results share a budget measured against the window
+		// (ADR-0034); the first round waits for the window lookup, with
+		// or without automatic compaction (§7).
+		budget := roundBudget{window: a.awaitWindow(ctx)}
+		for i, tc := range resp.ToolCalls {
 			if a.onToolCall != nil {
 				a.onToolCall(tc)
 			}
@@ -963,6 +996,12 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 			if stopAfterRound != "" {
 				result = "error: the turn was stopped by the loop guard; not executed"
 				a.logRecord("tool_skipped", map[string]any{"name": tc.Name, "detail": clip(callDetail, 200), "purpose": callPurpose})
+			} else if budget.window > 0 {
+				// Re-judged before every call: an mcp_load earlier in the
+				// round has grown the tool definitions since (§1).
+				allotted := a.allot(&budget, len(resp.ToolCalls)-i)
+				result, denied, ran, remote = a.execCall(tools.WithAllot(ctx, allotted), tc)
+				result = a.bounded(tc.Name, result, allotted, denied)
 			} else {
 				result, denied, ran, remote = a.execCall(ctx, tc)
 			}
@@ -997,9 +1036,16 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 				}
 			}
 			a.appendMessage(msg)
+			if budget.window > 0 {
+				budget.spend(msg.Content, len(msg.Attachments))
+			}
 		}
 		if stopAfterRound != "" {
 			return "", fmt.Errorf("the turn was stopped by the loop guard (repeated call: %s) — progress so far is saved in the conversation: say \"continue\" to resume, or rephrase the request", clip(stopAfterRound, 120))
+		}
+		if budget.full {
+			a.logRecord("window_full", map[string]any{"round": round})
+			return "", errWindowFull
 		}
 	}
 }

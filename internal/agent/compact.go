@@ -109,14 +109,29 @@ Be specific and dense; prefer concrete names and numbers over description. Do no
 // phase machine guarantees that for the /compact path, and the automatic
 // path runs inside Run itself.
 func (a *Agent) Compact(ctx context.Context) (CompactResult, error) {
-	cut := compactCut(a.history, keepRecent)
-	if cut < minCompacted {
-		return CompactResult{}, ErrNothingToCompact
-	}
-	cut, text, err := fitHead(a.history, cut, a.contextWindow())
+	cut, text, err := a.planCompaction(a.contextWindow())
 	if err != nil {
 		return CompactResult{}, err
 	}
+	return a.applyCompaction(ctx, cut, text)
+}
+
+// planCompaction settles where the cut falls and what the summariser
+// reads, without calling it: the retained tail bounded by size as well
+// as count (ADR-0034 §4), then the head fitted to half the window
+// (ADR-0033 §7). The automatic path judges the cut it returns — the one
+// the summariser actually reads up to — before paying for the call.
+func (a *Agent) planCompaction(window int) (int, string, error) {
+	cut := compactCut(a.history, keepRecent, a.tailBound(window))
+	if cut < minCompacted {
+		return 0, "", ErrNothingToCompact
+	}
+	return fitHead(a.history, cut, window)
+}
+
+// applyCompaction summarises history[:cut] from its rendered text and
+// swaps the summary in. History is left untouched on any error.
+func (a *Agent) applyCompaction(ctx context.Context, cut int, text string) (CompactResult, error) {
 	// The session facts — the untrusted-data tag name, the work
 	// directory, recalled memory — are the runtime's own words, not part
 	// of the story to summarise: the latest set rides the summary
@@ -246,17 +261,33 @@ func lastFacts(history []llm.Message) int {
 // compact the case that needs it most: one long tool loop contains
 // exactly one user message, at the very beginning. 0 means there is no
 // usable boundary.
-func compactCut(history []llm.Message, keep int) int {
+//
+// maxTail, when positive, bounds the retained tail by size as well
+// (ADR-0034 §4): while the tail's estimate exceeds it, the cut moves to
+// the next safe boundary, as far as the last message that is not a tool
+// result — the last round's assistant turn inside a tool loop, the
+// operator's message at the start of a turn. Counting alone kept the
+// round that overflowed the window, which is exactly the part a
+// compaction then could not touch.
+func compactCut(history []llm.Message, keep, maxTail int) int {
 	want := len(history) - keep
 	if want <= 0 {
-		return 0
+		if maxTail <= 0 {
+			return 0
+		}
+		want = 1 // a short history can still hold an oversized round
 	}
+	cut := 0
 	for i := want; i < len(history); i++ {
-		if history[i].Role != llm.RoleTool {
+		if history[i].Role == llm.RoleTool {
+			continue
+		}
+		cut = i
+		if maxTail <= 0 || estimateTokens(history[i:]) <= maxTail {
 			return i
 		}
 	}
-	return 0
+	return cut // the last safe boundary, however large what follows it
 }
 
 // summarize asks the model for the summary. No tools are offered — this
@@ -530,33 +561,39 @@ func (a *Agent) maybeAutoCompact(ctx context.Context) {
 		return // already compacted at roughly this size; do not spin
 	}
 	pct := projected * 100 / window
-	cut := compactCut(a.history, keepRecent)
-	if cut < minCompacted {
+	cut, text, err := a.planCompaction(window)
+	switch {
+	case errors.Is(err, ErrNothingToCompact):
 		if !a.warnedNoCut {
 			a.warnedNoCut = true
 			a.notify(fmt.Sprintf(a.msgs.CompactNothingFmt, pct))
 		}
 		return
-	}
-	// A compaction that could not bring the request under the threshold
-	// would run again two rounds later, and again: the system prompt and
-	// the tool definitions are out of its reach, and so is the retained
-	// tail. It is declined, once, naming the share that stays.
-	if after := a.estimateFixed() + estimateTokens(a.history[cut:]) + summaryAllowance; after*100 >= a.compactAtPct*window {
-		if !a.warnedNoRoom {
-			a.warnedNoRoom = true
-			a.notify(fmt.Sprintf(a.msgs.CompactNoRoomFmt, pct, a.estimateFixed()*100/window))
+	case err == nil:
+		// A compaction that could not bring the request under the
+		// threshold would run again two rounds later, and again: the
+		// system prompt and the tool definitions are out of its reach,
+		// and so is the retained tail. It is declined, once, naming the
+		// share that stays — judged on the cut the summariser would
+		// actually read up to, after fitHead (ADR-0034 §4).
+		if after := a.estimateFixed() + estimateTokens(a.history[cut:]) + summaryAllowance; after*100 >= a.compactAtPct*window {
+			if !a.warnedNoRoom {
+				a.warnedNoRoom = true
+				a.notify(fmt.Sprintf(a.msgs.CompactNoRoomFmt, pct, a.estimateFixed()*100/window))
+			}
+			return
 		}
-		return
 	}
 	// Said before the call: on a local server the summariser and the
-	// cold request after it are a silent wait (ADR-0033 §6).
-	a.notify(fmt.Sprintf(a.msgs.CompactingFmt, pct))
-	res, err := a.Compact(ctx)
-	switch {
-	case errors.Is(err, ErrNothingToCompact):
-		return
-	case err != nil:
+	// cold request after it are a silent wait (ADR-0033 §6). A plan
+	// that failed (no head fits half the window) is a failure like a
+	// summariser error, and is counted the same way below.
+	var res CompactResult
+	if err == nil {
+		a.notify(fmt.Sprintf(a.msgs.CompactingFmt, pct))
+		res, err = a.applyCompaction(ctx, cut, text)
+	}
+	if err != nil {
 		if ctx.Err() != nil {
 			return // interrupted, not failed
 		}

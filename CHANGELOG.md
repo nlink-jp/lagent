@@ -1,5 +1,26 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **One round of tool calls can no longer overflow the context window
+  (ADR-0034).** A session that read several large files in one round
+  (four whole-file reads, 506 KB, on a 168k-token window) passed the
+  window, compaction declined because the six messages it keeps verbatim
+  were that round, and every later turn failed until `/clear`. One
+  round's tool results now share a budget sized to the window — half of
+  what a compaction can make room for, re-judged before every call — and
+  each tool cuts with a route to the rest: `read_file` line windows end
+  on a whole line and name `start_line=K`, byte windows name `offset=N`,
+  MCP previews shrink, listings and searches say to narrow the path or
+  pattern. Compaction keeps the recent messages by size as well as
+  count, so a session already stuck on an oversized round recovers once
+  you write again. @-attachments share the bound. With automatic
+  compaction off, a round stays under `compact_at_pct`, and a window
+  with no room left ends the turn with `/compact` and `/clear` named
+  instead of failing every request.
+
 ## [0.20.1] - 2026-11-01
 
 ### Fixed
