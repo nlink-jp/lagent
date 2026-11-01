@@ -388,3 +388,13 @@ excepted).
   in either spelling are found, typed absolute paths in the other form
   are inside the project, and nothing is rewritten; archtests refuse
   `os.Getwd` and a raw prefix check
+- [`ADR-0036`](adr/0036-the-project-is-read-wherever-it-lies.md) —
+  the project is read wherever it lies (**Accepted**, implemented): the
+  read lane denies `~/Library`, `/Volumes` and `/Network` for reach, and
+  cloud storage lives in `~/Library/CloudStorage`, so in a project there
+  (or on a share) the lane could not even `getcwd`. The project and the
+  work directory are re-allowed for reading when they lie strictly inside
+  a denied tree — before the credential block, never a root that is or
+  contains a denied tree (a project at the home would re-open
+  `~/Library`). Measured: the read lane works under `~/Library`, Google
+  Drive and an SMB share; an online-only file is downloaded when read
