@@ -11,8 +11,6 @@
 package session
 
 import (
-	"github.com/nlink-jp/lagent/internal/bounded"
-
 	"bufio"
 	"bytes"
 	"crypto/rand"
@@ -29,7 +27,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nlink-jp/lagent/internal/bounded"
 	"github.com/nlink-jp/lagent/internal/llm"
+	"github.com/nlink-jp/lagent/internal/pathid"
 	"github.com/nlink-jp/lagent/internal/statedir"
 )
 
@@ -632,7 +632,7 @@ func listDir(dir, projectDir string) ([]Meta, bool) {
 		if err != nil {
 			continue
 		}
-		if projectDir != "" && meta.Header.Project != projectDir {
+		if projectDir != "" && !pathid.Same(meta.Header.Project, projectDir) {
 			continue
 		}
 		if !meta.HasConversation {

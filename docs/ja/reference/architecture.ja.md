@@ -42,7 +42,8 @@ submit、session end — ADR-0012/0014）、`internal/memory`
 Code 形式のスキルの発見と閉じ込めた読み込み、ADR-0011）、`internal/ignore`（ignore
 対応の列挙: 組込ディレクトリ一覧 + gitignore マッチャ）、
 `internal/session`（transcript: ロガー + 再開ローダ、usage レコード）、
-`internal/statedir`（プロジェクトごとの状態配置）、`internal/workdir`
+`internal/statedir`（プロジェクトごとの状態配置）、`internal/pathid`（2 つのパスが
+1 つのディレクトリを名指すか — 記録済みと現在のプロジェクトの照合すべて、ADR-0035）、`internal/workdir`
 （状態ルート下のセッション作業ディレクトリ）、`internal/trustpin`
 （エージェント向けファイルのコンテンツピンと永続ファイルのスナップショット）、
 `internal/uitext`（ja/en の UI 文字列カタログ）、`internal/bounded`

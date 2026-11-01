@@ -227,6 +227,8 @@ internal/banner/   the lines printed before the operator has typed: a line earns
                    place only if nothing else will say it; Sample() is the read-through
 internal/statedir/ shared per-project state convention: root (LAGENT_STATE_DIR overrides it),
                    escape, .project marker
+internal/pathid/   Same: two paths name one directory (equal, or os.SameFile) — every
+                   recorded-vs-current project comparison (ADR-0035)
 internal/workdir/  per-session work directory: layout under the state root, sweep
                    report, empty-dir removal; LAGENT_WORK_DIR is exported at startup
 internal/mention/  @-reference parsing (files, directories, images), project-confined
@@ -440,6 +442,14 @@ answers.
   only counted; the §6 decline is judged on the cut `planCompaction`
   returns. `Options.WindowLookup` makes the first round wait for the
   window; without it nothing waits (tests).
+- **A project is its directory, not its spelling** (ADR-0035). The
+  project path comes from `cmd.currentProject` (`syscall.Getwd`, the
+  on-disk spelling) — `os.Getwd` returns `$PWD`, and an NFC-typed `cd`
+  into an NFD directory made a second project string; an archtest
+  refuses `os.Getwd` in the module. A recorded path is compared with
+  `pathid.Same`, never `==`: transcripts, the state marker, and
+  `policy.toml` (`PolicyFile.ProjectKey` — setters resolve the key once,
+  deletes included).
 - **The model tier judges write-lane shell commands and nothing else**
   (ADR-0032). `modelTierJudges` in `internal/agent/riskreview.go` is the
   scope: `shell_exec`, `write` lane, sandbox confining, Review without

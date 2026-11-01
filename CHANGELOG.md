@@ -20,6 +20,15 @@
   compaction off, a round stays under `compact_at_pct`, and a window
   with no room left ends the turn with `/compact` and `/clear` named
   instead of failing every request.
+- **A project is found however its path is spelled (ADR-0035).** In a
+  directory whose path has Japanese voiced kana, `--resume` refused a
+  session recorded there ("belongs to <path>, not <path>" — two paths
+  that print the same): the shell's `$PWD` carried the typed
+  (precomposed) form while the record carried the on-disk (decomposed)
+  one. The state directory, trust, pins and allowlists split the same
+  way. The project path is now read from the kernel, and recorded paths
+  are matched by directory identity, so records already written in
+  either spelling are found without being rewritten.
 
 ## [0.20.1] - 2026-11-01
 
