@@ -158,16 +158,16 @@ func TestWithoutCompactionTheRoundStaysUnderTheThreshold(t *testing.T) {
 }
 
 // A tool that does not apply its allotment is cut by the runtime, and the
-// marker says the rest was not kept. An instruction file is never cut.
+// marker says the rest was not kept. A KeepWhole tool is never cut.
 func TestTheBackstopCutsAToolThatIgnoresItsAllotment(t *testing.T) {
 	huge := strings.Repeat("z", 60_000)
 	mb := &mockBackend{responses: []*llm.Response{
 		{ToolCalls: []llm.ToolCall{{ID: "x", Name: "mcp__s__dump"}, {ID: "y", Name: "load_skill"}}},
 		{Content: "done"},
 	}}
-	a := compactingAgent(t, mb, 16_000, 5, func(o *Options) { o.InstructionTools = []string{"load_skill"} })
+	a := compactingAgent(t, mb, 16_000, 5, nil)
 	for _, name := range []string{"mcp__s__dump", "load_skill"} {
-		if err := a.registry.Register(&tools.Tool{Name: name, Description: "d",
+		if err := a.registry.Register(&tools.Tool{Name: name, Description: "d", KeepWhole: name == "load_skill",
 			Run: func(context.Context, map[string]any) (string, error) { return huge, nil }}); err != nil {
 			t.Fatal(err)
 		}
@@ -247,6 +247,19 @@ func TestTheRetainedTailIsBoundedBySize(t *testing.T) {
 	// A tail within the bound is the counted one, as before.
 	if cut, old := compactCut(tenMessages(), keepRecent, 1<<20), compactCut(tenMessages(), keepRecent, 0); cut != old {
 		t.Errorf("a small tail moved the cut: %d, was %d", cut, old)
+	}
+	// A round of more parallel calls than keepRecent: every message from
+	// len-keep on is a tool result, and the cut steps back to the
+	// round's own assistant turn (pre-release review).
+	wide := append(tenMessages(), user("read them all"),
+		llm.Message{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{{ID: "1"}, {ID: "2"}, {ID: "3"}, {ID: "4"}, {ID: "5"}, {ID: "6"}, {ID: "7"}}})
+	for i := range 7 {
+		wide = append(wide, llm.Message{Role: llm.RoleTool, ToolName: "read_file", ToolCallID: fmt.Sprint(i + 1), Content: huge})
+	}
+	for _, maxTail := range []int{0, 12_000} {
+		if cut := compactCut(wide, keepRecent, maxTail); cut != 11 {
+			t.Errorf("seven parallel results (maxTail %d): cut %d, want the round's assistant turn at 11", maxTail, cut)
+		}
 	}
 	// A short history can still hold an oversized round.
 	short := []llm.Message{user("1"), assistant("2"), user("3"), toolCall("read_file"), toolResult("read_file", huge), user("go on")}

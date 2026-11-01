@@ -227,8 +227,8 @@ internal/banner/   the lines printed before the operator has typed: a line earns
                    place only if nothing else will say it; Sample() is the read-through
 internal/statedir/ shared per-project state convention: root (LAGENT_STATE_DIR overrides it),
                    escape, .project marker
-internal/pathid/   Same: two paths name one directory (equal, or os.SameFile) — every
-                   recorded-vs-current project comparison (ADR-0035)
+internal/pathid/   Same/Within/Rel: every path comparison, Unicode-normalised (NFC),
+                   case not folded, no disk access (ADR-0035)
 internal/workdir/  per-session work directory: layout under the state root, sweep
                    report, empty-dir removal; LAGENT_WORK_DIR is exported at startup
 internal/mention/  @-reference parsing (files, directories, images), project-confined
@@ -446,10 +446,18 @@ answers.
   project path comes from `cmd.currentProject` (`syscall.Getwd`, the
   on-disk spelling) — `os.Getwd` returns `$PWD`, and an NFC-typed `cd`
   into an NFD directory made a second project string; an archtest
-  refuses `os.Getwd` in the module. A recorded path is compared with
-  `pathid.Same`, never `==`: transcripts, the state marker, and
-  `policy.toml` (`PolicyFile.ProjectKey` — setters resolve the key once,
-  deletes included).
+  refuses `os.Getwd` in the module. Paths are compared through
+  `internal/pathid` (NFC-normalised, case not folded, no stat), never
+  `==` or a raw `HasPrefix(p, base+separator)` — a second archtest
+  refuses the latter: recorded projects (transcripts, the state marker,
+  `policy.toml` via `PolicyFile.ProjectKey` — setters resolve the key
+  once, deletes included — and `trusted_projects`), and containment
+  (`pathid.Within`, with `pathid.Rel` for the path inside).
+- **A KeepWhole tool is never cut by the round budget's backstop**
+  (ADR-0034 §2): the tools `cmd/` registers (ask_user, mcp_load, the
+  memory tools, load_skill) return the operator's or the runtime's own
+  words; a new one sets `KeepWhole` or applies the allotment
+  (`TestCmdToolsAreKeptWhole`).
 - **The model tier judges write-lane shell commands and nothing else**
   (ADR-0032). `modelTierJudges` in `internal/agent/riskreview.go` is the
   scope: `shell_exec`, `write` lane, sandbox confining, Review without

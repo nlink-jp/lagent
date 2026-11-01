@@ -68,7 +68,8 @@ func discoverSkills(projectDir string, grant projectGrant) ([]skills.Skill, []st
 // operator has installed (ADR-0003).
 func registerSkillTool(registry *tools.Registry, get func() []skills.Skill) error {
 	return registry.Register(&tools.Tool{
-		Name: skills.ToolName,
+		KeepWhole: true,
+		Name:      skills.ToolName,
 		Description: "Load a skill installed by the user. With only `name`, returns the skill's " +
 			"instructions (SKILL.md); with `file`, returns a supporting file from that skill's own " +
 			"directory (e.g. references/guide.md, scripts/run.py — a path to a directory lists it). " +

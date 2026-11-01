@@ -16,7 +16,7 @@ that survived all three refuted drafts: **the view layer opens no file.** A
 read the view layer performs is not a tool call, so it reaches neither the
 agent's decision nor ADR-0016's sandboxed child, and the path-judging list
 — `pathJudgedTools`, keyed on tool name
-([risk.go:323](../../../internal/risk/risk.go)) — cannot see it.
+([risk.go:324](../../../internal/risk/risk.go)) — cannot see it.
 
 That rules out the obvious design. The MCP intake already writes an image
 into the session work directory and hands the model
@@ -42,7 +42,7 @@ work-directory getter, a byte cap and a preview length — the sink this
 decision added is withdrawn by ADR-0022, and what it has never kept is the
 bytes ([mcpresult.go:33](../../../cmd/mcpresult.go)), and the tool contract is
 `Run func(ctx, args) (string, error)`
-([tools.go:69](../../../internal/tools/tools.go)).
+([tools.go:75](../../../internal/tools/tools.go)).
 
 The channel this needs already exists here too, and it is the same one:
 the agent loop talks to the UI **during** a tool call —

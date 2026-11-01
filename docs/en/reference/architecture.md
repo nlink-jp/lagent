@@ -45,9 +45,9 @@ scopes under the state root, ADR-0013), `internal/skills`
 ADR-0011), `internal/ignore`
 (ignore-aware enumeration: builtin dir list + gitignore matcher),
 `internal/session` (transcript: logger + resume loader, usage records),
-`internal/statedir` (per-project state layout), `internal/pathid` (two
-paths naming one directory, for every recorded-vs-current project
-comparison, ADR-0035), `internal/workdir` (the
+`internal/statedir` (per-project state layout), `internal/pathid` (every
+path comparison — equality, containment, relative path — Unicode-
+normalised, ADR-0035), `internal/workdir` (the
 per-session work directory under the state root), `internal/trustpin`
 (content pins of the agent-facing files and the persistent-file
 snapshot), `internal/uitext` (ja/en UI string catalogs),

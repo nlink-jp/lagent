@@ -9,6 +9,7 @@
 package tools
 
 import (
+	"github.com/nlink-jp/lagent/internal/pathid"
 	"github.com/nlink-jp/lagent/internal/sandbox"
 
 	"github.com/nlink-jp/lagent/internal/bounded"
@@ -66,7 +67,12 @@ type Tool struct {
 	// plain REPL's one stdin, eating the operator's next line. The
 	// operator, not a filesystem, decides when it returns.
 	WaitsOnOperator bool
-	Run             func(ctx context.Context, args map[string]any) (string, error)
+	// KeepWhole marks a result that is the operator's or the runtime's
+	// own words — ask_user's answer, mcp_load's tool list, a skill body,
+	// a memory confirmation — bounded at its source. The round budget
+	// counts it but its backstop never cuts it (ADR-0034 §2).
+	KeepWhole bool
+	Run       func(ctx context.Context, args map[string]any) (string, error)
 	// Annotate, when set, returns extra display lines for the approval
 	// prompt derived from live filesystem state (gem-agent ADR-0051) — e.g. what
 	// an overwrite replaces. Display-only: it must not mutate anything,
@@ -305,7 +311,7 @@ func (r *Registry) rootFor(abs string) (*os.Root, string, func(), error) {
 		if c.dir == "" || c.h == nil || !within(c.dir, abs) {
 			continue
 		}
-		rel, err := filepath.Rel(c.dir, abs)
+		rel, err := pathid.Rel(c.dir, abs)
 		if err != nil {
 			return nil, "", nil, err
 		}
@@ -1015,7 +1021,9 @@ func readWindow(ctx context.Context, f io.Reader, start, end, cap int) (string, 
 	if cutLines > 0 {
 		// A line longer than the cap is shown cut; the reader is told
 		// (gem-agent ADR-0072 §4.5 — the cut was silent).
-		note += fmt.Sprintf("\n[%d line(s) longer than %d bytes were cut]", cutLines, cap)
+		// The route to the rest of a cut line: a line window cannot
+		// reach it, a byte window can (ADR-0034 §3).
+		note += fmt.Sprintf("\n[%d line(s) longer than %d bytes were cut — offset/length reads a long line whole]", cutLines, cap)
 	}
 	if dropped > 0 {
 		// Lines of the window past the cap are not shown; said here,
@@ -1142,8 +1150,10 @@ func readLineCapped(br *bufio.Reader, cap int) (line string, cut bool, err error
 
 // --- path confinement ---
 
+// within is pathid.Within (ADR-0035): one comparison for every
+// containment check, in the volume's sense of a name.
 func within(base, p string) bool {
-	return p == base || strings.HasPrefix(p, base+string(filepath.Separator))
+	return pathid.Within(base, p)
 }
 
 // withinAny reports whether p sits under any of the roots.

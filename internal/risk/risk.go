@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/nlink-jp/lagent/internal/pathid"
 	"github.com/nlink-jp/lagent/internal/sandbox"
 )
 
@@ -265,7 +266,7 @@ func projectRelative(p, projectDir string) string {
 	// registry resolves its root; the model may type the alias).
 	for _, c := range []string{filepath.Clean(p), aliasResolve(filepath.Clean(p))} {
 		if withinDir(projectDir, c) {
-			if rel, err := filepath.Rel(projectDir, c); err == nil {
+			if rel, err := pathid.Rel(projectDir, c); err == nil {
 				return rel
 			}
 		}
@@ -588,9 +589,10 @@ func hasCredentialPath(s string) bool {
 	return false
 }
 
+// withinDir is pathid.Within (ADR-0035): one comparison for every
+// containment check, in the volume's sense of a name.
 func withinDir(base, p string) bool {
-	base = filepath.Clean(base)
-	return p == base || strings.HasPrefix(p, base+string(filepath.Separator))
+	return pathid.Within(base, p)
 }
 
 // Describe renders a verdict for display.

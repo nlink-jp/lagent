@@ -32,7 +32,8 @@ const (
 // would be a dialog to permit a dialog.
 func registerAskTool(registry *tools.Registry, ask askFunc) error {
 	return registry.Register(&tools.Tool{
-		Name: "ask_user",
+		KeepWhole: true,
+		Name:      "ask_user",
 		Description: "Present a QUESTION and 2-8 short OPTIONS to the user and get their choice, " +
 			"without ending your turn. Use when a decision genuinely branches your work (which " +
 			"approach, which file, which scope) — not for confirmations you can state in your " +

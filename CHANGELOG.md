@@ -26,9 +26,12 @@
   that print the same): the shell's `$PWD` carried the typed
   (precomposed) form while the record carried the on-disk (decomposed)
   one. The state directory, trust, pins and allowlists split the same
-  way. The project path is now read from the kernel, and recorded paths
-  are matched by directory identity, so records already written in
-  either spelling are found without being rewritten.
+  way. The project path is now read from the kernel, and every path
+  comparison — recorded projects, `trusted_projects`, and whether a path
+  is inside the project — is made on Unicode-normalised strings, so
+  records already written in either spelling are found without being
+  rewritten and an absolute path typed in the other form is inside the
+  project. Case is not folded.
 
 ## [0.20.1] - 2026-11-01
 

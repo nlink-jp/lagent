@@ -10,6 +10,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/config"
 	"github.com/nlink-jp/lagent/internal/instructions"
 	"github.com/nlink-jp/lagent/internal/mcp"
+	"github.com/nlink-jp/lagent/internal/pathid"
 	"github.com/nlink-jp/lagent/internal/uitext"
 )
 
@@ -27,10 +28,10 @@ func broadRoot(projectDir, home string) string {
 		return ""
 	}
 	home = filepath.Clean(home)
-	if projectDir == home {
+	if pathid.Same(projectDir, home) {
 		return "home"
 	}
-	if strings.HasPrefix(home, projectDir+string(filepath.Separator)) {
+	if pathid.Within(projectDir, home) {
 		return "home-ancestor"
 	}
 	return ""

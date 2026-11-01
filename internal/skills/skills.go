@@ -24,6 +24,7 @@ package skills
 
 import (
 	"github.com/nlink-jp/lagent/internal/bounded"
+	"github.com/nlink-jp/lagent/internal/pathid"
 
 	"fmt"
 	"io"
@@ -438,8 +439,10 @@ func (s Skill) File(rel string, lim Limits) (string, error) {
 	return string(data), nil
 }
 
+// within is pathid.Within (ADR-0035): one comparison for every
+// containment check, in the volume's sense of a name.
 func within(base, p string) bool {
-	return p == base || strings.HasPrefix(p, base+string(filepath.Separator))
+	return pathid.Within(base, p)
 }
 
 // CatalogLines renders the runtime-facts listing (ADR-0011 §2): a

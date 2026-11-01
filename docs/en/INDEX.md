@@ -381,8 +381,10 @@ excepted).
   a project is its directory, not its spelling (**Accepted**,
   implemented): the project path is taken from the kernel, not `$PWD`,
   so a directory reached in another Unicode form (NFC typed, NFD on
-  disk) is the same project; a recorded path — a transcript's
-  `project`, the state directory's marker, `policy.toml`'s project
-  tables — matches the current one by identity (`os.SameFile`), so
-  records already written in either spelling are found and nothing is
-  rewritten
+  disk) is the same project; every path comparison — a recorded project
+  (transcript, state marker, `policy.toml`, `trusted_projects`) and every
+  containment check — goes through `internal/pathid`, Unicode-normalised
+  (NFC), case not folded, touching no disk, so records already written
+  in either spelling are found, typed absolute paths in the other form
+  are inside the project, and nothing is rewritten; archtests refuse
+  `os.Getwd` and a raw prefix check

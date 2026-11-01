@@ -47,7 +47,8 @@ func registerMemoryTools(registry *tools.Registry, store memoryStore) error {
 		"description": "\"global\" = about the user or this machine; \"project\" = about this project only",
 	}
 	if err := registry.Register(&tools.Tool{
-		Name: "save_memory",
+		KeepWhole: true,
+		Name:      "save_memory",
 		Description: "Persist one short fact for future sessions: scope \"global\" is recalled in " +
 			"every project, scope \"project\" only in this one. Saving an existing name updates it. " +
 			"The user approves each save, and the memory is recalled in the runtime facts from the " +
@@ -86,7 +87,8 @@ func registerMemoryTools(registry *tools.Registry, store memoryStore) error {
 		return err
 	}
 	return registry.Register(&tools.Tool{
-		Name: "delete_memory",
+		KeepWhole: true,
+		Name:      "delete_memory",
 		Description: "Remove one persisted memory that is stale or wrong. Scopes as in save_memory. " +
 			"The removal takes effect from the next session.",
 		Parameters: map[string]any{

@@ -110,17 +110,24 @@ as today. No configuration key is added.
      existing counts and cut; the route is a narrower path or pattern,
      and the marker says so.
    - Counted against the budget but not cut: an image `view_image`
-     attaches (ADR-0033's flat 2,000 tokens), and what `load_skill`
-     returns — an instruction file the operator installed, bounded by
-     the skills loader (a body 64 KiB, a supporting file 96 KiB), where
-     half the instructions is worse than none.
+     attaches (ADR-0033's flat 2,000 tokens), and a tool marked
+     `KeepWhole` — one whose result is the operator's or the runtime's
+     own words, bounded at its source: what `load_skill` returns (an
+     instruction file the operator installed, a body 64 KiB, a supporting
+     file 96 KiB, where half the instructions is worse than none),
+     `ask_user`'s answer, `mcp_load`'s tool list, the memory tools'
+     confirmations. Every tool `cmd/` registers is one (pre-release
+     review: the backstop cut an operator's long answer).
 
 4. **Compaction's retained tail is bounded by size.** The cut keeps the
    most recent messages up to `keepRecent` (6), but moves forward to a
    later safe boundary while their estimate exceeds `T`, as far as the
    last message that is not a tool result: inside a tool loop that is
    the last round's assistant turn, at the start of a turn it is the
-   operator's message. ADR-0033 §6's check — decline once, with the
+   operator's message. When every message the count would keep is a
+   tool result — one round of more parallel calls than `keepRecent` —
+   the cut steps back to that round's own assistant turn (pre-release
+   review: six parallel reads left no cut at all). ADR-0033 §6's check — decline once, with the
    reason — is made on the cut the summariser actually reads up to
    (after `fitHead`), and stays for what no bound here reaches. The
    compaction record is unchanged: it carries the count replaced,

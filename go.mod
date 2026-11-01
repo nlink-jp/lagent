@@ -17,6 +17,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/sys v0.48.0
 	golang.org/x/term v0.45.0
+	golang.org/x/text v0.42.0
 )
 
 require (
@@ -48,5 +49,4 @@ require (
 	github.com/yuin/goldmark-emoji v1.0.6 // indirect
 	golang.org/x/image v0.46.0 // indirect
 	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
 )

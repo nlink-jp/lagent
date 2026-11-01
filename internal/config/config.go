@@ -6,6 +6,7 @@ package config
 
 import (
 	"github.com/nlink-jp/lagent/internal/bounded"
+	"github.com/nlink-jp/lagent/internal/pathid"
 	"net/url"
 
 	"fmt"
@@ -150,7 +151,10 @@ func LoadProject(dir string) (*ProjectConfig, error) {
 func (c *Config) TrustsProject(dir string) bool {
 	canon := canonicalPath(dir)
 	for _, p := range c.Approval.TrustedProjects {
-		if canonicalPath(expandHome(p)) == canon {
+		// By identity, not spelling (ADR-0035): an entry typed in one
+		// Unicode form or case still names the directory the kernel
+		// spells another way.
+		if pathid.Same(canonicalPath(expandHome(p)), canon) {
 			return true
 		}
 	}

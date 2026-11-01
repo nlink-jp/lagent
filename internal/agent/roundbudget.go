@@ -76,11 +76,14 @@ func (b *roundBudget) spend(result string, images int) {
 
 // bounded applies the backstop to a result: a tool that did not apply
 // its allotment is cut past it, with the marker that says the rest was
-// not kept. Instruction files (load_skill) and gate denials are the
-// runtime's and the operator's words and are never cut; an image rides
-// beside its text, which is short.
+// not kept. A tool marked KeepWhole (the operator's or the runtime's own
+// words) and a gate denial are never cut; an image rides beside its
+// text, which is short.
 func (a *Agent) bounded(name, result string, allotted int, denied bool) string {
-	if denied || a.instructionTools[name] {
+	if denied {
+		return result
+	}
+	if t, ok := a.registry.Get(name); ok && t.KeepWhole {
 		return result
 	}
 	return tools.CutUnkept(result, allotted+allotSlack)

@@ -195,7 +195,8 @@ func (a *mcpAdvertiser) Load(server string, registry *tools.Registry) (string, e
 // tool list after a load — the agent caches its declarations.
 func registerMCPLoadTool(registry *tools.Registry, adv *mcpAdvertiser, refresh func()) error {
 	return registry.Register(&tools.Tool{
-		Name: MCPLoadName,
+		KeepWhole: true,
+		Name:      MCPLoadName,
 		Description: "Load one MCP server named in the runtime facts: its tools are added to your tool list for " +
 			"the rest of the session and listed in the result. Call it before using any tool of a server " +
 			"that is not loaded. Loading runs nothing on the server.",

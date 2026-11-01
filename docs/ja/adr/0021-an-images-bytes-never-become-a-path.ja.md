@@ -14,7 +14,7 @@
 ADR-0020 はレーンを作り、供給源を開いたまま残し、反証された 3 稿すべてに対して成立した制約を
 1 つ保持した。**view 層はファイルを開かない。** view 層が行う読み取りはツールコールではないので、
 エージェントの判断にも ADR-0016 の sandbox 子にも届かず、ツール名で引かれるパス判定一覧 —
-`pathJudgedTools`（[risk.go:323](../../../internal/risk/risk.go)）— からは見えない。
+`pathJudgedTools`（[risk.go:324](../../../internal/risk/risk.go)）— からは見えない。
 
 それが素直な設計を排除する。MCP intake は既に画像をセッションの work dir へ書き出し、モデルには
 `[image saved at <path> … use view_image on that path]` を渡している
@@ -33,7 +33,7 @@ content-addressed の名前へ symlink を置ける。するとランタイム�
 work dir の getter とバイト上限とプレビュー長だけで（[mcpresult.go:33](../../../cmd/mcpresult.go)）、
 一度も持ったことが無いのがバイト列であり、
 ツール契約は `Run func(ctx, args) (string, error)` である
-（[tools.go:69](../../../internal/tools/tools.go)）。
+（[tools.go:75](../../../internal/tools/tools.go)）。
 
 必要な経路はこちらにも既にあり、しかも同じものである。エージェントループはツールコールの
 **最中に** UI へ話しかけている — `prog.Send(tui.ToolCall{…})`

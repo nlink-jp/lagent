@@ -217,14 +217,14 @@ not settled here and decision 4 does not rest on it.
 
 Written three times, refuted three times, each time the worst finding of its
 round: a path the model names bypasses the enforcers, which are keyed on
-tool name (`PathJudged`, [risk.go:323](../../../internal/risk/risk.go)); the
+tool name (`PathJudged`, [risk.go:324](../../../internal/risk/risk.go)); the
 path the intake wrote can be pre-empted, because `write` short-circuits on
 `os.Stat` ([mcpresult.go:267](../../../cmd/mcpresult.go)) and every call
 hands the server the work directory in `_meta`
 ([client.go:639](../../../internal/mcp/client.go)); and the third draft's
 decoded bytes have no carrier at all — `render` returns a `string`
 ([mcpresult.go:57](../../../cmd/mcpresult.go)) and `Tool.Run` is
-`func(ctx, args) (string, error)` ([tools.go:69](../../../internal/tools/tools.go)).
+`func(ctx, args) (string, error)` ([tools.go:75](../../../internal/tools/tools.go)).
 
 Three drafts in one place is one mistake: **the source cannot be named until
 the plumbing exists.** It is deferred to [ADR-0021](0021-an-images-bytes-never-become-a-path.md),

@@ -60,7 +60,7 @@ the intake route never fires for it, and never could.
 Asked to show such a file, the model has no route to the screen at all, so it
 reaches for the one thing that looks like a display: `shell_exec` with `open`.
 The read lane denies that at the kernel — `open` is on `DefaultDenyExec`
-([lane.go:121](../../../internal/sandbox/lane.go)) with the other IPC-capable
+([lane.go:122](../../../internal/sandbox/lane.go)) with the other IPC-capable
 programs — so the request fails; lifted into a lane where it succeeds, it opens
 a window outside the terminal, asks the operator to approve launching a GUI
 program rather than to look at a picture, and does nothing at all over ssh.
@@ -95,7 +95,7 @@ the pair differs in exactly one thing, which is the audience:
 This keeps the constraint ADR-0021 was built to protect — **the view layer
 opens no file** — because the file is opened by the TOOL layer, where a read is
 a tool call that every enforcer already sees. `show_image` joins
-`pathJudgedTools` ([risk.go:315](../../../internal/risk/risk.go)) beside
+`pathJudgedTools` ([risk.go:316](../../../internal/risk/risk.go)) beside
 `view_image`, so its argument is resolved to a real path and classified before
 it runs, and it reads through the same caged child. A model-named path is
 judged; that is the whole difference from the drafts ADR-0020 §5 refuted.

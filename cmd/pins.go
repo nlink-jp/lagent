@@ -13,6 +13,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/bounded"
 	"github.com/nlink-jp/lagent/internal/config"
 	"github.com/nlink-jp/lagent/internal/llm"
+	"github.com/nlink-jp/lagent/internal/pathid"
 	"github.com/nlink-jp/lagent/internal/statedir"
 	"github.com/nlink-jp/lagent/internal/trustpin"
 	"github.com/nlink-jp/lagent/internal/uitext"
@@ -162,7 +163,7 @@ func pinNameForWrite(projectDir string, tc llm.ToolCall) string {
 	if !filepath.IsAbs(p) {
 		p = filepath.Join(projectDir, p)
 	}
-	rel, err := filepath.Rel(projectDir, p)
+	rel, err := pathid.Rel(projectDir, p)
 	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
 		return ""
 	}

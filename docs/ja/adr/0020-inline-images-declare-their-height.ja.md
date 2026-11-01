@@ -183,13 +183,13 @@ gem-agent の iTerm2 で計測: 行数の宣言は既に正しいのに、画像
 ### 5. 何を描いてよいかは、ここでは決めない — 決まったのは制約 1 つ
 
 3 度書かれ、3 度反証された。いずれもそのラウンドの最悪の指摘だった。モデルが名指すパスは
-ツール名で引かれる強制者を迂回し（`PathJudged`、[risk.go:323](../../../internal/risk/risk.go)）、
+ツール名で引かれる強制者を迂回し（`PathJudged`、[risk.go:324](../../../internal/risk/risk.go)）、
 intake が書いたパスは先回りされうる。`write` が `os.Stat` で短絡し
 （[mcpresult.go:267](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに work dir を
 `_meta` で渡すからである（[client.go:639](../../../internal/mcp/client.go)）。そして第 3 稿の
 デコード済みバイト列には運搬体が無い。`render` は `string` を返し
 （[mcpresult.go:57](../../../cmd/mcpresult.go)）、`Tool.Run` は
-`func(ctx, args) (string, error)` である（[tools.go:69](../../../internal/tools/tools.go)）。
+`func(ctx, args) (string, error)` である（[tools.go:75](../../../internal/tools/tools.go)）。
 
 同じ場所の 3 稿は 1 つの誤りである。**配管が存在するまで、供給源は名指せない。** [ADR-0021](0021-an-images-bytes-never-become-a-path.ja.md) へ先送りし、3 稿すべてに
 対して成立した制約 1 つだけを引き継がせる: **view 層はファイルを

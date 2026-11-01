@@ -287,6 +287,18 @@ func compactCut(history []llm.Message, keep, maxTail int) int {
 			return i
 		}
 	}
+	if cut == 0 {
+		// Every message from want on is a tool result: one round of more
+		// parallel calls than keepRecent. Its own assistant turn lies
+		// before want, and is the nearest safe boundary (pre-release
+		// review: six parallel reads left no cut, and the round the
+		// budget let past the threshold went out uncompacted).
+		for i := want - 1; i >= 1; i-- {
+			if history[i].Role != llm.RoleTool {
+				return i
+			}
+		}
+	}
 	return cut // the last safe boundary, however large what follows it
 }
 
