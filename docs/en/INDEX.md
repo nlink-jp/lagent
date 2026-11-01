@@ -367,3 +367,14 @@ excepted).
   declined, the summariser's input is bounded to half the window, and a
   resume re-loads every server the session loaded. Records the measured
   cost of discarding the server's cache
+- [`ADR-0034`](adr/0034-one-round-is-bounded-by-the-window.md) —
+  one round is bounded by the window (**Proposed**, accepted after its
+  measurement): one round's tool results share a budget of half what a
+  compaction can make room for — and, when no compaction can run, no more
+  than the room under the threshold — re-judged before every call and
+  converted at 2 bytes per token; each tool cuts with a named route or
+  says the rest was not kept. Compaction's retained tail is bounded by the
+  same size, so the round that overflowed is no longer the part
+  compaction cannot touch, and a stuck session recovers once the operator
+  writes again. @-attachments share the bound; a window with no room ends
+  the turn. Amends ADR-0033 and ADR-0029
