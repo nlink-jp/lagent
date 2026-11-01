@@ -26,14 +26,16 @@ import (
 )
 
 // UsageStats is the session's per-category token accounting (gem-agent ADR-0019).
-// Main-loop numbers feed the footer; a side-call (gem-agent's risk
-// review and compaction; none here yet, the fields stay for the
-// record shape) must NOT touch the footer's context gauge — a risk check stomping
+// Main-loop numbers feed the footer; a side-call (compaction, ADR-0033)
+// must NOT touch the footer's context gauge — a risk check stomping
 // "ctx" with its own prompt size was the bug that shaped this split.
 type UsageStats struct {
 	Rounds                           int
 	Prompt, Output, Thoughts, Cached int
 	LastPrompt, Window               int
+	// CompactCalls, CompactPrompt, CompactOutput account the
+	// summariser (ADR-0033), a side-call.
+	CompactCalls, CompactPrompt, CompactOutput int
 	// AbandonedRunning counts tool calls the gem-agent ADR-0065 floor gave up
 	// on that have not returned yet — goroutines still holding a
 	// syscall, whose effect may still land. The exit receipt names
@@ -223,6 +225,24 @@ type Agent struct {
 	riskModel       string
 	rulebook        string
 	riskFailNoticed bool
+
+	// Compaction state (ADR-0033). autoCompact is guarded by mu (the
+	// failure path turns it off); the rest is touched only from the
+	// agent goroutine.
+	autoCompact     bool
+	compactAtPct    int
+	compactedAt     int  // history length right after the last compaction
+	compactFailures int  // consecutive failures; two disable auto-compaction
+	warnedNoCut     bool // "nothing safe to compact" is said once, not per round
+	warnedNoRoom    bool // so is "compaction cannot get under the threshold"
+	// autoCompactCfg is the configured setting a new session starts
+	// from; two failures turn autoCompact off for one session only.
+	autoCompactCfg bool
+	// measuredPrompt is the server's prompt count for the last request
+	// that reported one, and estAtMeasure the estimate of that same
+	// request: the base the next request's size is projected from.
+	measuredPrompt int
+	estAtMeasure   int
 }
 
 // Options configures New.
@@ -274,6 +294,12 @@ type Options struct {
 	OnUsage func(u llm.Usage)
 	// AutoApprove starts the session in auto-approve mode (gem-agent ADR-0004).
 	AutoApprove bool
+	// AutoCompact enables automatic history compaction (ADR-0033), and
+	// CompactAtPct is the share of the model's input window, projected
+	// for the request about to be sent, at which it fires. Compaction
+	// still needs a known window; see SetContextWindow.
+	AutoCompact  bool
+	CompactAtPct int
 	// OnAutoDecision, when set, observes each auto-mode verdict so the
 	// UI can show what ran without asking, and why.
 	OnAutoDecision func(tc llm.ToolCall, d AutoDecision)
@@ -372,6 +398,10 @@ func New(opts Options) *Agent {
 		riskModel: opts.RiskModel,
 		rulebook:  opts.Rulebook,
 
+		autoCompact:    opts.AutoCompact,
+		autoCompactCfg: opts.AutoCompact,
+		compactAtPct:   opts.CompactAtPct,
+
 		policy:    opts.Policy,
 		advertise: opts.Advertise,
 
@@ -405,6 +435,7 @@ func New(opts Options) *Agent {
 func (a *Agent) Reset() {
 	cleared := len(a.history)
 	a.history = nil
+	a.resetCompaction()
 	a.tag = guard.NewTagWithPrefix("tool_output")
 	a.mu.Lock()
 	a.epoch++
@@ -424,9 +455,18 @@ func (a *Agent) Reset() {
 // is closed, and the new file has failed nothing yet.
 func (a *Agent) Restart(log SessionLog) {
 	a.history = nil
+	a.resetCompaction()
+	// The compaction failure count and its one-time warning belong to
+	// the session that ends (gem-agent review round 4).
+	a.compactFailures = 0
+	a.warnedNoCut = false
+	a.warnedNoRoom = false
 	a.tag = guard.NewTagWithPrefix("tool_output")
 	a.pendingAtts = nil
 	a.mu.Lock()
+	// Automatic compaction turned off by failures was off "for this
+	// session"; the new one starts from the configured setting.
+	a.autoCompact = a.autoCompactCfg
 	a.epoch++
 	a.log = log
 	a.logDead = false
@@ -451,6 +491,11 @@ func (a *Agent) Restart(log SessionLog) {
 // while Run is in flight.
 func (a *Agent) SetHistory(history []llm.Message) {
 	a.history = history
+	// A restore is not a compaction, and the measurements describe a
+	// history that is gone: with none, the next request is projected
+	// from the estimate alone, so a resumed session already near the
+	// window compacts on its first round (gem-agent ADR-0021).
+	a.resetCompaction()
 	a.tag = guard.NewTagWithPrefix("tool_output")
 }
 
@@ -777,6 +822,11 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 		// caching can hit. Reuse is sound because guard.Wrap refuses
 		// content containing the tag name — a leaked tag cannot escape
 		// the wrapper, only get its carrier withheld.
+		// Compaction happens before the request that would overflow,
+		// judged by that request's projected size (ADR-0033 §2): a long
+		// tool loop is where the window actually runs out.
+		a.maybeAutoCompact(ctx)
+		sentEst := a.estimateRequest()
 		msgs := wrapToolMessages(a.history, a.tag, a.instructionTools)
 		if emptyAsked > 0 {
 			// A re-send after an empty completion carries a transient
@@ -800,6 +850,9 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 			a.stats.Cached += resp.CachedTokens
 			a.stats.LastPrompt = resp.PromptTokens
 			a.mu.Unlock()
+			if resp.PromptTokens > 0 {
+				a.noteMeasured(resp.PromptTokens, sentEst)
+			}
 			if a.onUsage != nil {
 				a.onUsage(resp.Usage())
 			}

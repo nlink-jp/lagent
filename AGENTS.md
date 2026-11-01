@@ -332,8 +332,8 @@ answers.
   bare; extend `mention.bareImageRefs`, never widen it to text files.
 - **No string for a feature this runtime does not have.** The catalog,
   `/help`, tool descriptions, notes and error text name only what is
-  here; a leftover from the porting source (`/readonly auto`, `/compact`,
-  "the model tier") is a seam ADR-0001 forbids. Before a
+  here; a leftover from the porting source (`/readonly auto`,
+  `/riskbook`) is a seam ADR-0001 forbids. Before a
   release, grep every string literal in cmd/ and internal/ for the
   ADR-0002 and Phase 2 feature names, and grep the `uitext.Messages`
   fields for ones no code reads — the completeness test only checks
@@ -365,7 +365,9 @@ answers.
   measured about 580 tokens/s on the reference machine, so a cache miss
   on a 20k-token prefix is 30+ seconds of silence before the first token,
   while an identical prefix re-sent hits LM Studio's KV cache in about a
-  second. Anything that rewrites history (compaction) discards the cache.
+  second. Anything that rewrites history (compaction, ADR-0033) discards
+  the cache, and the summariser's different system prompt and empty tool
+  list evict the main prefix on a single-slot server.
 - **Tool-call arguments arrive as one chunk** in streaming; there is no
   liveness signal while a large `write_file` argument is generated. Do
   not add a stall timeout on that path.
@@ -404,6 +406,19 @@ answers.
   operator's `/remember` bypasses no gate because the operator is the
   gate. A memory that is meant to drive behaviour is written as a
   pointer (a file, a command, a tool), the shape that measured.
+- **Compaction is judged on the request about to be sent** (ADR-0033,
+  `internal/agent/compact.go`, ported from gem-agent at `c06187c`).
+  `maybeAutoCompact` runs before every request; the projection is the
+  server's last prompt count plus the change in `estimateRequest`
+  (system + tool definitions + history, bytes / 3) since that request —
+  keep `noteMeasured` paired with the estimate of the request that was
+  actually sent. The session-facts message is carried into the summary
+  message, never summarised: a new per-session fact belongs in
+  `AnnounceSession`'s message, which crosses the cut. A summary that names
+  the session tag is refused (guard would withhold it forever). `mcp_load`
+  replay on resume reads the records (`session.CallArgs`), not the
+  restored history. The summariser is a side-call: its tokens go to
+  `UsageStats.Compact*` and a `compact` usage record, never the gauge.
 - **The model tier judges write-lane shell commands and nothing else**
   (ADR-0032). `modelTierJudges` in `internal/agent/riskreview.go` is the
   scope: `shell_exec`, `write` lane, sandbox confining, Review without

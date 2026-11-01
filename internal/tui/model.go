@@ -140,6 +140,11 @@ type TurnStarter func(ctx context.Context, input string)
 // message.
 type ShellStarter func(ctx context.Context, command string)
 
+// CompactStarter launches history compaction (ADR-0033) in a goroutine.
+// Like a turn it must not block: it makes an LLM call, and the UI has to
+// stay interruptible while it runs. Completion arrives as TurnDone.
+type CompactStarter func(ctx context.Context)
+
 // SlashHandler executes a /command and returns its output, whether the
 // output is an error (rendered so it stands out — an unknown command
 // must never look like dim meta text), and whether the program should
@@ -150,6 +155,7 @@ type SlashHandler func(cmd string) (output string, isErr bool, quit bool)
 type Options struct {
 	StartTurn TurnStarter
 	Shell     ShellStarter
+	Compact   CompactStarter
 	Slash     SlashHandler
 	BaseCtx   context.Context
 	// Msgs is the resolved language catalog (gem-agent ADR-0029); nil means
@@ -302,6 +308,7 @@ type Model struct {
 
 	startTurn       TurnStarter
 	shell           ShellStarter
+	compact         CompactStarter
 	slash           SlashHandler
 	toggleAuto      func() bool
 	autoMode        bool
@@ -398,6 +405,7 @@ func New(opts Options) Model {
 		hold:            &bottomHold{},
 		startTurn:       opts.StartTurn,
 		shell:           opts.Shell,
+		compact:         opts.Compact,
 		slash:           inertSlash(opts.Slash),
 		toggleAuto:      opts.ToggleAuto,
 		autoMode:        opts.AutoMode,
@@ -1780,6 +1788,19 @@ func (m Model) submit() (tea.Model, tea.Cmd) {
 	// so the two defences are independent.
 	if strings.Fields(input)[0] == "/auto" && m.toggleAuto != nil {
 		return m.setAutoMode(input, m.echoLine(">", input))
+	}
+
+	// /compact makes an LLM call, so it runs like a turn rather than
+	// like a slash command: the UI stays interruptible, and the result
+	// arrives as TurnDone.
+	if input == "/compact" && m.compact != nil {
+		m.phase = phaseRunning
+		m.status = m.msgs.StatusCompacting
+		m.beginTurnStats()
+		ctx, cancel := context.WithCancel(m.baseCtx)
+		m.cancelTurn = cancel
+		m.compact(ctx)
+		return m, tea.Batch(m.emit(m.echoLine(">", input)), m.spin.Tick)
 	}
 
 	if strings.HasPrefix(input, "/") {

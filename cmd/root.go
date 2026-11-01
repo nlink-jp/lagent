@@ -345,6 +345,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	sessionDir, sessionDirErr := session.DefaultDir()
 
 	var restored []llm.Message
+	var restoredLoads []string
 	resumedID := ""
 	var resumedFrom time.Time // when a resumed conversation began (ADR-0030)
 	if flagContinue || flagResume != "" {
@@ -407,6 +408,12 @@ func runREPL(cmd *cobra.Command, args []string) error {
 					fmt.Fprintf(stderr, "warning: %s\n", n)
 				}
 				restored = history
+				// Same file, same lock: the servers the session loaded,
+				// including any whose mcp_load a compaction summarised
+				// out of the restored history (ADR-0033).
+				if restoredLoads, err = session.CallArgs(lg.Path(), MCPLoadName, "server"); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -917,6 +924,12 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		RiskBackend:      riskBackend,
 		RiskModel:        riskModel,
 		Rulebook:         rulebook,
+
+		// ADR-0033: the history is compacted before a request would fill
+		// the window, one-shot included.
+		AutoCompact:  cfg.Agent.AutoCompact,
+		CompactAtPct: cfg.Agent.CompactAtPct,
+
 		OnAutoDecision: func(tc llm.ToolCall, d agent.AutoDecision) {
 			if !d.Approved {
 				return // the escalation shows up in the approval prompt
@@ -932,7 +945,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		ag.SetHistory(restored)
 		// The servers the earlier session loaded are loaded again, so
 		// it sees what it saw (ADR-0004).
-		if replayLoads(restored, adv, registry) > 0 {
+		if replayLoads(restoredLoads, adv, registry) > 0 {
 			ag.RefreshTools()
 		}
 	}
@@ -1435,6 +1448,20 @@ func runREPL(cmd *cobra.Command, args []string) error {
 					prog.Send(tui.ShellDone{Output: out, Interrupted: shellCtx.Err() != nil})
 				}()
 			},
+			Compact: func(compactCtx context.Context) {
+				go func() {
+					note, err := compactNow(compactCtx, ag, msgs)
+					if err == nil {
+						prog.Send(tui.Attached{Notes: []string{note}})
+					}
+					if err != nil && compactCtx.Err() != nil {
+						// Mirror StartTurn's mapping: a cancellation-caused
+						// failure is an interrupt, not a backend error.
+						err = context.Canceled
+					}
+					prog.Send(tui.TurnDone{Err: err})
+				}()
+			},
 			StartTurn: func(turnCtx context.Context, input string) {
 				go func() {
 					_, err := ag.Run(turnCtx, input, func(s string) { prog.Send(tui.TextDelta(s)) })
@@ -1516,6 +1543,25 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			writeSettingsTable(stderr, settings.data())
 			continue
 		}
+		if input == "/compact" {
+			// Synchronous here: the plain REPL has no phase machine, and
+			// nothing else can be happening while it waits for a line.
+			// runTurnWith makes Ctrl+C interrupt the summariser call
+			// rather than kill the process.
+			runErr := runTurnWith(ctx, ladder, func(compactCtx context.Context) error {
+				note, err := compactNow(compactCtx, ag, msgs)
+				if err == nil {
+					fmt.Fprintln(stderr, note)
+				}
+				return err
+			})
+			if errors.Is(runErr, errInterrupted) {
+				fmt.Fprintln(stderr, msgs.Interrupted)
+			} else if runErr != nil {
+				fmt.Fprintf(stderr, "%s%v\n", msgs.ErrorPrefix, runErr)
+			}
+			continue
+		}
 		if turn, handled, errMsg := expandSkillInput(input, skillsList); handled {
 			if errMsg != "" {
 				fmt.Fprintln(stderr, errMsg)
@@ -1564,6 +1610,20 @@ func runREPL(cmd *cobra.Command, args []string) error {
 }
 
 var errInterrupted = errors.New("interrupted")
+
+// compactNow runs a manual /compact (ADR-0033) and renders the outcome.
+// "Nothing to compact" is a normal answer, not an error: the operator
+// asked a reasonable question and the answer is no.
+func compactNow(ctx context.Context, ag *agent.Agent, msgs *uitext.Messages) (string, error) {
+	res, err := ag.Compact(ctx)
+	switch {
+	case errors.Is(err, agent.ErrNothingToCompact):
+		return msgs.NothingToCompact, nil
+	case err != nil:
+		return "", err
+	}
+	return fmt.Sprintf(msgs.CompactedFmt, res.Replaced, res.After-1), nil
+}
 
 // startupNotes tees startup-time stderr lines so the TUI can replay
 // them in the banner after its first ClearScreen (gem-agent ADR-0021).
@@ -2099,7 +2159,7 @@ func runDirectShell(ctx context.Context, registry *tools.Registry, ag *agent.Age
 // slashCompletions completes the slash commands this runtime has.
 func slashCompletions(getSkills func() []skills.Skill) func(string) []string {
 	commands := []string{
-		"/auto", "/clear", "/exit", "/help", "/mcp",
+		"/auto", "/clear", "/compact", "/exit", "/help", "/mcp",
 		"/forget", "/memory", "/quit", "/readonly", "/remember", "/settings", "/skill", "/skills",
 		"/tools", "/usage", "/version",
 	}

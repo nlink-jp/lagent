@@ -114,6 +114,17 @@ auto_approve = false
 # nothing in the runtime lowers the ceiling.
 read_only = false
 
+# History compaction (ADR-0033): before a request would pass this share
+# of the context window, the older part of the conversation is replaced
+# by a summary and the recent messages are kept verbatim. The size is
+# judged for the request about to be sent — the server's count for the
+# last one plus the estimated growth since — so one round of large tool
+# results or a newly loaded MCP server is seen in time. It needs a known
+# window ([model].context_window, or the provider's); /compact does it by
+# hand either way. Two failed attempts turn it off for the session.
+auto_compact = true
+compact_at_pct = 80
+
 [mcp]
 # false disables ALL MCP servers, global and project; --mcp on|off
 # overrides it per run (off is the one-shot pipeline case: no server

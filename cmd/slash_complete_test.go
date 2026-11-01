@@ -24,7 +24,11 @@ func TestSlashCompletionsSource(t *testing.T) {
 	if !strings.Contains(joined, "/settings") {
 		t.Errorf("/s missing /settings: %v", got)
 	}
-	for _, gone := range []string{"/compact", "/riskbook"} {
+	// /compact arrived with ADR-0033; /riskbook is gem-agent's only.
+	if got := complete("/comp"); len(got) != 1 || got[0] != "/compact" {
+		t.Errorf("/comp → %v", got)
+	}
+	for _, gone := range []string{"/riskbook"} {
 		if strings.Contains(strings.Join(complete("/"), " "), gone) {
 			t.Errorf("completion offers %s, which this runtime does not have", gone)
 		}

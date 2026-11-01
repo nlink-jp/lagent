@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nlink-jp/lagent/internal/llm"
 	"github.com/nlink-jp/lagent/internal/tools"
 	"github.com/nlink-jp/lagent/internal/uitext"
 )
@@ -153,19 +152,12 @@ func TestSummaryLinesCarryTheLoadedMarker(t *testing.T) {
 	}
 }
 
-// A resumed transcript's mcp_load calls are replayed; a server that is
-// gone is skipped.
+// A resumed transcript's mcp_load servers are replayed; a server that
+// is gone is skipped. (Which servers: session.CallArgs, which reads the
+// records — a compaction may have summarised the calls away, ADR-0033.)
 func TestReplayLoadsFollowsTheTranscript(t *testing.T) {
 	adv, reg, _ := loadHarness(t, false, nil, nil)
-	history := []llm.Message{
-		{Role: llm.RoleUser, Content: "x"},
-		{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{
-			{ID: "1", Name: MCPLoadName, Args: map[string]any{"server": "tor-exit"}},
-			{ID: "2", Name: MCPLoadName, Args: map[string]any{"server": "gone"}},
-			{ID: "3", Name: "read_file", Args: map[string]any{"path": "a"}},
-		}},
-	}
-	if n := replayLoads(history, adv, reg); n != 1 {
+	if n := replayLoads([]string{"tor-exit", "gone"}, adv, reg); n != 1 {
 		t.Errorf("replayed %d loads, want 1", n)
 	}
 	if !adv.Advertise("mcp__tor-exit__check_ip") || adv.Advertise("mcp__github__get_me") {

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/nlink-jp/lagent/internal/llm"
 	"github.com/nlink-jp/lagent/internal/tools"
 )
 
@@ -226,24 +225,16 @@ func registerMCPLoadTool(registry *tools.Registry, adv *mcpAdvertiser, refresh f
 }
 
 // replayLoads re-advertises the servers a restored transcript loaded:
-// every mcp_load call the model made, so a resumed session sees what it
-// saw. Servers that are gone are skipped without a word — the catalog in
-// the new facts message says what is here now.
-func replayLoads(history []llm.Message, adv *mcpAdvertiser, registry *tools.Registry) int {
+// the server of every mcp_load call the model made — read from the
+// transcript's records, not the restored history, which a compaction
+// may have summarised them out of (ADR-0033) — so a resumed session
+// sees what it saw. Servers that are gone are skipped without a word —
+// the catalog in the new facts message says what is here now.
+func replayLoads(servers []string, adv *mcpAdvertiser, registry *tools.Registry) int {
 	n := 0
-	for _, m := range history {
-		if m.Role != llm.RoleAssistant {
-			continue
-		}
-		for _, tc := range m.ToolCalls {
-			if tc.Name != MCPLoadName {
-				continue
-			}
-			if server, _ := tc.Args["server"].(string); server != "" {
-				if _, err := adv.Load(server, registry); err == nil {
-					n++
-				}
-			}
+	for _, server := range servers {
+		if _, err := adv.Load(server, registry); err == nil {
+			n++
 		}
 	}
 	return n

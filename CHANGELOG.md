@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+
+- **History compaction (ADR-0033).** A session no longer dies when the
+  conversation fills the context window. Before a request would pass
+  `[agent].compact_at_pct` (default 80) of the window, the older part
+  of the conversation is replaced by a summary and the recent messages
+  are kept verbatim; `/compact` does it by hand, and
+  `[agent].auto_compact = false` turns the automatic one off. Ported
+  from gem-agent's compaction, with the trigger judged on the request
+  about to be sent rather than the last one, so a round of large tool
+  results or a newly loaded MCP server is seen before it overflows. The
+  session facts (the data tag, the work directory, memory) survive the
+  cut verbatim, the summary is quoted as data, a failure leaves the
+  history untouched, and a resumed session comes back compacted and
+  re-loads every MCP server it had loaded.
+
 ## [0.19.2] - 2026-10-29
 
 ### Security

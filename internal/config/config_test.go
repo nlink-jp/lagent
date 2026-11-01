@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -511,5 +512,31 @@ func TestDiagramFontSetting(t *testing.T) {
 	}
 	if cfg.Source("tui.diagram.font") != FromFile || cfg.Source("tui.diagram.bold_font") != FromDefault {
 		t.Errorf("sources: font %s, bold_font %s", cfg.Source("tui.diagram.font"), cfg.Source("tui.diagram.bold_font"))
+	}
+}
+
+// ADR-0033: compaction is on by default at 80%, and the threshold must
+// be a usable share of the window.
+func TestCompactThresholdIsRangeChecked(t *testing.T) {
+	clearEnv(t)
+	for _, pct := range []int{0, 5, 100, 200, -1} {
+		path := writeConfig(t, fmt.Sprintf("\n[llm]\nmodel = \"m\"\n\n[agent]\ncompact_at_pct = %d\n", pct))
+		if _, err := Load(path); err == nil {
+			t.Errorf("compact_at_pct = %d accepted; it must be a usable share of the window", pct)
+		}
+	}
+	cfg, err := Load(writeConfig(t, "\n[llm]\nmodel = \"m\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Agent.AutoCompact || cfg.Agent.CompactAtPct != 80 {
+		t.Errorf("defaults = %+v, want auto_compact on at 80", cfg.Agent)
+	}
+	cfg, err = Load(writeConfig(t, "\n[llm]\nmodel = \"m\"\n\n[agent]\ncompact_at_pct = 90\nauto_compact = false\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Agent.CompactAtPct != 90 || cfg.Agent.AutoCompact {
+		t.Errorf("agent config = %+v", cfg.Agent)
 	}
 }

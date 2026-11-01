@@ -374,6 +374,13 @@ type AgentConfig struct {
 	// (gem-agent ADR-0080 §1), on an axis of its own: auto-approve decides who
 	// answers the gate, this decides what the session may reach at all.
 	ReadOnly bool `toml:"read_only"`
+	// AutoCompact summarises the older part of the conversation before a
+	// request would fill the context window (ADR-0033). Default on: a
+	// session that dies at the window is the failure it exists for.
+	AutoCompact bool `toml:"auto_compact"`
+	// CompactAtPct is the share of the window, projected for the request
+	// about to be sent, at which compaction fires.
+	CompactAtPct int `toml:"compact_at_pct"`
 }
 
 // DefaultPath returns the org-standard per-tool config path.
@@ -390,7 +397,7 @@ func defaults() Config {
 		LLM:      LLMConfig{Provider: "lmstudio", BaseURL: "http://localhost:1234/v1", RiskReasoningEffort: "none"},
 		Sandbox:  SandboxConfig{Enabled: true, ScratchCaches: map[string]string{"GOCACHE": "go-build"}},
 		Approval: ApprovalConfig{PinTrustedFiles: true, ModelTier: "off"},
-		Agent:    AgentConfig{MaxTurns: 50, ShellTimeoutSec: 120},
+		Agent:    AgentConfig{MaxTurns: 50, ShellTimeoutSec: 120, AutoCompact: true, CompactAtPct: 80},
 		MCP:      MCPConfig{Enabled: true, CallTimeoutSec: 60, StartupTimeoutSec: 30, Advertise: "deferred"},
 		TUI:      TUIConfig{Theme: "auto", Language: "auto", ShowThoughts: true, Images: "auto"},
 	}
@@ -538,7 +545,7 @@ var trackedKeys = []string{
 	"sandbox.scratch_caches",
 	"approval.pin_trusted_files", "approval.model_tier",
 	"agent.max_turns", "agent.shell_timeout_sec", "agent.auto_approve",
-	"agent.read_only",
+	"agent.read_only", "agent.auto_compact", "agent.compact_at_pct",
 	"mcp.enabled", "mcp.call_timeout_sec", "mcp.startup_timeout_sec", "mcp.advertise", "mcp.preload",
 	"tui.theme", "tui.language", "tui.show_thoughts",
 	"tui.diagram.font", "tui.diagram.font_name", "tui.diagram.bold_font", "tui.diagram.bold_font_name",
@@ -612,6 +619,11 @@ func (c *Config) validate() error {
 	}
 	if c.Agent.ShellTimeoutSec <= 0 {
 		return fmt.Errorf("[agent].shell_timeout_sec must be positive")
+	}
+	// Below ~10% compaction would fire constantly and summarise nothing
+	// useful; 100 would fire only after the request that already failed.
+	if c.Agent.CompactAtPct < 10 || c.Agent.CompactAtPct > 99 {
+		return fmt.Errorf("[agent].compact_at_pct must be between 10 and 99 (got %d)", c.Agent.CompactAtPct)
 	}
 	if c.MCP.CallTimeoutSec <= 0 {
 		return fmt.Errorf("[mcp].call_timeout_sec must be positive")

@@ -549,3 +549,58 @@ func TestFactsMessageIsNotAConversation(t *testing.T) {
 		t.Fatalf("after the operator's message: HasConversation=%v preview=%q", meta.HasConversation, meta.Preview)
 	}
 }
+
+// ADR-0033: a compaction removes calls from the history Load returns,
+// not from what the session did — CallArgs still finds them. A clear
+// starts over.
+func TestCallArgsSeesCallsACompactionSummarised(t *testing.T) {
+	dir := t.TempDir()
+	l, err := Open(dir, "/p")
+	if err != nil {
+		t.Fatal(err)
+	}
+	call := func(server string) llm.Message {
+		return llm.Message{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{
+			{ID: server, Name: "mcp_load", Args: map[string]any{"server": server}},
+			{ID: "r" + server, Name: "read_file", Args: map[string]any{"server": "not-a-load"}},
+		}}
+	}
+	recs := []struct {
+		kind string
+		data any
+	}{
+		{KindMessage, call("before-clear")},
+		{KindClear, map[string]any{"messages": 1}},
+		{KindMessage, llm.Message{Role: llm.RoleUser, Content: "go"}},
+		{KindMessage, call("alpha")},
+		{KindMessage, llm.Message{Role: llm.RoleTool, ToolCallID: "alpha", Content: "loaded"}},
+		{KindMessage, llm.Message{Role: llm.RoleTool, ToolCallID: "ralpha", Content: "x"}},
+		{KindCompaction, Compaction{Replaced: 4, Message: llm.Message{Role: llm.RoleUser, Content: "summary"}}},
+		{KindMessage, call("beta")},
+	}
+	for _, r := range recs {
+		if err := l.Log(r.kind, r.data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = l.Close()
+
+	history, _, _, err := Load(l.Path())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range history {
+		for _, tc := range m.ToolCalls {
+			if tc.ID == "alpha" {
+				t.Fatal("fixture: the compaction should have removed alpha's load from the history")
+			}
+		}
+	}
+	got, err := CallArgs(l.Path(), "mcp_load", "server")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got, ",") != "alpha,beta" {
+		t.Errorf("CallArgs = %v, want [alpha beta]", got)
+	}
+}

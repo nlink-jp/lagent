@@ -323,7 +323,7 @@ func TestEveryOptionsCallbackIsAccountedFor(t *testing.T) {
 		"RenderFactory": true, // held to SGR by inertRenderer
 	}
 	exempt := map[string]string{
-		"StartTurn": "returns nothing", "Shell": "returns nothing",
+		"StartTurn": "returns nothing", "Shell": "returns nothing", "Compact": "returns nothing",
 		"ToggleAuto": "returns a bool", "AutoState": "returns a bool",
 		"ReadOnlyState": "returns a ceiling value",
 		"Printer":       "the terminal's side, not a source",

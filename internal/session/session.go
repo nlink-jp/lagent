@@ -119,8 +119,7 @@ type Header struct {
 // Compaction is the record written when history is compacted (gem-agent ADR-0006).
 // Replaced counts the leading messages the summary stands in for, so a
 // loader can reproduce the compaction instead of re-inflating history.
-// lagent writes none (compaction is RFP Phase 2); the loader keeps
-// understanding the record so a transcript carrying one is not misread.
+// lagent writes it since ADR-0033.
 type Compaction struct {
 	Replaced int         `json:"replaced"`
 	Message  llm.Message `json:"message"`
@@ -479,6 +478,42 @@ func Load(path string) ([]llm.Message, Header, int, error) {
 		return nil, header, skipped, err
 	}
 	return history, header, skipped, nil
+}
+
+// CallArgs returns, in order, the string value of arg in every call to
+// tool the transcript at path records since its last clear —
+// compacted messages included (ADR-0033): a compaction replaces the
+// history the model sees, not what the session did, so a resumed
+// session re-loads an MCP server whose mcp_load call was summarised
+// away. Unreadable lines are skipped; Load reports them.
+func CallArgs(path, tool, arg string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	var out []string
+	err = forEachLine(f, func(rec *rawRecord) (bool, error) {
+		if rec == nil {
+			return true, nil
+		}
+		switch rec.Kind {
+		case KindClear:
+			out = nil
+		case KindMessage:
+			var m llm.Message
+			if json.Unmarshal(rec.Data, &m) != nil || m.Role != llm.RoleAssistant {
+				return true, nil
+			}
+			for _, tc := range m.ToolCalls {
+				if v, _ := tc.Args[arg].(string); tc.Name == tool && v != "" {
+					out = append(out, v)
+				}
+			}
+		}
+		return true, nil
+	})
+	return out, err
 }
 
 // List returns the resumable sessions in dir, newest first. When

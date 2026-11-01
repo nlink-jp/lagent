@@ -54,6 +54,12 @@ func usageReport(ag *agent.Agent, mainModel string) string {
 		}
 		fmt.Fprintf(&b, "  context now %s of %s\n", humanTok(s.LastPrompt), window)
 	}
+	// The summariser is a side-call (ADR-0033): its own line, never
+	// the main loop's numbers or the context gauge.
+	if s.CompactCalls > 0 {
+		fmt.Fprintf(&b, "compaction (%s): %d calls · prompt %s · output %s\n",
+			mainModel, s.CompactCalls, humanTok(s.CompactPrompt), humanTok(s.CompactOutput))
+	}
 	return b.String()
 }
 

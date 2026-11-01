@@ -135,6 +135,7 @@ type Messages struct {
 
 	// --- running-status chrome (TUI, gem-agent ADR-0033) ---
 	StatusThinking     string
+	StatusCompacting   string
 	StatusInterrupting string
 	StatusToolWait     string
 	StatusRunningFmt   string // %s = tool name
@@ -236,6 +237,24 @@ type Messages struct {
 	TranscriptFailedFmt string
 	// TruncatedFmt: why generation stopped early.
 	TruncatedFmt string
+	// Compaction (ADR-0033). NothingToCompact answers a /compact with
+	// no safe cut; CompactedFmt reports one (messages summarised, kept).
+	NothingToCompact string
+	CompactedFmt     string
+	// CompactingFmt is said before the summariser call, which on a
+	// local server is a silent wait: %d = projected % of the window.
+	CompactingFmt string
+	// AutoCompactedFmt: messages summarised, kept verbatim.
+	AutoCompactedFmt string
+	// CompactNothingFmt: projected %, with nothing safe to summarise.
+	CompactNothingFmt string
+	// CompactNoRoomFmt: projected %, and the % the system prompt and
+	// tool definitions take — what no compaction can shrink.
+	CompactNoRoomFmt string
+	// CompactFailedFmt: the cause. CompactOffSuffix is appended once
+	// automatic compaction gives up for the session.
+	CompactFailedFmt string
+	CompactOffSuffix string
 	// PromptHookAttachedFmt: bytes a prompt hook attached as data
 	// (ADR-0014 §4). %d = byte count.
 	PromptHookAttachedFmt string
@@ -359,6 +378,7 @@ var en = Messages{
 	NoOutput:                "(no output)",
 
 	StatusThinking:          "thinking…",
+	StatusCompacting:        "compacting the conversation…",
 	StatusInterrupting:      "interrupting…",
 	StatusToolWait:          "waiting for the tool…",
 	StatusRunningFmt:        "running %s",
@@ -397,6 +417,7 @@ var en = Messages{
   /show <path>   draw an image in this terminal (the model uses show_image for the same thing)
   /usage     token statement for this session
   /version   version and platform
+  /compact   summarise the older part of the conversation
   /clear     reset the conversation
   /quit      exit (/exit and Ctrl+D too)
 
@@ -432,6 +453,14 @@ keys:
 
 	TranscriptFailedFmt:    "session transcript write failed (%s) — recording stopped, so this session can no longer be resumed in full; restart lagent to record again",
 	TruncatedFmt:           "the response was cut off mid-generation (%s) — ask for the rest, or narrow the request",
+	NothingToCompact:       "nothing to compact yet — the conversation is still short",
+	CompactedFmt:           "compacted %d earlier messages into a summary; %d kept verbatim. Detail from the summarised part is now second-hand",
+	CompactingFmt:          "context is heading for %d%% of the window — summarising the older part of the conversation (the next request re-reads the rest and may take a while)",
+	AutoCompactedFmt:       "compacted %d earlier messages into a summary; %d kept verbatim. Detail from the summarised part is now second-hand",
+	CompactNothingFmt:      "context is heading for %d%% of the window and nothing can be summarised yet — /clear starts a fresh conversation",
+	CompactNoRoomFmt:       "context is heading for %d%% of the window, and summarising cannot bring it under the threshold: the system prompt and tool definitions alone take about %d%%, and the recent messages are kept verbatim — /clear starts a fresh conversation",
+	CompactFailedFmt:       "context compaction failed: %s",
+	CompactOffSuffix:       " — automatic compaction is off for this session; /compact retries by hand",
 	EmptyRetried:           "the model returned an empty response — sending the same request again",
 	RiskReviewFailedFmt:    "risk review failed, so write-lane commands are asked about (check [llm].risk_model and [llm].risk_reasoning_effort): %v",
 	PromptHookAttachedFmt:  "user_prompt_submit hook attached %d bytes of context as data",
@@ -516,6 +545,7 @@ var ja = Messages{
 	NoOutput:                "(出力なし)",
 
 	StatusThinking:          "思考中…",
+	StatusCompacting:        "会話を圧縮中…",
 	StatusInterrupting:      "中断中…",
 	StatusToolWait:          "ツールの完了待ち…",
 	StatusRunningFmt:        "実行中 %s",
@@ -554,6 +584,7 @@ var ja = Messages{
   /show <path>   画像をこの端末に描く（モデルは同じことを show_image で行う）
   /usage     このセッションのトークン明細
   /version   バージョンとプラットフォーム
+  /compact   会話の古い部分を要約に畳む
   /clear     会話履歴をリセット
   /quit      終了（/exit・Ctrl+D でも可）
 
@@ -589,6 +620,14 @@ var ja = Messages{
 
 	TranscriptFailedFmt:    "セッション記録の書き込みに失敗しました（%s）。記録が停止したため、このセッションは完全な形では再開できません。記録を再開するには lagent を起動し直してください",
 	TruncatedFmt:           "応答が生成途中で打ち切られました（%s）— 続きを求めるか、要求を絞ってください",
+	NothingToCompact:       "まだ圧縮できるものがありません — 会話がまだ短いためです",
+	CompactedFmt:           "古いメッセージ %d 件を要約に畳みました。%d 件はそのまま保持しています。要約された部分の詳細は伝聞になります",
+	CompactingFmt:          "コンテキストがウィンドウの %d%% に達する見込みです — 会話の古い部分を要約しています（次の要求は残りを読み直すので時間がかかることがあります）",
+	AutoCompactedFmt:       "古いメッセージ %d 件を要約に畳みました。%d 件はそのまま保持しています。要約された部分の詳細は伝聞になります",
+	CompactNothingFmt:      "コンテキストがウィンドウの %d%% に達する見込みですが、まだ要約できるものがありません — /clear で新しい会話を始められます",
+	CompactNoRoomFmt:       "コンテキストがウィンドウの %d%% に達する見込みですが、要約しても閾値を下回れません: システムプロンプトとツール定義だけで約 %d%% を占め、直近のメッセージはそのまま残すためです — /clear で新しい会話を始められます",
+	CompactFailedFmt:       "コンテキストの要約に失敗しました: %s",
+	CompactOffSuffix:       " — このセッションの自動圧縮は止めました。/compact で手動で再試行できます",
 	EmptyRetried:           "モデルが空の応答を返しました — 同じ要求をもう一度送ります",
 	RiskReviewFailedFmt:    "リスク判定に失敗したため、write レーンのコマンドは確認します（[llm].risk_model と [llm].risk_reasoning_effort を確認してください）: %v",
 	PromptHookAttachedFmt:  "user_prompt_submit フックが %d バイトのコンテキストをデータとして添付しました",

@@ -35,6 +35,8 @@ Unknown keys are errors (strict decode).
 | `[agent].shell_timeout_sec` | `120` | per-command timeout for `shell_exec` |
 | `[agent].auto_approve` | `false` | start with auto-approve on: rule-tier Safe calls run unasked, Review and Block ask. **Ignored in `-p`** — only `--auto` arms it there. `/auto on|off` and shift+tab change it for the session |
 | `[agent].read_only` | `false` | start with the lane ceiling in force: nothing outside the session scratch may change. Applies in `-p` too; `--read-only` / `--writable` override it per run, `/readonly on|off` per session. Nothing in the runtime lowers it |
+| `[agent].auto_compact` | `true` | summarise the older part of the conversation before a request would fill the window (ADR-0033). Needs a known window (`[model].context_window` or the provider's); `/compact` works either way. Two failed attempts turn it off for the session |
+| `[agent].compact_at_pct` | `80` | the share of the window, projected for the request about to be sent, at which it fires; 10–99 |
 | `[mcp].enabled` | `true` | `false` disables every MCP server, global and project; `--mcp on|off` overrides per run |
 | `[mcp].call_timeout_sec` | `60` | per-call timeout for an MCP tool |
 | `[mcp].startup_timeout_sec` | `30` | how long a server may take to say hello (spawn + `initialize` + the first `tools/list`). Separate from the call budget; servers are spawned in parallel, so this bounds the slowest one, not their sum |
@@ -267,6 +269,7 @@ In a session:
 | `/settings` | view and edit settings, with provenance |
 | `/usage` | token statement for this session |
 | `/version` | the version line |
+| `/compact` | summarise the older part of the conversation now; the recent messages stay verbatim (ADR-0033) |
 | `/clear` | start a new conversation in the same session |
 | `/quit` | leave (`/exit` is the same) |
 

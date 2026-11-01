@@ -126,6 +126,13 @@ injection case passed —
   `--resume`; usage records in the shape
   [gem-usage-lens](https://github.com/nlink-jp/gem-usage-lens) reads for
   both runtimes.
+- **Compaction:** before a request would pass `[agent].compact_at_pct`
+  (80 %) of the context window, the older part of the conversation is
+  summarised and the recent messages are kept verbatim; `/compact` does
+  it by hand. The size is judged for the request about to be sent, so one
+  round of large tool results or a loaded MCP server is seen in time. On
+  a local server the summary and the request after it re-read their input
+  cold — a wait you are told about (ADR-0033).
 - **Skills:** Claude Code's `SKILL.md` format, read as-is from
   `~/.config/lagent/skills/<name>/` and a trusted project's
   `.claude/skills/<name>/`. One line per skill tells the model what
@@ -149,8 +156,8 @@ injection case passed —
   same engine, and the other types stay source (ADR-0027). The plain REPL
   and `-p` always show the source. `[tui.diagram]` picks the font. Narrowing
   the window keeps the pictures on screen (ADR-0026).
-- **Not here:** web search and fetch, media uploads, audit-log export,
-  history compaction — see the RFP and
+- **Not here:** web search and fetch, media uploads, audit-log export
+  — see the RFP and
   [ADR-0002](docs/en/adr/0002-features-not-reproduced.md).
 
 ## Attachments
