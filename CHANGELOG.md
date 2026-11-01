@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-01
+
 ### Added
 
 - **History compaction (ADR-0033).** A session no longer dies when the
@@ -16,7 +18,9 @@
   session facts (the data tag, the work directory, memory) survive the
   cut verbatim, the summary is quoted as data, a failure leaves the
   history untouched, and a resumed session comes back compacted and
-  re-loads every MCP server it had loaded.
+  re-loads every MCP server it had loaded. Measured on mlx-serve with a
+  resumed 85k-token session: the compaction path took 111 s where
+  re-reading the uncompacted history cold took 266 s.
 
 ## [0.19.2] - 2026-10-29
 
