@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Proposed** (2026-11-01) — revised once against an independent design review; accepted only after the Measurement below |
+| Status | **Accepted** (2026-11-01) — revised once against an independent design review; implemented and accepted on the Measurement below |
 | Date | 2026-11-01 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
@@ -79,14 +79,18 @@ as today. No configuration key is added.
    tokens a result costs rather than estimating them. Below zero, the
    allotment is zero.
 
-2. **The allotment is an argument of the call.** It reaches the tool as
-   an upper bound on the bytes returned inline, below the tool's own
-   cap, and travels explicitly — through the sandboxed file child's
-   request too, which a context value never reaches. A result still
-   longer than its allotment (a tool that did not apply it) is cut by
-   the runtime with a marker that says the rest was not kept; a test
-   runs every built-in tool under a small allotment, so no built-in
-   tool relies on that backstop.
+2. **The allotment rides the call.** It reaches the tool as an upper
+   bound on the bytes returned inline, below the tool's own cap: on the
+   call's context in-process, and as an explicit field of the sandboxed
+   file child's request, which a context value never reaches. Every
+   allotment has a floor of 1 KiB, outside the budget, so a short
+   result — an edit's confirmation, an error — arrives whole and a byte
+   window always advances. A result longer than its allotment plus
+   2 KiB for the tool's own marker and route (a tool that did not apply
+   it) is cut by the runtime with a marker that says the rest was not
+   kept; a test runs the built-in tools under a small allotment and
+   requires every built-in tool to be classified, so none relies on
+   that backstop.
 
 3. **Every cut names its route, or says the rest was not kept.**
    ADR-0029 gave some tools a route; a smaller allotment makes cuts
@@ -211,13 +215,31 @@ as today. No configuration key is added.
 
 ## Measurement
 
-The gate for acceptance, run on the implementation against the same
-server: the failed round replayed in one-shot (the same files, the same
-request), recording the request sizes before and after, whether the
-model reads on through the routes it is given or stops, and the rounds
-it takes; and a session recorded before this change resumed, to see the
-first request after a new message rescue it. If the model does not read on, this ADR is
-revisited before it is accepted.
+mlx-serve (Qwen 3.6 35B A3B 4-bit), the same window (167,936 tokens),
+the same project and files, 2026-11-01; one-shot, read-only, `--mcp off`,
+an isolated state directory.
+
+| Run | What happened | Largest request |
+|---|---|---|
+| The reported request, replayed | The model read in line windows this time; one whole read (68 KB) fit its allotment and came back whole; no cut, no overflow | 87,116 tokens (51 %) |
+| The reported round, forced (four whole-file reads in one round, then quote each file's last line) | 68 KB + 2.0 MB + 267 KB + 29 KB asked; 31.4 + 31.3 + 31.3 + 28.7 KB returned, the first three with `offset=N reads on`. The model then read each tail (`offset=-500`) and quoted the last lines: three verbatim, the fourth reached whole but copied with its empty fields dropped | 75,136 tokens (44 %); the round itself took the request from 6,609 to 72,083 |
+| The stuck session, resumed with a new message (the record from before this change) | Projected at 109 %; compaction summarised the 6 messages holding the oversized round and kept 4; the turn answered | 7,026 tokens (4 %); 44 s in all |
+
+- The model reaches what was cut through the routes it is given: the
+  premise holds.
+- The forced round's CSV cost about 1.87 bytes per token (122.7 KB for
+  65.5k tokens) — under the 2 used for the allotment, so the round came
+  in about 7 % over its estimate. `T` is half of the room a compaction
+  makes, and the request stayed at 42 %; the margin is what absorbs this,
+  and it is recorded here rather than tightened.
+- Before this change the same round reached 113 % and every later turn
+  failed.
+- Two findings outside this ADR: `shell_exec` in the read lane could not
+  run under this project's cloud-storage path (`getcwd: Operation not
+  permitted`), so the model fell back to `read_file`; and resuming
+  requires the working directory's spelling to match the record's
+  byte for byte, which a path entered in a different Unicode
+  normalisation does not.
 
 ## References
 

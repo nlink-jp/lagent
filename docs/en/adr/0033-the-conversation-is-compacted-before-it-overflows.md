@@ -7,6 +7,7 @@
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
 | Triggered by | Operator report: a lagent session on another machine failed with a context-overflow error. RFP Phase 2 lists compaction, to be designed after measuring the cost of discarding the server's cache, and the plan took it up once a real session needed it; this is that session |
+| Amended | 2026-11-01 (ADR-0034): the retained tail is bounded by size as well as count, and §6 is judged on the cut the summariser actually reads up to. The Consequences line that relied on ADR-0029 to keep one round small did not hold on a local window: one round of four whole-file reads reached 113 % of it |
 | Relates to | gem-agent ADR-0006 (compaction), gem-agent ADR-0021 §1/§3 (clear records, dead transcript), gem-agent ADR-0051 (the summary's re-read warning), gem-agent ADR-0057 (usage records), ADR-0003 and ADR-0013 (the session-facts message), ADR-0004 (`mcp_load` adds a server's schemas to the tool list), ADR-0029 (bounded tool output) |
 
 ## Context

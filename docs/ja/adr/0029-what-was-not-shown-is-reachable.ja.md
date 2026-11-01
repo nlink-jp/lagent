@@ -7,6 +7,7 @@
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
 | Triggered by | 運用者が採択した gem-agent ADR-0096: 運用者の分析品質のレポートは、部分的な結果が全件として扱われた原因を、ランタイムが保持したものの置き場所にたどった。退避の intake、`read_file`、`shell_exec` の出力の書き込み器、`search_files` の走査は両ランタイムが共有する仕組みなので、欠陥はこのランタイムのものでもある |
+| Amended | 2026-11-01（ADR-0034）: ツール自身の上限は上限にすぎず、ランタイムは窓に合わせてそれより少なく割り当てることがある。切るたびに経路を名指すか、残りを保持していないと言う: `read_file` の行の窓は `start_line=K`、バイトの窓は `offset=N` を名指し、一覧と検索はパスやパターンを絞るよう言う |
 | Relates to | gem-agent ADR-0096（レポート、所見の検証、独立した設計レビュー、Part B を決めたプローブ）、gem-agent ADR-0058（退避）、gem-agent ADR-0052 §2（スキップは報告する） |
 
 ## Context

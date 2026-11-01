@@ -7,6 +7,7 @@
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
 | Triggered by | 運用者の報告: 別のマシンで lagent のセッションがコンテキスト超過のエラーで失敗した。RFP の Phase 2 は圧縮を「サーバのキャッシュを捨てる費用を計測してから設計する」ものとして挙げており、計画は実際のセッションが必要としたときに取りかかるとしていた。これがそのセッションである |
+| Amended | 2026-11-01（ADR-0034）: 残す末尾は件数だけでなく大きさでも上限を決め、§6 は要約器が実際に読む切れ目に対して判定する。1 ラウンドを小さく保つことを ADR-0029 に頼った Consequences の一文はローカルの窓では成り立たなかった: ファイル全体を読む 4 本の 1 ラウンドが窓の 113 % に達した |
 | Relates to | gem-agent ADR-0006（圧縮）、gem-agent ADR-0021 §1/§3（clear の記録、止まった transcript）、gem-agent ADR-0051（要約に付ける読み直しの警告）、gem-agent ADR-0057（usage レコード）、ADR-0003 と ADR-0013（セッションの事実のメッセージ）、ADR-0004（`mcp_load` はサーバのスキーマをツール一覧に加える）、ADR-0029（ツール出力の上限） |
 
 ## Context

@@ -368,8 +368,7 @@ excepted).
   resume re-loads every server the session loaded. Records the measured
   cost of discarding the server's cache
 - [`ADR-0034`](adr/0034-one-round-is-bounded-by-the-window.md) —
-  one round is bounded by the window (**Proposed**, accepted after its
-  measurement): one round's tool results share a budget of half what a
+  one round is bounded by the window (**Accepted**, implemented): one round's tool results share a budget of half what a
   compaction can make room for — and, when no compaction can run, no more
   than the room under the threshold — re-judged before every call and
   converted at 2 bytes per token; each tool cuts with a named route or

@@ -7,6 +7,7 @@
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
 | Triggered by | gem-agent ADR-0096, accepted by the operator: an operator's analysis-quality report traced partial results taken as whole to where the runtime puts what it kept. The spill intake, `read_file`, `shell_exec`'s output writer and the `search_files` walk are mechanisms both runtimes share, so the defects are this runtime's too |
+| Amended | 2026-11-01 (ADR-0034): a tool's own cap is an upper bound — the runtime may allot less, sized to the window — and every cut names its route or says the rest was not kept: `read_file` line windows name `start_line=K`, byte windows `offset=N`, listings and searches say to narrow the path or pattern |
 | Relates to | gem-agent ADR-0096 (the report, the verification of its findings, the independent design review and the probe that decided Part B), gem-agent ADR-0058 (the spill), gem-agent ADR-0052 §2 (skips are reported) |
 
 ## Context
