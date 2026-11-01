@@ -377,3 +377,12 @@ excepted).
   compaction cannot touch, and a stuck session recovers once the operator
   writes again. @-attachments share the bound; a window with no room ends
   the turn. Amends ADR-0033 and ADR-0029
+- [`ADR-0035`](adr/0035-a-project-is-its-directory-not-its-spelling.md) —
+  a project is its directory, not its spelling (**Accepted**,
+  implemented): the project path is taken from the kernel, not `$PWD`,
+  so a directory reached in another Unicode form (NFC typed, NFD on
+  disk) is the same project; a recorded path — a transcript's
+  `project`, the state directory's marker, `policy.toml`'s project
+  tables — matches the current one by identity (`os.SameFile`), so
+  records already written in either spelling are found and nothing is
+  rewritten
