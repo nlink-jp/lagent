@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -110,5 +111,24 @@ func TestExitSummaryNamesAbandonedCalls(t *testing.T) {
 	lines = exitSummary(agent.UsageStats{Rounds: 1, Prompt: 10, Output: 5}, "", en)
 	if strings.Contains(strings.Join(lines, "\n"), "abandoned") {
 		t.Error("receipt mentions abandoned calls when there are none")
+	}
+}
+
+// ADR-0033: one-shot runs its turn at once, so the window must be known
+// before it — automatic compaction is off while it is not.
+func TestOneShotSettlesTheWindowBeforeTheTurn(t *testing.T) {
+	src, err := os.ReadFile("root.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(src)
+	start := strings.Index(s, "// --- one-shot mode")
+	end := strings.Index(s[start:], "ag.Run(")
+	if start < 0 || end < 0 {
+		t.Fatal("one-shot block not found")
+	}
+	block := s[start : start+end]
+	if !strings.Contains(block, "\t\tresolveWindow()\n") || strings.Contains(block, "go resolveWindow()") {
+		t.Error("one-shot resolves the window beside the turn instead of before it")
 	}
 }

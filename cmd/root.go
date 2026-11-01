@@ -1298,7 +1298,13 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		for _, n := range policyNotes {
 			fmt.Fprintf(stderr, "warning: %s\n", n)
 		}
-		go resolveWindow()
+		// Settled before the turn, not beside it: the turn starts at
+		// once, and automatic compaction (ADR-0033) is off while the
+		// window is unknown — a resumed session near the window sent
+		// its first request unjudged and overflowed (measured). A local
+		// server answers in milliseconds; the lookup's own timeout
+		// bounds the rest.
+		resolveWindow()
 		// The measured state, all four branches: passing constants meant
 		// one-shot printed nothing when the read lane was unverified —
 		// and every shell_exec then needs an approval nobody is there to
