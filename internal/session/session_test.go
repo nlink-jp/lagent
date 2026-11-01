@@ -604,3 +604,42 @@ func TestCallArgsSeesCallsACompactionSummarised(t *testing.T) {
 		t.Errorf("CallArgs = %v, want [alpha beta]", got)
 	}
 }
+
+// Review finding: a torn diagnostic line before a compaction record made
+// every later resume refuse, though the replay was right. The record
+// carries the history length it saw; the loader checks that instead.
+func TestCompactionRecordChecksItsFrameByLength(t *testing.T) {
+	write := func(before int) string {
+		dir := t.TempDir()
+		l, err := Open(dir, "/p")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range []string{"one", "two", "three"} {
+			if err := l.Log(KindMessage, llm.Message{Role: llm.RoleUser, Content: c}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		_ = l.Close()
+		f, err := os.OpenFile(l.Path(), os.O_APPEND|os.O_WRONLY, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = f.WriteString("{\"kind\":\"usage\",\"data\":{\"torn\n")
+		rec, _ := json.Marshal(map[string]any{"ts": "2026-11-01T00:00:00Z", "kind": KindCompaction,
+			"data": Compaction{Replaced: 2, Before: before, Message: llm.Message{Role: llm.RoleUser, Content: "summary"}}})
+		_, _ = f.Write(append(rec, '\n'))
+		_ = f.Close()
+		return l.Path()
+	}
+	got, _, skipped, err := Load(write(3))
+	if err != nil {
+		t.Fatalf("a torn usage line refused a compaction whose frame checks out: %v", err)
+	}
+	if skipped != 1 || len(got) != 2 || got[0].Content != "summary" || got[1].Content != "three" {
+		t.Errorf("history = %+v (skipped %d)", got, skipped)
+	}
+	if _, _, _, err := Load(write(4)); err == nil {
+		t.Error("a compaction whose frame does not match the history was replayed")
+	}
+}

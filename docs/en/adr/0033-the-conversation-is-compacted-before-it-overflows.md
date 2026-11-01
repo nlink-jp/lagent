@@ -73,12 +73,17 @@ cache. See Measurement.
      verbatim and must be re-read before editing (gem-agent ADR-0051).
    - **Fail safe:** an error, an empty summary, or a cancelled call
      leaves the history exactly as it was. Two consecutive automatic
-     failures turn automatic compaction off for the session; "nothing
+     failures turn automatic compaction off for the session — any
+     successful compaction, `/compact` included, ends the run; "nothing
      to compact" is said once, not every round; a compaction does not
      fire again until the history has grown by 4 messages.
    - A `compaction` record (replaced count + summary message) goes to
      the transcript; the loader already replays it, so a resumed session
-     comes back compacted. A `usage` record with source `compact`
+     comes back compacted. The record also carries the history length it
+     saw (`before`), and the loader checks that the history it rebuilt
+     has exactly that many messages — instead of refusing whenever any
+     earlier line was unreadable, which a torn usage line would have
+     made permanent once the session compacted. A `usage` record with source `compact`
      accounts the call; `/usage` shows it as its own line, and the
      footer's gauge never carries it.
    - `/compact` compacts by hand. `[agent].auto_compact` (default on)
@@ -87,17 +92,21 @@ cache. See Measurement.
      `/compact` still works.
    - `/clear` (`Reset`), a new session (`Restart`) and a restore
      (`SetHistory`) forget the size measurements and the
-     "already compacted at this size" mark; a new session also forgets
-     the failure count and the one-time warnings, and starts from the
-     configured `auto_compact` again — two failures turned it off for
-     that session only.
+     "already compacted at this size" mark; `/clear` and a new session
+     also forget the failure count and the one-time warnings, and start
+     from the configured `auto_compact` again — two failures turned it
+     off for that conversation only. A compaction forgets the
+     measurement too: it described the history just replaced.
 
 2. **The session facts cross the cut verbatim.** The latest
    session-facts message, when it falls in the summarised head, leads
    the summary message as its unwrapped text, exactly as
    `AnnounceSession` wrote it; no facts message reaches the summariser
    (an older one names a tag this session no longer uses). Facts already
-   in the retained tail stay where they are.
+   in the retained tail stay where they are. A summary message that
+   carries facts is still a summary: the next compaction reads its
+   summary whole, without its framing or facts, and carries only the
+   facts on.
 
 3. **A summary that names the session's tag is refused.** The summary is
    wrapped in the session tag on every later request, and nlk/guard
@@ -122,7 +131,10 @@ cache. See Measurement.
    ratio never goes there, and a server that reports only the tokens it
    did not have cached would turn a full window into a small number.
    Compaction runs when the projection reaches `compact_at_pct` of the
-   window.
+   window. A turn can start before the window lookup has answered (an
+   argv first message, one-shot); the first judgment waits for it —
+   once per session, at most the lookup's own 15 s timeout — rather
+   than letting the first request out unjudged.
 
 5. **The estimate is bytes / 3.** It sits between the measured median
    (3.5) and the 10th percentile (2.25): it overcounts English slightly,

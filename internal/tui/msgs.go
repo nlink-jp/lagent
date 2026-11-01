@@ -67,6 +67,12 @@ type AutoApproved struct {
 	Tier   string
 }
 
+// Compacted reports a /compact that replaced history (ADR-0033): the
+// footer's context gauge mirrors the last round's count, which now
+// describes a conversation that is gone — it is cleared as /clear
+// clears it, until the next round reports.
+type Compacted struct{}
+
 // Attached reports what @-references pulled in, and what they could not
 // — a silently dropped reference would look like the file was read.
 type Attached struct {

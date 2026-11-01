@@ -58,6 +58,7 @@ func messageCases() map[string]msgCase {
 		"ShellDone":       {msg: ShellDone{}, shows: true},
 		"Usage":           {msg: Usage{}},
 		"ContextWindow":   {msg: ContextWindow{}},
+		"Compacted":       {msg: Compacted{}},
 		"Image":           {msg: Image{}},
 		"ApprovalRequest": {msg: ApprovalRequest{Resp: make(chan ApprovalAnswer, 1)}, shows: true},
 	}

@@ -757,6 +757,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.window = msg.Tokens
 		return m, nil
 
+	case Compacted:
+		m.resetContextGauge()
+		return m, nil
+
 	case ToolCall:
 		// Flushed text and the tool event ride ONE write, keeping the
 		// true order (text → tool event) with a single repaint.

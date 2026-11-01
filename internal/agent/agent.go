@@ -243,6 +243,10 @@ type Agent struct {
 	// request: the base the next request's size is projected from.
 	measuredPrompt int
 	estAtMeasure   int
+	// windowSet is closed once the window lookup has answered (or
+	// awaitWindow gave up on it), so the first request can be judged.
+	windowSet  chan struct{}
+	windowOnce sync.Once
 }
 
 // Options configures New.
@@ -422,6 +426,7 @@ func New(opts Options) *Agent {
 		preToolHook: opts.PreToolHook,
 		promptHook:  opts.PromptHook,
 		tag:         guard.NewTagWithPrefix("tool_output"),
+		windowSet:   make(chan struct{}),
 	}
 }
 
@@ -436,6 +441,10 @@ func (a *Agent) Reset() {
 	cleared := len(a.history)
 	a.history = nil
 	a.resetCompaction()
+	a.compactFailures = 0
+	a.warnedNoCut = false
+	a.warnedNoRoom = false
+	a.SetAutoCompact(a.autoCompactCfg)
 	a.tag = guard.NewTagWithPrefix("tool_output")
 	a.mu.Lock()
 	a.epoch++
@@ -506,6 +515,7 @@ func (a *Agent) SetContextWindow(tokens int) {
 	a.mu.Lock()
 	a.window = tokens
 	a.mu.Unlock()
+	a.windowOnce.Do(func() { close(a.windowSet) })
 }
 
 // Usage returns a snapshot of the session's accounting (gem-agent ADR-0019).

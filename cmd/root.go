@@ -1456,8 +1456,11 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			},
 			Compact: func(compactCtx context.Context) {
 				go func() {
-					note, err := compactNow(compactCtx, ag, msgs)
+					res, note, err := compactNow(compactCtx, ag, msgs)
 					if err == nil {
+						if res.Replaced > 0 {
+							prog.Send(tui.Compacted{})
+						}
 						prog.Send(tui.Attached{Notes: []string{note}})
 					}
 					if err != nil && compactCtx.Err() != nil {
@@ -1555,7 +1558,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			// runTurnWith makes Ctrl+C interrupt the summariser call
 			// rather than kill the process.
 			runErr := runTurnWith(ctx, ladder, func(compactCtx context.Context) error {
-				note, err := compactNow(compactCtx, ag, msgs)
+				_, note, err := compactNow(compactCtx, ag, msgs)
 				if err == nil {
 					fmt.Fprintln(stderr, note)
 				}
@@ -1620,15 +1623,15 @@ var errInterrupted = errors.New("interrupted")
 // compactNow runs a manual /compact (ADR-0033) and renders the outcome.
 // "Nothing to compact" is a normal answer, not an error: the operator
 // asked a reasonable question and the answer is no.
-func compactNow(ctx context.Context, ag *agent.Agent, msgs *uitext.Messages) (string, error) {
+func compactNow(ctx context.Context, ag *agent.Agent, msgs *uitext.Messages) (agent.CompactResult, string, error) {
 	res, err := ag.Compact(ctx)
 	switch {
 	case errors.Is(err, agent.ErrNothingToCompact):
-		return msgs.NothingToCompact, nil
+		return res, msgs.NothingToCompact, nil
 	case err != nil:
-		return "", err
+		return res, "", err
 	}
-	return fmt.Sprintf(msgs.CompactedFmt, res.Replaced, res.After-1), nil
+	return res, fmt.Sprintf(msgs.CompactedFmt, res.Replaced, res.After-1), nil
 }
 
 // startupNotes tees startup-time stderr lines so the TUI can replay

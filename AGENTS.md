@@ -419,6 +419,10 @@ answers.
   replay on resume reads the records (`session.CallArgs`), not the
   restored history. The summariser is a side-call: its tokens go to
   `UsageStats.Compact*` and a `compact` usage record, never the gauge.
+  A summary message that carries facts is a summary first (`isSummary`
+  before `isFacts`); the first judgment waits once for the window
+  (`awaitWindow`); a `compaction` record carries `before`, which the
+  loader checks instead of refusing on any earlier unreadable line.
 - **The model tier judges write-lane shell commands and nothing else**
   (ADR-0032). `modelTierJudges` in `internal/agent/riskreview.go` is the
   scope: `shell_exec`, `write` lane, sandbox confining, Review without

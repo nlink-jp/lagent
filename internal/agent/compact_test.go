@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/nlink-jp/lagent/internal/llm"
 	"github.com/nlink-jp/lagent/internal/session"
@@ -617,5 +619,106 @@ func TestResetsForgetTheMeasurements(t *testing.T) {
 		if a.measuredPrompt != 0 || a.estAtMeasure != 0 || a.compactedAt != 0 {
 			t.Errorf("%s left measured=%d est=%d compactedAt=%d", name, a.measuredPrompt, a.estAtMeasure, a.compactedAt)
 		}
+	}
+}
+
+// Review finding: a summary message leads with the facts it carried, so
+// it must not pass for a facts message — the second compaction has to
+// read the first summary, and carry the facts without a second framing.
+func TestASecondCompactionReadsTheFirstSummary(t *testing.T) {
+	mb := &mockBackend{responses: []*llm.Response{{Content: "FIRST SUMMARY"}, {Content: "SECOND SUMMARY"}}}
+	a, _ := newAgent(t, mb, &approveAll{}, 5)
+	a.AnnounceSession("- session work directory: /work/dir")
+	for range 5 {
+		a.history = append(a.history, user("more"), assistant("reply"))
+	}
+	if _, err := a.Compact(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for range 5 {
+		a.history = append(a.history, user("later"), assistant("reply"))
+	}
+	if _, err := a.Compact(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if transcript := mb.calls[1][0].Content; !strings.Contains(transcript, "FIRST SUMMARY") {
+		t.Errorf("the second summariser never saw the first summary: %.300q", transcript)
+	}
+	if transcript := mb.calls[1][0].Content; strings.Contains(transcript, "/work/dir") || strings.Contains(transcript, a.tag.Name()) {
+		t.Error("the carried facts reached the second summariser")
+	}
+	head := a.history[0]
+	if strings.Count(head.Content, "/work/dir") != 1 || strings.Count(head.Content, "was compacted") != 1 {
+		t.Errorf("head after two compactions = %q, want the facts and the framing once each", head.Content)
+	}
+	if head.Attachments[0].Content != "SECOND SUMMARY" {
+		t.Errorf("summary = %q", head.Attachments[0].Content)
+	}
+}
+
+// A compaction that worked — by hand included — ends a run of failures
+// and drops the size base it no longer describes; /clear starts the
+// compaction state over, the configured switch included.
+func TestCompactAndResetClearTheFailureState(t *testing.T) {
+	mb := &mockBackend{responses: []*llm.Response{{Content: "SUMMARY"}}}
+	a := compactingAgent(t, mb, 100_000, 5, nil)
+	a.SetHistory(tenMessages())
+	a.compactFailures, a.warnedNoCut, a.warnedNoRoom = 1, true, true
+	a.noteMeasured(50_000, 50_000)
+	if _, err := a.Compact(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if a.compactFailures != 0 || a.warnedNoCut || a.warnedNoRoom || a.measuredPrompt != 0 {
+		t.Errorf("after a compaction: failures=%d noCut=%v noRoom=%v measured=%d",
+			a.compactFailures, a.warnedNoCut, a.warnedNoRoom, a.measuredPrompt)
+	}
+	a.compactFailures, a.warnedNoCut = 1, true
+	a.SetAutoCompact(false)
+	a.Reset()
+	if a.compactFailures != 0 || a.warnedNoCut || !a.AutoCompact() {
+		t.Errorf("after /clear: failures=%d noCut=%v auto=%v", a.compactFailures, a.warnedNoCut, a.AutoCompact())
+	}
+}
+
+// Review finding: a turn can start before the window lookup answers
+// (an argv first message). The first request waits for it — once, and
+// boundedly — instead of going out unjudged.
+func TestTheFirstRequestWaitsForTheWindow(t *testing.T) {
+	mb := &mockBackend{responses: []*llm.Response{{Content: "SUMMARY"}, {Content: "done"}}}
+	_, reg := newAgent(t, mb, &approveAll{}, 5)
+	a := New(Options{Backend: mb, Registry: reg, Gate: &approveAll{}, System: "s", MaxTurns: 5,
+		AutoCompact: true, CompactAtPct: 80})
+	a.toolDefs = nil
+	a.SetHistory(tenMessages())
+	for range 4 {
+		a.history = append(a.history, user(strings.Repeat("x", 3_000*bytesPerToken)), assistant("ok"))
+	}
+	for range 4 {
+		a.history = append(a.history, user("short"), assistant("ok"))
+	}
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		a.SetContextWindow(10_000)
+	}()
+	if _, err := a.Run(context.Background(), "go", nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(mb.calls) != 2 || !strings.Contains(mb.systems[0], "UNTRUSTED DATA") {
+		t.Fatalf("%d calls, first system %.40q: the first request did not wait for the window", len(mb.calls), mb.systems[0])
+	}
+
+	// A lookup that never answers costs one bounded wait, not one per round.
+	old := windowWait
+	windowWait = 20 * time.Millisecond
+	t.Cleanup(func() { windowWait = old })
+	b := compactingAgent(t, &mockBackend{}, 0, 5, nil)
+	b.windowSet = make(chan struct{})
+	b.windowOnce = sync.Once{}
+	start := time.Now()
+	for range 3 {
+		b.maybeAutoCompact(context.Background())
+	}
+	if took := time.Since(start); took > 500*time.Millisecond {
+		t.Errorf("three rounds without a window took %v", took)
 	}
 }

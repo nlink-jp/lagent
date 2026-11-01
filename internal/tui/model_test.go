@@ -1564,3 +1564,24 @@ func TestAnEchoAndItsAnswerAreOneWrite(t *testing.T) {
 		})
 	}
 }
+
+// ADR-0033: a /compact that replaced history clears the gauge as /clear
+// does — the last round's count describes the conversation it replaced.
+func TestCompactedResetsContextGauge(t *testing.T) {
+	m := New(Options{
+		StartTurn: func(ctx context.Context, input string) {},
+		Printer:   (&capture{}).printer,
+		ModelName: "gemma",
+	})
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = next.(Model)
+	next, _ = m.Update(ContextWindow{Tokens: 1_048_576})
+	m = next.(Model)
+	next, _ = m.Update(Usage{Prompt: 11800, Output: 500, Cached: 5900})
+	m = next.(Model)
+	next, _ = m.Update(Compacted{})
+	m = next.(Model)
+	if v := m.footer(); !strings.Contains(v, "ctx –/1.0M") || strings.Contains(v, "cache") || !strings.Contains(v, "total 12.3k") {
+		t.Errorf("after a compaction: %q", v)
+	}
+}

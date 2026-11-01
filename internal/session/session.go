@@ -121,8 +121,14 @@ type Header struct {
 // loader can reproduce the compaction instead of re-inflating history.
 // lagent writes it since ADR-0033.
 type Compaction struct {
-	Replaced int         `json:"replaced"`
-	Message  llm.Message `json:"message"`
+	Replaced int `json:"replaced"`
+	// Before is the history length the compaction saw (ADR-0033). With
+	// it a loader checks the frame directly — the history it rebuilt has
+	// exactly this many messages — instead of refusing whenever any line
+	// before the record was unreadable, a torn usage line included.
+	// Zero in records that predate it.
+	Before  int         `json:"before,omitempty"`
+	Message llm.Message `json:"message"`
 }
 
 // Meta describes one session file without loading its conversation.
@@ -459,13 +465,17 @@ func Load(path string) ([]llm.Message, Header, int, error) {
 			history = nil
 			skippedSinceAnchor = 0
 		case KindCompaction:
-			if skippedSinceAnchor > 0 {
-				return false, fmt.Errorf("%s: %d unreadable lines precede a compaction record, so its index cannot be trusted — resume refused rather than replaying the wrong messages",
-					filepath.Base(path), skippedSinceAnchor)
-			}
 			var c Compaction
 			if err := json.Unmarshal(rec.Data, &c); err != nil {
 				return false, fmt.Errorf("%s: unreadable compaction record: %w", path, err)
+			}
+			if c.Before > 0 && len(history) != c.Before {
+				return false, fmt.Errorf("%s: a compaction record expects %d messages before it and %d were read — resume refused rather than replaying the wrong messages",
+					filepath.Base(path), c.Before, len(history))
+			}
+			if c.Before == 0 && skippedSinceAnchor > 0 {
+				return false, fmt.Errorf("%s: %d unreadable lines precede a compaction record, so its index cannot be trusted — resume refused rather than replaying the wrong messages",
+					filepath.Base(path), skippedSinceAnchor)
 			}
 			if c.Replaced < 0 || c.Replaced > len(history) {
 				return false, fmt.Errorf("%s: compaction record replaces %d of %d messages", path, c.Replaced, len(history))
