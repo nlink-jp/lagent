@@ -556,6 +556,18 @@ func LaneProfile(lane Lane, spec Spec) (string, error) {
 		}
 		b.WriteString(")\n")
 	}
+	// The session's own roots are read wherever they lie (ADR-0036): a
+	// project in cloud storage (~/Library/CloudStorage) or on a share
+	// (/Volumes) is inside a tree denied for reach, and without this the
+	// read lane cannot even learn its working directory. Before
+	// writeCredentialBlock, which re-denies credentials inside them.
+	if roots := ownRootsUnderReach(spec); len(roots) > 0 {
+		b.WriteString("(allow file-read*\n")
+		for _, r := range roots {
+			fmt.Fprintf(&b, "    (subpath %s)\n", sbplString(r))
+		}
+		b.WriteString(")\n")
+	}
 	b.WriteString("(deny signal)\n(allow signal (target self) (target children))\n")
 	if progs := resolveDenyExec(spec.DenyExec); len(progs) > 0 {
 		b.WriteString("(deny process-exec\n")
@@ -566,6 +578,38 @@ func LaneProfile(lane Lane, spec Spec) (string, error) {
 	}
 	writeCredentialBlock(&b, spec.Home)
 	return b.String(), nil
+}
+
+// reachDenied is every tree the read lane denies for reach.
+func reachDenied(home string) []string {
+	trees := append([]string(nil), readLaneReadDenies...)
+	if home != "" {
+		trees = append(trees, filepath.Join(filepath.Clean(home), "Library"))
+	}
+	return trees
+}
+
+// ownRootsUnderReach are the session's roots — the project and the work
+// directory — that lie strictly inside a tree denied for reach, the
+// ones the read lane re-allows (ADR-0036). A root that is such a tree or
+// contains one is left out: last-match-wins, re-allowing it would
+// re-open the whole tree (a project at the home directory would hand
+// ~/Library to the auto-approved lane).
+func ownRootsUnderReach(spec Spec) []string {
+	var roots []string
+	for _, r := range []string{spec.ProjectDir, spec.WorkDir} {
+		if r == "" {
+			continue
+		}
+		r = filepath.Clean(r)
+		for _, d := range reachDenied(spec.Home) {
+			if pathid.Within(d, r) && !pathid.Same(d, r) {
+				roots = append(roots, r)
+				break
+			}
+		}
+	}
+	return roots
 }
 
 // writeCredentialBlock writes the credential denials. LaneProfile calls

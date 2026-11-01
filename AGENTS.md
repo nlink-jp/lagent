@@ -323,6 +323,13 @@ answers.
   `~/Library/Caches/.env` was readable unasked. Any new read re-allow
   goes before `writeCredentialBlock`;
   `TestCredentialBlockIsTheLastReadRule` fails the build otherwise.
+- **The session's roots are read under a reach denial** (ADR-0036,
+  `ownRootsUnderReach`): a project or work directory strictly inside
+  `~/Library` (cloud storage lives in `~/Library/CloudStorage`),
+  `/Volumes` or `/Network` is re-allowed for reading in the read lane —
+  without it the lane could not even `getcwd`. Never a root that is or
+  contains a denied tree: a project at the home would re-open `~/Library`
+  (last-match-wins).
 - **gem-agent is a source, not an upstream.** Bring a package over with
   its commit recorded; do not add a feature because gem-agent has it.
   Anything in ADR-0002's list stays out — code, config keys, error text
