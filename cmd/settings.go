@@ -121,6 +121,7 @@ func (s *settingsStore) Rebuild() (tui.SettingsData, error) {
 func (s *settingsStore) data() tui.SettingsData {
 	autoApprove := strconv.FormatBool(s.ag.AutoApprove())
 	readOnly := strconv.FormatBool(s.ag.CeilingState().ReadOnly)
+	autoCompact := strconv.FormatBool(s.ag.AutoCompact())
 	if s.startValues == nil {
 		// The first build is the startup build (root.go calls data()
 		// before the first prompt), so this is the baseline every later
@@ -128,6 +129,7 @@ func (s *settingsStore) data() tui.SettingsData {
 		s.startValues = map[string]string{
 			"agent.auto_approve": autoApprove,
 			"agent.read_only":    readOnly,
+			"agent.auto_compact": autoCompact,
 		}
 	}
 	d := tui.SettingsData{ProjectDir: abbreviateHome(s.projectDir)}
@@ -183,6 +185,8 @@ func (s *settingsStore) data() tui.SettingsData {
 		"toolchain caches every shell_exec points into the session scratch (the read lane's directory is separate from the approved lanes'); restart to change")
 	ro("limits", "agent.max_turns", strconv.Itoa(s.cfg.Agent.MaxTurns), "agent.max_turns", "")
 	ro("limits", "agent.shell_timeout_sec", strconv.Itoa(s.cfg.Agent.ShellTimeoutSec), "agent.shell_timeout_sec", "")
+	ro("limits", "agent.compact_at_pct", strconv.Itoa(s.cfg.Agent.CompactAtPct)+"%", "agent.compact_at_pct",
+		"share of the context window, projected for the next request, at which automatic compaction fires; restart to change")
 	ro("limits", "mcp.call_timeout_sec", strconv.Itoa(s.cfg.MCP.CallTimeoutSec), "mcp.call_timeout_sec", "")
 	ro("limits", "mcp.startup_timeout_sec", strconv.Itoa(s.cfg.MCP.StartupTimeoutSec), "mcp.startup_timeout_sec", "")
 	// mcp.enabled was tracked but never shown: an operator whose file
@@ -212,6 +216,13 @@ func (s *settingsStore) data() tui.SettingsData {
 		tui.SettingRow{Section: "session", Label: "agent.read_only",
 			Value: readOnly, Source: s.liveSource("agent.read_only", readOnly),
 			Values: []string{"false", "true"}},
+		// Automatic compaction (ADR-0033). Live, not the file's value:
+		// two failed compactions turn it off for the session without the
+		// panel hearing about it, and the row must say so.
+		tui.SettingRow{Section: "session", Label: "agent.auto_compact",
+			Value: autoCompact, Source: s.liveSource("agent.auto_compact", autoCompact),
+			Values: []string{"false", "true"},
+			Detail: "summarise the older part of the conversation before a request would fill the window; needs a known window; /compact works either way"},
 	)
 	// Read-only by design (review round 2): the row was editable but
 	// applied NOTHING — styles and the glamour renderer are built once
@@ -421,6 +432,10 @@ func (s *settingsStore) Apply(ch tui.SettingChange) (tui.SettingsData, string) {
 		s.ag.SetReadOnly(ch.Value == "true", "operator")
 		s.markSessionEdit("agent.read_only")
 		return s.data(), "read-only: " + ch.Value + " (this session)"
+	case "agent.auto_compact":
+		s.ag.SetAutoCompact(ch.Value == "true")
+		s.markSessionEdit("agent.auto_compact")
+		return s.data(), "auto-compact: " + ch.Value + " (this session)"
 	}
 	return s.data(), ""
 }

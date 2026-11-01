@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`/settings` shows the compaction settings.** `[agent].compact_at_pct`
+  is listed with where it came from, and `[agent].auto_compact` can be
+  switched for the session there, as in gem-agent. The row follows the
+  live value, so automatic compaction that two failures turned off
+  reads as off for this session rather than as the file's `true`.
+
 ## [0.20.0] - 2026-11-01
 
 ### Added

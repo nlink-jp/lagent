@@ -343,3 +343,46 @@ func TestSettingsAnswersWhatTheImageProbeFound(t *testing.T) {
 		}
 	}
 }
+
+// ADR-0033: the threshold is shown with its source, and automatic
+// compaction is a session toggle whose row follows the live value — two
+// failed compactions turn it off without the panel hearing about it.
+func TestSettingsCompactionRows(t *testing.T) {
+	s := newStore(t)
+	s.cfg.Agent.CompactAtPct = 70
+	s.cfg.Sources = map[string]string{"agent.compact_at_pct": config.FromFile, "agent.auto_compact": config.FromFile}
+	s.ag.SetAutoCompact(true) // what [agent].auto_compact = true starts with
+	s.startValues = nil
+	d := s.data() // startup baseline
+
+	row, ok := rowFor(d, "agent.compact_at_pct")
+	if !ok || row.Value != "70%" || row.Source != config.FromFile || len(row.Values) != 0 {
+		t.Errorf("compact_at_pct row = %+v (found %v), want a read-only 70%% from the file", row, ok)
+	}
+	row, ok = rowFor(d, "agent.auto_compact")
+	if !ok || row.Value != "true" || row.Source != config.FromFile || len(row.Values) != 2 {
+		t.Errorf("auto_compact row = %+v (found %v), want an editable true from the file", row, ok)
+	}
+
+	d, line := s.Apply(tui.SettingChange{Label: "agent.auto_compact", Value: "false"})
+	if s.ag.AutoCompact() {
+		t.Error("the toggle did not reach the agent")
+	}
+	if !strings.Contains(line, "auto-compact: false (this session)") {
+		t.Errorf("scrollback line = %q", line)
+	}
+	if row, _ := rowFor(d, "agent.auto_compact"); row.Value != "false" || row.Source != "session" {
+		t.Errorf("after the edit = %+v, want false/session", row)
+	}
+
+	// Turned off by the runtime, not the panel: the row still tells.
+	other := newStore(t)
+	other.cfg.Sources = map[string]string{"agent.auto_compact": config.FromFile}
+	other.ag.SetAutoCompact(true)
+	other.startValues = nil
+	other.data()
+	other.ag.SetAutoCompact(false)
+	if row, _ := rowFor(other.data(), "agent.auto_compact"); row.Value != "false" || row.Source != "session" {
+		t.Errorf("a runtime switch-off reads %+v", row)
+	}
+}

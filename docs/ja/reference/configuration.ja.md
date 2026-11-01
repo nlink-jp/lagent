@@ -35,8 +35,8 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `[agent].shell_timeout_sec` | `120` | `shell_exec` のコマンドごとのタイムアウト |
 | `[agent].auto_approve` | `false` | 自動承認で開始: 規則層で Safe の呼び出しは尋ねずに走り、Review と Block は尋ねる。**`-p` では無視** — そこでは `--auto` だけが有効。`/auto on|off` と shift+tab でセッション中に変更 |
 | `[agent].read_only` | `false` | レーン天井を有効にして開始: セッションのスクラッチの外は何も変えない。`-p` でも効く。`--read-only` / `--writable` で実行ごとに、`/readonly on|off` でセッション中に上書き。ランタイムが下げることはない |
-| `[agent].auto_compact` | `true` | 要求が窓を埋める前に、会話の古い部分を要約に畳む（ADR-0033）。窓が分かっている必要がある（`[model].context_window` かプロバイダからの検出）。`/compact` はどちらでも使える。2 回続けて失敗するとそのセッションでは止まる |
-| `[agent].compact_at_pct` | `80` | 送る直前の要求の見込みの大きさが窓のこの割合に達すると発動する。10〜99 |
+| `[agent].auto_compact` | `true` | 要求が窓を埋める前に、会話の古い部分を要約に畳む（ADR-0033）。窓が分かっている必要がある（`[model].context_window` かプロバイダからの検出）。`/compact` はどちらでも使える。2 回続けて失敗するとそのセッションでは止まる。`/settings` でセッション中に切り替えられる |
+| `[agent].compact_at_pct` | `80` | 送る直前の要求の見込みの大きさが窓のこの割合に達すると発動する。10〜99。`/settings` に表示される。変えるには再起動 |
 | `[mcp].enabled` | `true` | `false` で global とプロジェクトの全 MCP サーバを無効化。`--mcp on|off` で実行ごとに上書き |
 | `[mcp].call_timeout_sec` | `60` | MCP ツール呼び出しごとのタイムアウト |
 | `[mcp].startup_timeout_sec` | `30` | サーバーが挨拶を返すまでの猶予（spawn + `initialize` + 最初の `tools/list`）。呼び出し用とは別枠。サーバーは並列に起動するので、これが縛るのは合計ではなく最も遅い 1 本 |
