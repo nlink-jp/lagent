@@ -38,11 +38,11 @@ ADR-0005 は、画像が**モデル**へ届く道を決めた。ドロップさ�
 gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.6 で実測すると、
 `ansi.StringWidth` は iTerm2 の `OSC 1337 File=`、kitty の `APC _G`、sixel の `DCS q` の
 いずれにも **0** を返し、`ansi.Strip` は空文字を返す。`ansi.Hardwrap` は 3 方式とも
-バイト同一で通すので、`wrapForScrollback`（[model.go:1229](../../../internal/tui/model.go)）は
+バイト同一で通すので、`wrapForScrollback`（[model.go:1236](../../../internal/tui/model.go)）は
 何も切り刻まない。
 
 ただしカウンタは盲目ではない。`physicalRows`
-（[model.go:1242](../../../internal/tui/model.go)）は `rows, cells := 1, 0` から始まるので、
+（[model.go:1249](../../../internal/tui/model.go)）は `rows, cells := 1, 0` から始まるので、
 画像の行はちょうど **1 行**と計上される。端末が N 行進める間に、である。不足は `N` では
 なく `N-1` である。
 
@@ -56,7 +56,7 @@ gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.
 :1143 に対応し、後ろ 2 つは `diff` が空を返す）。
 
 領域は仮定ではなく構成する。pin の padding は `height − printed − view − 1` で、正の分岐は
-「screen not full」とラベルされている（[model.go:1924](../../../internal/tui/model.go)）。
+「screen not full」とラベルされている（[model.go:1931](../../../internal/tui/model.go)）。
 30 行のペイン用に選んだ filler の行数が、80 行の窓をその反対側に置き、両記録の以前の稿は
 それらの実行を誤ったラベルの下で報告した。
 
@@ -208,7 +208,7 @@ view 層の読み取りを開く）は、いまや先送りした決定に属す
 この一文だけが立っているのを見つけた。この一文自身の規則により、それは「現時点では」に
 すぎない。テストは後から書かれ、いまこの一文は意図ではなく実在を述べている。これは既存の
 面を塞いだと主張するものではない。非テストコードで `ansi.Strip` が呼ばれるのは 1 箇所
-（[model.go:1247](../../../internal/tui/model.go)）、`physicalRows` の中で幅を**測る**ためだけ
+（[model.go:1254](../../../internal/tui/model.go)）、`physicalRows` の中で幅を**測る**ためだけ
 である。シェル出力の生エスケープは既に端末へ届いている。既存であり、ここで広がらず、
 ここで直しもしない。
 
