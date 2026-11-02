@@ -97,9 +97,17 @@ pixels still leaves the last reading in place.
   accounting stays right either way (the picture is shorter than the screen
   and the self-healing counter follows); only "wholly on screen" is lost.
   Accepted as a residual.
-- Not yet measured on a real terminal. The arithmetic and the payloads are
-  tested; how iTerm2 and kitty show a screen-sized picture is for the
-  operator's check before release.
+- Measured on real terminals before release (2026-11-02), with nobody at
+  the keyboard: a driver in the manner of `resizeprobe -auto -app` (kept in
+  the scratchpad, not this repository) opened a new 160×48 window of iTerm2
+  and of kitty, started the built gem-agent and lagent with an isolated
+  config, typed `/show` for a 3200×1800 JPEG photo, a 900×1600 JPEG and a
+  64×64 PNG, and captured the window after each. On both terminals and both
+  binaries the wide photo filled the binding ceiling — the width on iTerm2
+  (8×18 cells), the height above the frame on kitty (7×13 cells), its shape
+  intact — the tall one reached the row above the input, the icon stayed
+  about its own size, and the JPEGs drew on kitty. Each window's text,
+  scrollback included, held one footer and no stranded frame.
 - ADR-0020 A3 rejected deriving the row count from the cell's pixel size as
   unnecessary, the declared box overriding the aspect ratio. That holds for
   the row count, which is still the declared box's; the cell now chooses the
