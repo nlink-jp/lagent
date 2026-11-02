@@ -329,7 +329,9 @@ answers.
   `/Volumes` or `/Network` is re-allowed for reading in the read lane —
   without it the lane could not even `getcwd`. Never a root that is or
   contains a denied tree: a project at the home would re-open `~/Library`
-  (last-match-wins).
+  (last-match-wins), and so would one at or above a home under
+  `/Volumes`. `spec.Home` is resolved (`ResolveWriteDir`) like the
+  project, so the trees compare like with like.
 - **gem-agent is a source, not an upstream.** Bring a package over with
   its commit recorded; do not add a feature because gem-agent has it.
   Anything in ADR-0002's list stays out — code, config keys, error text

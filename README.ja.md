@@ -102,8 +102,8 @@ lagent
   read は尋ねずに（inspection と、キャッシュをセッション scratch に持つ Go の
   ビルド・テスト）、write と operator は尋ねてから。
   read レーンは `~/Library`・`/Volumes`・`/Network` に立ち入らないが、そこにある
-  プロジェクト — `~/Library/CloudStorage` の Google Drive・Dropbox・OneDrive・
-  iCloud、外部ディスク、ネットワーク共有 — は読める（ADR-0036）。
+  プロジェクト — Google Drive・Dropbox・OneDrive・iCloud Drive、
+  外部ディスク、ネットワーク共有 — は読める（ADR-0036）。
 - **端末の安全:** モデルが書く文字列をはじめ、TUI が表示するランタイムの外から来た
   文字列は制御文字を取り除いてから端末に届くので、プロンプトインジェクションを受けた
   返答がウィンドウのタイトルを変えたり、クリップボードに書き込んだり、カーソルを

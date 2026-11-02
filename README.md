@@ -107,7 +107,7 @@ injection case passed —
   whose cache lives in the session scratch), write and operator ask.
   The read lane keeps out of `~/Library`, `/Volumes` and `/Network`, but a
   project that lives there — Google Drive, Dropbox, OneDrive or iCloud
-  under `~/Library/CloudStorage`, an external disk, a network share — is
+  Drive, an external disk, a network share — is
   still read (ADR-0036).
 - **Terminal safety:** text the model writes, and the other text from
   outside the runtime the TUI shows, reaches the terminal with its control
