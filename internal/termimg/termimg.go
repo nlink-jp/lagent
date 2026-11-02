@@ -22,6 +22,8 @@
 //
 // Ported from gem-agent internal/termimg at 473fec48d485df4dc60359b16a6ea6469800c4ae (after v0.82.0), ADR-0001.
 // The kitty PNG conversion (kittyPNG, shrink) was ported from gem-agent 08f63ab.
+// The box sizing (BoxFor, Cell, CellSize, cellOf) was ported from gem-agent
+// f9566a6 (ADR-0037, gem-agent ADR-0103).
 package termimg
 
 import (

@@ -398,3 +398,13 @@ excepted).
   contains a denied tree (a project at the home would re-open
   `~/Library`). Measured: the read lane works under `~/Library`, Google
   Drive and an SMB share; an online-only file is downloaded when read
+- [`ADR-0037`](adr/0037-a-picture-is-as-large-as-the-screen-allows.md) —
+  a picture is as large as the screen allows, and no larger than itself
+  (**Accepted**, implemented; amends ADR-0021 §3, ported from gem-agent
+  ADR-0103): an inline image was drawn at most 40 columns wide and a third
+  of the screen tall, too small to see. The box is now the terminal's
+  width less one column and the screen above the frame, the picture
+  keeping its shape — and never larger than the picture at one pixel per
+  pixel the terminal reports for a cell (`TIOCGWINSZ`), so an icon stays
+  an icon. The box is shaped by the cell that was read, not the constant
+  2.25

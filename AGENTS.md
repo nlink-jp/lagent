@@ -54,7 +54,10 @@ and the intake's draw condition in `cmd/mcpresult.go` (`isImageBlock` and
 the saved-AND-described gate). **Added 2026-09-29 by ADR-0025:**
 `internal/diagram`'s scanner and picture path (gem-agent's minus its box
 art), `renderReply`, `pictureSegments` and `bandRows` in `internal/tui`,
-`termimg`'s `DiagramBox`, `Bands` and `CellAspect`, and `cmd/diagramfont.go`.
+`termimg`'s `DiagramBox`, `Bands` and `CellAspect` (now `CellSize`, with
+`Cell`, by ADR-0037 / gem-agent ADR-0103, which also replaced `BoxFor`'s
+40-column, third-of-the-screen box and added `frameRows`), and
+`cmd/diagramfont.go`.
 **Added 2026-09-30 by ADR-0027:** `internal/diagram`'s art path (`render`,
 `cellWidth`, `Segment.Art`, the same as gem-agent's after its ADR-0095)
 and `inertArt`. A defect in any of them is fixed in both

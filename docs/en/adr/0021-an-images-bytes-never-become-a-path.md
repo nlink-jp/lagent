@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Accepted** (2026-09-17) — implemented; **§2's source withdrawn by [ADR-0022](0022-showing-is-an-act-of-output.md)** (2026-09-17), §1's plumbing stands |
+| Status | **Accepted** (2026-09-17) — implemented; **§2's source withdrawn by [ADR-0022](0022-showing-is-an-act-of-output.md)** (2026-09-17), §1's plumbing stands; **§3's ceiling and width amended by [ADR-0037](0037-a-picture-is-as-large-as-the-screen-allows.md)** (2026-11-02) |
 | Date | 2026-09-17 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |

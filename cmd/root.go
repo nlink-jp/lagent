@@ -1422,7 +1422,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			Picture: picture,
 			// Bubble Tea draws on stdout; its cell size comes from an
 			// ioctl there, never from a query (ADR-0025 §3).
-			CellAspect:    func() (float64, bool) { return termimg.CellAspect(int(os.Stdout.Fd())) },
+			CellSize:      func() (termimg.Cell, bool) { return termimg.CellSize(int(os.Stdout.Fd())) },
 			ModelName:     cfg.LLM.Model,
 			ProjectDir:    abbreviateHome(projectDir),
 			Banner:        bannerLines,

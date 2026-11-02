@@ -154,8 +154,9 @@ injection case passed —
   you ask for one with `/show <path>` (PNG or JPEG, up to 2 MiB; the path may
   hold spaces, be quoted, or be a file dragged into the window) — drawn in the terminal when it can
   draw (iTerm2 or kitty; `[tui].images`, `auto` by default, off inside tmux
-  and screen). `view_image` is the other direction: that is the model
-  looking at an image, not you (ADR-0020/0021/0022).
+  and screen), as large as the screen above the input allows and never
+  larger than the picture itself. `view_image` is the other direction: that
+  is the model looking at an image, not you (ADR-0020/0021/0022/0037).
 - **Diagrams as pictures:** a mermaid fence in a reply (flowchart / graph,
   sequenceDiagram, erDiagram, pie, stateDiagram, gantt, mindmap, CJK labels included) is drawn as a picture
   where the terminal draws images, one em of its text per terminal line;
