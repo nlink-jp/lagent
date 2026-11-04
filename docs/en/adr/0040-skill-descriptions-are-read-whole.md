@@ -24,6 +24,7 @@ lagent adopts gem-agent ADR-0106 as implemented at `ac5d03e`:
 
 1. **`MaxDescription` becomes 1,024.** A longer description is still cut, and the cut is a discovery note: `skill "<name>": description is <n> characters; only the first 1024 are listed`.
 2. **`parseFrontmatter` reads multi-line values**: block scalars (`>` folds lines with spaces and a blank line becomes a line break; `|` keeps line breaks; chomping indicators and an indentation digit are accepted) and plain scalars continued on more-indented lines (folded with spaces). The common indentation is removed, and the block ends at the first line that is neither indented nor blank. Quoted values spanning lines, anchors and flow collections stay unread; a full YAML parser is a dependency the organization does not take for one field.
+3. **The catalog line stays one line.** A description that keeps line breaks (`|`, or a blank line inside `>`) is joined with spaces before it is listed, so no line of the facts message is the skill author's (independent review, ADR-0039 §6).
 
 **Under ADR-0034.** The catalog is part of the facts message, which the round budget counts as fixed cost. For the nine skills of skills-series it grows by about 1,700 characters, and `MaxSkills` (100) still bounds the number of lines. On a small window that is real cost, but a skill whose triggers are hidden costs more: it never loads when it should.
 

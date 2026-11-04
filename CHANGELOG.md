@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Skill descriptions are read whole (ADR-0040, ported from gem-agent
+  ADR-0106).** A description was cut at 400 characters with nothing said,
+  so a skill written to the 1,024-character limit Claude Code uses lost
+  the triggers past the cut — six of the nine skills-series skills did,
+  mcp-tactics everything from BigQuery on. Descriptions are now listed up
+  to 1,024 characters, and a longer one is cut with a discovery note
+  naming the skill. A multi-line description (`description: >` or `|`, or
+  a value continued on indented lines) was read as its first line, `>`;
+  it is now read whole, and listed as one line.
+
 ## [0.23.1] - 2026-11-04
 
 ### Changed

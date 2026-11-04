@@ -145,7 +145,10 @@ injection case passed —
   `~/.config/lagent/skills/<name>/` and a trusted project's
   `.claude/skills/<name>/`. One line per skill tells the model what
   each is for; it loads one with `load_skill`, and you invoke one by
-  hand with `/skill <name>` (ADR-0011). A skill arrives as instructions;
+  hand with `/skill <name>` (ADR-0011). The description is listed up to
+  1,024 characters, Claude Code's limit — a longer one is cut with a note
+  naming the skill — and a multi-line YAML value (`>`, `|`) is read whole
+  (ADR-0040). A skill arrives as instructions;
   everything a tool returns — a knowledge-vault server's notes included —
   arrives as data the model is told never to obey, so a procedure you want
   followed belongs in a skill, not in a note read through MCP (gem-agent's

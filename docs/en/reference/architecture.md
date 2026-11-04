@@ -240,7 +240,10 @@ linked from `~/.claude`, which the lanes deny; project skills are the
 trusted project's `.claude/skills/<name>/`, pinned by content like the
 instruction files, so a changed one stays out until re-trusted. One
 catalog line per skill rides the runtime-facts message beside the MCP
-catalog, so the system prompt stays byte-identical (ADR-0003).
+catalog, so the system prompt stays byte-identical (ADR-0003). The line
+carries the description up to 1,024 characters, a longer one cut with a
+discovery note, and the frontmatter reader takes multi-line YAML values
+(`>`, `|`, continued plain scalars) whole (ADR-0040).
 `load_skill` is the one tool whose results enter the prompt unwrapped:
 they are the operator's own instructions, and the tool cannot read
 outside a discovered skill's directory. `/skill <name>` sends a skill's
