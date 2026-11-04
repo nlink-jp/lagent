@@ -127,6 +127,17 @@ gem-agent's facts message carries the same sentence and is corrected in the same
 
 This is §5's one further revision; the note and `write_file`'s description stay as in §1–§3. It is measured as §5 pre-registers — cells, n = 10, at least 8 of 10 copied in each cell, failed or contaminated runs replaced up to 2n — at the commit that implements this section, `-jobs 2` as in §5.1. Still below the threshold in either cell, the operator decides; §1 and §2 stand either way. s3's path mis-transcription is not expected to move (§7).
 
+### 8.1 The second measurement (2026-11-05): still below the threshold
+
+Run at `571c4c4` as pre-registered, `-jobs 2`. Two earlier starts of this measurement were void and discarded whole: the model server refused most requests for lack of GPU memory (27 of 29 attempts, then the first attempt of the next start), so they measured the server, not the model. The run counted here was watched for server errors and had none. Two s3 attempts hit the 20-minute timeout and were replaced.
+
+| Cell | Valid | Copied | Derived | Regenerated | No evidence |
+|------|-------|--------|---------|-------------|-------------|
+| s1 (inline) | 10 | **0** | 0 | 10 (faithful 6, lossy 3, corrupted 1) | 0 |
+| s3 (spilled in all 10) | 10 | **1** | 0 | 5 | 4 |
+
+The corrected fact did not move either cell. In s1, 9 of 10 runs never named the saved file (8 of 10 in §5.1). In s3, 10 of 12 attempts named it, and in 6 of those the first path was wrong in the place §5.1 found; `write_file` `from` was tried in 2 attempts and copied in 1. In 20 of 22 attempts the model tried `mkdir` or `cp` through write-lane `shell_exec` first. The route does not fire on this model; per §5 the operator decides, and §1 and §2 stand.
+
 ## Not decided here
 
 - Built-in tool output (`shell_exec` already spools cut output, gem-agent ADR-0096 §3 as ported).
