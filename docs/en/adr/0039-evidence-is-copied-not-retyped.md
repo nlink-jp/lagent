@@ -113,7 +113,19 @@ After §5.1 a revision was drafted and implemented: the file tools would resolve
 - **It did not reach s1**, where the saved file is not taken up at all.
 - **It would have split the two runtimes' file tools**, or carried into gem-agent a mechanism it does not need.
 
-The wording revision §5 allows is not taken either. What §5.1 measured is a property of this model, recorded as such: that the runtime's facts are true and the route exists is this record's to decide; whether a given model takes the route is the model's. ADR-0039's status is decided by the operator on §5.1's result.
+No wording is revised to compensate either (§8 corrects a fact that was false). What §5.1 measured is a property of this model, recorded as such: that the runtime's facts are true and the route exists is this record's to decide; whether a given model takes the route is the model's. ADR-0039's status is decided by the operator on §5.1's result.
+
+## 8. A false fact in the facts message, corrected (2026-11-05)
+
+The runtime-facts message's work-directory line still said what was true before §1: "Results too large to return inline are saved here for you, and the reply says where." Since §1 every MCP result is saved, so for s1's small result the model was told, before any note, that there was no file. That is a false runtime fact, the kind lagent fixes in the runtime. The line becomes:
+
+```
+Every MCP result is saved here whole, and the reply says where — to keep one as evidence, copy it with write_file from rather than re-typing it.
+```
+
+gem-agent's facts message carries the same sentence and is corrected in the same piece of work. The system prompt is not changed.
+
+This is §5's one further revision; the note and `write_file`'s description stay as in §1–§3. It is measured as §5 pre-registers — cells, n = 10, at least 8 of 10 copied in each cell, failed or contaminated runs replaced up to 2n — at the commit that implements this section, `-jobs 2` as in §5.1. Still below the threshold in either cell, the operator decides; §1 and §2 stand either way. s3's path mis-transcription is not expected to move (§7).
 
 ## Not decided here
 
