@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-05
+
 ### Added
 
 - **Every MCP result is saved, and evidence can be a copy of it
@@ -18,7 +20,10 @@
   file is a copy of what a server returned is a hash comparison. The
   runtime-facts message says so too: it used to say only results too
   large to return inline were saved, which told the model a small result
-  had no file (ADR-0039 §8).
+  had no file (ADR-0039 §8). Measured after both changes, the model this
+  runtime was benched on still copied rarely (inline results 0 of 10,
+  spilled 1 of 10): the route is in place and stays as it is, and that
+  model not taking it is recorded as its property (ADR-0039 §8.2).
 - **`write_file` copies with `from`.** Instead of `content`, `from` names
   an existing file whose bytes become the new file — whole, byte for
   byte, read back and checked, with the sha256 in the result. The
