@@ -75,6 +75,23 @@ The probe's lagent cells are re-run against the implementation, pre-registered h
 - **Below the threshold.** The note and description are revised once and the cells measured once more; still below, the operator decides. §1 and §2 stand either way.
 - **Cost.** A local server; nothing is billed. Failed or contaminated runs are replaced up to 2n.
 
+### 5.1 First measurement (2026-11-04): below the threshold
+
+Run at `8ed0853` as pre-registered, except `-jobs 2` (two runs at a time on the one server; the baseline ran one at a time). No run failed or was contaminated.
+
+| Cell | Valid | Copied | Derived | Regenerated | No evidence |
+|------|-------|--------|---------|-------------|-------------|
+| s1 (inline) | 10 | **0** | 0 | 10 (exact 1, faithful 7, lossy 2) | 0 |
+| s3 (spilled in all 10) | 10 | **2** | 2 | 3 | 3 |
+
+The route did not fire in either cell. Read from the transcripts, the two cells fail for different reasons:
+
+- **s1: the saved file is not taken up.** In 8 of 10 runs no call names it; the model re-types the result it has in context. One run copied it with `write_file` `from` and then overwrote the copy with a re-typed file; one tried `cp`, which `-p` refused.
+- **s3: the saved file is taken up, but its path is mis-transcribed.** All 10 runs named the saved file. In 7 of them the first path given was wrong, and always in the same place. The file name, the 64-hex hash included, was copied right. What broke was the work directory's state-directory name, the project path with `/` replaced by `-` (`…-scratchpad-ep-work-w<N>-project`): the model wrote it back with slashes, as the project path that also stands in its context. `write_file` `from` was tried in 3 runs: 2 copied, and 1 failed on such a path. Of the 3 runs with no evidence, every one ended after shell routes (`mkdir`, `cp`) were refused.
+- **Common to both.** In 18 of 20 runs the model tried `mkdir` or `cp` through write-lane `shell_exec`, refused in `-p`, although `write_file` creates parent directories.
+
+The second cause is not in the wording: the note gives the path right, and the model's copy of it is wrong where the runtime's layout puts a name that looks like a mistyped copy of another path in context. Revising the wording, as this section pre-registers, does not reach it. Per the rule above the operator decides how to proceed; §1 and §2 stand.
+
 ## 6. Independent review (2026-11-04, before commit)
 
 A sub-agent read the implementation against this record, gem-agent's and the code. Confirmed and taken:
