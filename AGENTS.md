@@ -58,6 +58,9 @@ art), `renderReply`, `pictureSegments` and `bandRows` in `internal/tui`,
 `Cell`, by ADR-0037 / gem-agent ADR-0103, which also replaced `BoxFor`'s
 40-column, third-of-the-screen box and added `frameRows`), and
 `cmd/diagramfont.go`.
+**Added 2026-11-04 by ADR-0038:** `internal/tui/notify.go` (only the
+OSC 9 body, the ADR numbers and the provenance line differ),
+`cmd/notice.go`, and `SweepWriter.Inject`, which ADR-0026 had left out.
 **Added 2026-09-30 by ADR-0027:** `internal/diagram`'s art path (`render`,
 `cellWidth`, `Segment.Art`, the same as gem-agent's after its ADR-0095)
 and `inertArt`. A defect in any of them is fixed in both

@@ -408,3 +408,12 @@ excepted).
   pixel the terminal reports for a cell (`TIOCGWINSZ`), so an icon stays
   an icon. The box is shaped by the cell that was read, not the constant
   2.25
+- [`ADR-0038`](adr/0038-a-dialog-left-waiting-rings-the-terminal.md) —
+  a dialog left waiting rings the terminal (**Accepted**, implemented;
+  ported from gem-agent ADR-0104 by the operator's decision, with no
+  lagent measurement behind it): an approval, the ceiling's approval or
+  question, `ask_user` or the round-limit intervention left six seconds
+  without a keystroke is told to the terminal once. `[tui].notify` writes a
+  BEL (the default), an OSC 9 with a fixed body plus BEL, or nothing; a
+  keystroke puts it off to the next check; the plain REPL and `-p` never
+  notify. `Inject` comes over to the sweep writer for it

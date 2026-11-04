@@ -1,7 +1,9 @@
 // Ported from gem-agent internal/tui/sweep.go at 3f2ae9a533ea9ca735275f2f744ed4067609482f
 // (gem-agent ADR-0094, this runtime's ADR-0026), without the writer's
-// measurement surface — the trace, the arm record, Inject and DrawnCells —
-// which only gem-agent's resizeprobe reads.
+// measurement surface — the trace, the arm record and DrawnCells — which
+// only gem-agent's resizeprobe reads. Inject came over later, from gem-agent
+// at 386657fdbddba8703cb7d9fe2b2d979365db7e77, for the waiting-dialog
+// notice (ADR-0038).
 
 package tui
 
@@ -58,6 +60,16 @@ type SweepWriter struct {
 
 // NewSweepWriter wraps the terminal Bubble Tea would otherwise write to.
 func NewSweepWriter(out File) *SweepWriter { return &SweepWriter{out: out} }
+
+// Inject writes a sequence of the caller's own between two renderer writes
+// — never inside a flush: Write holds the lock across its write. The
+// waiting-dialog notice (BEL or OSC 9, ADR-0038) goes this way.
+func (w *SweepWriter) Inject(seq string) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	_, err := io.WriteString(w.out, seq)
+	return err
+}
 
 // Write passes the renderer's bytes through, rewriting the first flush
 // after an arm.

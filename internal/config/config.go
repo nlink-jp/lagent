@@ -204,6 +204,11 @@ type TUIConfig struct {
 	// is someone else's configuration, which is the reason that ADR
 	// refuses.
 	Images string `toml:"images"`
+	// Notify: how a dialog left waiting on the operator is told to the
+	// terminal (ADR-0038) — "bell" (one BEL, the default), "osc9" (an
+	// OSC 9 desktop notification with a fixed body, then a BEL), or
+	// "off". Read once at start; the TUI only.
+	Notify string `toml:"notify"`
 	// Diagram picks the font mermaid diagrams are drawn in where Images
 	// draws (ADR-0025 §5). User config only: the project config has no
 	// [tui] table. Deliberately not validated here — a display font is
@@ -403,7 +408,7 @@ func defaults() Config {
 		Approval: ApprovalConfig{PinTrustedFiles: true, ModelTier: "off"},
 		Agent:    AgentConfig{MaxTurns: 50, ShellTimeoutSec: 120, AutoCompact: true, CompactAtPct: 80},
 		MCP:      MCPConfig{Enabled: true, CallTimeoutSec: 60, StartupTimeoutSec: 30, Advertise: "deferred"},
-		TUI:      TUIConfig{Theme: "auto", Language: "auto", ShowThoughts: true, Images: "auto"},
+		TUI:      TUIConfig{Theme: "auto", Language: "auto", ShowThoughts: true, Images: "auto", Notify: "bell"},
 	}
 }
 
@@ -551,7 +556,7 @@ var trackedKeys = []string{
 	"agent.max_turns", "agent.shell_timeout_sec", "agent.auto_approve",
 	"agent.read_only", "agent.auto_compact", "agent.compact_at_pct",
 	"mcp.enabled", "mcp.call_timeout_sec", "mcp.startup_timeout_sec", "mcp.advertise", "mcp.preload",
-	"tui.theme", "tui.language", "tui.show_thoughts",
+	"tui.theme", "tui.language", "tui.show_thoughts", "tui.notify",
 	"tui.diagram.font", "tui.diagram.font_name", "tui.diagram.bold_font", "tui.diagram.bold_font_name",
 }
 
@@ -659,6 +664,11 @@ func (c *Config) validate() error {
 	case "auto", "off", "iterm", "kitty":
 	default:
 		return fmt.Errorf("[tui].images must be auto, off, iterm, or kitty (got %q)", c.TUI.Images)
+	}
+	switch c.TUI.Notify {
+	case "bell", "osc9", "off":
+	default:
+		return fmt.Errorf("[tui].notify must be bell, osc9, or off (got %q)", c.TUI.Notify)
 	}
 	if c.Model.ContextWindow < 0 {
 		return fmt.Errorf("[model].context_window must not be negative")

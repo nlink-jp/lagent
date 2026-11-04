@@ -328,6 +328,7 @@ func TestEveryOptionsCallbackIsAccountedFor(t *testing.T) {
 		"ToggleAuto": "returns a bool", "AutoState": "returns a bool",
 		"ReadOnlyState": "returns a ceiling value",
 		"Printer":       "the terminal's side, not a source",
+		"Notify":        "returns nothing; writes the runtime's own fixed bytes (ADR-0038)",
 		// Its pixels become a payload this runtime writes (ADR-0025 §6); its
 		// refusal reason is shown only inside the note, which is Markdown
 		// and goes through the renderer's hold.

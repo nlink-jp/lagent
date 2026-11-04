@@ -157,6 +157,13 @@ injection case passed —
   and screen), as large as the screen above the input allows and never
   larger than the picture itself. `view_image` is the other direction: that
   is the model looking at an image, not you (ADR-0020/0021/0022/0037).
+- **A waiting dialog rings the terminal:** when an approval or a question
+  has gone six seconds without a keystroke, the TUI rings the terminal bell
+  once (`[tui].notify`: `bell` by default, `osc9` for a desktop
+  notification in iTerm2 and others, or `off`). A keystroke puts it off to
+  the next six-second check; reading without pressing a key does not, so a
+  long dialog you are still reading can ring. It stops nothing; the plain
+  REPL and `-p` never notify (ADR-0038, from gem-agent ADR-0104).
 - **Diagrams as pictures:** a mermaid fence in a reply (flowchart / graph,
   sequenceDiagram, erDiagram, pie, stateDiagram, gantt, mindmap, CJK labels included) is drawn as a picture
   where the terminal draws images, one em of its text per terminal line;

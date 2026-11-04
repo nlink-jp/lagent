@@ -146,6 +146,11 @@ lagent
   収まる最大の大きさで、ただし画像そのものより大きくはせずに描く（iTerm2 と kitty。
   `[tui].images`、既定は `auto`、tmux・screen の中では off）。`view_image` は
   逆向きで、**モデルが**画像を見るためのものである（ADR-0020/0021/0022/0037）。
+- **待っている対話は端末を鳴らす:** 承認や質問が 6 秒キー入力無しのままだと、TUI は端末のベルを
+  1 回鳴らす（`[tui].notify`: 既定は `bell`、iTerm2 などでデスクトップ通知を出す `osc9`、または
+  `off`）。キーを押すと次の 6 秒ごとの確認まで先送りされる。キーを押さずに読んでいるだけでは
+  先送りされないので、長い対話を読んでいる途中で鳴ることがある。何も止めない。素の REPL と `-p` では
+  知らせない（ADR-0038、gem-agent ADR-0104 から）。
 - **図を絵として:** 返答中の mermaid フェンス（flowchart / graph・sequenceDiagram・erDiagram・pie・stateDiagram・gantt・mindmap、
   日本語のラベルも）は、端末が画像を描けるなら絵として描く。図の文字 1 em が端末の 1 行になる大きさ。
   正しく描けないものは注記 1 行つきでソースのまま。それ以外の端末では、flowchart・sequence・ER を同じ
