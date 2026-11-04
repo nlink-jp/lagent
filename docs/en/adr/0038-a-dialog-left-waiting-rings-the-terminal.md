@@ -28,6 +28,8 @@ Port gem-agent ADR-0104 as it stands at gem-agent `386657f` (v0.97.0):
 
 The measurements behind the timing and the terminal behaviour are gem-agent ADR-0104's ("Measured"); they are not repeated here.
 
+**The port, in a real terminal** (2026-11-04; tmux 3.8, the bytes the pane received recorded, a real approval prompt from a real turn against a local model): with the default `"bell"`, one BEL arrived 5.9 s after the prompt appeared, written on its own right after a renderer flush. With `"osc9"` and a key pressed 4.2 s after the prompt appeared, the notice came at the 12-second check, as `ESC ] 9 ; lagent needs your answer ESC \` followed by BEL — the same as gem-agent.
+
 ## Consequences
 
 - **Behaviour changes for operators who configure nothing:** a TUI dialog left six seconds without a keystroke rings the terminal bell. The release notes say so and name `[tui].notify = "off"`.

@@ -409,8 +409,8 @@ excepted).
   an icon. The box is shaped by the cell that was read, not the constant
   2.25
 - [`ADR-0038`](adr/0038-a-dialog-left-waiting-rings-the-terminal.md) —
-  a dialog left waiting rings the terminal (**Accepted**, implemented;
-  ported from gem-agent ADR-0104 by the operator's decision, with no
+  a dialog left waiting rings the terminal (**Accepted**, implemented, checked in a real
+  terminal; ported from gem-agent ADR-0104 by the operator's decision, with no
   lagent measurement behind it): an approval, the ceiling's approval or
   question, `ask_user` or the round-limit intervention left six seconds
   without a keystroke is told to the terminal once. `[tui].notify` writes a
