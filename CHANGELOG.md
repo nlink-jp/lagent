@@ -15,7 +15,10 @@
   size and hash and offering the copy (a result saved as several files is
   announced part by part, never as whole). The transcript's tool-result entry
   records the same files in a new `saved` field, so whether an evidence
-  file is a copy of what a server returned is a hash comparison.
+  file is a copy of what a server returned is a hash comparison. The
+  runtime-facts message says so too: it used to say only results too
+  large to return inline were saved, which told the model a small result
+  had no file (ADR-0039 §8).
 - **`write_file` copies with `from`.** Instead of `content`, `from` names
   an existing file whose bytes become the new file — whole, byte for
   byte, read back and checked, with the sha256 in the result. The

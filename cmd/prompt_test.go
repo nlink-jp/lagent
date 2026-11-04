@@ -120,6 +120,15 @@ func TestSessionFactsNameTheWorkDirectory(t *testing.T) {
 	if !strings.Contains(got, "session started: "+time.Now().Format("2006-01-02")) {
 		t.Errorf("the start date is missing: %q", got)
 	}
+	// Every MCP result is saved (ADR-0039 §1), and the facts say so: a
+	// line that said only the large ones were told the model a small
+	// result had no file before any note named it (ADR-0039 §8).
+	if !strings.Contains(got, "Every MCP result is saved here whole") || strings.Contains(got, "too large to return inline") {
+		t.Errorf("the facts misstate which results are saved: %q", got)
+	}
+	if !strings.Contains(got, "copy it with write_file from") {
+		t.Errorf("the facts do not name the copy route: %q", got)
+	}
 }
 
 func TestSessionFactsOmitTheDirectoryWhenNone(t *testing.T) {
