@@ -1196,9 +1196,8 @@ func resolveExisting(path string) (string, error) {
 // resolvePath confines p to the registry's roots: the project directory
 // and, when set, the session work directory. A relative path is always
 // relative to the PROJECT — the work directory is reached by the
-// absolute path the session prompt names, or as $LAGENT_WORK_DIR/…
-// (WorkDirRef), so an unqualified "report.md" keeps meaning the project
-// file it has always meant.
+// absolute path the session prompt names, so an unqualified "report.md"
+// keeps meaning the project file it has always meant.
 //
 // String-level checks alone are insufficient — a symlink inside a root
 // pointing outside would pass them — so the real path is checked too.
@@ -1208,10 +1207,11 @@ func (r *Registry) resolvePath(p string) (string, error) {
 	if p == "" {
 		return "", errors.New("path is required")
 	}
-	abs, err := r.lexicalPath(p)
-	if err != nil {
-		return "", err
+	abs := p
+	if !filepath.IsAbs(p) {
+		abs = filepath.Join(r.projectDir, p)
 	}
+	abs = filepath.Clean(abs)
 	if !withinAny(r.roots(), abs) {
 		return "", fmt.Errorf("path escapes the project directory: %s", p)
 	}
@@ -1227,27 +1227,6 @@ func (r *Registry) resolvePath(p string) (string, error) {
 		return "", fmt.Errorf("path escapes the project directory via symlink: %s", p)
 	}
 	return abs, nil
-}
-
-// lexicalPath is the absolute, cleaned spelling of p before any root
-// check: relative to the project, absolute as given, or under the work
-// directory for $LAGENT_WORK_DIR/… (ADR-0039 §7.1). The variable is
-// joined before the roots are checked, so a rest that climbs out is
-// judged like any other path, and it is never read as a project path
-// when there is no work directory. Every reader that needs a path's
-// lexical form goes through here, so the variable means one thing.
-func (r *Registry) lexicalPath(p string) (string, error) {
-	if rest, ok := WorkDirRef(p); ok {
-		wd := r.WorkDir()
-		if wd == "" {
-			return "", fmt.Errorf("%s: this session has no work directory", p)
-		}
-		return filepath.Join(wd, rest), nil
-	}
-	if !filepath.IsAbs(p) {
-		return filepath.Join(r.projectDir, p), nil
-	}
-	return filepath.Clean(p), nil
 }
 
 func strArg(args map[string]any, key string) (string, bool) {
@@ -1493,8 +1472,7 @@ func (r *Registry) writeFile() *Tool {
 				"from": map[string]any{
 					"type": "string",
 					"description": "Path of an existing file to copy byte for byte instead of content — a saved " +
-						"tool result, named as its note gives it ($LAGENT_WORK_DIR/<name>), or a file in the project. " +
-						"The whole file is copied.",
+						"tool result in the work directory, or a file in the project. The whole file is copied.",
 				},
 				"allow_shrink": map[string]any{
 					"type": "boolean",

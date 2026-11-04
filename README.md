@@ -101,10 +101,8 @@ injection case passed —
   the work directory — the small ones handed over inline too — under its
   sha256, and the transcript's tool-result entry records the file (path,
   size, hash) where no server can write. The model reads lagent's own line
-  naming the file as `$LAGENT_WORK_DIR/<name>` — the file tools accept that
-  name for the session work directory, as shell commands do — and
-  `write_file` with `from` instead of `content` copies a saved result into
-  the project byte for byte, with the sha256 in its
+  saying so, and `write_file` with `from` instead of `content` copies a
+  saved result into the project byte for byte, with the sha256 in its
   result, approved exactly as a write of content would be. Whether an
   evidence file is what the server returned is then a hash comparison
   (ADR-0039).

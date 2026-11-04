@@ -56,9 +56,8 @@ func TestFileChildUnderTheRealProfile(t *testing.T) {
 		}
 	}
 	profile := sandbox.FileReadProfile(filepath.Dir(proj))
-	childWork := ""
 	run := func(tool string, args map[string]any, allot ...int) (string, int) {
-		creq := fileChildRequest{ProjectDir: proj, WorkDir: childWork, Tool: tool, Args: args}
+		creq := fileChildRequest{ProjectDir: proj, Tool: tool, Args: args}
 		if len(allot) > 0 {
 			creq.Allot = &allot[0]
 		}
@@ -161,21 +160,6 @@ func TestFileChildUnderTheRealProfile(t *testing.T) {
 	}
 	if out, code := run(tools.CopySourceOp, map[string]any{"path": ".env"}); code == 0 || strings.Contains(out, "hunter2") {
 		t.Errorf("copy source read the credential file: exit %d, %q", code, out)
-	}
-	// ADR-0039 §7.1: the copy source named as the saved-result note names
-	// it resolves in the child against the work directory the parent
-	// sends — the production path of write_file's `from`.
-	work := t.TempDir()
-	if err := os.WriteFile(filepath.Join(work, "bq-x.json"), []byte(raw), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	childWork = work
-	if out, code := run(tools.CopySourceOp, map[string]any{"path": "$LAGENT_WORK_DIR/bq-x.json"}); code != 0 || out != raw {
-		t.Errorf("copy source through the variable exited %d with %d bytes, want the %d raw bytes", code, len(out), len(raw))
-	}
-	childWork = ""
-	if out, code := run(tools.CopySourceOp, map[string]any{"path": "$LAGENT_WORK_DIR/bq-x.json"}); code == 0 || !strings.Contains(out, "no work directory") {
-		t.Errorf("with no work directory the variable must be an error: exit %d, %q", code, out)
 	}
 }
 

@@ -95,11 +95,6 @@ type SavedFile struct {
 	SHA256 string `json:"sha256,omitempty"`
 	// Error says why the block was not saved; Path is empty then.
 	Error string `json:"error,omitempty"`
-	// Ref is the name the note gives the model for Path:
-	// $LAGENT_WORK_DIR/<name> when Path lies in the session work
-	// directory (ADR-0039 §7.1). Absent in older transcripts, where the
-	// note falls back to Path.
-	Ref string `json:"ref,omitempty"`
 }
 
 // ToolDef describes one tool to the model.

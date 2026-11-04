@@ -208,9 +208,8 @@ internal/agent/    tool-calling loop, approval dispatch, nonce wrapping, history
 internal/tools/    the ten built-in tools (list_files, list_tree, search_files, read_file,
                    file_info, view_image, show_image, write_file, edit_file, shell_exec), path
                    confinement, lane-aware exec injection, Register, the per-call
-                   allotment (ADR-0034); tools.Saved / RecordSaved (saved.go),
-                   write_file's `from` source read (copysource.go, ADR-0039) and the
-                   $LAGENT_WORK_DIR path prefix (workdirref.go, ADR-0039 §7.1)
+                   allotment (ADR-0034); tools.Saved / RecordSaved (saved.go) and
+                   write_file's `from` source read (copysource.go, ADR-0039)
 internal/inert/    the one predicate that makes outside text inert for a terminal
                    (ADR-0024, ported from gem-agent ADR-0093): control characters out,
                    nothing else; Styled holds a renderer's output to SGR (goldmark
@@ -307,17 +306,6 @@ answers.
   own error, and a credential `from` is Block in `risk.Classify`. A tool
   added later that reads through the child and should ask the operator has
   to be a ChildTool, or its refusal will not be retried.
-- **`$LAGENT_WORK_DIR/…` is a file-tool path** (ADR-0039 §7.1), expanded in
-  `lexicalPath`, under `resolvePath` — the one resolver every file tool,
-  `RealPath` (and so the decision point's `realPathArgs`) and the copy
-  source go through. A new reader of a path argument outside the tools
-  package must resolve `tools.WorkDirRef` against the live work directory
-  itself, as `pinNameForWrite` does (a rest may climb back into the
-  project). The intake's own spill and image notes name files with
-  `tools.WorkDirName` too. The
-  saved-result note names files this way because the measured model
-  rewrote the long state-directory name (the project path with `/` → `-`)
-  as the project path; do not put the absolute path back in the note.
 
 - **mlx-serve answers any model name** with the model it has loaded (status
   200), so `provider = "mlxserve"` is the only place a mistyped `[llm].model`

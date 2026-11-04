@@ -828,7 +828,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		PromptHook:     promptHook,
 		ClipboardImage: clipboardImage,
 		BeforeOperatorWrite: func(tc llm.ToolCall) {
-			if name := pinNameForWrite(projectDir, registry.WorkDir(), tc); name != "" {
+			if name := pinNameForWrite(projectDir, tc); name != "" {
 				writes.begin(tc, name, pinIsCurrent(policyFile, projectDir, name))
 			}
 		},
@@ -842,7 +842,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			// its text, not its effect on those files, so it re-pins
 			// nothing; what now differs is named and the next start
 			// asks.
-			if name := pinNameForWrite(projectDir, registry.WorkDir(), tc); name != "" {
+			if name := pinNameForWrite(projectDir, tc); name != "" {
 				if !writes.end(tc, name) {
 					notice(fmt.Sprintf(msgs.PinStaleWriteFmt, name))
 					return

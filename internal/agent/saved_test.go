@@ -2,13 +2,10 @@ package agent
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/nlink-jp/lagent/internal/llm"
-	"github.com/nlink-jp/lagent/internal/risk"
 	"github.com/nlink-jp/lagent/internal/tools"
 	"github.com/nlink-jp/nlk/guard"
 )
@@ -48,7 +45,7 @@ func TestSavedFilesReachTheToolMessage(t *testing.T) {
 	// The model reads it as the runtime's note, outside the tag.
 	sent := mb.calls[len(mb.calls)-1]
 	last := sent[len(sent)-1]
-	if !strings.Contains(last.Content, `write_file {"path": "<destination>", "from": "/w/bq-query-ab.json"}`) ||
+	if !strings.Contains(last.Content, "write_file with from set to that path") ||
 		!strings.Contains(last.Content, "/w/bq-query-ab.json") {
 		t.Errorf("the note did not reach the model: %q", last.Content)
 	}
@@ -146,7 +143,7 @@ func TestSavedNoteSurvivesTheBackstopCut(t *testing.T) {
 	}
 	sent := mb.calls[len(mb.calls)-1]
 	last := sent[len(sent)-1]
-	if !strings.HasSuffix(last.Content, "no shell command is needed]") || !strings.Contains(last.Content, "/w/s-dump-ab.txt") {
+	if !strings.HasSuffix(last.Content, "copies it byte for byte]") || !strings.Contains(last.Content, "/w/s-dump-ab.txt") {
 		t.Errorf("the note did not follow the cut result: ends %q", last.Content[max(0, len(last.Content)-120):])
 	}
 }
@@ -165,7 +162,7 @@ func TestSavedNoteNamesEachPartOfASplitResult(t *testing.T) {
 	if len(lines) != 3 {
 		t.Fatalf("lines = %q", lines)
 	}
-	if strings.Contains(note, "result whole") {
+	if strings.Contains(note, "whole:") {
 		t.Errorf("a part was announced as the whole result: %q", note)
 	}
 	for i, want := range []string{"part 1 of 3", "part 2 of 3", "could not save part 3 of 3"} {
@@ -176,7 +173,7 @@ func TestSavedNoteNamesEachPartOfASplitResult(t *testing.T) {
 	if !strings.Contains(lines[0], "copy every part") || !strings.Contains(lines[0], "/w/a.json") {
 		t.Errorf("the route is missing: %q", lines[0])
 	}
-	if one := savedNote([]llm.SavedFile{{Path: "/w/a.json", Bytes: 10, SHA256: "aa"}}); !strings.Contains(one, "saved this result whole as /w/a.json") {
+	if one := savedNote([]llm.SavedFile{{Path: "/w/a.json", Bytes: 10, SHA256: "aa"}}); !strings.Contains(one, "saved this result whole: /w/a.json") {
 		t.Errorf("a single file lost its wording: %q", one)
 	}
 }
@@ -193,97 +190,5 @@ func TestTheSavedNoteIsCountedAsSent(t *testing.T) {
 	}
 	if got := wrapToolMessages([]llm.Message{m}, guard.NewTag(), nil)[0].Content; !strings.HasSuffix(got, runtimeSuffix(m)) {
 		t.Errorf("the wrap and the count disagree: %q", got)
-	}
-}
-
-// A file saved in the session work directory is named the way the file
-// tools accept it, $LAGENT_WORK_DIR/<name>, and the note spells out the
-// call with that name (ADR-0039 §7.1, §7.2): measured, the model copied
-// the file name right and rewrote the long state-directory name. A file
-// elsewhere, and a record from an older transcript, keep the absolute
-// path.
-func TestSavedNoteNamesTheFileByTheWorkDirVariable(t *testing.T) {
-	work := "/state/lagent/-Users-me-proj/work/s1"
-	files := savedFiles([]tools.Saved{
-		{Path: work + "/bq-query-ab.json", Bytes: 12, SHA256: "ab"},
-	}, work)
-	if len(files) != 1 || files[0].Ref != "$LAGENT_WORK_DIR/bq-query-ab.json" || files[0].Path != work+"/bq-query-ab.json" {
-		t.Fatalf("record = %+v", files)
-	}
-	note := savedNote(files)
-	for _, want := range []string{
-		"saved this result whole as $LAGENT_WORK_DIR/bq-query-ab.json (12 bytes, sha256 ab)",
-		`write_file {"path": "<destination>", "from": "$LAGENT_WORK_DIR/bq-query-ab.json"}`,
-		"creates the parent directories",
-		"no shell command is needed",
-	} {
-		if !strings.Contains(note, want) {
-			t.Errorf("note lacks %q: %q", want, note)
-		}
-	}
-	if strings.Contains(note, work) {
-		t.Errorf("the note still names the long path: %q", note)
-	}
-
-	if out := savedFiles([]tools.Saved{{Path: "/elsewhere/x.json", Bytes: 1, SHA256: "cc"}}, work); out[0].Ref != "" {
-		t.Errorf("a file outside the work directory got a short name: %+v", out[0])
-	}
-	if out := savedFiles([]tools.Saved{{Path: work + "/x.json", Bytes: 1, SHA256: "cc"}}, ""); out[0].Ref != "" {
-		t.Errorf("a session with no work directory got a short name: %+v", out[0])
-	}
-	old := savedNote([]llm.SavedFile{{Path: work + "/old.json", Bytes: 3, SHA256: "dd"}})
-	if !strings.Contains(old, `"from": "`+work+`/old.json"`) {
-		t.Errorf("an older record without Ref did not fall back to its path: %q", old)
-	}
-	// The name in the call is a JSON string as the model would write it,
-	// not HTML-escaped.
-	odd := savedNote([]llm.SavedFile{{Path: `/w/a&b "c".json`, Bytes: 1, SHA256: "ee"}})
-	if !strings.Contains(odd, `"from": "/w/a&b \"c\".json"`) {
-		t.Errorf("the from value is not a plain JSON string: %q", odd)
-	}
-	parts := savedNote(savedFiles([]tools.Saved{
-		{Path: work + "/a.json", Bytes: 1, SHA256: "aa"},
-		{Path: work + "/b.txt", Bytes: 2, SHA256: "bb"},
-	}, work))
-	if !strings.Contains(parts, `part 2 of 2 of this result as $LAGENT_WORK_DIR/b.txt`) ||
-		!strings.Contains(parts, `"from": "$LAGENT_WORK_DIR/b.txt"} for each]`) {
-		t.Errorf("a part lost the short name: %q", parts)
-	}
-}
-
-// The decision point judges $LAGENT_WORK_DIR/… as what it names
-// (ADR-0039 §7.1): realPathArgs goes through the file tools' resolver,
-// so a destination there is a work-directory write, and a copy source
-// that reaches credential material through it is still Block.
-func TestTheWorkDirVariableIsJudgedAsWhatItNames(t *testing.T) {
-	a, reg, _, _ := newRemoteAgent(t, &mockBackend{}, &approveAll{})
-	work := t.TempDir()
-	if err := reg.UseWorkDir(work); err != nil {
-		t.Fatal(err)
-	}
-	d := a.decide(llm.ToolCall{Name: "write_file", Args: map[string]any{
-		"path": "$LAGENT_WORK_DIR/notes/n.md", "content": "x"}})
-	if d.Verdict.Tier != risk.Safe || !strings.Contains(d.Verdict.Reason, "session work directory") {
-		t.Errorf("a work-directory write was judged %+v", d.Verdict)
-	}
-	env := filepath.Join(reg.ProjectDir(), ".env")
-	if err := os.WriteFile(env, []byte("TOKEN=x\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(env, filepath.Join(work, "notes.txt")); err != nil {
-		t.Fatal(err)
-	}
-	d = a.decide(llm.ToolCall{Name: "write_file", Args: map[string]any{
-		"path": "evidence/x.txt", "from": "$LAGENT_WORK_DIR/notes.txt"}})
-	if d.Verdict.Tier != risk.Block {
-		t.Errorf("a credential copy source named through the variable was judged %+v", d.Verdict)
-	}
-	// A rest that climbs back into the project is the project file it
-	// names: AGENTS.md is a persistent target, the operator's alone
-	// (independent review).
-	climb := "$LAGENT_WORK_DIR/../" + filepath.Base(reg.ProjectDir()) + "/AGENTS.md"
-	d = a.decide(llm.ToolCall{Name: "write_file", Args: map[string]any{"path": climb, "content": "x"}})
-	if d.Verdict.Tier != risk.Review || !d.Verdict.OperatorOnly {
-		t.Errorf("a climb into the project's AGENTS.md was judged %+v", d.Verdict)
 	}
 }

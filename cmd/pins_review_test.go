@@ -109,7 +109,7 @@ func TestRepinIsScopedToTheApprovedWrite(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	name := pinNameForWrite(proj, "", llm.ToolCall{Name: "write_file", Args: map[string]any{"path": "AGENTS.md"}})
+	name := pinNameForWrite(proj, llm.ToolCall{Name: "write_file", Args: map[string]any{"path": "AGENTS.md"}})
 	if name != "AGENTS.md" {
 		t.Fatalf("pinNameForWrite = %q", name)
 	}
@@ -146,8 +146,6 @@ func TestRepinIsScopedToTheApprovedWrite(t *testing.T) {
 // outside the project.
 func TestPinNameForWrite(t *testing.T) {
 	proj := t.TempDir()
-	work := filepath.Join(filepath.Dir(proj), "state", "w", "s1")
-	climb := "$LAGENT_WORK_DIR/../../../" + filepath.Base(proj)
 	cases := []struct {
 		tool, path, want string
 	}{
@@ -158,18 +156,10 @@ func TestPinNameForWrite(t *testing.T) {
 		{"write_file", "README.md", ""},
 		{"write_file", "sub/AGENTS.md", ""},
 		{"write_file", "../AGENTS.md", ""},
-		// The session work directory by its variable (ADR-0039 §7.1):
-		// outside the project, never pinned content.
-		{"write_file", "$LAGENT_WORK_DIR/AGENTS.md", ""},
-		{"write_file", "${LAGENT_WORK_DIR}/.claude/skills/deploy/SKILL.md", ""},
-		// …unless the rest climbs back into the project: then it is the
-		// project file it names, as the file tools resolve it.
-		{"write_file", climb + "/AGENTS.md", "AGENTS.md"},
-		{"edit_file", climb + "/.claude/skills/deploy/SKILL.md", ".claude/skills/deploy"},
 		{"shell_exec", "AGENTS.md", ""},
 	}
 	for _, c := range cases {
-		got := pinNameForWrite(proj, work, llm.ToolCall{Name: c.tool, Args: map[string]any{"path": c.path}})
+		got := pinNameForWrite(proj, llm.ToolCall{Name: c.tool, Args: map[string]any{"path": c.path}})
 		if got != c.want {
 			t.Errorf("%s %s: %q, want %q", c.tool, c.path, got, c.want)
 		}
@@ -225,13 +215,4 @@ func TestTrustReport(t *testing.T) {
 		t.Errorf("report = %q", s)
 	}
 	_ = pf
-}
-
-// With no work directory a $LAGENT_WORK_DIR write is refused by the file
-// tools, so it touches no pin.
-func TestPinNameForWriteWithNoWorkDir(t *testing.T) {
-	proj := t.TempDir()
-	if got := pinNameForWrite(proj, "", llm.ToolCall{Name: "write_file", Args: map[string]any{"path": "$LAGENT_WORK_DIR/AGENTS.md"}}); got != "" {
-		t.Errorf("got %q", got)
-	}
 }

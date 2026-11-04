@@ -13,11 +13,7 @@
   under its full sha256, and the model reads lagent's own line about it —
   outside the nonce tag, where no server can forge it — naming the path,
   size and hash and offering the copy (a result saved as several files is
-  announced part by part, never as whole). The line names the file as
-  `$LAGENT_WORK_DIR/<name>` and spells out the `write_file` call that copies
-  it: the file tools now accept that name for the session work directory,
-  as shell commands do, because the local model copied a saved file's name
-  right but rewrote the long state-directory path (ADR-0039 §7). The transcript's tool-result entry
+  announced part by part, never as whole). The transcript's tool-result entry
   records the same files in a new `saved` field, so whether an evidence
   file is a copy of what a server returned is a hash comparison.
 - **`write_file` copies with `from`.** Instead of `content`, `from` names
