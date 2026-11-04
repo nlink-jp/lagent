@@ -327,3 +327,28 @@ func TestCredentialReadsAreOperatorOnly(t *testing.T) {
 		}
 	}
 }
+
+// ADR-0039 §2: a copy is judged by its destination exactly as a write
+// of content is — so copying is never costlier than re-typing — and a
+// copy source that is credential material is Block, never a
+// CredentialRead the operator could wave through as a read.
+func TestWriteFileFromIsJudgedLikeAWrite(t *testing.T) {
+	work := "/tmp/work"
+	for _, c := range []struct {
+		path, from string
+		want       Tier
+		opOnly     bool
+	}{
+		{"evidence/rows.json", work + "/bq-query-ab.json", Safe, false},
+		{"evidence/rows.json", "notes/source.txt", Safe, false},
+		{"AGENTS.md", "notes/source.txt", Review, true},
+		{".git/config", "notes/source.txt", Block, false},
+		{"evidence/env.txt", ".env", Block, false},
+		{"evidence/key.txt", "~/.ssh/id_ed25519", Block, false},
+	} {
+		v := Classify("write_file", true, map[string]any{"path": c.path, "from": c.from}, proj, work)
+		if v.Tier != c.want || v.OperatorOnly != c.opOnly || v.CredentialRead {
+			t.Errorf("write_file(%q from %q) = %+v, want %v (operator only %v)", c.path, c.from, v, c.want, c.opOnly)
+		}
+	}
+}

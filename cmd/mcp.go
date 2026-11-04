@@ -106,7 +106,11 @@ func registerMCPTools(registry *tools.Registry, client mcpCaller, list []mcp.Too
 					}
 					return "", re
 				}
-				text := intake.within(tools.Allot(ctx)).render(client.Name(), remoteName, blocks)
+				text, saved := intake.within(tools.Allot(ctx)).render(client.Name(), remoteName, blocks)
+				// What was saved goes to the executor beside the text,
+				// never inside it (ADR-0039 §1): the record evidence is
+				// checked against must be one no server can write.
+				tools.RecordSaved(ctx, saved...)
 				if isErr {
 					return "", &tools.RemoteError{Server: client.Name(), Tool: remoteName, Kind: tools.RemoteResult, Text: text, Sent: true}
 				}

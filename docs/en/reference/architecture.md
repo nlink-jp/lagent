@@ -212,6 +212,16 @@ Those three are the only `LAGENT_*` names a read-lane `shell_exec`
 keeps by name; every other variable whose name looks like a secret,
 `LAGENT_API_KEY` included, is dropped from that lane's environment.
 
+Every MCP text block is saved in the work directory under its full
+sha256 (the inline blocks of a response as one file), and the
+tool-result message's `saved` field records each file — path, bytes,
+sha256 — from what the intake reported through the call's context,
+never from the server's text. When the history is sent, lagent's note
+about it is drawn from that field outside the nonce tag. `write_file`'s
+`from` copies such a file whole through the file-read child's raw
+`copy_source` operation (32 MiB, refused above or when interrupted), and
+the copy's hash is checked (ADR-0039).
+
 ## Configuration and drop-in behaviour
 
 `~/.config/lagent/config.toml` is strict-decoded; precedence is flags >

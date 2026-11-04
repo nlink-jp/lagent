@@ -993,6 +993,10 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 			var result string
 			var denied, ran bool
 			var remote *tools.RemoteError
+			// What the call saves is reported here, beside its text
+			// (ADR-0039 §1), and becomes the transcript's record.
+			saves := &tools.SaveRecorder{}
+			callCtx := tools.WithSaveRecorder(ctx, saves)
 			if stopAfterRound != "" {
 				result = "error: the turn was stopped by the loop guard; not executed"
 				a.logRecord("tool_skipped", map[string]any{"name": tc.Name, "detail": clip(callDetail, 200), "purpose": callPurpose})
@@ -1000,10 +1004,10 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 				// Re-judged before every call: an mcp_load earlier in the
 				// round has grown the tool definitions since (§1).
 				allotted := a.allot(&budget, len(resp.ToolCalls)-i)
-				result, denied, ran, remote = a.execCall(tools.WithAllot(ctx, allotted), tc)
+				result, denied, ran, remote = a.execCall(tools.WithAllot(callCtx, allotted), tc)
 				result = a.bounded(tc.Name, result, allotted, denied)
 			} else {
-				result, denied, ran, remote = a.execCall(ctx, tc)
+				result, denied, ran, remote = a.execCall(callCtx, tc)
 			}
 			if a.onToolDone != nil {
 				a.onToolDone(tc)
@@ -1022,6 +1026,10 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 				// here from the typed error the executor returned, never
 				// from the result text. Empty for every other call.
 				RuntimeNote: a.remoteFault(tc.Name, remote, ran, round),
+				// The files the runtime saved for this result (ADR-0039
+				// §1): provenance from the intake through the context,
+				// never read out of the text a server wrote.
+				Saved: savedFiles(saves.Files()),
 			}
 			// view_image's pixels ride on the TOOL message (ADR-0005):
 			// the backend turns them into the image part that follows
@@ -1037,7 +1045,9 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 			}
 			a.appendMessage(msg)
 			if budget.window > 0 {
-				budget.spend(msg.Content, len(msg.Attachments))
+				// Charged as sent: the runtime's notes are appended at
+				// send time, and the model reads them too (ADR-0039 §1).
+				budget.spend(msg.Content+runtimeSuffix(msg), len(msg.Attachments))
 			}
 		}
 		if stopAfterRound != "" {
@@ -1139,13 +1149,10 @@ func wrapToolMessages(history []llm.Message, tag guard.Tag, instructionTools map
 						att.Kind, att.Ref)
 				}
 			}
-			// The runtime's note rides outside the tag too (gem-agent ADR-0075
-			// §3): lagent's words, at the system prompt's trust level,
-			// after the wrapped server text. Provenance is the field; a
-			// result whose text merely looks like the note stays wrapped.
-			if out[i].RuntimeNote != "" {
-				out[i].Content += "\n\n" + out[i].RuntimeNote
-			}
+			// The runtime's notes ride outside the tag too: lagent's
+			// words, at the system prompt's trust level, after the
+			// wrapped server text (runtimeSuffix).
+			out[i].Content += runtimeSuffix(out[i])
 			continue
 		}
 		if len(out[i].Attachments) == 0 {
@@ -1548,7 +1555,11 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 	}
 	out, state, err := a.runWithFloor(runCtx, tool, tc)
 	credentialDenied := false
-	if errors.Is(err, tools.ErrCredentialRead) {
+	if errors.Is(err, tools.ErrCredentialRead) && tools.ChildTool(tc.Name) {
+		// Only the covered reads are retried — in lagent exactly the
+		// tools that can return ErrCredentialRead. An approval that
+		// looks like a read must never let write_file copy credential
+		// material under an ordinary project name (ADR-0039 §2).
 		// The kernel refused a path the rule tier did not recognise.
 		// The read produced no bytes, so nothing reached the model; the
 		// operator gets the same question the matcher would have raised,

@@ -46,9 +46,9 @@ lagent adopts gem-agent ADR-0105 §1–§4 as implemented at `edd8e60` (§8 ther
   [lagent saved this result whole: <path> (<n> bytes, sha256 <64 hex>) — to keep it as evidence, write_file with from set to that path copies it byte for byte]
   ```
 
-  With no work directory (the transcript is off) the line says there is no file to copy.
+  With no work directory (the transcript is off) the line says there is no file to copy. A result saved as more than one file — the inline group, a spilled block, the rest past the budget, an image — is never called whole: each line reads `[lagent saved part <i> of <n> of this result: <path> (…) — to keep the whole result as evidence, copy every part, each with write_file from set to its path]` (§6).
 
-**Under ADR-0034.** The note is not the server's text, so it is paid from neither the response budget nor the allotment, and the inline text is unchanged. It is bounded all the same: one line for the inline group, and one per spilled piece, each of which had to fit the budget to exist. ADR-0034's backstop (`CutUnkept`) applies to the result text as before; the note is appended after it, so a cut result still names its whole saved file.
+**Under ADR-0034.** The note is not the server's text, so it is not paid from the response budget or the call's allotment, and the inline text is unchanged. It is bounded all the same: one line for the inline group, one per spilled piece (each of which had to fit the budget to exist) and one per saved image. It is bytes the model receives, so the round budget and the compaction estimate count it as sent: one function (`runtimeSuffix`) builds what the wrap appends — the runtime note and this note — and the same function is what `spend` and `estimateTokens` count (§6). ADR-0034's backstop (`CutUnkept`) applies to the result text as before; the note is appended after it, so a cut result still names its whole saved file.
 
 ### 2. `write_file` copies: `from` instead of `content`
 
@@ -74,6 +74,18 @@ The probe's lagent cells are re-run against the implementation, pre-registered h
 - **Reading.** The route fires when at least 8 of 10 valid runs in each cell are copied. Against the baseline (s3 0 of 10, s1 0 of 3), that is the before-and-after gem-agent did not have.
 - **Below the threshold.** The note and description are revised once and the cells measured once more; still below, the operator decides. §1 and §2 stand either way.
 - **Cost.** A local server; nothing is billed. Failed or contaminated runs are replaced up to 2n.
+
+## 6. Independent review (2026-11-04, before commit)
+
+A sub-agent read the implementation against this record, gem-agent's and the code. Confirmed and taken:
+
+1. **The note was invisible to the window accounting.** It is appended at send time, but `estimateTokens` (ADR-0033's compaction estimate) and the round budget's `spend` counted only the stored text — about 330–420 bytes per MCP result, retained for as long as the result is, so compaction could judge itself under the threshold and the next request be over it. Both now count `runtimeSuffix`, the function the wrap appends from.
+2. **"saved this result whole" was false for a split result.** A response whose first block fits and whose next does not is two files, and each note claimed the whole; under lagent's allotment splits are common. Each line now names its part (§1). This is gem-agent's wording too.
+3. **A multi-line description broke the one-line catalog** (ADR-0040): a `|` block kept its line breaks into the facts message. The description is joined into one line.
+4. **`Saved` was trusted outside the tag but not pinned** by the provenance architecture test. It is now, counted only in an `llm.Message` literal (another struct has a `Saved` field).
+5. Smaller: a carried-over test clause that could never fire, an error that printed `<nil>` when only the hash differed, and patch leftovers in the tree.
+
+Noted, not changed: an image's saved file gets a note beside its own image note (bounded, and the copy route applies to an image too); after compaction the summary drops the notes, so the model loses older paths — the transcript keeps them.
 
 ## Not decided here
 

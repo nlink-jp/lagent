@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Every MCP result is saved, and evidence can be a copy of it
+  (ADR-0039, ported from gem-agent ADR-0105).** Small results used to
+  reach the model only inline, so an agent asked to keep a query result as
+  evidence re-typed it — measured on this runtime, a spilled result was
+  copied in 0 of 10 runs and re-typed with wrong values in 6. Now every
+  text block an MCP server returns is saved in the session work directory
+  under its full sha256, and the model reads lagent's own line about it —
+  outside the nonce tag, where no server can forge it — naming the path,
+  size and hash and offering the copy (a result saved as several files is
+  announced part by part, never as whole). The transcript's tool-result entry
+  records the same files in a new `saved` field, so whether an evidence
+  file is a copy of what a server returned is a hash comparison.
+- **`write_file` copies with `from`.** Instead of `content`, `from` names
+  an existing file whose bytes become the new file — whole, byte for
+  byte, read back and checked, with the sha256 in the result. The
+  destination is judged exactly as a write of content (no approval inside
+  the project), so copying is never more work than re-typing. The source
+  is read through the sandboxed child, up to 32 MiB; above that, and for
+  credential material, the copy is refused. The call's detail names the
+  source and its size, never its bytes.
+
 ### Fixed
 
 - **Skill descriptions are read whole (ADR-0040, ported from gem-agent
@@ -13,6 +36,15 @@
   naming the skill. A multi-line description (`description: >` or `|`, or
   a value continued on indented lines) was read as its first line, `>`;
   it is now read whole, and listed as one line.
+
+### Changed
+
+- **Saved MCP results are named by their full sha256**, not its first 4
+  bytes, and a file already at that name is reused only when its own
+  bytes hash to it.
+- **The in-process credential retry is limited to the covered reads**
+  (`tools.ChildTool`), so a refusal on any other tool is never one
+  approval away from running again.
 
 ## [0.23.1] - 2026-11-04
 

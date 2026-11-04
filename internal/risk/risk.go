@@ -136,6 +136,13 @@ func Classify(toolName string, mutating bool, args map[string]any, projectDir, w
 
 	switch toolName {
 	case "write_file", "edit_file":
+		// A copy source that is credential material is Block, and never
+		// a CredentialRead the operator could approve (ADR-0039 §2): the
+		// approval would look like a read and land as a credential
+		// written under an ordinary project name.
+		if from, _ := args["from"].(string); from != "" && sandbox.CredentialPath(from) {
+			return Verdict{Tier: Block, Reason: "copies credential material (" + from + ")"}
+		}
 		p, _ := args["path"].(string)
 		if v, blocked := classifyPath(p, projectDir, workDir); blocked {
 			return v

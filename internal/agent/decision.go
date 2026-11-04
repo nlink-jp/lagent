@@ -121,18 +121,21 @@ func (a *Agent) decide(tc llm.ToolCall) Decision {
 	return d
 }
 
-// realPathArgs returns a copy of args with `path` and each entry of
-// `paths` replaced by the real path the file tools will open, where it
-// resolves. The copy leaves tc.Args — what the model said, what the
+// realPathArgs returns a copy of args with `path`, `from` and each entry
+// of `paths` replaced by the real path the file tools will open, where it
+// resolves. `from` is write_file's copy source (ADR-0039 §2): a link named
+// `notes.txt` that points at a credential is judged as the credential. The copy leaves tc.Args — what the model said, what the
 // prompt shows and the transcript records — untouched.
 func (a *Agent) realPathArgs(in map[string]any) map[string]any {
 	out := make(map[string]any, len(in))
 	for k, v := range in {
 		out[k] = v
 	}
-	if p, ok := in["path"].(string); ok {
-		if real, err := a.registry.RealPath(p); err == nil && real != "" {
-			out["path"] = real
+	for _, k := range []string{"path", "from"} {
+		if p, ok := in[k].(string); ok && p != "" {
+			if real, err := a.registry.RealPath(p); err == nil && real != "" {
+				out[k] = real
+			}
 		}
 	}
 	if raw, ok := in["paths"].([]any); ok {

@@ -445,7 +445,10 @@ func estimateTokens(msgs []llm.Message) int {
 	for _, m := range msgs {
 		bytes += len(m.Content)
 		if m.Role == llm.RoleTool {
-			bytes += wrapBytes
+			// The notes appended at send time are bytes the model
+			// receives (ADR-0039 §1): an estimate that leaves them out
+			// undercounts every retained MCP result.
+			bytes += wrapBytes + len(runtimeSuffix(m))
 		}
 		for _, tc := range m.ToolCalls {
 			if data, err := json.Marshal(tc.Args); err == nil {

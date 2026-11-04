@@ -97,6 +97,15 @@ injection case passed —
   the sandbox, where commands may read credentials). `search_files` counts every file it did not search — over
   2 MB (named), binary, image, unreadable — so "no match" says what was not
   looked at.
+- **Evidence is copied, not re-typed:** every MCP result is saved whole to
+  the work directory — the small ones handed over inline too — under its
+  sha256, and the transcript's tool-result entry records the file (path,
+  size, hash) where no server can write. The model reads lagent's own line
+  saying so, and `write_file` with `from` instead of `content` copies a
+  saved result into the project byte for byte, with the sha256 in its
+  result, approved exactly as a write of content would be. Whether an
+  evidence file is what the server returned is then a hash comparison
+  (ADR-0039).
 - **Confinement:** file tools stay inside the project (and the session
   work directory), and a credential file — `.env`, a private key, a
   token store — is read only when you approve it, every time, never

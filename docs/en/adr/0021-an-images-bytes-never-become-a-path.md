@@ -16,14 +16,14 @@ that survived all three refuted drafts: **the view layer opens no file.** A
 read the view layer performs is not a tool call, so it reaches neither the
 agent's decision nor ADR-0016's sandboxed child, and the path-judging list
 — `pathJudgedTools`, keyed on tool name
-([risk.go:324](../../../internal/risk/risk.go)) — cannot see it.
+([risk.go:331](../../../internal/risk/risk.go)) — cannot see it.
 
 That rules out the obvious design. The MCP intake already writes an image
 into the session work directory and hands the model
 `[image saved at <path> … use view_image on that path]`
-([mcpresult.go:244](../../../cmd/mcpresult.go)), so a path is sitting
+([mcpresult.go:304](../../../cmd/mcpresult.go)), so a path is sitting
 there — but `write` short-circuits on `os.Stat`
-([mcpresult.go:267](../../../cmd/mcpresult.go)) while every call hands the
+([mcpresult.go:344](../../../cmd/mcpresult.go)) while every call hands the
 server the work directory as `_meta[workdir.MetaKey]`
 ([client.go:639](../../../internal/mcp/client.go)). A local server child
 knows its own name, its tool name, the bytes it will return and the
@@ -37,12 +37,12 @@ view layer that opened it would not be.
 
 The third refuted draft said the view layer would be handed "the bytes the
 intake already holds". It cannot: `render` returns a `string`
-([mcpresult.go:57](../../../cmd/mcpresult.go)), `mcpIntake` keeps a
+([mcpresult.go:65](../../../cmd/mcpresult.go)), `mcpIntake` keeps a
 work-directory getter, a byte cap and a preview length — the sink this
 decision added is withdrawn by ADR-0022, and what it has never kept is the
-bytes ([mcpresult.go:33](../../../cmd/mcpresult.go)), and the tool contract is
+bytes ([mcpresult.go:40](../../../cmd/mcpresult.go)), and the tool contract is
 `Run func(ctx, args) (string, error)`
-([tools.go:75](../../../internal/tools/tools.go)).
+([tools.go:77](../../../internal/tools/tools.go)).
 
 The channel this needs already exists here too, and it is the same one:
 the agent loop talks to the UI **during** a tool call —
@@ -93,7 +93,7 @@ plain REPL drop what they are given rather than deciding not to draw it.
 
 A block whose note does not fit the response budget is already neither
 saved nor described individually — the guard sizes `binaryNote` before
-anything is written ([mcpresult.go:109](../../../cmd/mcpresult.go)) — and
+anything is written ([mcpresult.go:143](../../../cmd/mcpresult.go)) — and
 such a block is not drawn. Drawing one would put a picture on the
 operator's screen that appears nowhere in the session's record. One rule,
 not a second budget.

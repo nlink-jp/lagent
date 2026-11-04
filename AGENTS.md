@@ -202,11 +202,14 @@ internal/llm/      Backend interface + the OpenAI-compatible client (stdlib net/
                    hand-written SSE, tool-call assembly, retry, per-provider context probe)
 internal/agent/    tool-calling loop, approval dispatch, nonce wrapping, history,
                    the rule-tier auto-approve ladder, the round ladder, compaction
-                   and the round budget (ADR-0033, ADR-0034)
+                   and the round budget (ADR-0033, ADR-0034); the per-call save
+                   recorder → Message.Saved and the note drawn from it (saved.go,
+                   ADR-0039)
 internal/tools/    the ten built-in tools (list_files, list_tree, search_files, read_file,
                    file_info, view_image, show_image, write_file, edit_file, shell_exec), path
                    confinement, lane-aware exec injection, Register, the per-call
-                   allotment (ADR-0034)
+                   allotment (ADR-0034); tools.Saved / RecordSaved (saved.go) and
+                   write_file's `from` source read (copysource.go, ADR-0039)
 internal/inert/    the one predicate that makes outside text inert for a terminal
                    (ADR-0024, ported from gem-agent ADR-0093): control characters out,
                    nothing else; Styled holds a renderer's output to SGR (goldmark
@@ -290,6 +293,19 @@ ADR-NNNN`; a bare `ADR-NNNN` is one of this repository's records, and
 answers.
 
 ## Gotchas
+
+- **`Message.Saved` is provenance, never parsed from text** (ADR-0039). The
+  MCP intake returns what it saved beside the text, the adapter calls
+  `tools.RecordSaved(ctx, …)`, and the executor's per-call `SaveRecorder`
+  lands it in the tool message; the note is drawn from the field outside
+  the nonce tag at send time, after ADR-0034's backstop cut. Do not move
+  the note into the result text: a server can print the same line.
+- **The in-process credential retry runs only for `tools.ChildTool`**
+  (ADR-0039 §2). In lagent those are exactly the tools that can return
+  `ErrCredentialRead`; `write_file`'s copy maps the kernel's refusal to its
+  own error, and a credential `from` is Block in `risk.Classify`. A tool
+  added later that reads through the child and should ask the operator has
+  to be a ChildTool, or its refusal will not be retried.
 
 - **mlx-serve answers any model name** with the model it has loaded (status
   200), so `provider = "mlxserve"` is the only place a mistyped `[llm].model`
