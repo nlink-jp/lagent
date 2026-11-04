@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Proposed** (2026-11-04) |
+| Status | **Accepted** (2026-11-05; proposed 2026-11-04) |
 | Date | 2026-11-04 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
@@ -137,6 +137,10 @@ Run at `571c4c4` as pre-registered, `-jobs 2`. Two earlier starts of this measur
 | s3 (spilled in all 10) | 10 | **1** | 0 | 5 | 4 |
 
 The corrected fact did not move either cell. In s1, 9 of 10 runs never named the saved file (8 of 10 in §5.1). In s3, 10 of 12 attempts named it, and in 6 of those the first path was wrong in the place §5.1 found; `write_file` `from` was tried in 2 attempts and copied in 1. In 20 of 22 attempts the model tried `mkdir` or `cp` through write-lane `shell_exec` first. The route does not fire on this model; per §5 the operator decides, and §1 and §2 stand.
+
+### 8.2 The operator's decision (2026-11-05): accepted
+
+Accepted with §8.1 as it stands. §1 and §2 make the runtime's facts and route true — every result is on disk, recorded where no server can write, and a byte-for-byte copy exists — and that holds whichever model reads them. That this model does not take the route is recorded as a property of the model, not compensated by the runtime (§7) and not by more wording: the note, `write_file`'s description and the facts line stay as §1–§3 and §8 leave them.
 
 ## Not decided here
 

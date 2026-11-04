@@ -2,7 +2,7 @@
 
 | 項目 | 値 |
 |-------|-----|
-| Status | **Proposed**（2026-11-04） |
+| Status | **Accepted**（2026-11-05、提案 2026-11-04） |
 | Date | 2026-11-04 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
