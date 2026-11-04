@@ -56,13 +56,13 @@ The measurements live in gem-agent (`tools/rowprobe`, `tools/pinprobe`,
 `tools/imgpayload`) and are **not ported**: they measure a terminal, not a
 runtime, and this repository has no `tools/` directory. `pinprobe` drives
 that runtime's real model through its real emit path — which is this
-runtime's emit path too, function for function ([model.go:976, :1229,
-:1242](../../../internal/tui/model.go) against gem-agent's :872, :1130,
+runtime's emit path too, function for function ([model.go:996, :1256,
+:1269](../../../internal/tui/model.go) against gem-agent's :872, :1130,
 :1143; `diff` returns nothing on the last two).
 
 The regime is arranged, not assumed. The pin's padding is
 `height − printed − view − 1` and the positive branch is labelled "screen
-not full" ([model.go:1951](../../../internal/tui/model.go)). A filler count
+not full" ([model.go:1954](../../../internal/tui/model.go)). A filler count
 chosen for a 30-row pane left an 80-row window on the other side of it, and
 an earlier draft of both records reported those runs under the wrong label.
 
@@ -110,7 +110,7 @@ what makes a declaration usable as a count.
 gem-agent partitions a reply before rendering: `diagram.Split` hands art
 segments to the terminal verbatim, a lane gem-agent ADR-0063 built there for mermaid.
 **This runtime has no such lane.** `newGlamourRenderer`
-([model.go:501](../../../internal/tui/model.go), the render at `:498`)
+([model.go:501](../../../internal/tui/model.go), the render at `:514`)
 passes the whole reply through glamour in one piece — no `Split`, no segment
 type, no verbatim path. (As of this record's implementation the last two
 exist: `Segment` and the verbatim branch of `emitSegments`. What is still

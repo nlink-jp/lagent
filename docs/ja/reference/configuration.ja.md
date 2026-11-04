@@ -47,8 +47,8 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `[tui].language` | `auto` | `auto`（`LC_ALL` / `LC_MESSAGES` / `LANG` から）、`ja`、`en` |
 | `[tui].show_thoughts` | `true` | サーバが送る推論差分をライブ領域に表示。表示専用 |
 | `[tui.diagram].font` / `font_name` / `bold_font` / `bold_font_name` | ヒラギノ角ゴシック W3 / W6 | 画像を描ける場所で mermaid の図を描くフォント（ADR-0025）: .ttf/.otf/.ttc のファイルと、その中の書体（フル名か PostScript 名）。`bold_font`（実体名・枠の見出し）の既定は本文の書体。起動時に一度、画像を描くときだけ読む。読めない値はバナーの警告と既定のフォントになり、起動は止めない。ユーザ設定だけ |
-| `[tui].notify` | `bell` | 承認・上限の問い・`ask_user`・ラウンド上限の介入の対話が 6 秒キー入力無しのままなら、端末に 1 回知らせる（ADR-0038）: `bell` は BEL、`osc9` は OSC 9 のデスクトップ通知も、`off` は何も書かない。キー入力は次の 6 秒ごとの確認まで先送りする。TUI だけ。起動時に読む。ユーザー設定のみ |
 | `[tui].images` | `auto` | インライン画像 — モデルが `show_image` で見せるものと、あなたが `/show` で出すもの（PNG か JPEG、2 MiB まで）: `auto`（UI 起動前に端末へ一度だけ問う）、`off`、または強制指定の `iterm` / `kitty`（ADR-0020/0022）。tmux・screen の中では `auto` は off に解決 |
+| `[tui].notify` | `bell` | 承認・上限の問い・`ask_user`・ラウンド上限の介入の対話が 6 秒キー入力無しのままなら、端末に 1 回知らせる（ADR-0038）: `bell` は BEL、`osc9` は OSC 9 のデスクトップ通知も、`off` は何も書かない。キー入力は次の 6 秒ごとの確認まで先送りする。TUI だけ。起動時に読む。ユーザ設定だけ |
 | `[approval].pin_trusted_files` | `true` | 信頼は内容に与える: 信頼済みプロジェクトのエージェント向けファイルはダイジェストで固定され、変わると再度尋ねる |
 | `[approval].model_tier` | `off` | `shell` で、自動承認の下、規則層が Review に残した write レーンの `shell_exec` を判定役のモデルが決める（ADR-0032）: gem-agent の 2 ラウンドの両方で確信度 0.8 以上なら承認、それ以外は判定役の理由とともに尋ねる。他は何も届かない — MCP の呼び出し、operator レーン、その他の Review は尋ねる。global のみ |
 | `[approval].tools` | （未設定） | ツールごとのポリシー: `"always"`（常に尋ねる。自動承認でも外せない床）または `"never"`（尋ねない。ブロック対象のシェルパターンと資格情報の読取は尋ねる）。`--allow` は 1 実行分の同等物 |

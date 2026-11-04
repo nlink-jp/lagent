@@ -52,11 +52,11 @@ gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.
 **移植しない。** それらが測るのは端末であってランタイムではなく、このリポジトリに
 `tools/` は無い。`pinprobe` は向こうのランタイムの本番 Model をその本番 emit 経路で
 駆動するが、それはこちらの emit 経路でもある — 関数ごとに同一である
-（[model.go:976, :1229, :1242](../../../internal/tui/model.go) が gem-agent の :872・:1130・
+（[model.go:996, :1256, :1269](../../../internal/tui/model.go) が gem-agent の :872・:1130・
 :1143 に対応し、後ろ 2 つは `diff` が空を返す）。
 
 領域は仮定ではなく構成する。pin の padding は `height − printed − view − 1` で、正の分岐は
-「screen not full」とラベルされている（[model.go:1951](../../../internal/tui/model.go)）。
+「screen not full」とラベルされている（[model.go:1954](../../../internal/tui/model.go)）。
 30 行のペイン用に選んだ filler の行数が、80 行の窓をその反対側に置き、両記録の以前の稿は
 それらの実行を誤ったラベルの下で報告した。
 
@@ -97,7 +97,7 @@ iTerm2 はスクリプト経由で駆動し画面を読み戻し、フレーム�
 
 gem-agent は描画前に応答を分割する。`diagram.Split` が art segment を verbatim で端末へ
 渡す。gem-agent ADR-0063 が向こうで mermaid のために作ったレーンである。**このランタイムにそのレーンは
-無い。** `newGlamourRenderer`（[model.go:501](../../../internal/tui/model.go)、描画は `:498`）は
+無い。** `newGlamourRenderer`（[model.go:501](../../../internal/tui/model.go)、描画は `:514`）は
 応答を丸ごと 1 個として glamour に通す。`Split` も segment 型も verbatim 経路も無い（本記録の
 実装後、後ろ 2 つは存在する — `Segment` と `emitSegments` の verbatim 分岐である。いまも無いのは
 `Split` であり、応答が分割されることはなく、画像は応答の外からレーンへ入る）。よって

@@ -90,10 +90,6 @@ model = "example-model"
 	}
 }
 
-// TestImagesSettingIsValidated: the enumeration decides whether escapes are
-// written to the operator's terminal at all, and it was the only enumerated
-// [tui] value with no test — a typo in the accepted set, or a later default
-// branch that let anything through, would have failed nothing.
 // TestNotifySettingIsValidated: [tui].notify decides which bytes reach the
 // operator's terminal when a dialog waits (ADR-0038). The default is
 // "bell", and the source of the value is tracked for /settings.
@@ -131,6 +127,10 @@ func TestNotifySettingIsValidated(t *testing.T) {
 	}
 }
 
+// TestImagesSettingIsValidated: the enumeration decides whether escapes are
+// written to the operator's terminal at all, and it was the only enumerated
+// [tui] value with no test — a typo in the accepted set, or a later default
+// branch that let anything through, would have failed nothing.
 func TestImagesSettingIsValidated(t *testing.T) {
 	for _, v := range []string{"auto", "off", "iterm", "kitty"} {
 		clearEnv(t)
