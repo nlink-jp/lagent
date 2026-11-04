@@ -3,7 +3,6 @@ module github.com/nlink-jp/lagent
 go 1.26.2
 
 require (
-	github.com/BurntSushi/toml v1.6.0
 	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/glamour v1.0.0
@@ -13,6 +12,7 @@ require (
 	github.com/muesli/termenv v0.16.0
 	github.com/nlink-jp/mermaid-render v0.6.0
 	github.com/nlink-jp/nlk v0.5.2
+	github.com/nlink-jp/toml v0.1.1
 	github.com/rivo/uniseg v0.4.7
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/sys v0.48.0

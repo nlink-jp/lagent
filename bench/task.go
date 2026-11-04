@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -9,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/BurntSushi/toml"
+	"github.com/nlink-jp/toml"
 )
 
 // task is one bench case: a prompt, the fixture it runs in, and the
@@ -162,11 +163,13 @@ func loadTasks(tasksDir string, only []string) ([]*task, error) {
 
 func loadTask(dir string) (*task, error) {
 	t := &task{Name: filepath.Base(dir), Dir: dir, Fixture: filepath.Join(dir, "testdata")}
-	md, err := toml.DecodeFile(filepath.Join(dir, "task.toml"), t)
-	if err != nil {
+	_, err := toml.DecodeFile(filepath.Join(dir, "task.toml"), t)
+	var unknown *toml.UnknownKeysError
+	if err != nil && !errors.As(err, &unknown) {
 		return nil, fmt.Errorf("task %s: %w", t.Name, err)
 	}
-	if undecoded := md.Undecoded(); len(undecoded) > 0 {
+	if unknown != nil {
+		undecoded := unknown.Keys
 		return nil, fmt.Errorf("task %s: unknown key %s", t.Name, undecoded[0].String())
 	}
 	if strings.TrimSpace(t.Prompt) == "" {
