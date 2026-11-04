@@ -119,11 +119,8 @@ func (r *Registry) describeFile(p string) (string, error) {
 		// it must for every reading tool), so recognise exactly that
 		// case here: the lexical path is inside the project and the
 		// entry itself is a link. Nothing about the target is inspected.
-		lex := filepath.Clean(p)
-		if !filepath.IsAbs(lex) {
-			lex = filepath.Clean(filepath.Join(r.projectDir, p))
-		}
-		if withinAny(r.roots(), lex) {
+		lex, lexErr := r.lexicalPath(p)
+		if lexErr == nil && withinAny(r.roots(), lex) {
 			// The PARENT must genuinely resolve inside the project:
 			// Lstat follows intermediate symlinks, so a lexically
 			// in-project path under a model-planted escaping link would

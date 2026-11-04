@@ -112,7 +112,7 @@ Noted, not changed: an image's saved file gets a note beside its own image note 
 
 A path whose first segment is exactly `$LAGENT_WORK_DIR` or `${LAGENT_WORK_DIR}` is resolved under the session work directory by the file tools' one resolver (`resolvePath`), so `$LAGENT_WORK_DIR/<name>` means in `read_file`, `write_file` (`path` and `from`) and the rest what it already means in a shell command. It is the name the runtime-facts message already gives the directory, not a new one.
 
-- **Containment is unchanged.** The expansion happens before the roots are checked, so `$LAGENT_WORK_DIR/../x` is refused like any other escape. With no work directory (the transcript is off) such a path is an error that says so, never a project path.
+- **Containment is unchanged.** The expansion happens before the roots are checked, so a rest that climbs out of both the project and the work directory is refused like any other escape, and one that climbs into the project is the project file it names, judged as that file (pins included). With no work directory (the transcript is off) such a path is an error that says so, never a project path.
 - **Judged as what it names.** The decision point resolves a judged path to its real path before classifying (`realPathArgs`), and that goes through the same resolver, so a write to `$LAGENT_WORK_DIR/x` is judged a work-directory write and a `from` naming credential material through it is still Block. The pin check of an approved write treats such a path as outside the project.
 - **What is not expanded.** Only that first segment, only in the built-in file tools. An MCP tool argument is still passed as written, and the facts message keeps telling the model to give such a tool the directory in full. A project directory literally named `$LAGENT_WORK_DIR` is reached as `./$LAGENT_WORK_DIR`.
 
@@ -124,11 +124,26 @@ This removes the trap where it is: the model no longer has to reproduce the stat
 [lagent saved this result whole as $LAGENT_WORK_DIR/<name> (<n> bytes, sha256 <64 hex>). To keep it as evidence, copy the file instead of re-typing it: write_file {"path": "<destination>", "from": "$LAGENT_WORK_DIR/<name>"} copies it byte for byte and creates the parent directories — no shell command is needed]
 ```
 
-A part of a split result reads `[lagent saved part <i> of <n> of this result as $LAGENT_WORK_DIR/<name> (…). To keep the whole result as evidence, copy every part: write_file {"path": "<destination>", "from": "$LAGENT_WORK_DIR/<name>"} for each]`. The absolute path stays in the transcript's `saved` record. The call is spelled out because in §5.1 the model reached for `mkdir` and `cp` first in 18 of 20 runs; the words name what makes them unnecessary rather than forbidding them. `write_file`'s `from` description and the facts message's work-directory line say the same.
+A part of a split result reads `[lagent saved part <i> of <n> of this result as $LAGENT_WORK_DIR/<name> (…). To keep the whole result as evidence, copy every part: write_file {"path": "<destination>", "from": "$LAGENT_WORK_DIR/<name>"} for each]`. The absolute path stays in the transcript's `saved` record. The call is spelled out because in §5.1 the model reached for `mkdir` and `cp` first in 18 of 20 runs; the words name what makes them unnecessary rather than forbidding them. `write_file`'s `from` description and the facts message's work-directory line say the same, and the intake's own notes inside the result — a spilled block's `read_file` route, the rest past the budget, a saved image — name the file the same way, so no text the model reads asks it for the long path.
 
 ### 7.3 The second measurement, pre-registered
 
 §5 unchanged — cells, n = 10, at least 8 of 10 copied in each cell, failed or contaminated runs replaced up to 2n — at the commit that implements this section, `-jobs 2` as in §5.1. Still below the threshold in either cell, the operator decides; §1, §2 and §7.1 stand either way.
+
+### 7.4 Independent review (2026-11-05, before commit)
+
+A sub-agent read the change against this section and the code. It found no route outside the two roots, past the credential rules, or to a cheaper tier than the path named. Taken:
+
+1. **The spilled cell still showed the long path.** The intake's spill, rest and image notes inside the result printed the absolute path, so s3 would have measured both names at once. They now print `$LAGENT_WORK_DIR/<name>`; the pre-write sizing renders the same notes, so lengths are still known before a write.
+2. **`file_info`'s escaping-link report** built its lexical path without the variable. One function (`lexicalPath`) now gives every reader the lexical form.
+3. **The pin check** returned "no pin" for every variable path, though a rest climbing into the project writes the project file; it failed safe (one extra question at the next start). It now resolves the variable against the live work directory and judges the result.
+4. Tests: the containment test now points at a file that exists and asserts the escape refusal; the decision point and the pin check are tested for a climb into the project; the file child is tested end to end for a copy source named through the variable, and for its refusal with no work directory.
+
+Accepted, with the reason:
+
+- **An unresolvable variable path gets the project's audit reason** ("edits a file inside the project") at the decision point, because `realPathArgs` keeps a spelling it cannot resolve. The tier is the same, and the execution fails in the same resolver.
+- **A failed work-directory rotation** (`UseWorkDir` failing right after the directory was created) leaves the file tools on the previous directory while the environment names the new one, so a variable write lands in the previous session's directory. It needs `EvalSymlinks` or `OpenRoot` to fail on a directory just made; the write stays inside a root.
+- **Hooks and the approval detail show the spelling the model wrote**, as they already do for `../` and absolute spellings; hooks have `LAGENT_WORK_DIR` in their environment.
 
 ## Not decided here
 
@@ -140,7 +155,7 @@ A part of a split result reads `[lagent saved part <i> of <n> of this result as 
 ## Consequences
 
 - Every MCP result is on disk, not only the spilled ones, mode 0600 in the session work directory. Accepted: the operator keeps evidence of the same data in the project.
-- About 300–400 bytes of note per saved file enter the context outside the allotment. Saved file names grow by 56 hex characters.
+- About 500–550 bytes of note per saved file (about 300–400 before §7.2 spelled out the call) enter the context outside the allotment. Saved file names grow by 56 hex characters.
 - `write_file`'s schema grows one property, the child one raw-bytes operation, the transcript's tool-result entry one field. Older lagent builds resuming a transcript ignore it.
 - Accepted residuals, as in gem-agent: a copy gets the operator's default mode, not 0600; without the child, the credential check and the open are two steps; after a resume a note may name a work directory that is gone, and the copy then fails with that reason.
 

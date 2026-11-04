@@ -220,7 +220,11 @@ never from the server's text. When the history is sent, lagent's note
 about it is drawn from that field outside the nonce tag. `write_file`'s
 `from` copies such a file whole through the file-read child's raw
 `copy_source` operation (32 MiB, refused above or when interrupted), and
-the copy's hash is checked (ADR-0039).
+the copy's hash is checked (ADR-0039). The file tools resolve a path whose
+first segment is `$LAGENT_WORK_DIR` (or `${LAGENT_WORK_DIR}`) under the work
+directory, containment checked after the join, and the note names saved
+files that way, so the model copies a file name, not the long
+state-directory path (ADR-0039 §7.1).
 
 ## Configuration and drop-in behaviour
 

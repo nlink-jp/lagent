@@ -46,7 +46,9 @@ func loadInstructions(projectDir string, grant projectGrant) (section string, la
 // writes: no shell expands a variable on the way, so a variable name
 // there would arrive at the server literally. The environment variable
 // is still exported for shell commands and for mcp.json entries, which
-// ARE expanded. It is stated at all because a capability nothing points
+// ARE expanded, and the built-in file tools expand it at the head of a
+// path (ADR-0039 §7.1) — the short name the saved-result note uses,
+// because the model mis-copies the long one. It is stated at all because a capability nothing points
 // at never gets used: the model has no way to discover a directory it
 // was never told about, and would keep putting intermediates in the
 // project.
@@ -86,7 +88,7 @@ func sessionFacts(workDir string, dates sessionDates, catalog []string) string {
 	var b strings.Builder
 	if workDir != "" {
 		b.WriteString("- session work directory: " + workDir + "\n")
-		b.WriteString("  Use it for anything that is not part of the project: intermediate data, a report you are assembling, a file you only need for the next step. It is outside the project, so writing there does not dirty the user's working copy; the file tools can read and write it, and shell commands see it as $LAGENT_WORK_DIR (a shell command that writes there needs access: \"write\"). An MCP tool that takes a workspace or output directory should be given this path — write it out in full, since nothing expands variables inside a tool argument. Results too large to return inline are saved here for you, and the reply says where.\n")
+		b.WriteString("  Use it for anything that is not part of the project: intermediate data, a report you are assembling, a file you only need for the next step. It is outside the project, so writing there does not dirty the user's working copy. The file tools can read and write it: name a file in it as $LAGENT_WORK_DIR/<name>, which they expand, or by its full path. Shell commands see it as $LAGENT_WORK_DIR too (a shell command that writes there needs access: \"write\"). An MCP tool that takes a workspace or output directory should be given this path written out in full, since an MCP tool's arguments are passed as written. Every MCP result is saved here, and the reply says where.\n")
 	}
 	b.WriteString(dateFact(dates))
 	for _, line := range catalog {

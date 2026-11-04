@@ -201,7 +201,7 @@ func (in mcpIntake) spillRest(server, tool string, texts []string) (string, tool
 			len(texts), len(joined), rec.Err), rec
 	}
 	return fmt.Sprintf("[%d more text block(s), %d bytes — past the response budget, saved whole. Read them with read_file (offset/length reach any byte), or narrow the call and ask again: read_file %s]",
-		len(texts), len(joined), rec.Path), rec
+		len(texts), len(joined), in.name(rec.Path)), rec
 }
 
 // textExt names a text block's file: .json when it reads as JSON, so the
@@ -240,7 +240,7 @@ func (in mcpIntake) spillPiece(s, path string) string {
 	// a path followed by a full stop reads ambiguously, and the model
 	// has to hand it to read_file character for character.
 	return fmt.Sprintf("%s\n\n[%d bytes — too large to hold inline, so the whole result is saved. Shown above: %s. Read the rest with read_file offset/length, or narrow the call and ask again: read_file %s]",
-		preview, len(s), shown, path)
+		preview, len(s), shown, in.name(path))
 }
 
 // headAndTail returns the first head and last tail runes of s with an
@@ -301,9 +301,9 @@ func isImageBlock(b mcp.Content) bool { return b.Type == "image" }
 // refuse the block without saving it.
 func (in mcpIntake) binaryNote(_, _ string, b mcp.Content, path string) string {
 	if isImageBlock(b) {
-		return fmt.Sprintf("[image saved at %s (%d bytes, %s) — use view_image on that path to look at it]", path, len(b.Data), b.MIME)
+		return fmt.Sprintf("[image saved at %s (%d bytes, %s) — use view_image on that path to look at it]", in.name(path), len(b.Data), b.MIME)
 	}
-	return fmt.Sprintf("[%s content saved at %s (%d bytes, %s)]", b.Type, path, len(b.Data), b.MIME)
+	return fmt.Sprintf("[%s content saved at %s (%d bytes, %s)]", b.Type, in.name(path), len(b.Data), b.MIME)
 }
 
 // pathFor is the content-addressed path a block would be saved at. The
@@ -455,4 +455,15 @@ func (in mcpIntake) within(n int, ok bool) mcpIntake {
 	in.headRunes = min(in.headRunes, runes*3/4)
 	in.tailRunes = min(in.tailRunes, runes/4)
 	return in
+}
+
+// name is how the intake's own text names a saved file to the model:
+// $LAGENT_WORK_DIR/<name>, the form the file tools accept (ADR-0039 §7.1),
+// so the spill and binary notes inside the result agree with lagent's
+// note outside it, and neither asks the model to reproduce the long
+// state-directory path it was measured to mis-copy. The pre-write sizing
+// renders the same notes through the same function, so a note's length
+// is still known before anything is saved.
+func (in mcpIntake) name(path string) string {
+	return tools.WorkDirName(in.workDir(), path)
 }

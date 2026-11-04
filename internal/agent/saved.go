@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -8,14 +10,23 @@ import (
 	"github.com/nlink-jp/lagent/internal/tools"
 )
 
-// savedFiles converts the intake's records to the transcript's shape.
-func savedFiles(in []tools.Saved) []llm.SavedFile {
+// savedFiles converts the intake's records to the transcript's shape,
+// naming each file as the file tools accept it in this session's work
+// directory (ADR-0039 §7.1). The name is fixed here, with the work
+// directory the result was saved in, so a later note never re-derives it
+// against another one.
+func savedFiles(in []tools.Saved, workDir string) []llm.SavedFile {
 	if len(in) == 0 {
 		return nil
 	}
 	out := make([]llm.SavedFile, len(in))
 	for i, s := range in {
 		out[i] = llm.SavedFile{Path: s.Path, Bytes: s.Bytes, SHA256: s.SHA256, Error: s.Err}
+		if s.Path != "" {
+			if ref := tools.WorkDirName(workDir, s.Path); ref != s.Path {
+				out[i].Ref = ref
+			}
+		}
 	}
 	return out
 }
@@ -64,15 +75,35 @@ func savedNote(files []llm.SavedFile) string {
 				"[lagent could not save %s (%s), so there is no file to copy]", what, f.Error))
 			continue
 		}
+		name := f.Ref
+		if name == "" {
+			name = f.Path
+		}
+		// The call is spelled out (ADR-0039 §7.2): measured, the model
+		// reached for mkdir and cp first in 18 of 20 runs, and the words
+		// name what makes them unnecessary rather than forbid them.
+		from := jsonString(name)
 		if n > 1 {
 			lines = append(lines, fmt.Sprintf(
-				"[lagent saved %s: %s (%d bytes, sha256 %s) — to keep the whole result as evidence, copy every part, each with write_file from set to its path]",
-				what, f.Path, f.Bytes, f.SHA256))
+				`[lagent saved %s as %s (%d bytes, sha256 %s). To keep the whole result as evidence, copy every part: write_file {"path": "<destination>", "from": %s} for each]`,
+				what, name, f.Bytes, f.SHA256, from))
 			continue
 		}
 		lines = append(lines, fmt.Sprintf(
-			"[lagent saved this result whole: %s (%d bytes, sha256 %s) — to keep it as evidence, write_file with from set to that path copies it byte for byte]",
-			f.Path, f.Bytes, f.SHA256))
+			`[lagent saved this result whole as %s (%d bytes, sha256 %s). To keep it as evidence, copy the file instead of re-typing it: write_file {"path": "<destination>", "from": %s} copies it byte for byte and creates the parent directories — no shell command is needed]`,
+			name, f.Bytes, f.SHA256, from))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// jsonString is s as a JSON string literal, as the model would write it
+// in the call the note spells out — without the HTML escaping
+// encoding/json applies by default, which would print a path's `&` or
+// `<` as \u0026 and \u003c.
+func jsonString(s string) string {
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(s)
+	return strings.TrimSuffix(b.String(), "\n")
 }

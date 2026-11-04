@@ -169,12 +169,18 @@ func TestExtForMIME(t *testing.T) {
 	}
 }
 
-// extractPath pulls the saved file's path out of the rendered text.
+// extractPath pulls the saved file's path out of the rendered text. The
+// intake names it as $LAGENT_WORK_DIR/<name> (ADR-0039 §7.1), never by
+// the long absolute path the model was measured to mis-copy; the
+// returned path is the absolute one the name resolves to.
 func extractPath(t *testing.T, out, work string) string {
 	t.Helper()
 	for _, f := range strings.Fields(strings.NewReplacer("(", " ", ")", " ", "[", " ", "]", " ", ",", " ").Replace(out)) {
 		if strings.HasPrefix(f, work) {
-			return f
+			t.Fatalf("the intake printed the absolute work-directory path %q", f)
+		}
+		if rest, ok := tools.WorkDirRef(f); ok {
+			return filepath.Join(work, rest)
 		}
 	}
 	t.Fatalf("no path under %q in %q", work, out)

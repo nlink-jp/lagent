@@ -109,10 +109,18 @@ func TestSessionFactsNameTheWorkDirectory(t *testing.T) {
 	if !strings.Contains(got, work) {
 		t.Error("the work directory is not named in the facts")
 	}
-	// The literal path, not the variable: an MCP tool argument is JSON
-	// the model writes, and nothing expands a variable on the way.
+	// The literal path, not the variable, for an MCP tool: its argument
+	// is JSON the model writes, and nothing expands a variable on the way.
 	if !strings.Contains(got, "$LAGENT_WORK_DIR") {
 		t.Error("shell commands are not told the variable exists")
+	}
+	// The file tools do expand it (ADR-0039 §7.1), and the model has to
+	// be told so, or the saved-result note's name looks like a mistake.
+	if !strings.Contains(got, "name a file in it as $LAGENT_WORK_DIR/<name>, which they expand") {
+		t.Error("the file tools' short name for the work directory is not stated")
+	}
+	if !strings.Contains(got, "passed as written") {
+		t.Error("an MCP tool's arguments must still be said to arrive unexpanded")
 	}
 	if i, j := strings.Index(got, work), strings.Index(got, "$LAGENT_WORK_DIR"); i < 0 || j < 0 || i > j {
 		t.Error("the literal path should be given before the variable is mentioned")

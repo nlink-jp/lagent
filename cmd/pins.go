@@ -15,6 +15,7 @@ import (
 	"github.com/nlink-jp/lagent/internal/llm"
 	"github.com/nlink-jp/lagent/internal/pathid"
 	"github.com/nlink-jp/lagent/internal/statedir"
+	"github.com/nlink-jp/lagent/internal/tools"
 	"github.com/nlink-jp/lagent/internal/trustpin"
 	"github.com/nlink-jp/lagent/internal/uitext"
 )
@@ -152,13 +153,24 @@ func pinNames(pins trustpin.Pins) string {
 // pinNameForWrite maps an operator-approved write_file/edit_file call
 // to the pin its target belongs to, or "" when the write touched no
 // pinned content (or was not a file write at all).
-func pinNameForWrite(projectDir string, tc llm.ToolCall) string {
+func pinNameForWrite(projectDir, workDir string, tc llm.ToolCall) string {
 	if tc.Name != "write_file" && tc.Name != "edit_file" {
 		return ""
 	}
 	p, _ := tc.Args["path"].(string)
 	if p == "" {
 		return ""
+	}
+	if rest, ok := tools.WorkDirRef(p); ok {
+		// $LAGENT_WORK_DIR/… names the session work directory (ADR-0039
+		// §7.1), and is judged as the file tools resolve it: a rest that
+		// climbs back into the project writes the project file it names
+		// (independent review). With no work directory the write is
+		// refused, so it touches no pin.
+		if workDir == "" {
+			return ""
+		}
+		p = filepath.Join(workDir, rest)
 	}
 	if !filepath.IsAbs(p) {
 		p = filepath.Join(projectDir, p)

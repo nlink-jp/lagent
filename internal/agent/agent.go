@@ -1029,7 +1029,7 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 				// The files the runtime saved for this result (ADR-0039
 				// §1): provenance from the intake through the context,
 				// never read out of the text a server wrote.
-				Saved: savedFiles(saves.Files()),
+				Saved: savedFiles(saves.Files(), a.registry.WorkDir()),
 			}
 			// view_image's pixels ride on the TOOL message (ADR-0005):
 			// the backend turns them into the image part that follows
