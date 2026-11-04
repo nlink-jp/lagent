@@ -417,3 +417,15 @@ excepted).
   BEL (the default), an OSC 9 with a fixed body plus BEL, or nothing; a
   keystroke puts it off to the next check; the plain REPL and `-p` never
   notify. `Inject` comes over to the sweep writer for it
+- [`ADR-0039`](adr/0039-evidence-is-copied-not-retyped.md) —
+  every MCP result is saved, and evidence is copied from the saved file — never
+  re-typed (**Proposed**; ported from gem-agent ADR-0105 on the operator's report
+  for both runtimes): every text block is saved under its full sha256 and recorded
+  in the tool-result entry's `saved` field, which the server cannot write; lagent's
+  note outside the nonce tag offers the copy; `write_file` gains `from`, a
+  byte-for-byte copy judged exactly as a write of content, a credential source
+  Block. Measured before: s3 0 copies in 10
+- [`ADR-0040`](adr/0040-skill-descriptions-are-read-whole.md) —
+  a skill's description is read as Claude Code reads it (**Proposed**; ported
+  from gem-agent ADR-0106, Issue #3 there): up to 1,024 characters with a note
+  when cut, and multi-line YAML values (`>`, `|`, continued plain scalars) read whole

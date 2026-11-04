@@ -312,3 +312,12 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   6 秒キー入力無しのままなら端末に 1 回知らせる。`[tui].notify` は BEL（既定）、固定の本文の OSC 9 と
   BEL、なしから選ぶ。キー入力は次の確認まで先送りする。素の REPL と `-p` では知らせない。そのために
   sweep writer に `Inject` を持ち込む
+- [`ADR-0039`](adr/0039-evidence-is-copied-not-retyped.ja.md) —
+  MCP の結果はすべて保存し、エビデンスは保存したファイルから写す — 打ち直さない（**Proposed**。
+  両ランタイムについての利用者の報告を受け、gem-agent ADR-0105 から移植）: テキストのブロックはすべて
+  全桁の sha256 の名前で保存し、サーバが書けないツール結果の `saved` 欄に記録する。nonce タグの外の
+  lagent の注記がコピーを案内する。`write_file` に `from` を足す。バイト単位のコピーで、内容を書くときと
+  まったく同じ判定にかけ、資格情報が元なら Block。変更前の測定: s3 で 10 回中コピー 0
+- [`ADR-0040`](adr/0040-skill-descriptions-are-read-whole.ja.md) —
+  スキルの説明は Claude Code と同じに読む（**Proposed**。gem-agent ADR-0106 から移植。発端はその Issue #3）:
+  1,024 文字まで示し、切ったら注記する。複数行の YAML の値（`>`・`|`・字下げで続くプレーンスカラー）も丸ごと読む
