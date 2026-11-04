@@ -46,7 +46,7 @@ lagent adopts gem-agent ADR-0105 §1–§4 as implemented at `edd8e60` (§8 ther
   [lagent saved this result whole: <path> (<n> bytes, sha256 <64 hex>) — to keep it as evidence, write_file with from set to that path copies it byte for byte]
   ```
 
-  With no work directory (the transcript is off) the line says there is no file to copy. A result saved as more than one file — the inline group, a spilled block, the rest past the budget, an image — is never called whole: each line reads `[lagent saved part <i> of <n> of this result: <path> (…) — to keep the whole result as evidence, copy every part, each with write_file from set to its path]` (§6).
+  With no work directory (the transcript is off) the line says there is no file to copy. A result saved as more than one file — the inline group, a spilled block, the rest past the budget, an image — is never called whole: each line reads `[lagent saved part <i> of <n> of this result: <path> (…) — to keep the whole result as evidence, copy every part, each with write_file from set to its path]` (§6). The wording is revised in §7.2.
 
 **Under ADR-0034.** The note is not the server's text, so it is not paid from the response budget or the call's allotment, and the inline text is unchanged. It is bounded all the same: one line for the inline group, one per spilled piece (each of which had to fit the budget to exist) and one per saved image. It is bytes the model receives, so the round budget and the compaction estimate count it as sent: one function (`runtimeSuffix`) builds what the wrap appends — the runtime note and this note — and the same function is what `spend` and `estimateTokens` count (§6). ADR-0034's backstop (`CutUnkept`) applies to the result text as before; the note is appended after it, so a cut result still names its whole saved file.
 
@@ -104,11 +104,38 @@ A sub-agent read the implementation against this record, gem-agent's and the cod
 
 Noted, not changed: an image's saved file gets a note beside its own image note (bounded, and the copy route applies to an image too); after compaction the summary drops the notes, so the model loses older paths — the transcript keeps them.
 
+## 7. Revision after the first measurement (2026-11-05)
+
+§5.1 found two causes. The operator chose to fix the second in the runtime as well as revising the wording, and to spend §5's one further measurement on both together.
+
+### 7.1 The work directory has a short name in the file tools
+
+A path whose first segment is exactly `$LAGENT_WORK_DIR` or `${LAGENT_WORK_DIR}` is resolved under the session work directory by the file tools' one resolver (`resolvePath`), so `$LAGENT_WORK_DIR/<name>` means in `read_file`, `write_file` (`path` and `from`) and the rest what it already means in a shell command. It is the name the runtime-facts message already gives the directory, not a new one.
+
+- **Containment is unchanged.** The expansion happens before the roots are checked, so `$LAGENT_WORK_DIR/../x` is refused like any other escape. With no work directory (the transcript is off) such a path is an error that says so, never a project path.
+- **Judged as what it names.** The decision point resolves a judged path to its real path before classifying (`realPathArgs`), and that goes through the same resolver, so a write to `$LAGENT_WORK_DIR/x` is judged a work-directory write and a `from` naming credential material through it is still Block. The pin check of an approved write treats such a path as outside the project.
+- **What is not expanded.** Only that first segment, only in the built-in file tools. An MCP tool argument is still passed as written, and the facts message keeps telling the model to give such a tool the directory in full. A project directory literally named `$LAGENT_WORK_DIR` is reached as `./$LAGENT_WORK_DIR`.
+
+This removes the trap where it is: the model no longer has to reproduce the state-directory name, the project path with `/` replaced by `-`, which §5.1 found it rewrote as the project path. The file name it has to copy is the part it copied right in every run.
+
+### 7.2 The note names the file that way, and gives the call
+
+```
+[lagent saved this result whole as $LAGENT_WORK_DIR/<name> (<n> bytes, sha256 <64 hex>). To keep it as evidence, copy the file instead of re-typing it: write_file {"path": "<destination>", "from": "$LAGENT_WORK_DIR/<name>"} copies it byte for byte and creates the parent directories — no shell command is needed]
+```
+
+A part of a split result reads `[lagent saved part <i> of <n> of this result as $LAGENT_WORK_DIR/<name> (…). To keep the whole result as evidence, copy every part: write_file {"path": "<destination>", "from": "$LAGENT_WORK_DIR/<name>"} for each]`. The absolute path stays in the transcript's `saved` record. The call is spelled out because in §5.1 the model reached for `mkdir` and `cp` first in 18 of 20 runs; the words name what makes them unnecessary rather than forbidding them. `write_file`'s `from` description and the facts message's work-directory line say the same.
+
+### 7.3 The second measurement, pre-registered
+
+§5 unchanged — cells, n = 10, at least 8 of 10 copied in each cell, failed or contaminated runs replaced up to 2n — at the commit that implements this section, `-jobs 2` as in §5.1. Still below the threshold in either cell, the operator decides; §1, §2 and §7.1 stand either way.
+
 ## Not decided here
 
 - Built-in tool output (`shell_exec` already spools cut output, gem-agent ADR-0096 §3 as ported).
 - The write-lane asymmetry itself (ADR-0032 stands).
 - The work directory's lifetime: saved results go with it; evidence is copied into the project.
+- Whether gem-agent takes §7.1: the trap is in its layout too, but it measured 20 of 20 copied without it. gem-agent's owner decides, with this section's measurement in hand.
 
 ## Consequences
 
