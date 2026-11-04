@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.23.1] - 2026-11-04
+
+### Changed
+
+- **The config files are read by nlink-jp/toml** (v0.1.1) instead of the
+  third-party `BurntSushi/toml`, so the tool carries no TOML code from
+  outside the organization. `config.toml`, `policy.toml`, a project's
+  `.lagent.toml` and the bench's `task.toml` read as before: unknown keys
+  are still refused with their names (the project file's message still says
+  what it may carry), the project file is still read through its capped
+  read before the trust prompt, and the settings that came from the file
+  are still told apart.
+
 ## [0.23.0] - 2026-11-04
 
 ### Added
