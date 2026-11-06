@@ -431,3 +431,7 @@ excepted).
   a skill's description is read as Claude Code reads it (**Accepted**, implemented; ported
   from gem-agent ADR-0106, Issue #3 there): up to 1,024 characters with a note
   when cut, and multi-line YAML values (`>`, `|`, continued plain scalars) read whole
+- [`ADR-0041`](adr/0041-a-path-is-judged-where-it-leads.md) —
+  a path is judged where it leads, and a probe that cannot remove itself says so (**Accepted**, implemented; ported
+  from gem-agent ADR-0108 and ADR-0107 §4): a full path through a link outside the roots (`~/Dropbox` → `~/Library/CloudStorage/Dropbox`)
+  is rewritten once to its real path where the call comes in, and a probe file left in the project is named

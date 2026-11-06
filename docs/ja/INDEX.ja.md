@@ -322,3 +322,6 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
 - [`ADR-0040`](adr/0040-skill-descriptions-are-read-whole.ja.md) —
   スキルの説明は Claude Code と同じに読む（**Accepted**、実装済み。gem-agent ADR-0106 から移植。発端はその Issue #3）:
   1,024 文字まで示し、切ったら注記する。複数行の YAML の値（`>`・`|`・字下げで続くプレーンスカラー）も丸ごと読む
+- [`ADR-0041`](adr/0041-a-path-is-judged-where-it-leads.ja.md) —
+  パスは行き着く先で判定し、自分を消せなかったプローブはそう言う（**Accepted**、実装済み。gem-agent ADR-0108 と ADR-0107 §4 から移植）:
+  ルートの外のリンク（`~/Dropbox` → `~/Library/CloudStorage/Dropbox`）を通した完全なパスは、呼び出しが入ってきたところで一度だけ実パスに書き換え、プロジェクトに残ったプローブのファイルは名前を示す
