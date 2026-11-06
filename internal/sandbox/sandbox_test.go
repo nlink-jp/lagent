@@ -511,13 +511,13 @@ func TestVerifyWriteLane(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := VerifyWriteLane(profile, spec); err != nil {
+	if left, err := VerifyWriteLane(profile, spec); err != nil || len(left) != 0 {
 		t.Errorf("the real write lane failed verification: %v", err)
 	}
-	if err := VerifyWriteLane("(version 1)(allow default)", spec); err == nil {
+	if _, err := VerifyWriteLane("(version 1)(allow default)", spec); err == nil {
 		t.Error("an allow-everything profile passed verification")
 	}
-	if err := VerifyWriteLane("(version 1)(deny default)", spec); err == nil {
+	if _, err := VerifyWriteLane("(version 1)(deny default)", spec); err == nil {
 		t.Error("a deny-everything profile passed verification")
 	}
 	entries, _ := os.ReadDir(proj)
@@ -551,10 +551,10 @@ func TestVerifyReadLane(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := VerifyReadLane(profile, spec); err != nil {
+	if left, err := VerifyReadLane(profile, spec); err != nil || len(left) != 0 {
 		t.Errorf("the real read lane failed verification: %v", err)
 	}
-	if err := VerifyReadLane("(version 1)(allow default)", spec); err == nil {
+	if _, err := VerifyReadLane("(version 1)(allow default)", spec); err == nil {
 		t.Error("an allow-everything profile passed verification")
 	}
 	// Final review R1: a pre-existing file with the old fixed probe
@@ -567,7 +567,7 @@ func TestVerifyReadLane(t *testing.T) {
 	if err := os.Symlink("keep.txt", filepath.Join(proj, ".lagent-lane-probe")); err != nil {
 		t.Fatal(err)
 	}
-	if err := VerifyReadLane(profile, spec); err != nil {
+	if left, err := VerifyReadLane(profile, spec); err != nil || len(left) != 0 {
 		t.Errorf("verification failed with a bystander link present: %v", err)
 	}
 	if got, _ := os.ReadFile(target); string(got) != "keep\n" {

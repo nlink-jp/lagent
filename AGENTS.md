@@ -294,6 +294,14 @@ answers.
 
 ## Gotchas
 
+- **A path through a link outside the roots is rewritten once, in the
+  tool-call loop** (`Agent.intoRoots` → `sandbox.IntoRoot`, ADR-0041,
+  ported from gem-agent ADR-0108): the approval, verdict, hooks, run and
+  audit share one string; do not resolve it again later, or the verdict
+  and the run part. Only the tools in `pathArgTools` are touched. The
+  lane probes return the files they could not remove apart from their
+  errors; `buildExecFn` turns them into an operator note — never drop
+  them with `_ = os.Remove` again.
 - **`Message.Saved` is provenance, never parsed from text** (ADR-0039). The
   MCP intake returns what it saved beside the text, the adapter calls
   `tools.RecordSaved(ctx, …)`, and the executor's per-call `SaveRecorder`

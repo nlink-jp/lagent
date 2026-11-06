@@ -238,3 +238,70 @@ func (a *Agent) laneOf(tc llm.ToolCall) string {
 	}
 	return lane.String()
 }
+
+// pathArgTools are the built-in tools whose `path` (and file_info's
+// `paths`) name a file or a directory the file tools confine; write_file
+// alone has a `from` that is one too. A tool missing here is left as
+// typed and refused as before, which fails safe (ADR-0041 §1).
+var pathArgTools = map[string]bool{
+	"read_file": true, "write_file": true, "edit_file": true,
+	"view_image": true, "show_image": true, "file_info": true,
+	"list_files": true, "list_tree": true, "search_files": true,
+}
+
+// intoRoots rewrites a built-in file tool's path arguments that were
+// typed through a link outside the project and the work directory into
+// the real path inside the root they lead to (ADR-0041 §1, porting
+// gem-agent ADR-0108 §1 at e42f89e). It runs once, where the call comes
+// in, and the rewritten call is the one shown, judged, hooked, run and
+// audited: the verdict and the run read one string, so no link is
+// consulted between them. The map is copied only when something changed.
+func (a *Agent) intoRoots(tc llm.ToolCall) llm.ToolCall {
+	if !pathArgTools[tc.Name] {
+		return tc
+	}
+	roots := []string{a.registry.ProjectDir(), a.registry.WorkDir()}
+	var out map[string]any
+	set := func(k string, v any) {
+		if out == nil {
+			out = make(map[string]any, len(tc.Args))
+			for k, v := range tc.Args {
+				out[k] = v
+			}
+		}
+		out[k] = v
+	}
+	keys := []string{"path"}
+	if tc.Name == "write_file" {
+		keys = append(keys, "from")
+	}
+	for _, k := range keys {
+		if p, ok := tc.Args[k].(string); ok {
+			if real, ok := sandbox.IntoRoot(p, roots); ok {
+				set(k, real)
+			}
+		}
+	}
+	if raw, ok := tc.Args["paths"].([]any); ok {
+		var resolved []any
+		for i, v := range raw {
+			p, ok := v.(string)
+			if !ok {
+				continue
+			}
+			if real, ok := sandbox.IntoRoot(p, roots); ok {
+				if resolved == nil {
+					resolved = append([]any(nil), raw...)
+				}
+				resolved[i] = real
+			}
+		}
+		if resolved != nil {
+			set("paths", resolved)
+		}
+	}
+	if out != nil {
+		tc.Args = out
+	}
+	return tc
+}

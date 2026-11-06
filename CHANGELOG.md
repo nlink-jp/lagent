@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A path through a link outside the project reaches the directory it
+  leads to** (ADR-0041, ported from gem-agent ADR-0108). With the
+  project in `~/Library/CloudStorage/Dropbox/proj`, the full path through
+  the link, `/Users/<you>/Dropbox/proj/x.txt`, was refused by every file tool — even
+  an approved write failed with "path escapes the project directory" —
+  while the real path worked. Such a path is now replaced by the real one
+  where the call comes in, when it leads into the project or the work
+  directory; the approval, the verdict, pre-tool hooks, the run and the
+  audit all see that one path (the model's own message keeps what it
+  typed). A link leading anywhere else is refused as before, without
+  saying where it leads. The last element, a credential-looking name,
+  paths in `/Volumes`, `/Network`, `/net` and `/home` and links that lead
+  into them are left as typed. `@` references follow the same rule.
+- **A sandbox probe file that cannot be removed is reported** (ADR-0041
+  §2, from gem-agent ADR-0107 §4). The start-up check creates test files
+  in the project and removed them ignoring a failure; in a shared drive
+  that lets you create but not delete they would stay and sync to
+  everyone sharing it, unannounced. Each leftover is now named in a
+  start-up note.
+
 ## [0.24.0] - 2026-11-05
 
 ### Added

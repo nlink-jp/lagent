@@ -104,7 +104,12 @@ catalog; `/mcp` shows each server's loaded state.
 `Agent.Run` takes the operator's text, expands `@`-references into
 attachments beside it, and loops: send the history (tool results
 nonce-wrapped at send time), stream the answer, and for each tool call
-decide, gate, execute, and append the result. The loop ends on a text
+decide, gate, execute, and append the result. Before any of that, a file
+tool's absolute path typed through a link outside the roots
+(`~/Dropbox/proj` → `~/Library/CloudStorage/Dropbox/proj`) is rewritten
+once to its real path (`sandbox.IntoRoot`, ADR-0041), so what is shown,
+judged, run and audited is one string; the model's own message keeps
+what it sent. The loop ends on a text
 answer, a round limit, or a loop-guard stop. A completion that carries
 neither text nor a tool call is asked again, twice at most, with the
 same history and one transient line appended, before it is reported

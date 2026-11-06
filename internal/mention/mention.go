@@ -11,6 +11,7 @@ package mention
 import (
 	"github.com/nlink-jp/lagent/internal/bounded"
 	"github.com/nlink-jp/lagent/internal/pathid"
+	"github.com/nlink-jp/lagent/internal/sandbox"
 
 	"context"
 	"fmt"
@@ -536,6 +537,12 @@ func resolve(projectDir, workDir, ref string) (string, error) {
 	p := ref
 	if strings.HasPrefix(p, "~") {
 		return "", outside("")
+	}
+	// An absolute reference typed through a link outside the roots is
+	// the real path it leads to (ADR-0041 §1); anything else is left as
+	// typed and confined below exactly as before.
+	if real, ok := sandbox.IntoRoot(p, []string{projectDir, workDir}); ok {
+		p = real
 	}
 	if !filepath.IsAbs(p) {
 		p = filepath.Join(projectDir, p)

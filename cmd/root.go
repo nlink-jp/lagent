@@ -1991,6 +1991,7 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 		}
 	}
 	var notes []string
+	var leftovers []string
 	// The read lane's private scratch: under the work directory when
 	// there is one, a fresh temporary directory otherwise. TMPDIR points
 	// there for read-lane commands, so what such a command may change
@@ -2013,7 +2014,9 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 		// The claim is checked, not assumed: a read-lane call runs
 		// unasked only where the kernel demonstrably denies what the
 		// lane says it denies.
-		if err := sandbox.VerifyReadLane(profiles[sandbox.LaneRead], spec); err != nil {
+		readLeft, err := sandbox.VerifyReadLane(profiles[sandbox.LaneRead], spec)
+		leftovers = append(leftovers, readLeft...)
+		if err != nil {
 			enf.ReadLane = false
 			notes = append(notes, fmt.Sprintf("read lane disabled: %v; every shell_exec asks", err))
 		}
@@ -2024,9 +2027,16 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 	// unconfined, and every shell command is the operator's to answer.
 	// The commands stay wrapped: a cage that half-works is still in
 	// the way.
-	if err := sandbox.VerifyWriteLane(profiles[sandbox.LaneWrite], spec); err != nil {
+	writeLeft, err := sandbox.VerifyWriteLane(profiles[sandbox.LaneWrite], spec)
+	leftovers = append(leftovers, writeLeft...)
+	if err != nil {
 		enf = sandbox.Enforcement{}
 		notes = append(notes, fmt.Sprintf("sandbox unverified: %v — shell commands run as unconfined: every one asks you", err))
+	}
+	// A probe file left in the project is the operator's to delete
+	// (ADR-0041 §2); both callers show these notes to the operator only.
+	if len(leftovers) > 0 {
+		notes = append(notes, sandbox.LeftoverNote(leftovers))
 	}
 	scratch := spec.ReadScratch
 	return func(ctx context.Context, command string, lane sandbox.Lane) *exec.Cmd {

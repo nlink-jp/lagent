@@ -953,6 +953,10 @@ func (a *Agent) Run(ctx context.Context, input string, onText func(string)) (out
 		// or without automatic compaction (§7).
 		budget := roundBudget{window: a.awaitWindow(ctx)}
 		for i, tc := range resp.ToolCalls {
+			// A path typed through a link outside the roots becomes the
+			// real path it leads to, once, before anything shows, judges,
+			// hooks, runs or records the call (ADR-0041 §1).
+			tc = a.intoRoots(tc)
 			if a.onToolCall != nil {
 				a.onToolCall(tc)
 			}

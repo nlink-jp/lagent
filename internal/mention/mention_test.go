@@ -547,3 +547,31 @@ func TestRefsTakeDroppedImagePathsAndEscapedSpaces(t *testing.T) {
 		}
 	}
 }
+
+// An absolute reference through a link outside the roots attaches the
+// file it leads to in the project; one leading out is refused as before
+// (ADR-0041 §1).
+func TestExpandThroughAnOutsideLink(t *testing.T) {
+	proj, _ := filepath.EvalSymlinks(t.TempDir())
+	outside, _ := filepath.EvalSymlinks(t.TempDir())
+	escape, _ := filepath.EvalSymlinks(t.TempDir())
+	if err := os.WriteFile(filepath.Join(proj, "note.md"), []byte("LINKED-SENTINEL"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(escape, "stray.md"), []byte("ESCAPED"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for name, target := range map[string]string{"proj": proj, "elsewhere": escape} {
+		if err := os.Symlink(target, filepath.Join(outside, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := "@" + filepath.Join(outside, "proj", "note.md") + " と @" + filepath.Join(outside, "elsewhere", "stray.md")
+	atts, problems := Expand(context.Background(), in, proj, "", DefaultLimits())
+	if len(atts) != 1 || !strings.Contains(atts[0].Content, "LINKED-SENTINEL") {
+		t.Errorf("attachments = %+v", atts)
+	}
+	if len(problems) != 1 || strings.Contains(problems[0].Reason, escape) {
+		t.Errorf("problems = %+v", problems)
+	}
+}
