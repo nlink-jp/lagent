@@ -107,8 +107,10 @@ injection case passed —
   evidence file is what the server returned is then a hash comparison
   (ADR-0039).
 - **Confinement:** file tools stay inside the project (and the session
-  work directory) — a full path through a link such as `~/Dropbox/proj`
-  reaches it like its real path — and a credential file — `.env`, a private key, a
+  work directory) — a full path through a link, such as
+  `/Users/<you>/Dropbox/proj/…` with `~/Dropbox` a link into
+  `~/Library/CloudStorage`, reaches it like its real path (`~` itself is
+  not expanded) — and a credential file — `.env`, a private key, a
   token store — is read only when you approve it, every time, never
   unattended: those reads run in a sandboxed child that cannot open
   credential material at all, so the list raises the question and the

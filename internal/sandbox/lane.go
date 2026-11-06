@@ -774,7 +774,9 @@ func VerifyReadLane(profile string, spec Spec) (leftovers []string, err error) {
 // the configuration says (gem-agent ADR-0073 §5, extended to the write lane in
 // §7): a machine, or a build, where sandbox-exec is present but applies
 // no cage is unconfined, and every shell command asks the operator. The
-// probe files are created exclusively under random names and removed.
+// probe files are created exclusively under random names and removed;
+// leftovers names any it could not remove (ADR-0041 §2), whatever the
+// result.
 func VerifyWriteLane(profile string, spec Spec) (leftovers []string, err error) {
 	if err := Available(); err != nil {
 		return nil, fmt.Errorf("sandbox-exec cannot apply a profile here: %w", err)

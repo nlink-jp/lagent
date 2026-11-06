@@ -143,6 +143,9 @@ func TestIntoRootsLeavesEverythingElse(t *testing.T) {
 	if _, err := tool.Run(context.Background(), tc.Args); err == nil || strings.Contains(err.Error(), escape) {
 		t.Errorf("err = %v, want a refusal that does not name %s", err, escape)
 	}
+	if _, err := os.Stat(filepath.Join(escape, "x.txt")); err == nil {
+		t.Error("the write escaped")
+	}
 	in := filepath.Join(outside, "proj", "a.txt")
 	real := filepath.Join(reg.ProjectDir(), "a.txt")
 	got := a.intoRoots(llm.ToolCall{Name: "write_file", Args: map[string]any{"path": in, "from": in}})
