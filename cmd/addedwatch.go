@@ -102,6 +102,11 @@ func (w *addedWatch) report(reason string, log func(kind string, data any) error
 		return
 	}
 	for _, root := range w.roots {
+		// A root that is not there now (an ejected volume) tells nothing:
+		// an empty walk would report everything in it as removed.
+		if _, err := os.Stat(root); err != nil {
+			continue
+		}
 		now, cut := w.snapshot(root)
 		a, c, r := trustpin.SnapshotDiff(w.base[root], now)
 		if cut {
@@ -180,6 +185,18 @@ func (w *addedWatch) add(root string, absorbed []string, log func(kind string, d
 	w.base[root] = snap
 	w.save()
 	return notes
+}
+
+// forget stops watching every root, when the session has dropped them
+// (ADR-0046): one added again later starts from a new snapshot.
+func (w *addedWatch) forget() {
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.roots, w.base = nil, map[string]map[string]string{}
+	w.save()
 }
 
 func (w *addedWatch) save() {

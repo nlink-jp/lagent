@@ -211,6 +211,11 @@ nothing in one (its `AGENTS.md`, `.mcp.json`, skills) is loaded. A directory
 added during a session lasts until lagent exits. A folder in Google Drive,
 Dropbox, OneDrive or iCloud Drive can be a write directory.
 
+To check the sandbox, lagent briefly creates and removes a small
+`.lagent-root-probe-*` directory in an added directory it can write, the
+read-only kind included. In a synced folder, that can reach your other
+devices for a moment.
+
 Do not add a directory above projects you open with an agent as a write
 directory. A command can move a directory holding an `AGENTS.md` or a git
 hook into it; lagent tells you when that happens, but does not stop it.

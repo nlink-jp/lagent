@@ -7,7 +7,7 @@
 - **Directories outside the project, under the same lanes** (ADR-0046).
   `--add-dir <path>` adds a directory the file tools and the write and
   operator lanes write like the project; `--read-dir <path>` adds one that
-  is read and written by nothing. Both repeat, and `[directories]` in the
+  is read only: no tool or lane writes it. Both repeat, and `[directories]` in the
   global config file lists them too. Nothing in an added directory is
   loaded: not its instruction files, MCP servers or skills.
 - **Adding a directory during a session.** `/add-dir <path>` and

@@ -89,12 +89,14 @@ enabled = true
 # .git hooks protected the same way. "read": read like the project,
 # written by nothing; the read lane reads it even on an external volume.
 # Nothing in them is loaded: their instruction files, MCP servers and
-# skills are not read. Refused: /, your home, anything holding a
+# skills are not read. Refused: /, your home, anything in or around a
 # credential location or the configuration or state directory, anything
-# in or around a shared temporary directory or /dev, /Volumes and
-# /Network themselves, and for write ~/Library (except a synced folder:
-# a provider's account folder in ~/Library/CloudStorage or below it, or
-# iCloud Drive) or the config file in use. A path that is not there now,
+# in or around a shared temporary directory or /dev, /Volumes, /Network
+# and ~/Library themselves, and for write anything inside ~/Library
+# (except a synced folder: a provider's account folder in
+# ~/Library/CloudStorage or below it, or iCloud Drive) or holding the
+# config file in use. To check the sandbox, lagent briefly creates and
+# removes a .lagent-root-probe-* directory in each one it can write. A path that is not there now,
 # holds the project you start in, or is already covered is skipped with
 # a note. --add-dir / --read-dir add more.
 #write = ["~/notes"]

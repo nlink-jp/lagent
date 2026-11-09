@@ -80,24 +80,30 @@ type fileChildRequest struct {
 	Allot *int `json:"allot,omitempty"`
 }
 
-// rootsNamedBy keeps the added roots a call's path arguments lie in. The
-// child opens only those: one stale share must not stall a read that has
-// nothing to do with it (ADR-0041 §1). A root is reached only by an
-// absolute path, so a call without one needs none.
-func rootsNamedBy(added []sandbox.AddedRoot, args map[string]any) []sandbox.AddedRoot {
+// rootsNamedBy keeps the added roots a call's arguments lie in, a
+// relative path being relative to the project. The child opens only
+// those: one stale share must not stall a read that has nothing to do
+// with it (ADR-0041 §1).
+func rootsNamedBy(added []sandbox.AddedRoot, args map[string]any, projectDir string) []sandbox.AddedRoot {
 	var out []sandbox.AddedRoot
 	for _, a := range added {
-		if argsLieIn(a.Dir, args) {
+		if argsLieIn(a.Dir, args, projectDir) {
 			out = append(out, a)
 		}
 	}
 	return out
 }
 
-func argsLieIn(dir string, args map[string]any) bool {
+func argsLieIn(dir string, args map[string]any, projectDir string) bool {
 	names := func(v any) bool {
 		s, ok := v.(string)
-		return ok && filepath.IsAbs(s) && pathid.Within(dir, filepath.Clean(s))
+		if !ok || s == "" {
+			return false
+		}
+		if !filepath.IsAbs(s) {
+			s = filepath.Join(projectDir, s)
+		}
+		return pathid.Within(dir, filepath.Clean(s))
 	}
 	for _, v := range args {
 		if names(v) {
@@ -147,7 +153,7 @@ func newFileChildCmd() *cobra.Command {
 			// not open (an ejected volume, a renamed directory) must not
 			// take every project read down with it — a path under it then
 			// fails on its own, as a work directory's does above.
-			for _, a := range rootsNamedBy(req.Added, req.Args) {
+			for _, a := range rootsNamedBy(req.Added, req.Args, req.ProjectDir) {
 				_ = reg.AddDirs([]sandbox.AddedRoot{a})
 			}
 			if req.Tool == tools.CopySourceOp {

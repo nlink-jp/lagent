@@ -699,8 +699,9 @@ func TestChildOpensOnlyTheRootsACallNames(t *testing.T) {
 		{map[string]any{"path": "/Users/op/notes/a.md"}, 1},
 		{map[string]any{"paths": []any{"/Users/op/notes/a.md", "/Volumes/stale/b"}}, 2},
 		{map[string]any{"path": "/Users/op/notes-other/a.md"}, 0},
+		{map[string]any{"path": "../notes/a.md"}, 1},
 	} {
-		if got := rootsNamedBy(added, c.args); len(got) != c.want {
+		if got := rootsNamedBy(added, c.args, "/Users/op/proj"); len(got) != c.want {
 			t.Errorf("%v: %v, want %d", c.args, got, c.want)
 		}
 	}
@@ -724,10 +725,36 @@ func TestClearDropsARootThatNoLongerPasses(t *testing.T) {
 	if len(g.registry.AddedDirs()) != 0 {
 		t.Errorf("the failed root stayed: %v", g.registry.AddedDirs())
 	}
-	if len(out) != 1 || !strings.Contains(out[0], "/add-dir") {
+	if len(out) != 1 || !strings.Contains(out[0], "/read-dir") || !strings.Contains(out[0], notes+" (write)") {
 		t.Errorf("notes = %v, want the removal named", out)
 	}
 	if g.registry.WorkDir() == "" || !g.registry.Enforcement().Confined {
 		t.Errorf("work dir %q, enforcement %+v", g.registry.WorkDir(), g.registry.Enforcement())
+	}
+}
+
+// A notice is sent with the grant lock released: prog.Send waits on the
+// TUI's event loop, which may itself be waiting on that lock.
+func TestGrantSendsNoticesOutsideTheLock(t *testing.T) {
+	g, _, _ := newTestGranter(t, nil, false)
+	stuck := []string{"/nowhere/left-behind"}
+	g.build = func(on bool, p, w string, d []string, c map[string]string, pp []string, a []sandbox.AddedRoot) (tools.LaneExecFunc, sandbox.Enforcement, []string, []string, error) {
+		fn, enf, _, _, err := buildLanes(on, p, w, d, c, pp, a)
+		return fn, enf, nil, stuck, err
+	}
+	sent := 0
+	g.notice = func(string) {
+		sent++
+		if !g.mu.TryLock() {
+			t.Error("a notice was sent with the grant lock held")
+			return
+		}
+		g.mu.Unlock()
+	}
+	if _, err := g.grant(context.Background(), underHome(t, "noticed"), true, "request", g.currentEpoch(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if sent == 0 {
+		t.Error("no notice was sent")
 	}
 }

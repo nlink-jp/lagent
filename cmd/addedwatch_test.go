@@ -179,3 +179,32 @@ func TestAddedWatchCutAndStateFile(t *testing.T) {
 		t.Errorf("without a state directory = %q", buf.String())
 	}
 }
+
+// A root that is not there now reports nothing, and one the session
+// dropped starts from a new snapshot when it is added again (ADR-0046).
+func TestWatchDoesNotReportAMissingRootAndForgets(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "vol")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	snap := map[string]string{"AGENTS.md": "x"}
+	w := newAddedWatchWith([]addedDir{{AddedRoot: sandbox.AddedRoot{Dir: root, Write: true}}}, "", &out, uitext.For(uitext.EN),
+		func(string) (map[string]string, bool) { return snap, false })
+	snap = map[string]string{}
+	moved := root + ".away"
+	if err := os.Rename(root, moved); err != nil {
+		t.Fatal(err)
+	}
+	w.report("clear", nil)
+	if out.Len() != 0 {
+		t.Errorf("a missing root reported: %s", out.String())
+	}
+	if err := os.Rename(moved, root); err != nil {
+		t.Fatal(err)
+	}
+	w.forget()
+	if len(w.roots) != 0 || len(w.base) != 0 {
+		t.Errorf("after forget: roots %v base %v", w.roots, w.base)
+	}
+}

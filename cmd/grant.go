@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -92,7 +93,11 @@ func (g *dirGranter) source(s string) string {
 // request's error is the model's to read and a dropped grant's is read
 // by nobody, so those go to the operator's notices; a typed command's
 // error is the operator's own and carries them.
-func (g *dirGranter) tellLeftovers(source string, leftovers []string, err error) error {
+//
+// A notice is only queued here: it is sent after the grant lock is
+// released, because prog.Send waits on the TUI's event loop, and that loop
+// may itself be waiting on the lock (/clear, /dirs, /add-dir).
+func (g *dirGranter) tellLeftovers(source string, leftovers []string, err error, notices *[]string) error {
 	if len(leftovers) == 0 {
 		return err
 	}
@@ -100,7 +105,7 @@ func (g *dirGranter) tellLeftovers(source string, leftovers []string, err error)
 	// Never for a typed command: it runs inside the TUI's Update, where a
 	// notice would block on the event loop it is running on.
 	if source != "slash" && g.notice != nil {
-		g.notice(left)
+		*notices = append(*notices, left)
 		return err
 	}
 	return fmt.Errorf("%w; %s", err, left)
@@ -189,6 +194,12 @@ func (g *dirGranter) grant(ctx context.Context, path string, write bool, source 
 		return "", fmt.Errorf(m.GrantLinkFmt, typed, real, map[bool]string{true: "/add-dir", false: "/read-dir"}[write], real)
 	}
 
+	var notices []string
+	defer func() {
+		for _, n := range notices {
+			g.notice(n)
+		}
+	}()
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if ctx.Err() != nil || epoch != g.epoch {
@@ -243,7 +254,7 @@ func (g *dirGranter) grant(ctx context.Context, path string, write bool, source 
 	}
 	next := []sandbox.AddedRoot{}
 	for _, a := range current {
-		if !containsFold(absorbedDirs, a.Dir) {
+		if !slices.Contains(absorbedDirs, a.Dir) {
 			next = append(next, a)
 		}
 	}
@@ -270,21 +281,21 @@ func (g *dirGranter) grant(ctx context.Context, path string, write bool, source 
 		fn, enf, _, leftovers, err = build(g.sandboxOn, g.projectDir, g.workDir(), g.denyExec, g.caches, g.parents(), next)
 		if err != nil {
 			_ = root.Close()
-			return "", g.tellLeftovers(source, leftovers, fmt.Errorf(m.GrantNotAddedFmt, canonical, err))
+			return "", g.tellLeftovers(source, leftovers, fmt.Errorf(m.GrantNotAddedFmt, canonical, err), &notices)
 		}
 		if g.readLanePrompts {
 			enf.ReadLane = false
 		}
 		if enf != cur {
 			_ = root.Close()
-			return "", g.tellLeftovers(source, leftovers, fmt.Errorf(m.GrantStateFmt, canonical))
+			return "", g.tellLeftovers(source, leftovers, fmt.Errorf(m.GrantStateFmt, canonical), &notices)
 		}
 	}
 	// The probes take time; a call cancelled meanwhile, or a session
 	// that moved on, does not commit (review of step 2, #3).
 	if ctx.Err() != nil || epoch != g.epoch {
 		_ = root.Close()
-		return "", g.tellLeftovers(source, leftovers, errDropped)
+		return "", g.tellLeftovers(source, leftovers, errDropped, &notices)
 	}
 
 	var watchNotes []string
@@ -339,7 +350,7 @@ func (g *dirGranter) grant(ctx context.Context, path string, write bool, source 
 	}
 	for _, n := range watchNotes {
 		if source == "request" && g.notice != nil {
-			g.notice(n)
+			notices = append(notices, n)
 			continue
 		}
 		note += "\n" + n
@@ -403,15 +414,6 @@ func descriptorPathOf(root *os.Root) (string, error) {
 	}
 	defer func() { _ = f.Close() }()
 	return sandbox.DescriptorPath(f)
-}
-
-func containsFold(list []string, s string) bool {
-	for _, x := range list {
-		if strings.EqualFold(x, s) {
-			return true
-		}
-	}
-	return false
 }
 
 // requestDirectoryName is the model's entrance (gem-agent ADR-0099 §4).

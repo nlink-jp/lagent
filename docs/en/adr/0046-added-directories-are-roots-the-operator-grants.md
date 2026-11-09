@@ -39,8 +39,9 @@ The behaviour is gem-agent ADR-0099's, section for section. In short:
 6. **The approved cache needs no rule of its own.** It lies under the state directory (ADR-0042), which `RefuseRoot` keeps out of every root, and its read-lane denial by name still follows every allow.
 7. **Paths compare through `pathid` where they name the same place** (ADR-0035). The grant's own comparisons of two names the kernel gave stay byte-exact, as gem-agent's review requires: a case-only swap on a case-sensitive volume is a change.
 
-8. **`/clear` drops a root that no longer passes its probes.** gem-agent keeps the old profile, which names the old work directory. Here the new work directory must work, so `rotateWorkDir` rebuilds without the added roots, removes them from the session and says so; `/add-dir` adds them again.
-9. **A typed grant never sends a notice.** It runs inside the TUI's update, where `prog.Send` would wait on its own event loop, so its error carries the probe leftovers.
+8. **`/clear` drops a root that no longer passes its probes.** gem-agent keeps the old profile, which names the old work directory. Here the new work directory must work, so `rotateWorkDir` rebuilds without the added roots, removes them from the session and the watch, and names each with its level, to be added again at that level.
+9. **A notice is never sent with the grant lock held, and a typed grant sends none.** `prog.Send` waits on the TUI's event loop, and `/clear`, `/dirs` and `/add-dir` take the lock inside it, so notices are sent after the unlock, and a typed grant's error carries the probe leftovers.
+10. **`request_directory` also fires when the user named the path.** gem-agent's description sends the model to suggest `/add-dir` then; here the request is one keystroke for the operator and needs no retyped path.
 
 ### Build order
 

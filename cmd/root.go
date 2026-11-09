@@ -1371,6 +1371,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// A root that failed its probes was dropped: the new transcript
 		// says what is in force.
 		if had := len(addedBeforeRotate); had != len(registry.AddedDirs()) {
+			watch.forget()
 			_ = newLog.Log("added_directories", granter.record())
 		}
 		// The rotate above ran under the grant lock: a late grant cannot
@@ -2723,7 +2724,11 @@ func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool
 		fn, enf, laneNotes, retryErr = buildExecFn(sandboxOn, projectDir, dir, denyExec, caches, persistentParents, nil)
 		if retryErr == nil {
 			registry.DropAddedDirs()
-			notes = append(notes, fmt.Sprintf("added directories removed from this session, because one no longer passes the sandbox check (%v); /add-dir adds them again", err))
+			var dropped []string
+			for _, a := range added {
+				dropped = append(dropped, a.Dir+" ("+a.Access()+")")
+			}
+			notes = append(notes, fmt.Sprintf("added directories removed from this session: %s, because one no longer passes the sandbox check (%v); add them again with /add-dir or /read-dir", strings.Join(dropped, ", "), err))
 			err = nil
 		}
 	}
