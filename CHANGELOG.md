@@ -4,6 +4,9 @@
 
 ### Security
 
+- **A settings edit no longer re-enables what you declined at startup.** A
+  `never` entry from a project file you declined to re-trust came back on the
+  next `/settings` change or `p` answer in the same session.
 - **What an approved build trusts is out of reach of what runs unasked**
   (ADR-0042). The write and operator lanes' toolchain cache sat inside the
   read lane's scratch, separated only by an environment variable, so a
