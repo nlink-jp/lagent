@@ -330,3 +330,4 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
 - [`ADR-0044`](adr/0044-the-approval-dialog-carries-the-whole-call.ja.md) — 承認ダイアログは呼び出しの全体を運び、スクロールできる（**Accepted**、実装済み。gem-agent ADR-0112 の移植）: 64 KiB まで全引数を短いものから表示し、↑↓ PgUp PgDn Home End でスクロールできる
 - [`ADR-0045`](adr/0045-a-pipe-without-p-is-the-operators-own-input.ja.md) — `-p` なしのパイプは操作者自身の入力であり、監査の 2 つの限界を受け入れる（**Accepted**。gem-agent ADR-0110 と ADR-0113 の一部の移植）: 動作は変えず、README にパイプの意味を書く
 - [`ADR-0046`](adr/0046-added-directories-are-roots-the-operator-grants.ja.md) — 追加ディレクトリは操作者が与えるルートである（**Accepted**。gem-agent ADR-0099 と ADR-0107 §1〜§2 の移植）: `--add-dir`、`--read-dir`、`[directories]`、`/add-dir`、`/read-dir`、`/dirs`、`request_directory`。ルートはシステムプロンプトではなく事実メッセージでモデルに伝える
+- [`ADR-0047`](adr/0047-a-root-that-fails-at-clear-costs-only-itself.ja.md) — `/clear` で失敗したルートは自分だけを失う（**Accepted**。gem-agent ADR-0114 §2 の移植。ADR-0046 を改訂）: ほかのルートは残し、通知には同じレベルで足し直すコマンドを示す

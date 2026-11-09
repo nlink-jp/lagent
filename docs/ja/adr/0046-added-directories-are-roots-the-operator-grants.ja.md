@@ -8,6 +8,7 @@
 | Decision makers | nlink-jp maintainers |
 | Triggered by | 操作者: gem-agent の `/add-dir` がここには無い |
 | Ports | v0.94.0 のレビューで改訂された gem-agent ADR-0099 と、gem-agent ADR-0107 §1・§2 |
+| Amended by | ADR-0047（`/clear` は失敗したルートだけを外す） |
 | Relates to | ADR-0003（セッションごとの事実はシステムプロンプトから外す）、ADR-0008（規則ではなく経路を供給する）、ADR-0035（`pathid`）、ADR-0036（セッションのルートは到達範囲の拒否の下でも読む）、ADR-0041（パスは行き着く先で判定する・プローブの残骸）、ADR-0042（承認レーンのキャッシュ） |
 
 ## Context

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`/clear` keeps the added directories that still work** (ADR-0047). When
+  one no longer passes the sandbox check, only that one is removed, and the
+  note says which command adds it back at the same level.
+
 ## [0.27.0] - 2026-11-09
 
 ### Added

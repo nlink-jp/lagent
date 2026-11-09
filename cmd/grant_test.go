@@ -707,32 +707,6 @@ func TestChildOpensOnlyTheRootsACallNames(t *testing.T) {
 	}
 }
 
-// /clear with a root that no longer passes its probes moves the session
-// to the new work directory and drops the roots, rather than leaving
-// the new work directory on the old profile (ADR-0046).
-func TestClearDropsARootThatNoLongerPasses(t *testing.T) {
-	g, _, _ := newTestGranter(t, nil, false)
-	notes := underHome(t, "offline")
-	if _, err := g.grant(context.Background(), notes, true, "slash", g.currentEpoch(), nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(notes, 0o500); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(notes, 0o755) })
-	work := underHome(t, "newwork")
-	out := rotateWorkDir(g.registry, g.shellExec, true, g.projectDir, work, nil, nil, false, nil, g.registry.AddedDirs())
-	if len(g.registry.AddedDirs()) != 0 {
-		t.Errorf("the failed root stayed: %v", g.registry.AddedDirs())
-	}
-	if len(out) != 1 || !strings.Contains(out[0], "/read-dir") || !strings.Contains(out[0], notes+" (write)") {
-		t.Errorf("notes = %v, want the removal named", out)
-	}
-	if g.registry.WorkDir() == "" || !g.registry.Enforcement().Confined {
-		t.Errorf("work dir %q, enforcement %+v", g.registry.WorkDir(), g.registry.Enforcement())
-	}
-}
-
 // A notice is sent with the grant lock released: prog.Send waits on the
 // TUI's event loop, which may itself be waiting on that lock.
 func TestGrantSendsNoticesOutsideTheLock(t *testing.T) {
@@ -756,5 +730,40 @@ func TestGrantSendsNoticesOutsideTheLock(t *testing.T) {
 	}
 	if sent == 0 {
 		t.Error("no notice was sent")
+	}
+}
+
+// A root /clear dropped leaves the sources and the watch, and the
+// transcript in use says what is in force (ADR-0047).
+func TestForgetDroppedRoots(t *testing.T) {
+	lost, kept := underHome(t, "lost"), underHome(t, "kept")
+	registry, err := tools.New(t.TempDir(), nil, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := registry.AddDirs([]sandbox.AddedRoot{{Dir: kept, Write: true}}); err != nil {
+		t.Fatal(err)
+	}
+	var records []map[string]any
+	g := &dirGranter{
+		registry: registry,
+		sources:  map[string]string{lost: "config", kept: "slash"},
+		log: func(kind string, data any) error {
+			if kind == "added_directories" {
+				records = append(records, data.(map[string]any))
+			}
+			return nil
+		},
+	}
+	g.forget([]string{lost})
+	if _, ok := g.sources[lost]; ok || g.sources[kept] != "slash" {
+		t.Errorf("sources = %v", g.sources)
+	}
+	if len(records) != 1 {
+		t.Fatalf("records = %v", records)
+	}
+	roots := records[0]["roots"].([]map[string]string)
+	if len(roots) != 1 || roots[0]["dir"] != kept {
+		t.Errorf("recorded roots = %v", roots)
 	}
 }

@@ -137,3 +137,30 @@ func TestOutsideRootsRouteFollowsTheTool(t *testing.T) {
 		t.Errorf("refusal = %v", err)
 	}
 }
+
+// Dropping one root leaves the others usable (ADR-0047).
+func TestDropAddedDirs(t *testing.T) {
+	a, b := t.TempDir(), t.TempDir()
+	if err := os.WriteFile(filepath.Join(b, "x.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, err := New(t.TempDir(), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.AddDirs([]sandbox.AddedRoot{{Dir: a, Write: true}, {Dir: b}}); err != nil {
+		t.Fatal(err)
+	}
+	r.DropAddedDirs([]string{a})
+	if got := r.AddedDirs(); len(got) != 1 || got[0].Dir != b {
+		t.Errorf("roots = %v", got)
+	}
+	if _, err := r.resolvePath(filepath.Join(a, "y")); err == nil {
+		t.Error("a dropped root still resolves")
+	}
+	if f, err := r.openRead(filepath.Join(b, "x.txt")); err != nil {
+		t.Errorf("the kept root: %v", err)
+	} else {
+		_ = f.Close()
+	}
+}

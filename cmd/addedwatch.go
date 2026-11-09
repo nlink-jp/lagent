@@ -187,15 +187,28 @@ func (w *addedWatch) add(root string, absorbed []string, log func(kind string, d
 	return notes
 }
 
-// forget stops watching every root, when the session has dropped them
-// (ADR-0046): one added again later starts from a new snapshot.
-func (w *addedWatch) forget() {
+// drop stops watching roots the session lost (ADR-0047), with no
+// report: /clear reported them a moment ago, and a root added again
+// later starts from a new snapshot.
+func (w *addedWatch) drop(dirs []string) {
 	if w == nil {
 		return
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	w.roots, w.base = nil, map[string]map[string]string{}
+	gone := map[string]bool{}
+	for _, d := range dirs {
+		gone[d] = true
+	}
+	kept := w.roots[:0]
+	for _, r := range w.roots {
+		if gone[r] {
+			delete(w.base, r)
+			continue
+		}
+		kept = append(kept, r)
+	}
+	w.roots = kept
 	w.save()
 }
 

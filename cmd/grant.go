@@ -372,6 +372,19 @@ func typedStillNames(path string, root *os.Root) bool {
 	return err == nil && os.SameFile(st, held)
 }
 
+// forget takes in the roots /clear had to drop (ADR-0047): the watch and
+// the sources let them go, and the new transcript says what is in force.
+// rotateWorkDir calls it, so the grant lock is already held.
+func (g *dirGranter) forget(dirs []string) {
+	for _, d := range dirs {
+		delete(g.sources, d)
+	}
+	g.watch.drop(dirs)
+	if g.log != nil {
+		_ = g.log("added_directories", g.record())
+	}
+}
+
 // record is the added_directories record of the roots in force, each
 // with its level and source.
 func (g *dirGranter) record() map[string]any {

@@ -181,7 +181,7 @@ func TestAddedWatchCutAndStateFile(t *testing.T) {
 }
 
 // A root that is not there now reports nothing, and one the session
-// dropped starts from a new snapshot when it is added again (ADR-0046).
+// dropped starts from a new snapshot when it is added again (ADR-0047).
 func TestWatchDoesNotReportAMissingRootAndForgets(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "vol")
 	if err := os.Mkdir(root, 0o755); err != nil {
@@ -203,8 +203,8 @@ func TestWatchDoesNotReportAMissingRootAndForgets(t *testing.T) {
 	if err := os.Rename(moved, root); err != nil {
 		t.Fatal(err)
 	}
-	w.forget()
+	w.drop([]string{root})
 	if len(w.roots) != 0 || len(w.base) != 0 {
-		t.Errorf("after forget: roots %v base %v", w.roots, w.base)
+		t.Errorf("after drop: roots %v base %v", w.roots, w.base)
 	}
 }

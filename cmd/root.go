@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/nlink-jp/lagent/internal/trustpin"
 	"runtime"
+	"slices"
 	"syscall"
 
 	"github.com/nlink-jp/lagent/internal/bounded"
@@ -1366,14 +1367,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// runtime-facts message, never through the system prompt, which
 		// stays byte-identical so the server's prefix cache survives
 		// the clear.
-		addedBeforeRotate := registry.AddedDirs()
-		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.Caches(), cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap), registry.AddedDirs())...)
-		// A root that failed its probes was dropped: the new transcript
-		// says what is in force.
-		if had := len(addedBeforeRotate); had != len(registry.AddedDirs()) {
-			watch.forget()
-			_ = newLog.Log("added_directories", granter.record())
-		}
+		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.Caches(), cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap), registry.AddedDirs(), granter.forget)...)
 		// The rotate above ran under the grant lock: a late grant cannot
 		// swap in a runner built against the old work directory.
 		granter.endClear()
@@ -2709,29 +2703,14 @@ func (l liveLog) Log(kind string, data any) error {
 // the model is told by the caller, through the runtime-facts message,
 // once everything that message names is in place. Returns operator
 // notes for what could not follow.
-func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool, projectDir, dir string, denyExec []string, caches map[string]string, readLanePrompts bool, persistentParents []string, added []sandbox.AddedRoot) []string {
+func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool, projectDir, dir string, denyExec []string, caches map[string]string, readLanePrompts bool, persistentParents []string, added []sandbox.AddedRoot, onDropped func([]string)) []string {
 	var notes []string
 	if err := registry.UseWorkDir(dir); err != nil {
 		notes = append(notes, fmt.Sprintf("file tools keep the previous work directory: %v", err))
 	}
-	fn, enf, laneNotes, err := buildExecFn(sandboxOn, projectDir, dir, denyExec, caches, persistentParents, added)
-	if err != nil && len(added) > 0 {
-		// An added root that no longer passes its probes (an ejected
-		// volume, an offline synced folder) must not strand the new work
-		// directory on the old profile: the roots are dropped, everywhere
-		// at once, and the operator told (ADR-0046).
-		var retryErr error
-		fn, enf, laneNotes, retryErr = buildExecFn(sandboxOn, projectDir, dir, denyExec, caches, persistentParents, nil)
-		if retryErr == nil {
-			registry.DropAddedDirs()
-			var dropped []string
-			for _, a := range added {
-				dropped = append(dropped, a.Dir+" ("+a.Access()+")")
-			}
-			notes = append(notes, fmt.Sprintf("added directories removed from this session: %s, because one no longer passes the sandbox check (%v); add them again with /add-dir or /read-dir", strings.Join(dropped, ", "), err))
-			err = nil
-		}
-	}
+	fn, enf, laneNotes, dropped, err := buildWithoutFailedRoots(added, func(roots []sandbox.AddedRoot) (tools.LaneExecFunc, sandbox.Enforcement, []string, error) {
+		return buildExecFn(sandboxOn, projectDir, dir, denyExec, caches, persistentParents, roots)
+	})
 	if err != nil {
 		notes = append(notes, fmt.Sprintf("shell commands keep the previous sandbox profile: %v", err))
 	} else {
@@ -2741,8 +2720,47 @@ func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool
 		}
 		registry.SetLaneExec(shellExec.run, enf)
 		notes = append(notes, laneNotes...)
+		if len(dropped) > 0 {
+			registry.DropAddedDirs(dropped)
+			if onDropped != nil {
+				onDropped(dropped)
+			}
+		}
 	}
 	return notes
+}
+
+// buildWithoutFailedRoots builds the lanes over added, leaving out each
+// root that fails its probes: the file tools have already moved to the
+// new work directory, so the lanes must follow it, and one ejected
+// volume must not take the other roots with it (ADR-0047). Each failure
+// removes a root, so this builds at most once per root and once more. A
+// failure that names no root is returned, and then nothing is dropped:
+// the previous profile, which still names every root, stays.
+func buildWithoutFailedRoots(added []sandbox.AddedRoot, build func([]sandbox.AddedRoot) (tools.LaneExecFunc, sandbox.Enforcement, []string, error)) (tools.LaneExecFunc, sandbox.Enforcement, []string, []string, error) {
+	kept := append([]sandbox.AddedRoot(nil), added...)
+	var dropped, dropNotes []string
+	fn, enf, notes, err := build(kept)
+	for range added {
+		var bad *sandbox.AddedRootError
+		if !errors.As(err, &bad) {
+			break
+		}
+		// The command that restores this level: /add-dir on a read root
+		// would bring it back writable.
+		again := "/read-dir"
+		if bad.Root.Write {
+			again = "/add-dir"
+		}
+		dropped = append(dropped, bad.Root.Dir)
+		dropNotes = append(dropNotes, fmt.Sprintf("removed from this session, because it no longer passes the sandbox check: %v — %s adds it again", err, again))
+		kept = slices.DeleteFunc(kept, func(r sandbox.AddedRoot) bool { return r.Dir == bad.Root.Dir })
+		fn, enf, notes, err = build(kept)
+	}
+	if err != nil {
+		return nil, sandbox.Enforcement{}, nil, nil, err
+	}
+	return fn, enf, append(dropNotes, notes...), dropped, nil
 }
 
 // versionLine is the /version answer: the runtime, its version, and

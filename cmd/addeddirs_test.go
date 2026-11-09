@@ -4,7 +4,10 @@ package cmd
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -160,7 +163,7 @@ func TestAddedRootsReachTheLanesAndSurviveClear(t *testing.T) {
 	}
 	shellExec := &liveExec{fn: execFn}
 	work := t.TempDir()
-	notesOut := rotateWorkDir(registry, shellExec, true, project, work, nil, nil, false, nil, registry.AddedDirs())
+	notesOut := rotateWorkDir(registry, shellExec, true, project, work, nil, nil, false, nil, registry.AddedDirs(), nil)
 	for _, n := range notesOut {
 		if strings.Contains(n, "keep the previous") {
 			t.Errorf("rotation failed: %s", n)
@@ -209,5 +212,94 @@ func TestConfiguredDirectoriesThatDoNotApplyAreSkipped(t *testing.T) {
 	withDirFlags(t, []string{gone}, nil)
 	if _, _, err := resolveAddedDirs(&config.Config{}, sub, "", ""); err == nil || !strings.Contains(err.Error(), "--add-dir") {
 		t.Errorf("a typed path that is not there must stop the start: %v", err)
+	}
+}
+
+// /clear with a root that no longer passes its probes: the lanes follow
+// the file tools to the new work directory, the root that failed goes
+// and the others stay (ADR-0047).
+func TestClearDropsOnlyTheRootThatFailsItsProbes(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("sandbox-exec is macOS-only")
+	}
+	if err := sandbox.Available(); err != nil {
+		t.Skipf("sandbox-exec cannot apply a profile here: %v", err)
+	}
+	project := t.TempDir()
+	stale := underHome(t, "stale")
+	notes := underHome(t, "notes")
+	added := []sandbox.AddedRoot{{Dir: stale, Write: true}, {Dir: notes, Write: true}}
+	execFn, enf, _, err := buildExecFn(true, project, "", nil, nil, nil, added)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !enf.Confined {
+		t.Skip("sandbox unverified here")
+	}
+	registry, err := tools.New(project, nil, 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := registry.AddDirs(added); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(stale, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(stale, 0o755) })
+	shellExec := &liveExec{fn: execFn}
+	work := underHome(t, "work")
+	var heard []string
+	got := rotateWorkDir(registry, shellExec, true, project, work, nil, nil, false, nil, registry.AddedDirs(), func(d []string) { heard = d })
+	if len(got) != 1 || !strings.Contains(got[0], stale) || !strings.Contains(got[0], "/add-dir adds it again") || strings.Contains(got[0], "keep the previous") {
+		t.Errorf("notes = %q", got)
+	}
+	if len(heard) != 1 || heard[0] != stale {
+		t.Errorf("onDropped heard %v", heard)
+	}
+	if left := registry.AddedDirs(); len(left) != 1 || left[0].Dir != notes {
+		t.Errorf("roots in force = %v", left)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	for _, dir := range []string{work, notes} {
+		if err := shellExec.run(ctx, "echo ok > "+filepath.Join(dir, "w.txt"), sandbox.LaneWrite).Run(); err != nil {
+			t.Errorf("after /clear the write lane cannot write %s: %v", dir, err)
+		}
+	}
+}
+
+// A read root is told to come back with /read-dir, a failure naming no
+// root drops nothing, and every root failing leaves lanes with none
+// (ADR-0047).
+func TestBuildWithoutFailedRoots(t *testing.T) {
+	w, r := sandbox.AddedRoot{Dir: "/w", Write: true}, sandbox.AddedRoot{Dir: "/r"}
+	ok := func(context.Context, string, sandbox.Lane) *exec.Cmd { return nil }
+	failing := map[string]bool{"/r": true}
+	build := func(roots []sandbox.AddedRoot) (tools.LaneExecFunc, sandbox.Enforcement, []string, error) {
+		for _, a := range roots {
+			if failing[a.Dir] {
+				return nil, sandbox.Enforcement{}, nil, fmt.Errorf("%w; left /r/x", &sandbox.AddedRootError{Root: a, Err: errors.New("gone")})
+			}
+		}
+		return ok, sandbox.Enforcement{Confined: true}, []string{"lane note"}, nil
+	}
+	fn, _, notes, dropped, err := buildWithoutFailedRoots([]sandbox.AddedRoot{w, r}, build)
+	if err != nil || fn == nil || len(dropped) != 1 || dropped[0] != "/r" {
+		t.Fatalf("one failing root: %v %v", dropped, err)
+	}
+	if len(notes) != 2 || !strings.Contains(notes[0], "/read-dir adds it again") || !strings.Contains(notes[0], "left /r/x") {
+		t.Errorf("notes = %q", notes)
+	}
+	failing["/w"] = true
+	if _, _, _, dropped, err := buildWithoutFailedRoots([]sandbox.AddedRoot{w, r}, build); err != nil || len(dropped) != 2 {
+		t.Errorf("every root failing: %v %v", dropped, err)
+	}
+	other := errors.New("no sandbox")
+	_, _, _, dropped, err = buildWithoutFailedRoots([]sandbox.AddedRoot{w}, func([]sandbox.AddedRoot) (tools.LaneExecFunc, sandbox.Enforcement, []string, error) {
+		return nil, sandbox.Enforcement{}, nil, other
+	})
+	if !errors.Is(err, other) || len(dropped) != 0 {
+		t.Errorf("a failure naming no root: %v %v", dropped, err)
 	}
 }

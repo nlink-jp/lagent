@@ -4,6 +4,7 @@ package sandbox
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -393,5 +394,20 @@ func TestAddedRootProbesReturnLeftovers(t *testing.T) {
 func TestRefuseRootKeepsReachDeniedTreesClosed(t *testing.T) {
 	if _, err := RefuseRoot("/Volumes", false, RootContext{}); err == nil || !strings.Contains(err.Error(), "keeps out") {
 		t.Errorf("/Volumes: %v", err)
+	}
+}
+
+// A probe failure names the root it failed on, in a form a rebuild can
+// read (ADR-0047), with the words it has always had.
+func TestVerifyAddedRootsNamesTheRootThatFailed(t *testing.T) {
+	base := t.TempDir()
+	missing := AddedRoot{Dir: filepath.Join(base, "gone"), Write: true}
+	_, _, err := VerifyAddedRoots(nil, Spec{Added: []AddedRoot{missing}}, false)
+	var bad *AddedRootError
+	if !errors.As(err, &bad) || bad.Root != missing {
+		t.Fatalf("err = %v", err)
+	}
+	if !strings.Contains(err.Error(), "added directory "+missing.Dir+" (write): cannot create a probe") {
+		t.Errorf("text = %q", err)
 	}
 }

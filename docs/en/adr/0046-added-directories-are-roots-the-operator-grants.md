@@ -8,6 +8,7 @@
 | Decision makers | nlink-jp maintainers |
 | Triggered by | Operator: gem-agent's `/add-dir` is missing here |
 | Ports | gem-agent ADR-0099 as amended at its v0.94.0 review, and gem-agent ADR-0107 §1 and §2 |
+| Amended by | ADR-0047 (`/clear` drops only the root that fails) |
 | Relates to | ADR-0003 (per-session facts leave the system prompt), ADR-0008 (supply a route, not a rule), ADR-0035 (`pathid`), ADR-0036 (the session's roots are read under a reach denial), ADR-0041 (a path is judged where it leads; probe leftovers), ADR-0042 (the approved cache) |
 
 ## Context

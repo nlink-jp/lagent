@@ -314,19 +314,28 @@ func (r *Registry) GrantAddedDir(root sandbox.AddedRoot, opened *os.Root, absorb
 	r.rootsMu.Unlock()
 }
 
-// DropAddedDirs removes every added root, retiring their handles as a
-// rotated work directory's is (ADR-0046).
-func (r *Registry) DropAddedDirs() {
+// DropAddedDirs removes the named added roots and retires their
+// handles, as a rotated work directory's is (ADR-0047).
+func (r *Registry) DropAddedDirs(dirs []string) {
 	if r.parent != nil {
-		r.parent.DropAddedDirs()
+		r.parent.DropAddedDirs(dirs)
 		return
 	}
-	r.rootsMu.Lock()
-	for _, a := range r.added {
-		a.h.retire()
+	drop := map[string]bool{}
+	for _, d := range dirs {
+		drop[d] = true
 	}
-	r.added = nil
-	r.rootsMu.Unlock()
+	r.rootsMu.Lock()
+	defer r.rootsMu.Unlock()
+	next := make([]addedHandle, 0, len(r.added))
+	for _, a := range r.added {
+		if drop[a.root.Dir] {
+			a.h.retire()
+			continue
+		}
+		next = append(next, a)
+	}
+	r.added = next
 }
 
 // OutsideRootsRoute is what a refusal of a path outside every root adds
