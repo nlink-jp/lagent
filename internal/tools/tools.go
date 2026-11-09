@@ -314,6 +314,13 @@ func (r *Registry) GrantAddedDir(root sandbox.AddedRoot, opened *os.Root, absorb
 	r.rootsMu.Unlock()
 }
 
+// Enforcement returns what the runtime established about the sandbox.
+// A mid-session grant must leave it unchanged (ADR-0046).
+func (r *Registry) Enforcement() sandbox.Enforcement {
+	_, enf := r.laneState()
+	return enf
+}
+
 // AddedDirs returns the added roots with their levels, in the order
 // they were added.
 func (r *Registry) AddedDirs() []sandbox.AddedRoot {

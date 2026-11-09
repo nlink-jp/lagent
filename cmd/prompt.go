@@ -83,7 +83,6 @@ func dateFact(d sessionDates) string {
 	return fmt.Sprintf("- resumed: %s; the conversation above began on %s\n", day, d.ResumedFrom.In(start.Location()).Format("2006-01-02"))
 }
 
-//
 // added are the operator's added directories (ADR-0046): like the work
 // directory, a root nothing points at never gets used.
 func sessionFacts(workDir string, dates sessionDates, catalog []string, added ...sandbox.AddedRoot) string {

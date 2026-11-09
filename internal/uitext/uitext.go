@@ -319,6 +319,31 @@ type Messages struct {
 	AddedPersistentSinceLastFmt string
 	AddedPersistentSessionFmt   string
 	AddedPersistentCutFmt       string // %d = the walk's cap, %s = the directory
+	// The operator's /add-dir, /read-dir and /dirs, and the notes of a
+	// grant (ADR-0046).
+	GrantNotFoundFmt   string // %s = the path
+	GrantCannotOpenFmt string // %s = the path, %v = why
+	// GrantLinkFmt: the typed path, its real path, the command, the real
+	// path again.
+	GrantLinkFmt        string
+	GrantCoveredFmt     string // %s = the path, %s = the root, %s = its level
+	GrantChangedFmt     string // %s = the path, %s = what it is now
+	GrantNotAddedFmt    string // %s = the path, %v = why
+	GrantStateFmt       string // %s = the path — the sandbox would not set up as it is
+	GrantAddedFmt       string // %s = the path, %s = its level
+	GrantAbsorbedFmt    string // %s = an added directory now inside the new one
+	GrantUnconfined     string // appended: shell commands still ask
+	GrantThisProcessFmt string // appended to a typed one; %s = the flag to keep it
+	AccessWrite         string
+	AccessRead          string
+	DirsProjectFmt      string // %s = the project, %s = AccessWrite
+	DirsWorkFmt         string // %s = the work directory, %s = AccessWrite
+	DirsAddedFmt        string // %s = the directory, %s = its level, %s = where it came from
+	DirsNone            string
+	SourceFlag          string
+	SourceConfig        string
+	SourceSlash         string
+	SourceRequest       string
 	// TrustDeclinedFmt is the banner note after declining: policy path.
 	TrustDeclinedFmt string
 	TrustUndecided   string // non-interactive, undecided: ran bare
@@ -421,6 +446,9 @@ var en = Messages{
   /mcp       list connected MCP servers with their loaded state (/mcp load <server> advertises one, /mcp reload reconnects)
   /auto      auto-approve: on|off, or bare to toggle (shift+tab too)
   /readonly  read-only: on|off · bare shows the state
+  /add-dir <path>   add a directory outside the project, written like the project (this process only)
+  /read-dir <path>  add a directory outside the project, read only (this process only)
+  /dirs      list the project, the work directory and the added directories
   /settings  view and edit settings, with provenance
   /skills    list installed skills
   /skill <name> [args]   invoke a skill directly
@@ -485,36 +513,57 @@ keys:
 	MCPDisabled:            "MCP is disabled for this session ([mcp].enabled=false or --mcp off) — restart to enable it\n",
 	MCPReloadedFmt:         "mcp reloaded: %d server(s), %d tool(s)\n",
 
-	TrustHeaderFmt:           "\nnew project: %s\nthis project provides:\n",
-	TrustItemInstructionsFmt: "%s (loaded as your instructions)",
-	TrustItemMCPFmt:          ".mcp.json (%d server(s) — will be started)",
-	TrustItemSkillsFmt:       ".claude/skills/ (%d skill(s) — loaded as your instructions)",
-	TrustQuestion:            "trust this project? These files will be treated as YOUR instructions and its MCP servers will run. [y/N]: ",
-	PinRecordedFmt:           "project trust: %d file(s) recorded as trusted: %s",
-	PinNonePending:           "project trust: no trusted files recorded yet — start interactively once, or run `lagent trust --accept`",
-	PinChangeFmt:             "%s %s %s",
-	PinKindChanged:           "changed",
-	PinKindAdded:             "added",
-	PinChangedFmt:            "\n%s since you trusted it.",
-	PinQuestion:              "trust the new content? [y/N]: ",
-	PinNotLoadedFmt:          "project trust: %s since you trusted it — not loaded; re-trust with `lagent trust --accept` or at an interactive start",
-	PinAcceptedFmt:           "project trust: %s re-trusted",
-	PinRemovedFmt:            "project trust: %s was removed since you trusted it",
-	PinPendingFmt:            "project trust: %s since you trusted it — not re-trusted; `lagent trust --accept` or the next interactive start",
-	PinStaleWriteFmt:         "project trust: %s had changed before this write — not re-trusted; asks at the next interactive start",
-	PersistentSinceLastFmt:   "note: changed since your previous session: %s",
-	PersistentSessionFmt:     "note: this session added or changed: %s",
+	TrustHeaderFmt:              "\nnew project: %s\nthis project provides:\n",
+	TrustItemInstructionsFmt:    "%s (loaded as your instructions)",
+	TrustItemMCPFmt:             ".mcp.json (%d server(s) — will be started)",
+	TrustItemSkillsFmt:          ".claude/skills/ (%d skill(s) — loaded as your instructions)",
+	TrustQuestion:               "trust this project? These files will be treated as YOUR instructions and its MCP servers will run. [y/N]: ",
+	PinRecordedFmt:              "project trust: %d file(s) recorded as trusted: %s",
+	PinNonePending:              "project trust: no trusted files recorded yet — start interactively once, or run `lagent trust --accept`",
+	PinChangeFmt:                "%s %s %s",
+	PinKindChanged:              "changed",
+	PinKindAdded:                "added",
+	PinChangedFmt:               "\n%s since you trusted it.",
+	PinQuestion:                 "trust the new content? [y/N]: ",
+	PinNotLoadedFmt:             "project trust: %s since you trusted it — not loaded; re-trust with `lagent trust --accept` or at an interactive start",
+	PinAcceptedFmt:              "project trust: %s re-trusted",
+	PinRemovedFmt:               "project trust: %s was removed since you trusted it",
+	PinPendingFmt:               "project trust: %s since you trusted it — not re-trusted; `lagent trust --accept` or the next interactive start",
+	PinStaleWriteFmt:            "project trust: %s had changed before this write — not re-trusted; asks at the next interactive start",
+	PersistentSinceLastFmt:      "note: changed since your previous session: %s",
+	PersistentSessionFmt:        "note: this session added or changed: %s",
 	AddedPersistentSinceLastFmt: "note: in the added directory %s, changed since your previous session: %s — a project opened under it would load or run these",
 	AddedPersistentSessionFmt:   "note: in the added directory %s, this session added, changed or removed: %s — a project opened under it would load or run these",
 	AddedPersistentCutFmt:       "note: change detection covers the first %d entries under the added directory %s only",
-	TrustDeclinedFmt:         "project trust: declined — the project's own files are not loaded (edit %s to be asked again)",
-	TrustUndecided:           "project trust: undecided — the project's own files are not loaded; start interactively once to decide",
-	ReasonFSRoot:             "the filesystem root",
-	ReasonHome:               "your home directory",
-	ReasonHomeAncestor:       "an ancestor of your home directory",
-	BroadRootPromptFmt:       "\n⚠ %s is %s.\nFile tools and sandboxed shell writes would span this ENTIRE tree.\nstart anyway? [y/N]: ",
-	BroadRootRefusedFmt:      "refusing to start in %s (%s): file tools and shell writes would span this entire tree; run interactively to confirm, or start in a project directory",
-	BroadRootAbortFmt:        "not starting in %s — cd into a project directory first",
+	GrantNotFoundFmt:            "%s: not found",
+	GrantCannotOpenFmt:          "%s: cannot be opened as a directory: %v",
+	GrantLinkFmt:                "%s resolves to %s — to add that directory, type: %s %s",
+	GrantCoveredFmt:             "%s is already inside %s (%s); nothing changed",
+	GrantChangedFmt:             "%s changed while it was being added (it is now %s); nothing changed — add it again",
+	GrantNotAddedFmt:            "%s was not added: %v",
+	GrantStateFmt:               "%s was not added: with it the shell sandbox would not set up the way it is now; nothing changed",
+	GrantAddedFmt:               "added %s (%s)",
+	GrantAbsorbedFmt:            "; %s is now part of it",
+	GrantUnconfined:             " — the file tools reach it; shell commands still ask, as everything does in this session",
+	GrantThisProcessFmt:         " — for this process only; to keep it, add it to [directories] or pass --%s",
+	AccessWrite:                 "write",
+	AccessRead:                  "read only",
+	DirsProjectFmt:              "project: %s (%s)",
+	DirsWorkFmt:                 "work directory: %s (%s)",
+	DirsAddedFmt:                "added: %s (%s, %s)",
+	DirsNone:                    "no added directories — /add-dir <path> or /read-dir <path> adds one",
+	SourceFlag:                  "from a flag",
+	SourceConfig:                "from [directories]",
+	SourceSlash:                 "typed in this session",
+	SourceRequest:               "asked for by the model, approved by you",
+	TrustDeclinedFmt:            "project trust: declined — the project's own files are not loaded (edit %s to be asked again)",
+	TrustUndecided:              "project trust: undecided — the project's own files are not loaded; start interactively once to decide",
+	ReasonFSRoot:                "the filesystem root",
+	ReasonHome:                  "your home directory",
+	ReasonHomeAncestor:          "an ancestor of your home directory",
+	BroadRootPromptFmt:          "\n⚠ %s is %s.\nFile tools and sandboxed shell writes would span this ENTIRE tree.\nstart anyway? [y/N]: ",
+	BroadRootRefusedFmt:         "refusing to start in %s (%s): file tools and shell writes would span this entire tree; run interactively to confirm, or start in a project directory",
+	BroadRootAbortFmt:           "not starting in %s — cd into a project directory first",
 }
 
 var ja = Messages{
@@ -593,6 +642,9 @@ var ja = Messages{
   /mcp       接続中の MCP サーバー一覧とロード状態（/mcp load <server> で 1 台を広告、/mcp reload で再接続）
   /auto      auto-approve: on|off、引数なしで切替（shift+tab でも可）
   /readonly  読み取り専用: on|off・引数なしで状態を表示
+  /add-dir <path>   プロジェクト外のディレクトリを、プロジェクトと同じく書ける形で足す（このプロセスの間だけ）
+  /read-dir <path>  プロジェクト外のディレクトリを、読むだけの形で足す（このプロセスの間だけ）
+  /dirs      プロジェクト・作業ディレクトリ・追加ディレクトリの一覧
   /settings  設定の表示と編集（出所つき）
   /skills    インストール済みスキル一覧
   /skill <name> [args]   スキルを直接起動
@@ -657,34 +709,55 @@ var ja = Messages{
 	MCPDisabled:            "MCP はこのセッションでは無効です（[mcp].enabled=false または --mcp off）— 有効化するには再起動してください\n",
 	MCPReloadedFmt:         "MCP を再接続しました: %d サーバー・%d ツール\n",
 
-	TrustHeaderFmt:           "\n新しいプロジェクト: %s\nこのプロジェクトの提供物:\n",
-	TrustItemInstructionsFmt: "%s（あなたへの指示として読み込まれます）",
-	TrustItemMCPFmt:          ".mcp.json（サーバー %d 件 — 起動されます）",
-	TrustItemSkillsFmt:       ".claude/skills/（スキル %d 件 — あなたへの指示として読み込まれます）",
-	TrustQuestion:            "このプロジェクトを信用しますか？ これらのファイルはあなたへの指示として扱われ、MCP サーバーが起動します。 [y/N]: ",
-	PinRecordedFmt:           "project trust: %d 件を信用済みとして記録: %s",
-	PinNonePending:           "project trust: 信用済みファイルは未記録です — 一度対話起動するか `lagent trust --accept` を実行",
-	PinChangeFmt:             "%s が%s %s",
-	PinKindChanged:           "変更されました",
-	PinKindAdded:             "追加されました",
-	PinChangedFmt:            "\n信用した時点から %s。",
-	PinQuestion:              "新しい内容を信用しますか？ [y/N]: ",
-	PinNotLoadedFmt:          "project trust: 信用した時点から %s — 読み込みません。`lagent trust --accept` か対話起動で再信用",
-	PinAcceptedFmt:           "project trust: %s を再信用しました",
-	PinRemovedFmt:            "project trust: %s は信用した時点から削除されています",
-	PinPendingFmt:            "project trust: 信用した時点から %s — 再信用していません。`lagent trust --accept` か次の対話起動で",
-	PinStaleWriteFmt:         "project trust: %s はこの書込の前から変わっていました — 再信用していません。次の対話起動で確認",
-	PersistentSinceLastFmt:   "note: 前回のセッション以降に変更: %s",
-	PersistentSessionFmt:     "note: このセッションが追加・変更: %s",
+	TrustHeaderFmt:              "\n新しいプロジェクト: %s\nこのプロジェクトの提供物:\n",
+	TrustItemInstructionsFmt:    "%s（あなたへの指示として読み込まれます）",
+	TrustItemMCPFmt:             ".mcp.json（サーバー %d 件 — 起動されます）",
+	TrustItemSkillsFmt:          ".claude/skills/（スキル %d 件 — あなたへの指示として読み込まれます）",
+	TrustQuestion:               "このプロジェクトを信用しますか？ これらのファイルはあなたへの指示として扱われ、MCP サーバーが起動します。 [y/N]: ",
+	PinRecordedFmt:              "project trust: %d 件を信用済みとして記録: %s",
+	PinNonePending:              "project trust: 信用済みファイルは未記録です — 一度対話起動するか `lagent trust --accept` を実行",
+	PinChangeFmt:                "%s が%s %s",
+	PinKindChanged:              "変更されました",
+	PinKindAdded:                "追加されました",
+	PinChangedFmt:               "\n信用した時点から %s。",
+	PinQuestion:                 "新しい内容を信用しますか？ [y/N]: ",
+	PinNotLoadedFmt:             "project trust: 信用した時点から %s — 読み込みません。`lagent trust --accept` か対話起動で再信用",
+	PinAcceptedFmt:              "project trust: %s を再信用しました",
+	PinRemovedFmt:               "project trust: %s は信用した時点から削除されています",
+	PinPendingFmt:               "project trust: 信用した時点から %s — 再信用していません。`lagent trust --accept` か次の対話起動で",
+	PinStaleWriteFmt:            "project trust: %s はこの書込の前から変わっていました — 再信用していません。次の対話起動で確認",
+	PersistentSinceLastFmt:      "note: 前回のセッション以降に変更: %s",
+	PersistentSessionFmt:        "note: このセッションが追加・変更: %s",
 	AddedPersistentSinceLastFmt: "note: 追加ディレクトリ %s で、前回のセッション以降に変更: %s — その下で開くプロジェクトはこれらを読み込むか実行します",
 	AddedPersistentSessionFmt:   "note: 追加ディレクトリ %s で、このセッションが追加・変更・削除: %s — その下で開くプロジェクトはこれらを読み込むか実行します",
 	AddedPersistentCutFmt:       "note: 変化の検出は最初の %d 項目だけが対象です（追加ディレクトリ %s）",
-	TrustDeclinedFmt:         "project trust: 拒否 — このプロジェクト自身のファイルは読み込みません（再確認するには %s を編集）",
-	TrustUndecided:           "project trust: 未決定 — このプロジェクト自身のファイルは読み込みません。一度対話起動して決めてください",
-	ReasonFSRoot:             "ファイルシステムのルート",
-	ReasonHome:               "ホームディレクトリ",
-	ReasonHomeAncestor:       "ホームディレクトリの祖先",
-	BroadRootPromptFmt:       "\n⚠ %s は %s です。\nファイルツールとサンドボックス内シェルの書き込みが、このツリー全体に及びます。\nこのまま起動しますか？ [y/N]: ",
-	BroadRootRefusedFmt:      "%s（%s）では起動を拒否します: ファイルツールとシェル書き込みがツリー全体に及びます。対話モードで確認するか、プロジェクトディレクトリで起動してください",
-	BroadRootAbortFmt:        "%s では起動しません — まずプロジェクトディレクトリに cd してください",
+	GrantNotFoundFmt:            "%s: 見つかりません",
+	GrantCannotOpenFmt:          "%s: ディレクトリとして開けません: %v",
+	GrantLinkFmt:                "%s の実体は %s です — そのディレクトリを足すには次のように打ってください: %s %s",
+	GrantCoveredFmt:             "%s はすでに %s（%s）の中にあります。変更はありません",
+	GrantChangedFmt:             "%s は追加の途中で変わりました（現在は %s）。変更はありません — もう一度足してください",
+	GrantNotAddedFmt:            "%s は足せませんでした: %v",
+	GrantStateFmt:               "%s は足せませんでした: これを足すとシェルのサンドボックスを今と同じ形で準備できません。変更はありません",
+	GrantAddedFmt:               "%s を足しました（%s）",
+	GrantAbsorbedFmt:            "。%s はこの中に含まれるようになりました",
+	GrantUnconfined:             " — ファイルツールから届きます。シェルコマンドは、このセッションのほかの操作と同じく毎回確認します",
+	GrantThisProcessFmt:         " — このプロセスの間だけです。続けて使うなら [directories] に書くか、--%s を付けて起動してください",
+	AccessWrite:                 "書き込み可",
+	AccessRead:                  "読み取りのみ",
+	DirsProjectFmt:              "プロジェクト: %s（%s）",
+	DirsWorkFmt:                 "作業ディレクトリ: %s（%s）",
+	DirsAddedFmt:                "追加: %s（%s、%s）",
+	DirsNone:                    "追加ディレクトリはありません — /add-dir <パス> か /read-dir <パス> で足せます",
+	SourceFlag:                  "起動フラグ",
+	SourceConfig:                "[directories] の設定",
+	SourceSlash:                 "このセッションで入力",
+	SourceRequest:               "モデルの要請をあなたが承認",
+	TrustDeclinedFmt:            "project trust: 拒否 — このプロジェクト自身のファイルは読み込みません（再確認するには %s を編集）",
+	TrustUndecided:              "project trust: 未決定 — このプロジェクト自身のファイルは読み込みません。一度対話起動して決めてください",
+	ReasonFSRoot:                "ファイルシステムのルート",
+	ReasonHome:                  "ホームディレクトリ",
+	ReasonHomeAncestor:          "ホームディレクトリの祖先",
+	BroadRootPromptFmt:          "\n⚠ %s は %s です。\nファイルツールとサンドボックス内シェルの書き込みが、このツリー全体に及びます。\nこのまま起動しますか？ [y/N]: ",
+	BroadRootRefusedFmt:         "%s（%s）では起動を拒否します: ファイルツールとシェル書き込みがツリー全体に及びます。対話モードで確認するか、プロジェクトディレクトリで起動してください",
+	BroadRootAbortFmt:           "%s では起動しません — まずプロジェクトディレクトリに cd してください",
 }

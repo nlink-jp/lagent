@@ -540,6 +540,30 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	if err := registry.AddDirs(rootsOf(added)); err != nil {
 		return err
 	}
+	// Mid-session grants (ADR-0046): the operator's /add-dir and
+	// /read-dir and the model's request_directory share this one path.
+	granter := &dirGranter{
+		registry: registry, shellExec: shellExec, sandboxOn: sandboxOn,
+		projectDir: realOrSelf(projectDir), workDir: func() string { return workDir },
+		denyExec: cfg.Sandbox.ReadLaneDenyExec, caches: cfg.Sandbox.Caches(), readLanePrompts: cfg.Sandbox.ReadLanePrompts,
+		parents: func() []string { return trustpin.Parents(projectDir, persistentSnap) },
+		base:    rootBaseContext(cfgPath), watch: watch, sources: map[string]string{}, msgs: msgs,
+		log: func(kind string, data any) error {
+			if sessionLog == nil {
+				return nil
+			}
+			return sessionLog.Log(kind, data)
+		},
+	}
+	for _, a := range added {
+		granter.sources[a.Dir] = a.Source
+	}
+	if flagPrompt == "" {
+		// Only where a human answers: under -p it could only be denied.
+		if err := registerRequestDirectory(registry, granter); err != nil {
+			return err
+		}
+	}
 	// The file tools' reads run in a child under a profile that denies
 	// the credential list at the kernel (ADR-0016), proven on this
 	// machine before it is trusted. Where it cannot be proven the reads
@@ -789,6 +813,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Fprintf(stderr, "[⚠ %s]\n", msg)
 	}
+	granter.notice = notice
 	for _, n := range tierNotes {
 		notice(n)
 	}
@@ -977,6 +1002,14 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// caller's copy of this list would be one more to forget a root in.
 	announceFacts := func() {
 		ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...), registry.AddedDirs()...))
+	}
+	// announceGrant is called where a turn starts: a directory granted
+	// since the last turn reaches the model in a fresh facts message
+	// (ADR-0046), which appends and leaves the earlier prefix cached.
+	announceGrant := func() {
+		if granter.factsStale.Swap(false) {
+			announceFacts()
+		}
 	}
 	// The per-session facts open the conversation (after SetHistory: the
 	// isolation tag is fresh, and the restored history's own opening
@@ -1202,6 +1235,17 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// One value for both surfaces, so a closure added to one cannot be
+	// missed in the other and read as an unknown command there.
+	addDirSlash := func(rest string, write bool) (string, bool) {
+		note, err := granter.grant(context.Background(), rest, write, "slash", granter.currentEpoch(), nil)
+		if err != nil {
+			return err.Error(), true
+		}
+		return note, false
+	}
+	reloads := slashReloads{mcp: reloadMCP, load: loadMCP, show: showPath, addDir: addDirSlash, dirs: granter.listing}
+
 	defer reportPersistent("exit", func(kind string, data any) error {
 		if sessionLog == nil {
 			return nil
@@ -1264,6 +1308,11 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 		// The old session's end hook runs before the new transcript
 		// takes over (ADR-0014 §5), then the audit event under the old id.
+		// From here to the runner's rebuild the session's identity, its
+		// transcript and its work directory change: a grant — a late one
+		// from an abandoned call included — waits, and one from the old
+		// session is dropped by the epoch advanced now (ADR-0046).
+		granter.beginClear()
 		sessionEndHooks("clear")
 		reportPersistent("clear", func(kind string, data any) error { return curLog.Log(kind, data) })
 		watch.report("clear", func(kind string, data any) error { return curLog.Log(kind, data) })
@@ -1284,10 +1333,11 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		sessionLog = newLog
 		sessionPath, sessionID = newLog.Path(), newLog.ID()
 		hookSession = hooks.Session{ID: sessionID, TranscriptPath: sessionPath, CWD: projectDir}
-		if len(added) > 0 {
-			// The roots stay in force across /clear, so the new transcript
-			// records them too (ADR-0046).
-			_ = newLog.Log("added_directories", addedDirsRecord(added))
+		if len(registry.AddedDirs()) > 0 {
+			// The roots stay in force across /clear — startup, slash and
+			// requested alike — so the new transcript records them too
+			// (ADR-0046).
+			_ = newLog.Log("added_directories", granter.record())
 		}
 		if err := session.Export(sessionID); err != nil {
 			note("cannot set %s: %v", session.EnvVar, err)
@@ -1313,6 +1363,9 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// stays byte-identical so the server's prefix cache survives
 		// the clear.
 		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.Caches(), cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap), registry.AddedDirs())...)
+		// The rotate above ran under the grant lock: a late grant cannot
+		// swap in a runner built against the old work directory.
+		granter.endClear()
 		// The MCP servers — spawned at startup with the old id in their
 		// environment and arguments — are reconnected the way /mcp
 		// reload does, so a server keeping per-session state sees the
@@ -1518,6 +1571,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			},
 			StartTurn: func(turnCtx context.Context, input string) {
 				go func() {
+					announceGrant()
 					_, err := ag.Run(turnCtx, input, func(s string) { prog.Send(tui.TextDelta(s)) })
 					if err != nil && turnCtx.Err() != nil {
 						// Mirror runTurn's mapping: a cancellation-caused
@@ -1532,7 +1586,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 					return out, isErr, false
 				}
 				return slashOutput(in, ag, registry, mcpStatus(), skillsList,
-					slashReloads{mcp: reloadMCP, load: loadMCP, show: showPath},
+					reloads,
 					func() string { return usageReport(ag, cfg.LLM.Model) },
 					appVersion, msgs, onClear)
 			},
@@ -1623,6 +1677,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 				continue
 			}
 			runErr := runTurnWith(ctx, ladder, func(turnCtx context.Context) error {
+				announceGrant()
 				_, err := ag.Run(turnCtx, turn, func(s string) { fmt.Fprint(cmd.OutOrStdout(), s) })
 				return err
 			})
@@ -1638,7 +1693,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 				continue
 			}
 			out, _, quit := slashOutput(input, ag, registry, mcpStatus(), skillsList,
-				slashReloads{mcp: reloadMCP, load: loadMCP, show: showPath},
+				reloads,
 				func() string { return usageReport(ag, cfg.LLM.Model) },
 				appVersion, msgs, onClear)
 			fmt.Fprint(stderr, out)
@@ -1650,6 +1705,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 
 		// SIGINT cancels the in-flight turn, not the process.
 		runErr := runTurnWith(ctx, ladder, func(turnCtx context.Context) error {
+			announceGrant()
 			_, err := ag.Run(turnCtx, input, func(s string) { fmt.Fprint(cmd.OutOrStdout(), s) })
 			return err
 		})
@@ -2280,8 +2336,8 @@ func runDirectShell(ctx context.Context, registry *tools.Registry, ag *agent.Age
 // slashCompletions completes the slash commands this runtime has.
 func slashCompletions(getSkills func() []skills.Skill) func(string) []string {
 	commands := []string{
-		"/auto", "/clear", "/compact", "/exit", "/help", "/mcp",
-		"/forget", "/memory", "/quit", "/readonly", "/remember", "/settings", "/skill", "/skills",
+		"/add-dir", "/auto", "/clear", "/compact", "/dirs", "/exit", "/help", "/mcp",
+		"/forget", "/memory", "/quit", "/read-dir", "/readonly", "/remember", "/settings", "/skill", "/skills",
 		"/tools", "/usage", "/version",
 	}
 	return func(prefix string) []string {
@@ -2401,6 +2457,10 @@ type slashReloads struct {
 	// `@<image>`, and it is why the symlink hazard that rules out a
 	// runtime-chosen path does not apply.
 	show func(path string) (string, bool)
+	// addDir is /add-dir and /read-dir (ADR-0046): the rest of the line
+	// is the path. dirs is /dirs. nil reads as unknown.
+	addDir func(rest string, write bool) (string, bool)
+	dirs   func() string
 }
 
 func slashOutput(input string, ag *agent.Agent, registry *tools.Registry, mcpSummary []string, skillsList []skills.Skill, reload slashReloads, usage func() string, version string, msgs *uitext.Messages, onClear func() string) (output string, isErr bool, quit bool) {
@@ -2498,6 +2558,19 @@ func slashOutput(input string, ag *agent.Agent, registry *tools.Registry, mcpSum
 		} else {
 			b.WriteString(msgs.AutoOff)
 		}
+	case "/add-dir", "/read-dir", "/dirs":
+		if reload.addDir == nil || reload.dirs == nil {
+			fmt.Fprintf(&b, msgs.UnknownCommandFmt, input)
+			return b.String(), true, false
+		}
+		// The rest of the line is the path, so a path with spaces needs
+		// no quoting; bare, each lists the roots.
+		rest := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(input), fields[0]))
+		if fields[0] == "/dirs" || rest == "" {
+			return reload.dirs(), false, false
+		}
+		out, isErr := reload.addDir(rest, fields[0] == "/add-dir")
+		return out, isErr, false
 	case "/readonly":
 		// The ceiling in force: `on`/`off` move it, nothing in the
 		// runtime lowers it, this is where the operator does. A typo is
