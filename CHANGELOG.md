@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-09
+
 ### Documentation
 
 - **What a pipe without `-p` means is now stated** (ADR-0045). It is your own
