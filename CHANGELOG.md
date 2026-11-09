@@ -22,6 +22,9 @@
 
 ### Security
 
+- **A session directory that has become a link is refused on resume.** The
+  write lane can replace the work directory or the approved cache with a
+  link, and following it would widen what that lane may write.
 - **A link left at the session scratch no longer becomes the read lane's
   writable directory.** Such a session now runs with the read lane off, and
   says so.

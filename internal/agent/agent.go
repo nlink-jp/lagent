@@ -1816,6 +1816,9 @@ func ClipDetail(detail string) string {
 // together: a model can pass any size of write_file and choose any name.
 const approvalDetailCap = 64 << 10
 
+// minArgShare keeps something of every argument, however many there are.
+const minArgShare = 64
+
 // FullCallDetail renders every argument of a call for the question the
 // operator answers (ADR-0044), and how many bytes it left out. The path
 // comes first, then the other short values, then the long ones, so a long
@@ -1840,10 +1843,10 @@ func FullCallDetail(tc llm.ToolCall) (detail string, omitted int) {
 		total += len(k) + len(text)
 		rank := 1
 		switch {
+		case isLongValue(k + "=" + text):
+			rank = 2
 		case k == "path":
 			rank = 0
-		case isLongValue(text):
-			rank = 2
 		}
 		args = append(args, arg{k, text, rank})
 	}
@@ -1857,7 +1860,7 @@ func FullCallDetail(tc llm.ToolCall) (detail string, omitted int) {
 	// share, so the short arguments are untouched.
 	limit := approvalDetailCap
 	if total > approvalDetailCap {
-		limit = approvalDetailCap / len(args)
+		limit = max(approvalDetailCap/len(args), minArgShare)
 	}
 	parts := make([]string, 0, len(args))
 	for _, a := range args {

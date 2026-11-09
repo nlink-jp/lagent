@@ -30,7 +30,7 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `[sandbox].enabled` | `true` | `shell_exec` を sandbox-exec で包む。モデルが宣言したレーンをカーネルが強制。off だと全シェル呼び出しが操作者の承認待ち |
 | `[sandbox].read_lane_deny_exec` | （未設定） | read レーンが起動してはならないプログラム。組込一覧に追加 |
 | `[sandbox].read_lane_prompts` | `false` | read レーンのコマンドにも承認プロンプトを残す |
-| `[sandbox.scratch_caches]` | `GOCACHE = "go-build"` | 全 `shell_exec` がセッション scratch に向けるツールチェインのキャッシュ。環境変数 = ディレクトリ名。read レーンはその名前、write と operator レーンは `<name>-approved`。別のツールチェインは行を足す（`PIP_CACHE_DIR`、`UV_CACHE_DIR`、`npm_config_cache`）、`""` で行を消す。再生成できるキャッシュだけ — ローダ変数とレーンが決める変数は拒否され、プロジェクトファイルからは設定できない |
+| `[sandbox.scratch_caches]` | `GOCACHE = "go-build"` | 全 `shell_exec` がセッション scratch に向けるツールチェインのキャッシュ。環境変数 = ディレクトリ名。read レーン用は scratch に、write と operator レーン用は作業ディレクトリの隣の別のディレクトリに置く（ADR-0042）。別のツールチェインは行を足す（`PIP_CACHE_DIR`、`UV_CACHE_DIR`、`npm_config_cache`）、`""` で行を消す。再生成できるキャッシュだけ — ローダ変数とレーンが決める変数は拒否され、プロジェクトファイルからは設定できない |
 | `[agent].max_turns` | `50` | 1 ターンのラウンド予算。対話中はチェックポイント、`-p` では停止。絶対上限は 3 倍 |
 | `[agent].shell_timeout_sec` | `120` | `shell_exec` のコマンドごとのタイムアウト |
 | `[agent].auto_approve` | `false` | 自動承認で開始: 規則層で Safe の呼び出しは尋ねずに走り、Review と Block は尋ねる。**`-p` では無視** — そこでは `--auto` だけが有効。`/auto on|off` と shift+tab でセッション中に変更 |
@@ -209,7 +209,7 @@ command     = "/Users/you/hooks/session-end.sh"
 | `LAGENT_SESSION_ID` | export | セッション id。`shell_exec` の子プロセスと `.mcp.json` の `${LAGENT_SESSION_ID}` 向け |
 | `LAGENT_WORK_DIR` | export | セッション作業ディレクトリ。同じく `.mcp.json` で展開できる |
 | `LAGENT_PROJECT_DIR` | export | プロジェクトディレクトリ。それを知る必要がある子プロセス向け |
-| `GOCACHE`（と `[sandbox.scratch_caches]` の全行） | export | 全レーンの `shell_exec` 向け: セッション scratch 内のディレクトリ。Go のコンパイル・vet・テストが read レーンで走る（sandbox は `~/Library` 下のキャッシュを拒否する）。あなた自身のキャッシュには触れない |
+| `GOCACHE`（と `[sandbox.scratch_caches]` の全行） | export | 全レーンの `shell_exec` 向け: セッションのディレクトリ（read レーンは scratch、承認済みレーンは別のディレクトリ）。Go のコンパイル・vet・テストが read レーンで走る（sandbox は `~/Library` 下のキャッシュを拒否する）。あなた自身のキャッシュには触れない |
 
 **あなたが export した変数は絞り込みません**（ADR-0017）。コマンドが動かす
 プログラムにどれが必要かは lagent が答えられる問いではないので、lagent が

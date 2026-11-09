@@ -30,7 +30,7 @@ Unknown keys are errors (strict decode).
 | `[sandbox].enabled` | `true` | wrap `shell_exec` in sandbox-exec; the lane the model declares is enforced by the kernel. Off, every shell call is yours to approve |
 | `[sandbox].read_lane_deny_exec` | (unset) | programs the read lane may not launch, added to the built-in list |
 | `[sandbox].read_lane_prompts` | `false` | keep the approval prompt for read-lane commands too |
-| `[sandbox.scratch_caches]` | `GOCACHE = "go-build"` | toolchain caches every `shell_exec` points into the session scratch, environment variable = directory name; the read lane gets the name, the write and operator lanes `<name>-approved`. Add a row for another toolchain (`PIP_CACHE_DIR`, `UV_CACHE_DIR`, `npm_config_cache`), set one to `""` to remove it; regenerable caches only — loader variables and the ones the lane decides are refused, and a project file cannot set it |
+| `[sandbox.scratch_caches]` | `GOCACHE = "go-build"` | toolchain caches every `shell_exec` points into the session scratch, environment variable = directory name; the read lane's copy is in the scratch, the write and operator lanes' in a separate directory beside the work directory (ADR-0042). Add a row for another toolchain (`PIP_CACHE_DIR`, `UV_CACHE_DIR`, `npm_config_cache`), set one to `""` to remove it; regenerable caches only — loader variables and the ones the lane decides are refused, and a project file cannot set it |
 | `[agent].max_turns` | `50` | round budget per turn; a checkpoint interactively, a stop in `-p`; a hard cap of 3x |
 | `[agent].shell_timeout_sec` | `120` | per-command timeout for `shell_exec` |
 | `[agent].auto_approve` | `false` | start with auto-approve on: rule-tier Safe calls run unasked, Review and Block ask. **Ignored in `-p`** — only `--auto` arms it there. `/auto on|off` and shift+tab change it for the session |
@@ -221,7 +221,7 @@ Other environment variables the runtime reads or sets:
 | `LAGENT_SESSION_ID` | exported | the session id, for `shell_exec` children and `${LAGENT_SESSION_ID}` in `.mcp.json` |
 | `LAGENT_WORK_DIR` | exported | the per-session work directory, likewise expandable in `.mcp.json` |
 | `LAGENT_PROJECT_DIR` | exported | the project directory, for children that need to know it |
-| `GOCACHE` (and every `[sandbox.scratch_caches]` row) | exported | for `shell_exec` in every lane: a directory in the session scratch, so Go compiles, vets and tests run in the read lane (the sandbox denies the cache under `~/Library`); your own cache is untouched |
+| `GOCACHE` (and every `[sandbox.scratch_caches]` row) | exported | for `shell_exec` in every lane: a session directory (the scratch for the read lane, a separate one for the approved lanes), so Go compiles, vets and tests run in the read lane (the sandbox denies the cache under `~/Library`); your own cache is untouched |
 
 **Your exported variables are not filtered** (ADR-0017). Which one the
 program a command runs needs is not a question lagent can answer, so

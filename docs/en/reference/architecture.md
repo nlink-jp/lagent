@@ -159,7 +159,7 @@ callbacks and the agent never imports a UI package:
 
 ## Approval
 
-The dialog carries the whole call, up to 64 KiB, short arguments first, and scrolls with ↑↓, PgUp, PgDn, Home and End (ADR-0044).
+The dialog carries the whole call, cut only past 64 KiB, short arguments first, and scrolls with ↑↓, PgUp, PgDn, Home and End (ADR-0044).
 
 Before the ladder, the operator's pre-tool hooks (`internal/hooks`,
 ADR-0012) may refuse a call outright: a deny is a floor no mode, row or

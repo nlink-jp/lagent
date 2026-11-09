@@ -578,9 +578,8 @@ answers.
   no gate.
 - **Toolchain caches are the operator's table, not a list in code**
   (ADR-0008 §1). `[sandbox].scratch_caches` maps a variable to a
-  directory under the session scratch; `laneEnv` renders it with the
-  read lane and the approved lanes apart (`go-build` /
-  the approved lanes' `go-build` beside the work directory, ADR-0042) because a build cache is trusted on read. The
+  directory name; `laneEnv` renders it with the read lane in the scratch
+  and the approved lanes' copy beside the work directory (ADR-0042) because a build cache is trusted on read. The
   loader refuses loader variables and the ones the lane decides; a
   project file cannot set it. Do not add a toolchain in code — add the
   row to the example config.
