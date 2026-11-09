@@ -729,6 +729,15 @@ func (a *Agent) AnnounceSession(facts string) {
 	a.appendMessage(llm.Message{Role: llm.RoleUser, Content: b.String()})
 }
 
+// AddContextData appends a between-turns user message whose text is the
+// operator's and whose attachment is data (ADR-0043): the nonce wrap at
+// send covers the attachment, as it does a piped stdin's. Same
+// between-turns discipline as AddContext.
+func (a *Agent) AddContextData(text, ref, kind, content string) {
+	a.appendMessage(llm.Message{Role: llm.RoleUser, Content: text,
+		Attachments: []llm.Attachment{{Ref: ref, Kind: kind, Content: content}}})
+}
+
 // AttachData queues one text attachment for the next Run's user message
 // (gem-agent ADR-0055): one-shot mode uses it to carry piped stdin as
 // nonce-wrapped untrusted data. It must never be merged into the input

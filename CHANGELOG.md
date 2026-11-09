@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **The output of a `!` command reaches the model as data** (ADR-0043). It
+  used to join the conversation as your own words. The command still does;
+  what it printed is now marked like a file you attach.
+
 ### Security
 
 - **A link left at the session scratch no longer becomes the read lane's

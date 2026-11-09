@@ -433,6 +433,7 @@ excepted).
   when cut, and multi-line YAML values (`>`, `|`, continued plain scalars) read whole
 - [`ADR-0041`](adr/0041-a-path-is-judged-where-it-leads.md) —
 - [`ADR-0042`](adr/0042-the-approved-cache-is-out-of-the-unasked-lanes-reach.md) — the approved lanes' toolchain cache lies outside everything that runs unasked (**Accepted**, implemented; ports gem-agent ADR-0109): it moves from inside the read lane's scratch to the session's own directory beside the work directory, denied to the read lane by the kernel and probed at startup
+- [`ADR-0043`](adr/0043-the-output-of-a-bang-command-is-data.md) — the output of a `!` command is data (**Accepted**, implemented; ports gem-agent ADR-0111): the command stays the operator's text and the output is a text attachment, wrapped at send
   a path is judged where it leads, and a probe that cannot remove itself says so (**Accepted**, implemented; ported
   from gem-agent ADR-0108 and ADR-0107 §4): a full path through a link outside the roots (`~/Dropbox` → `~/Library/CloudStorage/Dropbox`)
   is rewritten once to its real path where the call comes in, and a probe file left in the project is named
