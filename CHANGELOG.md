@@ -4,6 +4,9 @@
 
 ### Security
 
+- **A link left at the session scratch no longer becomes the read lane's
+  writable directory.** Such a session now runs with the read lane off, and
+  says so.
 - **The startup file-read probe no longer writes through planted links.** It
   now uses a new randomly named directory and exclusive creates.
 - **A control character in a skill directory's name no longer breaks every
