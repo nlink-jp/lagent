@@ -1,0 +1,290 @@
+// Ported from gem-agent internal/sandbox/roots.go at 32c85ba (v0.100.1), ADR-0001 / ADR-0046.
+
+package sandbox
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+
+	"github.com/nlink-jp/lagent/internal/pathid"
+)
+
+// RootContext is what RefuseRoot judges an added directory against
+// (gem-agent ADR-0099 §5). Every path is the real one; an empty field is not
+// judged.
+type RootContext struct {
+	Home       string
+	ProjectDir string
+	WorkDir    string
+	// ConfigHome is the runtime's configuration home
+	// (~/.config/lagent) and StateDir its state root
+	// (~/.local/state/lagent): what later sessions trust and record.
+	ConfigHome string
+	StateDir   string
+	// ConfigFile is the configuration file in effect (--config may name
+	// one outside ConfigHome): a write root may not contain it, or the
+	// model could rewrite the operator's hooks, approvals and roots for
+	// every later session.
+	ConfigFile string
+	// Roots are the directories already added in this session.
+	Roots []AddedRoot
+}
+
+// RefuseRoot decides whether path may become an added root at the given
+// level (gem-agent ADR-0099 §5) and returns its real path. It is the one rule the
+// startup flags, the configuration and (later) the model's request all
+// read. A refusal names the reason in the operator's terms.
+func RefuseRoot(path string, write bool, c RootContext) (string, error) {
+	// Judged on the kernel's name for it: the typed case would slip past
+	// every case-sensitive containment check below on a case-folding
+	// volume.
+	real, err := CanonicalDir(path)
+	if err != nil {
+		if real == "" {
+			return "", fmt.Errorf("%s: not found", path)
+		}
+		return "", fmt.Errorf("%s: cannot be opened: %v", real, err)
+	}
+	st, err := os.Stat(real)
+	if err != nil {
+		return "", fmt.Errorf("%s: %v", path, err)
+	}
+	if !st.IsDir() {
+		return "", fmt.Errorf("%s: not a directory", path)
+	}
+	refuse := func(why string) (string, error) {
+		return "", fmt.Errorf("%s cannot be added: %s", real, why)
+	}
+	if real == "/" {
+		return refuse("it is the root of the filesystem")
+	}
+	if c.Home != "" && within(real, c.Home) {
+		return refuse("it is the home directory or contains it")
+	}
+	for _, x := range []struct{ dir, what string }{
+		{c.ProjectDir, "the project"},
+		{c.WorkDir, "the session work directory"},
+		{c.ConfigHome, "the lagent configuration home"},
+		{c.StateDir, "the lagent state directory"},
+	} {
+		if x.dir != "" && within(real, x.dir) && real != x.dir {
+			return refuse("it contains " + x.what)
+		}
+	}
+	for _, x := range []struct{ dir, what string }{
+		{c.ConfigHome, "the lagent configuration home"},
+		{c.StateDir, "the lagent state directory"},
+	} {
+		if x.dir != "" && within(x.dir, real) {
+			return refuse("it lies inside " + x.what)
+		}
+	}
+	if c.Home != "" {
+		h := filepath.Clean(c.Home)
+		var creds []string
+		for _, d := range credentialDirs {
+			creds = append(creds, filepath.Join(h, d))
+		}
+		for _, f := range credentialFiles {
+			creds = append(creds, filepath.Join(h, f))
+		}
+		for _, cr := range creds {
+			if within(cr, real) || within(real, cr) {
+				return refuse("it is, lies inside or contains a credential location (" + cr + ")")
+			}
+		}
+		if write && within(filepath.Join(h, "Library"), real) && !SyncedFolder(h, real) {
+			return refuse("a write root may not lie inside ~/Library, where programs run outside the sandbox — except a synced folder: one inside a provider's folder in ~/Library/CloudStorage, or in iCloud Drive")
+		}
+	}
+	if write && c.ConfigFile != "" && within(real, c.ConfigFile) {
+		return refuse("a write root may not contain the lagent configuration file in use (" + c.ConfigFile + ")")
+	}
+	// A shared scratch root lets any write-lane command rename the root
+	// away and put another directory in its place: the profile names a
+	// path and the file tools hold a descriptor, so the two would part.
+	for _, s := range append(ScratchDirs(), "/private/var/tmp") {
+		if within(s, real) {
+			return refuse("it lies inside a shared temporary directory (" + s + ")")
+		}
+	}
+	// A root that contains a scratch root or the devices would take the
+	// lanes' own allowances with it: the write lanes write scratch under
+	// a read root the file tools refuse, and a re-allow over /dev reopens
+	// the terminal devices every lane denies.
+	for _, s := range append(ScratchDirs(), "/private/var/tmp", "/dev") {
+		if within(real, s) {
+			return refuse("it contains a shared temporary directory or the devices (" + s + ")")
+		}
+	}
+	// Already covered: the project and the work directory are write
+	// roots; an added root covers what lies under it at its level.
+	covers := []AddedRoot{{Dir: c.ProjectDir, Write: true}, {Dir: c.WorkDir, Write: true}}
+	covers = append(covers, c.Roots...)
+	for _, r := range covers {
+		if r.Dir != "" && within(r.Dir, real) && (r.Write || !write) {
+			return "", &CoveredError{Path: real, By: r}
+		}
+	}
+	return real, nil
+}
+
+// SyncedFolder reports whether real — a real path, judged against the
+// resolved home — is one of the two places macOS keeps synced documents
+// under ~/Library (gem-agent ADR-0107 §1): strictly inside ~/Library/CloudStorage
+// (a File Provider account folder or below; CloudStorage itself covers
+// every account and is not one), or iCloud Drive itself or below. The
+// rest of Mobile Documents is app containers, which hold what the apps
+// run, and stays out.
+func SyncedFolder(home, real string) bool {
+	lib := filepath.Join(filepath.Clean(home), "Library")
+	cloud := filepath.Join(lib, "CloudStorage")
+	icloud := filepath.Join(lib, "Mobile Documents", "com~apple~CloudDocs")
+	if within(cloud, real) && !pathid.Same(cloud, real) {
+		return true
+	}
+	return within(icloud, real)
+}
+
+// CoveredError is RefuseRoot's "already covered": the path lies inside a
+// root of the same or a higher level. At startup it is an error; during
+// a session it is a note that changes nothing (gem-agent ADR-0099 §12).
+type CoveredError struct {
+	Path string
+	By   AddedRoot
+}
+
+func (e *CoveredError) Error() string {
+	return fmt.Sprintf("%s is already covered by %s (%s)", e.Path, e.By.Dir, e.By.Access())
+}
+
+// Absorbed returns the added roots a new root at real absorbs (ADR-0046
+// §12): those at or inside it whose level is not higher than the new
+// one. A write root over a read root replaces it — otherwise the write
+// lanes would write a root the file tools refuse — and the same
+// directory given at a higher level is an upgrade.
+func Absorbed(real string, write bool, roots []AddedRoot) []AddedRoot {
+	var out []AddedRoot
+	for _, r := range roots {
+		if within(real, r.Dir) && (write || !r.Write) {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// VerifyAddedRoots probes each added root under the real profiles
+// (gem-agent ADR-0099 §7): the startup probes prove the cage around the project
+// and home, not where a new root sits in it. For every root the read
+// lane must not create a file there and must not read a credential name
+// there, and must read an ordinary file there (the re-allow under a
+// tree denied for reach); a write root must be writable by the write
+// lane with its persistent names denied, and a read root writable by no
+// lane. Each must-fail probe runs first without the sandbox as its
+// control. The probe files are created under a random name and removed
+// by full path.
+//
+// A read root the operator's own process cannot write (a read-only
+// volume) cannot hold a probe; nothing can write it either, so its
+// write probes are moot and its credential probe is left to the
+// profile's order test — the note says so.
+//
+// readLane is whether the startup probes verified the read lane: when
+// they did not, every read-lane call already asks, and a read-lane probe
+// failing for the same unrelated reason must not be blamed on the root —
+// the read-lane probes are skipped with a note, the others still run.
+//
+// leftovers are the probe files it could not remove (ADR-0041 §2), kept
+// apart from notes and returned whatever the result: a note may be the
+// model's to read, a leftover is the operator's alone.
+func VerifyAddedRoots(profiles map[Lane]string, spec Spec, readLane bool) (notes, leftovers []string, err error) {
+	if !readLane && len(spec.Added) > 0 {
+		notes = append(notes, "added directories: the read lane was not verified, so their read-lane probes were skipped")
+	}
+	for _, a := range spec.Added {
+		n, left, err := verifyAddedRoot(profiles, a, readLane)
+		notes = append(notes, n...)
+		leftovers = append(leftovers, left...)
+		if err != nil {
+			return notes, leftovers, fmt.Errorf("added directory %s (%s): %w", a.Dir, a.Access(), err)
+		}
+	}
+	return notes, leftovers, nil
+}
+
+func verifyAddedRoot(profiles map[Lane]string, a AddedRoot, readLane bool) (notes, leftovers []string, err error) {
+	probeDir, err := os.MkdirTemp(a.Dir, ".lagent-root-probe-*")
+	if err != nil {
+		if a.Write {
+			return nil, nil, fmt.Errorf("cannot create a probe in it: %w", err)
+		}
+		return []string{fmt.Sprintf("added directory %s is not writable here, so its probes were skipped", a.Dir)}, nil, nil
+	}
+	cred := filepath.Join(probeDir, ".env")
+	plain := filepath.Join(probeDir, "plain")
+	created := filepath.Join(probeDir, "created")
+	persistent := filepath.Join(probeDir, "AGENTS.md")
+	defer func() { leftovers = removeProbes(cred, plain, created, persistent, probeDir) }()
+	for _, f := range []string{cred, plain} {
+		if err := os.WriteFile(f, []byte("probe\n"), 0o600); err != nil {
+			return nil, nil, fmt.Errorf("cannot create a probe file in it: %w", err)
+		}
+	}
+	run := func(lane Lane, command string) error {
+		argv := Wrap(profiles[lane], "/bin/bash", command)
+		cmd := exec.Command(argv[0], argv[1:]...)
+		cmd.Env = ChildEnv(os.Environ())
+		return cmd.Run()
+	}
+	control := func(command, made string) error {
+		cmd := exec.Command("/bin/bash", "-c", command)
+		cmd.Env = ChildEnv(os.Environ())
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("the control run of %q failed outside the sandbox (%v) — the probe cannot tell a denial from an unrelated failure", command, err)
+		}
+		if made != "" {
+			_ = os.Remove(made)
+		}
+		return nil
+	}
+	mustFail := func(lane Lane, command, made, what string) error {
+		if err := control(command, made); err != nil {
+			return err
+		}
+		if run(lane, command) == nil {
+			_ = os.Remove(made)
+			return fmt.Errorf("the %s lane %s", lane, what)
+		}
+		return nil
+	}
+	write := "echo x > " + shellQuote(created)
+	if readLane {
+		if err := mustFail(LaneRead, write, created, "created a file in it"); err != nil {
+			return nil, nil, err
+		}
+		if err := mustFail(LaneRead, "cat "+shellQuote(cred)+" > /dev/null", "", "read a credential name in it"); err != nil {
+			return nil, nil, err
+		}
+		if err := run(LaneRead, "cat "+shellQuote(plain)+" > /dev/null"); err != nil {
+			return nil, nil, fmt.Errorf("the read lane cannot read an ordinary file in it: %w", err)
+		}
+	}
+	if a.Write {
+		if err := run(LaneWrite, write); err != nil {
+			return nil, nil, fmt.Errorf("the write lane cannot write it: %w", err)
+		}
+		_ = os.Remove(created)
+		if err := mustFail(LaneWrite, "echo x > "+shellQuote(persistent), persistent, "wrote an instruction file's name in it"); err != nil {
+			return nil, nil, err
+		}
+		return nil, nil, nil
+	}
+	for _, lane := range []Lane{LaneWrite, LaneOperator} {
+		if err := mustFail(lane, write, created, "wrote a read-only added directory"); err != nil {
+			return nil, nil, err
+		}
+	}
+	return nil, nil, nil
+}

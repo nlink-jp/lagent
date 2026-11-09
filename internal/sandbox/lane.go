@@ -114,6 +114,27 @@ type Spec struct {
 	// unlink — so a nested AGENTS.md cannot be replaced by swapping its
 	// parent (gem-agent ADR-0074 §2). Writes inside them stay allowed.
 	PersistentParents []string
+	// Added are the directories the operator added as roots (ADR-0046),
+	// resolved to real paths by RefuseRoot. A write root is written by
+	// the write and operator lanes like the project, with its persistent
+	// names denied to the write lane; a read root is written by no lane.
+	// The read lane reads both, even under a tree it denies for reach.
+	Added []AddedRoot
+}
+
+// AddedRoot is one directory the operator added as a root (ADR-0046):
+// Dir is the real path, Write its access level.
+type AddedRoot struct {
+	Dir   string `json:"dir"`
+	Write bool   `json:"write"`
+}
+
+// Access names the level as the operator spells it.
+func (r AddedRoot) Access() string {
+	if r.Write {
+		return "write"
+	}
+	return "read"
 }
 
 // DefaultDenyExec are the IPC-capable programs the read lane refuses to
@@ -474,6 +495,13 @@ func LaneProfile(lane Lane, spec Spec) (string, error) {
 		if spec.WorkDir != "" {
 			writeDirs = append(writeDirs, spec.WorkDir)
 		}
+		// Write roots are written like the project (ADR-0046); a read
+		// root appears in no write allow, the operator lane's included.
+		for _, a := range spec.Added {
+			if a.Write {
+				writeDirs = append(writeDirs, a.Dir)
+			}
+		}
 		// Each session's own; no other session's profile names it
 		// (ADR-0042).
 		if spec.ApprovedCacheRoot != "" {
@@ -515,6 +543,15 @@ func LaneProfile(lane Lane, spec Spec) (string, error) {
 		for _, f := range PersistentFiles(spec.ProjectDir) {
 			fmt.Fprintf(&b, "    %s\n", f)
 		}
+		// A write root may be another project a later session trusts:
+		// its persistent names are denied the same way, anchored at it.
+		for _, a := range spec.Added {
+			if a.Write {
+				for _, f := range PersistentFiles(a.Dir) {
+					fmt.Fprintf(&b, "    %s\n", f)
+				}
+			}
+		}
 		for _, p := range spec.PersistentParents {
 			if within(spec.ProjectDir, p) && filepath.Clean(p) != filepath.Clean(spec.ProjectDir) {
 				fmt.Fprintf(&b, "    (literal %s)\n", sbplString(filepath.Clean(p)))
@@ -539,6 +576,9 @@ func LaneProfile(lane Lane, spec Spec) (string, error) {
 	fmt.Fprintf(&b, "    (subpath %s)\n", sbplString(filepath.Clean(spec.ProjectDir)))
 	if spec.WorkDir != "" {
 		fmt.Fprintf(&b, "    (subpath %s)\n", sbplString(filepath.Clean(spec.WorkDir)))
+	}
+	for _, a := range spec.Added {
+		fmt.Fprintf(&b, "    (subpath %s)\n", sbplString(filepath.Clean(a.Dir)))
 	}
 	b.WriteString(")\n")
 	if spec.ReadScratch != "" {
@@ -573,15 +613,20 @@ func LaneProfile(lane Lane, spec Spec) (string, error) {
 		}
 		b.WriteString(")\n")
 	}
-	// The session's own roots are read wherever they lie (ADR-0036): a
-	// project in cloud storage (~/Library/CloudStorage) or on a share
-	// (/Volumes) is inside a tree denied for reach, and without this the
-	// read lane cannot even learn its working directory. Before
-	// writeCredentialBlock, which re-denies credentials inside them.
-	if roots := ownRootsUnderReach(spec); len(roots) > 0 {
+	// An added root is read even where it lies under a tree denied for
+	// reach (/Volumes, ~/Library): the operator named it (ADR-0046). So
+	// are the session's own roots (ADR-0036): a project in cloud storage
+	// (~/Library/CloudStorage) or on a share (/Volumes) is inside a tree
+	// denied for reach, and without this the read lane cannot even learn
+	// its working directory. Before writeCredentialBlock, which re-denies
+	// credentials inside them: the block is the last read rule.
+	if own := ownRootsUnderReach(spec); len(spec.Added) > 0 || len(own) > 0 {
 		b.WriteString("(allow file-read*\n")
-		for _, r := range roots {
+		for _, r := range own {
 			fmt.Fprintf(&b, "    (subpath %s)\n", sbplString(r))
+		}
+		for _, a := range spec.Added {
+			fmt.Fprintf(&b, "    (subpath %s)\n", sbplString(filepath.Clean(a.Dir)))
 		}
 		b.WriteString(")\n")
 	}
