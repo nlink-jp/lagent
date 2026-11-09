@@ -4,6 +4,8 @@
 
 ### Security
 
+- **The startup file-read probe no longer writes through planted links.** It
+  now uses a new randomly named directory and exclusive creates.
 - **A control character in a skill directory's name no longer breaks every
   start.** Such names are now escaped in the global policy file, and a file
   that cannot be read back never replaces the existing one.
