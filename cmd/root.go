@@ -492,9 +492,12 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// The operator's added directories (ADR-0046): judged by the one
 	// rule before anything uses them, and a refusal stops the start —
 	// the operator typed the path and must hear it did not apply.
-	added, err := resolveAddedDirs(cfg, projectDir, workDir, cfgPath)
+	added, skippedDirs, err := resolveAddedDirs(cfg, projectDir, workDir, cfgPath)
 	if err != nil {
 		return err
+	}
+	for _, s := range skippedDirs {
+		fmt.Fprintf(stderr, msgs.AddedSkippedFmt+"\n", s)
 	}
 	if len(added) > 0 && sessionLog != nil {
 		_ = sessionLog.Log("added_directories", addedDirsRecord(added))
@@ -1001,13 +1004,14 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// announceFacts sends the facts as they stand. One place, because each
 	// caller's copy of this list would be one more to forget a root in.
 	announceFacts := func() {
+		granter.factsStale.Store(false)
 		ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...), registry.AddedDirs()...))
 	}
 	// announceGrant is called where a turn starts: a directory granted
 	// since the last turn reaches the model in a fresh facts message
 	// (ADR-0046), which appends and leaves the earlier prefix cached.
 	announceGrant := func() {
-		if granter.factsStale.Swap(false) {
+		if granter.factsStale.Load() {
 			announceFacts()
 		}
 	}
@@ -1362,7 +1366,13 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// runtime-facts message, never through the system prompt, which
 		// stays byte-identical so the server's prefix cache survives
 		// the clear.
+		addedBeforeRotate := registry.AddedDirs()
 		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.Caches(), cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap), registry.AddedDirs())...)
+		// A root that failed its probes was dropped: the new transcript
+		// says what is in force.
+		if had := len(addedBeforeRotate); had != len(registry.AddedDirs()) {
+			_ = newLog.Log("added_directories", granter.record())
+		}
 		// The rotate above ran under the grant lock: a late grant cannot
 		// swap in a runner built against the old work directory.
 		granter.endClear()
@@ -2703,7 +2713,21 @@ func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool
 	if err := registry.UseWorkDir(dir); err != nil {
 		notes = append(notes, fmt.Sprintf("file tools keep the previous work directory: %v", err))
 	}
-	if fn, enf, laneNotes, err := buildExecFn(sandboxOn, projectDir, dir, denyExec, caches, persistentParents, added); err != nil {
+	fn, enf, laneNotes, err := buildExecFn(sandboxOn, projectDir, dir, denyExec, caches, persistentParents, added)
+	if err != nil && len(added) > 0 {
+		// An added root that no longer passes its probes (an ejected
+		// volume, an offline synced folder) must not strand the new work
+		// directory on the old profile: the roots are dropped, everywhere
+		// at once, and the operator told (ADR-0046).
+		var retryErr error
+		fn, enf, laneNotes, retryErr = buildExecFn(sandboxOn, projectDir, dir, denyExec, caches, persistentParents, nil)
+		if retryErr == nil {
+			registry.DropAddedDirs()
+			notes = append(notes, fmt.Sprintf("added directories removed from this session, because one no longer passes the sandbox check (%v); /add-dir adds them again", err))
+			err = nil
+		}
+	}
+	if err != nil {
 		notes = append(notes, fmt.Sprintf("shell commands keep the previous sandbox profile: %v", err))
 	} else {
 		shellExec.set(fn)

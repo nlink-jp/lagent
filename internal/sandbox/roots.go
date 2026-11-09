@@ -3,6 +3,7 @@
 package sandbox
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -43,9 +44,9 @@ func RefuseRoot(path string, write bool, c RootContext) (string, error) {
 	real, err := CanonicalDir(path)
 	if err != nil {
 		if real == "" {
-			return "", fmt.Errorf("%s: not found", path)
+			return "", &situationalError{fmt.Sprintf("%s: not found", path)}
 		}
-		return "", fmt.Errorf("%s: cannot be opened: %v", real, err)
+		return "", &situationalError{fmt.Sprintf("%s: cannot be opened: %v", real, err)}
 	}
 	st, err := os.Stat(real)
 	if err != nil {
@@ -63,13 +64,19 @@ func RefuseRoot(path string, write bool, c RootContext) (string, error) {
 	if c.Home != "" && within(real, c.Home) {
 		return refuse("it is the home directory or contains it")
 	}
-	for _, x := range []struct{ dir, what string }{
-		{c.ProjectDir, "the project"},
-		{c.WorkDir, "the session work directory"},
-		{c.ConfigHome, "the lagent configuration home"},
-		{c.StateDir, "the lagent state directory"},
+	for _, x := range []struct {
+		dir, what   string
+		situational bool
+	}{
+		{c.ProjectDir, "the project", true},
+		{c.WorkDir, "the session work directory", true},
+		{c.ConfigHome, "the lagent configuration home", false},
+		{c.StateDir, "the lagent state directory", false},
 	} {
 		if x.dir != "" && within(real, x.dir) && real != x.dir {
+			if x.situational {
+				return "", &situationalError{fmt.Sprintf("%s cannot be added: it contains %s", real, x.what)}
+			}
 			return refuse("it contains " + x.what)
 		}
 	}
@@ -119,6 +126,15 @@ func RefuseRoot(path string, write bool, c RootContext) (string, error) {
 			return refuse("it contains a shared temporary directory or the devices (" + s + ")")
 		}
 	}
+	// A root that is, or holds, a tree the read lane keeps out would hand
+	// that whole tree to the unasked lane: last-match-wins, its re-allow
+	// reopens it, the rule ownRootsUnderReach keeps for the session's own
+	// roots (ADR-0036). One inside such a tree is the point of a root.
+	for _, d := range reachDenied(c.Home) {
+		if within(real, d) {
+			return refuse("it is or contains " + d + ", which the read lane keeps out; add a directory inside it")
+		}
+	}
 	// Already covered: the project and the work directory are write
 	// roots; an added root covers what lies under it at its level.
 	covers := []AddedRoot{{Dir: c.ProjectDir, Write: true}, {Dir: c.WorkDir, Write: true}}
@@ -146,6 +162,23 @@ func SyncedFolder(home, real string) bool {
 		return true
 	}
 	return within(icloud, real)
+}
+
+// situationalError is a refusal that depends on where this session
+// started or on what is mounted now, not on the path being wrong.
+type situationalError struct{ msg string }
+
+func (e *situationalError) Error() string { return e.msg }
+
+// Situational reports whether RefuseRoot's err is about this session
+// rather than the path: not found or not openable now, holding the
+// project, or already covered. A path listed in the global file applies
+// to every project, so such a refusal skips it; a path typed for this
+// run still stops the start (ADR-0046).
+func Situational(err error) bool {
+	var s *situationalError
+	var c *CoveredError
+	return errors.As(err, &s) || errors.As(err, &c)
 }
 
 // CoveredError is RefuseRoot's "already covered": the path lies inside a

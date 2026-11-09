@@ -77,7 +77,7 @@ func TestRefuseRoot(t *testing.T) {
 	if err != nil {
 		t.Skip("no home directory")
 	}
-	base, err := os.MkdirTemp(userHome, ".gem-agent-refuse-test-")
+	base, err := os.MkdirTemp(userHome, ".lagent-refuse-test-")
 	if err != nil {
 		t.Skip("cannot create a directory under home")
 	}
@@ -94,7 +94,7 @@ func TestRefuseRoot(t *testing.T) {
 	}
 	home := mk("home")
 	proj := mk("home/dev/proj")
-	c := RootContext{Home: home, ProjectDir: proj, ConfigHome: mk("home/.config/gem-agent"), StateDir: mk("home/.local/state/gem-agent"),
+	c := RootContext{Home: home, ProjectDir: proj, ConfigHome: mk("home/.config/lagent"), StateDir: mk("home/.local/state/lagent"),
 		Roots: []AddedRoot{{Dir: mk("home/ref"), Write: false}, {Dir: mk("home/notes"), Write: true}}}
 	mk("home/.ssh")
 	mk("home/Library/LaunchAgents")
@@ -134,8 +134,8 @@ func TestRefuseRoot(t *testing.T) {
 		{base, false, "home directory"},
 		{filepath.Join(home, "dev"), true, "contains the project"},
 		{filepath.Join(home, ".config"), false, "contains the lagent configuration home"},
-		{filepath.Join(home, ".config/gem-agent"), false, "configuration home"},
-		{filepath.Join(home, ".local/state/gem-agent"), false, "state directory"},
+		{filepath.Join(home, ".config/lagent"), false, "configuration home"},
+		{filepath.Join(home, ".local/state/lagent"), false, "state directory"},
 		{filepath.Join(home, ".ssh"), false, "credential location"},
 		{filepath.Join(home, "Library/LaunchAgents"), true, "~/Library"},
 		{filepath.Join(home, "Library/Mobile Documents/x"), true, "~/Library"},
@@ -206,7 +206,7 @@ func TestRefuseRoot(t *testing.T) {
 		t.Errorf("a link resolves to %q, want the real path", got)
 	}
 	// A shared temporary directory is refused (the root could be swapped).
-	tmp, err := os.MkdirTemp("/private/tmp", "gem-agent-root-test-")
+	tmp, err := os.MkdirTemp("/private/tmp", "lagent-root-test-")
 	if err != nil {
 		t.Skip("cannot create under /private/tmp")
 	}
@@ -225,7 +225,7 @@ func TestRefuseRoot(t *testing.T) {
 	// a read root may.
 	dot := mk("home/dotfiles")
 	cc := c
-	cc.ConfigFile = filepath.Join(dot, "gem-agent.toml")
+	cc.ConfigFile = filepath.Join(dot, "lagent.toml")
 	if _, err := RefuseRoot(dot, true, cc); err == nil || !strings.Contains(err.Error(), "configuration file in use") {
 		t.Errorf("a write root holding --config: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestAddedRootEnforcement(t *testing.T) {
 	if err != nil {
 		t.Skip("no home directory")
 	}
-	base, err := os.MkdirTemp(home, ".gem-agent-root-test-")
+	base, err := os.MkdirTemp(home, ".lagent-root-test-")
 	if err != nil {
 		t.Skip("cannot create a directory under home")
 	}
@@ -384,5 +384,14 @@ func TestAddedRootProbesReturnLeftovers(t *testing.T) {
 	stuck := done()
 	if err != nil || len(left) != 1 || len(stuck) != 1 || left[0] != stuck[0] {
 		t.Errorf("left %v, stuck %v, err %v", left, stuck, err)
+	}
+}
+
+// A root that is or holds a tree the read lane keeps out would reopen
+// the whole tree to the unasked lane; one inside it is what a root is
+// for (ADR-0046, the rule ADR-0036 keeps for the session's own roots).
+func TestRefuseRootKeepsReachDeniedTreesClosed(t *testing.T) {
+	if _, err := RefuseRoot("/Volumes", false, RootContext{}); err == nil || !strings.Contains(err.Error(), "keeps out") {
+		t.Errorf("/Volumes: %v", err)
 	}
 }

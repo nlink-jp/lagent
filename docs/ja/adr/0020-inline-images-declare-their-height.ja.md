@@ -183,7 +183,7 @@ gem-agent の iTerm2 で計測: 行数の宣言は既に正しいのに、画像
 ### 5. 何を描いてよいかは、ここでは決めない — 決まったのは制約 1 つ
 
 3 度書かれ、3 度反証された。いずれもそのラウンドの最悪の指摘だった。モデルが名指すパスは
-ツール名で引かれる強制者を迂回し（`PathJudged`、[risk.go:365](../../../internal/risk/risk.go)）、
+ツール名で引かれる強制者を迂回し（`PathJudged`、[risk.go:368](../../../internal/risk/risk.go)）、
 intake が書いたパスは先回りされうる。`write` が `os.Stat` で短絡し
 （[mcpresult.go:344](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに work dir を
 `_meta` で渡すからである（[client.go:639](../../../internal/mcp/client.go)）。そして第 3 稿の
@@ -214,7 +214,7 @@ view 層の読み取りを開く）は、いまや先送りした決定に属す
 
 ### 7. 描画は TUI 限定。能力の検出は 1 度だけ
 
-`tea.NewProgram` が構築されるのは 1 箇所（[root.go:1594](../../../cmd/root.go)）。
+`tea.NewProgram` が構築されるのは 1 箇所（[root.go:1604](../../../cmd/root.go)）。
 one-shot `-p` と素の REPL はそれを作らず、描かない。探針はその構築の**前**に走りキャッシュ
 される。理由は `newGlamourRenderer` が `WithAutoStyle` について記録しているとおりで、これは
 移植元から継承した記述であり、ここでも真である。探針は問い合わせ前に排出し、応答が無いことを

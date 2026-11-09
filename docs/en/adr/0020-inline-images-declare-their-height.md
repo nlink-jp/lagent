@@ -217,7 +217,7 @@ not settled here and decision 4 does not rest on it.
 
 Written three times, refuted three times, each time the worst finding of its
 round: a path the model names bypasses the enforcers, which are keyed on
-tool name (`PathJudged`, [risk.go:365](../../../internal/risk/risk.go)); the
+tool name (`PathJudged`, [risk.go:368](../../../internal/risk/risk.go)); the
 path the intake wrote can be pre-empted, because `write` short-circuits on
 `os.Stat` ([mcpresult.go:344](../../../cmd/mcpresult.go)) and every call
 hands the server the work directory in `_meta`
@@ -256,7 +256,7 @@ Pre-existing, not widened here, not repaired here.
 ### 7. Drawing is TUI-only, and the capability is probed once
 
 `tea.NewProgram` is constructed at one site
-([root.go:1594](../../../cmd/root.go)); one-shot `-p` and the plain REPL
+([root.go:1604](../../../cmd/root.go)); one-shot `-p` and the plain REPL
 never build it and never draw. The probe runs **before** that construction
 and is cached, for the reason `newGlamourRenderer` records about
 `WithAutoStyle` — inherited from the porting source, and true here. It

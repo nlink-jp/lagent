@@ -16,7 +16,7 @@ that survived all three refuted drafts: **the view layer opens no file.** A
 read the view layer performs is not a tool call, so it reaches neither the
 agent's decision nor ADR-0016's sandboxed child, and the path-judging list
 — `pathJudgedTools`, keyed on tool name
-([risk.go:365](../../../internal/risk/risk.go)) — cannot see it.
+([risk.go:368](../../../internal/risk/risk.go)) — cannot see it.
 
 That rules out the obvious design. The MCP intake already writes an image
 into the session work directory and hands the model
@@ -46,7 +46,7 @@ bytes ([mcpresult.go:40](../../../cmd/mcpresult.go)), and the tool contract is
 
 The channel this needs already exists here too, and it is the same one:
 the agent loop talks to the UI **during** a tool call —
-`prog.Send(tui.ToolCall{…})` at [root.go:914](../../../cmd/root.go). Nothing
+`prog.Send(tui.ToolCall{…})` at [root.go:917](../../../cmd/root.go). Nothing
 about the string contract has to move.
 
 ### The cost

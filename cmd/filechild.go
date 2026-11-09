@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nlink-jp/lagent/internal/bounded"
+	"github.com/nlink-jp/lagent/internal/pathid"
 	"github.com/nlink-jp/lagent/internal/sandbox"
 	"github.com/nlink-jp/lagent/internal/tools"
 )
@@ -79,6 +80,40 @@ type fileChildRequest struct {
 	Allot *int `json:"allot,omitempty"`
 }
 
+// rootsNamedBy keeps the added roots a call's path arguments lie in. The
+// child opens only those: one stale share must not stall a read that has
+// nothing to do with it (ADR-0041 §1). A root is reached only by an
+// absolute path, so a call without one needs none.
+func rootsNamedBy(added []sandbox.AddedRoot, args map[string]any) []sandbox.AddedRoot {
+	var out []sandbox.AddedRoot
+	for _, a := range added {
+		if argsLieIn(a.Dir, args) {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+func argsLieIn(dir string, args map[string]any) bool {
+	names := func(v any) bool {
+		s, ok := v.(string)
+		return ok && filepath.IsAbs(s) && pathid.Within(dir, filepath.Clean(s))
+	}
+	for _, v := range args {
+		if names(v) {
+			return true
+		}
+		if list, ok := v.([]any); ok {
+			for _, e := range list {
+				if names(e) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func newFileChildCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:    fileChildCommand,
@@ -112,7 +147,7 @@ func newFileChildCmd() *cobra.Command {
 			// not open (an ejected volume, a renamed directory) must not
 			// take every project read down with it — a path under it then
 			// fails on its own, as a work directory's does above.
-			for _, a := range req.Added {
+			for _, a := range rootsNamedBy(req.Added, req.Args) {
 				_ = reg.AddDirs([]sandbox.AddedRoot{a})
 			}
 			if req.Tool == tools.CopySourceOp {

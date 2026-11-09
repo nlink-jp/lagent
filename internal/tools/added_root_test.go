@@ -117,3 +117,23 @@ func TestAddedRootSymlinkOutAndSubset(t *testing.T) {
 		t.Errorf("a subset sees %d added roots, want 2", len(sub.AddedDirs()))
 	}
 }
+
+// A refusal names request_directory only where the session has it.
+func TestOutsideRootsRouteFollowsTheTool(t *testing.T) {
+	r, err := New(t.TempDir(), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := r.OutsideRootsRoute(); got != "" {
+		t.Errorf("no tool, route %q", got)
+	}
+	if err := r.Register(&Tool{Name: "request_directory", Parameters: map[string]any{"type": "object"}}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(r.OutsideRootsRoute(), "request_directory") {
+		t.Error("the route does not name the tool")
+	}
+	if _, err := r.resolvePath("/definitely/outside"); err == nil || !strings.Contains(err.Error(), "request_directory") {
+		t.Errorf("refusal = %v", err)
+	}
+}

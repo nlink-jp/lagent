@@ -65,6 +65,9 @@ type Verdict struct {
 	// the operator. A shell command in the operator lane (gem-agent ADR-0073) is
 	// the same verdict: the lane can write those files.
 	OperatorOnly bool
+	// OutsideRoots marks a Block because the path lies outside every
+	// root: the refusal the model reads can name the route (ADR-0046).
+	OutsideRoots bool
 	// CredentialRead marks the OperatorOnly verdict that is a read of
 	// credential material (ADR-0016 §2). The kernel refuses that read in
 	// the sandboxed child, so once the operator has approved it the call
@@ -285,7 +288,7 @@ func classifyPath(p, projectDir, workDir string, added []sandbox.AddedRoot) (Ver
 			}
 			return Verdict{}, false
 		}
-		return Verdict{Tier: Block, Reason: outsideRootsReason("absolute path", workDir, len(added) > 0)}, true
+		return Verdict{Tier: Block, OutsideRoots: true, Reason: outsideRootsReason("absolute path", workDir, len(added) > 0)}, true
 	}
 	if strings.Contains(p, "..") {
 		return Verdict{Tier: Block, Reason: "path escapes the project directory"}, true

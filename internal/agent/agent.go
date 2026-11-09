@@ -1556,7 +1556,11 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 				if denyReason != "" {
 					return deniedWithReason(denyReason), true, false, floorRan, nil
 				}
-				return a.deniedText(), true, false, floorRan, nil
+				text := a.deniedText()
+				if d.Verdict.OutsideRoots {
+					text += a.registry.OutsideRootsRoute()
+				}
+				return text, true, false, floorRan, nil
 			}
 		}
 	}

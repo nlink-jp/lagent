@@ -653,11 +653,13 @@ func TestGrantReportsTheProbesLeftovers(t *testing.T) {
 		cancel()
 		return fn, enf, nil, stuck, err
 	}
-	if _, err := g.grant(ctx, underHome(t, "dropped"), true, "slash", g.currentEpoch(), nil); !errors.Is(err, errDropped) {
-		t.Errorf("a dropped grant: %v", err)
+	if _, err := g.grant(ctx, underHome(t, "dropped"), true, "slash", g.currentEpoch(), nil); !errors.Is(err, errDropped) || !strings.Contains(err.Error(), leftover) {
+		t.Errorf("a dropped grant: %v, want the leftover in the error", err)
 	}
-	if len(notices) != 1 || notices[0] != leftover {
-		t.Errorf("notices after a dropped grant = %v, want the leftover", notices)
+	// A typed command runs inside the TUI's Update: a notice would wait on
+	// the event loop it is running on, so its error carries the line.
+	if len(notices) != 0 {
+		t.Errorf("a typed command sent a notice = %v", notices)
 	}
 }
 
@@ -682,5 +684,50 @@ func TestEveryInteractiveTurnAnnouncesGrants(t *testing.T) {
 	}
 	if runs != 3 {
 		t.Errorf("found %d interactive ag.Run sites, want 3 (TUI, piped REPL, REPL)", runs)
+	}
+}
+
+// A call opens only the added roots its paths lie in, so a stale share
+// cannot stall a read that has nothing to do with it (ADR-0041 §1).
+func TestChildOpensOnlyTheRootsACallNames(t *testing.T) {
+	added := []sandbox.AddedRoot{{Dir: "/Users/op/notes", Write: true}, {Dir: "/Volumes/stale"}}
+	for _, c := range []struct {
+		args map[string]any
+		want int
+	}{
+		{map[string]any{"path": "src/a.go"}, 0},
+		{map[string]any{"path": "/Users/op/notes/a.md"}, 1},
+		{map[string]any{"paths": []any{"/Users/op/notes/a.md", "/Volumes/stale/b"}}, 2},
+		{map[string]any{"path": "/Users/op/notes-other/a.md"}, 0},
+	} {
+		if got := rootsNamedBy(added, c.args); len(got) != c.want {
+			t.Errorf("%v: %v, want %d", c.args, got, c.want)
+		}
+	}
+}
+
+// /clear with a root that no longer passes its probes moves the session
+// to the new work directory and drops the roots, rather than leaving
+// the new work directory on the old profile (ADR-0046).
+func TestClearDropsARootThatNoLongerPasses(t *testing.T) {
+	g, _, _ := newTestGranter(t, nil, false)
+	notes := underHome(t, "offline")
+	if _, err := g.grant(context.Background(), notes, true, "slash", g.currentEpoch(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(notes, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(notes, 0o755) })
+	work := underHome(t, "newwork")
+	out := rotateWorkDir(g.registry, g.shellExec, true, g.projectDir, work, nil, nil, false, nil, g.registry.AddedDirs())
+	if len(g.registry.AddedDirs()) != 0 {
+		t.Errorf("the failed root stayed: %v", g.registry.AddedDirs())
+	}
+	if len(out) != 1 || !strings.Contains(out[0], "/add-dir") {
+		t.Errorf("notes = %v, want the removal named", out)
+	}
+	if g.registry.WorkDir() == "" || !g.registry.Enforcement().Confined {
+		t.Errorf("work dir %q, enforcement %+v", g.registry.WorkDir(), g.registry.Enforcement())
 	}
 }

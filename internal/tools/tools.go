@@ -314,6 +314,31 @@ func (r *Registry) GrantAddedDir(root sandbox.AddedRoot, opened *os.Root, absorb
 	r.rootsMu.Unlock()
 }
 
+// DropAddedDirs removes every added root, retiring their handles as a
+// rotated work directory's is (ADR-0046).
+func (r *Registry) DropAddedDirs() {
+	if r.parent != nil {
+		r.parent.DropAddedDirs()
+		return
+	}
+	r.rootsMu.Lock()
+	for _, a := range r.added {
+		a.h.retire()
+	}
+	r.added = nil
+	r.rootsMu.Unlock()
+}
+
+// OutsideRootsRoute is what a refusal of a path outside every root adds
+// when the session has request_directory, so a model refused there has
+// a next step instead of ending in prose (ADR-0008, ADR-0046).
+func (r *Registry) OutsideRootsRoute() string {
+	if _, ok := r.Get("request_directory"); !ok {
+		return ""
+	}
+	return " — if the task needs it, call request_directory with its directory; the user answers"
+}
+
 // Enforcement returns what the runtime established about the sandbox.
 // A mid-session grant must leave it unchanged (ADR-0046).
 func (r *Registry) Enforcement() sandbox.Enforcement {
@@ -1333,7 +1358,7 @@ func (r *Registry) resolvePath(p string) (string, error) {
 	}
 	abs = filepath.Clean(abs)
 	if !withinAny(r.roots(), abs) {
-		return "", fmt.Errorf("path escapes the project directory: %s", p)
+		return "", fmt.Errorf("path escapes the project directory: %s%s", p, r.OutsideRootsRoute())
 	}
 	real, err := resolveExisting(abs)
 	if err != nil {
