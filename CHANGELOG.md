@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-09
+
 ### Added
 
 - **Directories outside the project, under the same lanes** (ADR-0046).
