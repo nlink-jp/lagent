@@ -314,6 +314,11 @@ type Messages struct {
 	PinStaleWriteFmt       string // %s = name — had drifted before the approved write; not re-pinned
 	PersistentSinceLastFmt string // %s = comma list — changed since the previous session
 	PersistentSessionFmt   string // %s = comma list — added/changed by this session
+	// The same report for a write root the operator added (ADR-0046):
+	// %s = the directory, %s = comma list.
+	AddedPersistentSinceLastFmt string
+	AddedPersistentSessionFmt   string
+	AddedPersistentCutFmt       string // %d = the walk's cap, %s = the directory
 	// TrustDeclinedFmt is the banner note after declining: policy path.
 	TrustDeclinedFmt string
 	TrustUndecided   string // non-interactive, undecided: ran bare
@@ -499,6 +504,9 @@ keys:
 	PinStaleWriteFmt:         "project trust: %s had changed before this write — not re-trusted; asks at the next interactive start",
 	PersistentSinceLastFmt:   "note: changed since your previous session: %s",
 	PersistentSessionFmt:     "note: this session added or changed: %s",
+	AddedPersistentSinceLastFmt: "note: in the added directory %s, changed since your previous session: %s — a project opened under it would load or run these",
+	AddedPersistentSessionFmt:   "note: in the added directory %s, this session added, changed or removed: %s — a project opened under it would load or run these",
+	AddedPersistentCutFmt:       "note: change detection covers the first %d entries under the added directory %s only",
 	TrustDeclinedFmt:         "project trust: declined — the project's own files are not loaded (edit %s to be asked again)",
 	TrustUndecided:           "project trust: undecided — the project's own files are not loaded; start interactively once to decide",
 	ReasonFSRoot:             "the filesystem root",
@@ -668,6 +676,9 @@ var ja = Messages{
 	PinStaleWriteFmt:         "project trust: %s はこの書込の前から変わっていました — 再信用していません。次の対話起動で確認",
 	PersistentSinceLastFmt:   "note: 前回のセッション以降に変更: %s",
 	PersistentSessionFmt:     "note: このセッションが追加・変更: %s",
+	AddedPersistentSinceLastFmt: "note: 追加ディレクトリ %s で、前回のセッション以降に変更: %s — その下で開くプロジェクトはこれらを読み込むか実行します",
+	AddedPersistentSessionFmt:   "note: 追加ディレクトリ %s で、このセッションが追加・変更・削除: %s — その下で開くプロジェクトはこれらを読み込むか実行します",
+	AddedPersistentCutFmt:       "note: 変化の検出は最初の %d 項目だけが対象です（追加ディレクトリ %s）",
 	TrustDeclinedFmt:         "project trust: 拒否 — このプロジェクト自身のファイルは読み込みません（再確認するには %s を編集）",
 	TrustUndecided:           "project trust: 未決定 — このプロジェクト自身のファイルは読み込みません。一度対話起動して決めてください",
 	ReasonFSRoot:             "ファイルシステムのルート",

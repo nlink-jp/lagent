@@ -37,7 +37,7 @@ func TestApprovedCacheWiredThroughBuildLanes(t *testing.T) {
 		t.Fatal(err)
 	}
 	work, _ = sandbox.ResolveWriteDir(work)
-	execFn, enf, notes, err := buildExecFn(true, project, work, nil, map[string]string{"GOCACHE": "go-build"}, nil)
+	execFn, enf, notes, err := buildExecFn(true, project, work, nil, map[string]string{"GOCACHE": "go-build"}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestApprovedCacheWiredThroughBuildLanes(t *testing.T) {
 		t.Fatal(err)
 	}
 	otherWork, _ = sandbox.ResolveWriteDir(otherWork)
-	otherExec, _, _, err := buildExecFn(true, project, otherWork, nil, map[string]string{"GOCACHE": "go-build"}, nil)
+	otherExec, _, _, err := buildExecFn(true, project, otherWork, nil, map[string]string{"GOCACHE": "go-build"}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

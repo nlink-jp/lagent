@@ -45,7 +45,7 @@ func TestPlantedScratchLinkDisablesTheReadLane(t *testing.T) {
 	if dir, err := readScratchDir(work); err == nil {
 		t.Fatalf("the planted link was accepted: %q", dir)
 	}
-	execFn, enf, notes, err := buildExecFn(true, project, work, nil, nil, nil)
+	execFn, enf, notes, err := buildExecFn(true, project, work, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

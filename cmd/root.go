@@ -62,6 +62,8 @@ var (
 	flagWritable  bool
 	flagReadOnly  bool
 	flagAllow     []string
+	flagAddDir    []string
+	flagReadDir   []string
 )
 
 // appVersion mirrors rootCmd.Version for use inside rootCmd's own run
@@ -87,7 +89,9 @@ your approval. It reads a project's AGENTS.md / CLAUDE.md and Claude
 Code-format .mcp.json as they are — no lagent-specific setup.
 
 The current working directory is the project: file tools stay inside it,
-and sandboxed shell commands cannot write outside it.
+and sandboxed shell commands cannot write outside it. --add-dir and
+--read-dir add directories outside it, under the same lanes; nothing in
+them is loaded.
 
 macOS only. Documentation: README.md.`,
 	// One optional positional argument: the first interactive turn
@@ -108,6 +112,8 @@ func init() {
 	rootCmd.Flags().StringSliceVar(&flagAllow, "allow", nil, `tools that never ask this run: tool names or mcp__server__* prefixes (repeatable or comma-separated); blocked commands and credential reads still ask`)
 	rootCmd.Flags().BoolVar(&flagWritable, "writable", false, "no lane ceiling — the default, stated; use it to step out of a configured [agent].read_only")
 	rootCmd.Flags().BoolVar(&flagReadOnly, "read-only", false, "cap the session at the read lane: nothing outside the session scratch may change")
+	rootCmd.Flags().StringArrayVar(&flagAddDir, "add-dir", nil, "add a directory outside the project that the file tools and the write lane may write like the project (repeatable; its AGENTS.md, .mcp.json and skills are not loaded)")
+	rootCmd.Flags().StringArrayVar(&flagReadDir, "read-dir", nil, "add a directory outside the project that the file tools and the read lane may read, and nothing may write (repeatable)")
 	rootCmd.Flags().BoolVarP(&flagContinue, "continue", "c", false, "resume this project's most recent session")
 	rootCmd.Flags().StringVar(&flagResume, "resume", "", "resume a specific session id (see: lagent sessions)")
 }
@@ -483,7 +489,21 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("the sandbox cannot be applied here (%v); every shell command would run unconfined — pass --no-sandbox to accept that explicitly", err)
 		}
 	}
-	execFn, enforcement, laneNotes, err := buildExecFn(sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.Caches(), trustpin.Parents(projectDir, persistentSnap))
+	// The operator's added directories (ADR-0046): judged by the one
+	// rule before anything uses them, and a refusal stops the start —
+	// the operator typed the path and must hear it did not apply.
+	added, err := resolveAddedDirs(cfg, projectDir, workDir, cfgPath)
+	if err != nil {
+		return err
+	}
+	if len(added) > 0 && sessionLog != nil {
+		_ = sessionLog.Log("added_directories", addedDirsRecord(added))
+	}
+	// Persistent files in the write roots are watched: what changed
+	// since the previous session is said now, what this session changes
+	// at /clear and at exit.
+	watch := newAddedWatch(added, projectDir, stderr, msgs)
+	execFn, enforcement, laneNotes, err := buildExecFn(sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.Caches(), trustpin.Parents(projectDir, persistentSnap), rootsOf(added))
 	if err != nil {
 		return err
 	}
@@ -516,6 +536,9 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		if err := registry.UseWorkDir(workDir); err != nil {
 			fmt.Fprintf(stderr, "warning: session work directory not readable by the file tools: %v\n", err)
 		}
+	}
+	if err := registry.AddDirs(rootsOf(added)); err != nil {
+		return err
 	}
 	// The file tools' reads run in a child under a profile that denies
 	// the credential list at the kernel (ADR-0016), proven on this
@@ -950,10 +973,15 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// The session's dates are captured once (ADR-0030): a facts message
 	// re-sent mid-session states the same day; /clear captures a new one.
 	dates := sessionDates{Start: time.Now(), ResumedFrom: resumedFrom}
+	// announceFacts sends the facts as they stand. One place, because each
+	// caller's copy of this list would be one more to forget a root in.
+	announceFacts := func() {
+		ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...), registry.AddedDirs()...))
+	}
 	// The per-session facts open the conversation (after SetHistory: the
 	// isolation tag is fresh, and the restored history's own opening
 	// message named the old one). The MCP catalog rides with them.
-	ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
+	announceFacts()
 	// Session-start hooks (ADR-0014 §4): the output rides the next
 	// turn's user message as a data attachment — never the system
 	// prompt (ADR-0003), never the typed input.
@@ -1082,7 +1110,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// The catalog changed with the server set: the model is told
 		// through a fresh facts message (ADR-0003's lane), never through
 		// the system prompt.
-		ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
+		announceFacts()
 		return out
 	}
 	loadMCP := func(server string) (string, bool) {
@@ -1180,6 +1208,14 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 		return sessionLog.Log(kind, data)
 	})
+	// Defers run last-first: at exit the added roots are reported before
+	// the project.
+	defer watch.report("exit", func(kind string, data any) error {
+		if sessionLog == nil {
+			return nil
+		}
+		return sessionLog.Log(kind, data)
+	})
 
 	// /clear starts a new session: the old transcript is closed where
 	// the conversation ended and stays resumable by its id; a new id,
@@ -1211,7 +1247,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			// resume line named is gone), and Reset changed the isolation
 			// tag, which only a fresh facts message tells the model.
 			dates = sessionDates{Start: time.Now()}
-			ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
+			announceFacts()
 			note("history cleared; a new session could not be started (%v) — the conversation continues in this session", sessionDirErr)
 			return render()
 		}
@@ -1222,7 +1258,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			// resume line named is gone), and Reset changed the isolation
 			// tag, which only a fresh facts message tells the model.
 			dates = sessionDates{Start: time.Now()}
-			ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
+			announceFacts()
 			note("history cleared; a new session could not be started (%v) — the conversation continues in this session", err)
 			return render()
 		}
@@ -1230,6 +1266,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// takes over (ADR-0014 §5), then the audit event under the old id.
 		sessionEndHooks("clear")
 		reportPersistent("clear", func(kind string, data any) error { return curLog.Log(kind, data) })
+		watch.report("clear", func(kind string, data any) error { return curLog.Log(kind, data) })
 		ag.Restart(newLog)
 		// The new session re-checks the pins: a file that changed during
 		// the old one is left out, and the system prompt is composed
@@ -1247,6 +1284,11 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		sessionLog = newLog
 		sessionPath, sessionID = newLog.Path(), newLog.ID()
 		hookSession = hooks.Session{ID: sessionID, TranscriptPath: sessionPath, CWD: projectDir}
+		if len(added) > 0 {
+			// The roots stay in force across /clear, so the new transcript
+			// records them too (ADR-0046).
+			_ = newLog.Log("added_directories", addedDirsRecord(added))
+		}
 		if err := session.Export(sessionID); err != nil {
 			note("cannot set %s: %v", session.EnvVar, err)
 		}
@@ -1270,7 +1312,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// runtime-facts message, never through the system prompt, which
 		// stays byte-identical so the server's prefix cache survives
 		// the clear.
-		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.Caches(), cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap))...)
+		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.Caches(), cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap), registry.AddedDirs())...)
 		// The MCP servers — spawned at startup with the old id in their
 		// environment and arguments — are reconnected the way /mcp
 		// reload does, so a server keeping per-session state sees the
@@ -1284,7 +1326,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		dates = sessionDates{Start: time.Now()}
 		// Told last, once everything it names is in place: the work
 		// directory and the catalog ride one fresh facts message.
-		ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...)))
+		announceFacts()
 		// A cleared conversation is a fresh start to the operator's
 		// scripts (ADR-0014 §2): its output rides the first new turn.
 		sessionStartHooks("clear")
@@ -1950,7 +1992,21 @@ func runTurnWith(parent context.Context, ladder *interruptLadder, fn func(ctx co
 // this machine (notes say why when it did not); with the sandbox off,
 // direct bash and Confined=false — the unconfined mode the agent gates
 // as the operator's alone.
-func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, caches map[string]string, persistentParents []string) (tools.LaneExecFunc, sandbox.Enforcement, []string, error) {
+func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, caches map[string]string, persistentParents []string, added []sandbox.AddedRoot) (tools.LaneExecFunc, sandbox.Enforcement, []string, error) {
+	fn, enf, notes, left, err := buildLanes(sandboxOn, projectDir, workDir, denyExec, caches, persistentParents, added)
+	if len(left) > 0 {
+		if err != nil {
+			err = fmt.Errorf("%w; %s", err, sandbox.LeftoverNote(left))
+		} else {
+			notes = append(notes, sandbox.LeftoverNote(left))
+		}
+	}
+	return fn, enf, notes, err
+}
+
+// buildLanes is buildExecFn with the probes' leftovers (ADR-0041 §2)
+// apart from its notes, returned whatever the result.
+func buildLanes(sandboxOn bool, projectDir, workDir string, denyExec []string, caches map[string]string, persistentParents []string, added []sandbox.AddedRoot) (_ tools.LaneExecFunc, _ sandbox.Enforcement, _ []string, leftovers []string, _ error) {
 	if !sandboxOn {
 		return func(ctx context.Context, command string, lane sandbox.Lane) *exec.Cmd {
 			cmd := exec.CommandContext(ctx, shell, "-c", command)
@@ -1961,10 +2017,10 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 			// directory and no toolchain cache to point into one.
 			cmd.Env = laneEnv(lane, "", "", nil, os.Environ())
 			return cmd
-		}, sandbox.Enforcement{}, nil, nil
+		}, sandbox.Enforcement{}, nil, nil, nil
 	}
 	if _, err := os.Stat(sandbox.Executable); err != nil {
-		return nil, sandbox.Enforcement{}, nil, fmt.Errorf("%s not found (lagent is macOS-only); use --no-sandbox to bypass at your own risk", sandbox.Executable)
+		return nil, sandbox.Enforcement{}, nil, nil, fmt.Errorf("%s not found (lagent is macOS-only); use --no-sandbox to bypass at your own risk", sandbox.Executable)
 	}
 	// The profile's anchors must be the path the kernel reports —
 	// symlinks resolved (/var → /private/var): a regex anchored on the
@@ -1973,7 +2029,7 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 	if real, err := sandbox.ResolveWriteDir(projectDir); err == nil {
 		projectDir = real
 	}
-	spec := sandbox.Spec{ProjectDir: projectDir, DenyExec: append(append([]string{}, sandbox.DefaultDenyExec...), denyExec...), PersistentParents: persistentParents}
+	spec := sandbox.Spec{ProjectDir: projectDir, DenyExec: append(append([]string{}, sandbox.DefaultDenyExec...), denyExec...), PersistentParents: persistentParents, Added: added}
 	if workDir != "" {
 		// The session work directory (gem-agent ADR-0058). A shell command told to
 		// put its output in $LAGENT_WORK_DIR has to be able to.
@@ -1992,7 +2048,6 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 		}
 	}
 	var notes []string
-	var leftovers []string
 	// The read lane's private scratch: under the work directory when
 	// there is one, a fresh temporary directory otherwise. TMPDIR points
 	// there for read-lane commands, so what such a command may change
@@ -2011,7 +2066,7 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 	for _, lane := range []sandbox.Lane{sandbox.LaneRead, sandbox.LaneWrite, sandbox.LaneOperator} {
 		p, err := sandbox.LaneProfile(lane, spec)
 		if err != nil {
-			return nil, sandbox.Enforcement{}, nil, err
+			return nil, sandbox.Enforcement{}, nil, nil, err
 		}
 		profiles[lane] = p
 	}
@@ -2039,10 +2094,16 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 		enf = sandbox.Enforcement{}
 		notes = append(notes, fmt.Sprintf("sandbox unverified: %v — shell commands run as unconfined: every one asks you", err))
 	}
-	// A probe file left in the project is the operator's to delete
-	// (ADR-0041 §2); both callers show these notes to the operator only.
-	if len(leftovers) > 0 {
-		notes = append(notes, sandbox.LeftoverNote(leftovers))
+	if enf.Confined && len(added) > 0 {
+		// The startup probes prove the cage, not where an added root
+		// sits in it (ADR-0046). A root that fails its probes is an
+		// error, not a degraded mode: the operator named it.
+		rootNotes, rootLeft, err := sandbox.VerifyAddedRoots(profiles, spec, enf.ReadLane)
+		leftovers = append(leftovers, rootLeft...)
+		if err != nil {
+			return nil, sandbox.Enforcement{}, nil, leftovers, err
+		}
+		notes = append(notes, rootNotes...)
 	}
 	scratch, approved := spec.ReadScratch, spec.ApprovedCacheRoot
 	return func(ctx context.Context, command string, lane sandbox.Lane) *exec.Cmd {
@@ -2050,7 +2111,7 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 		cmd.Env = laneEnv(lane, scratch, approved, caches, os.Environ())
 		return cmd
-	}, enf, notes, nil
+	}, enf, notes, leftovers, nil
 }
 
 // laneEnv is the environment a shell command gets in a lane. Every
@@ -2564,12 +2625,12 @@ func (l liveLog) Log(kind string, data any) error {
 // the model is told by the caller, through the runtime-facts message,
 // once everything that message names is in place. Returns operator
 // notes for what could not follow.
-func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool, projectDir, dir string, denyExec []string, caches map[string]string, readLanePrompts bool, persistentParents []string) []string {
+func rotateWorkDir(registry *tools.Registry, shellExec *liveExec, sandboxOn bool, projectDir, dir string, denyExec []string, caches map[string]string, readLanePrompts bool, persistentParents []string, added []sandbox.AddedRoot) []string {
 	var notes []string
 	if err := registry.UseWorkDir(dir); err != nil {
 		notes = append(notes, fmt.Sprintf("file tools keep the previous work directory: %v", err))
 	}
-	if fn, enf, laneNotes, err := buildExecFn(sandboxOn, projectDir, dir, denyExec, caches, persistentParents); err != nil {
+	if fn, enf, laneNotes, err := buildExecFn(sandboxOn, projectDir, dir, denyExec, caches, persistentParents, added); err != nil {
 		notes = append(notes, fmt.Sprintf("shell commands keep the previous sandbox profile: %v", err))
 	} else {
 		shellExec.set(fn)

@@ -29,6 +29,8 @@ type Config struct {
 	TUI      TUIConfig      `toml:"tui"`
 	Approval ApprovalConfig `toml:"approval"`
 	Hooks    HooksConfig    `toml:"hooks"`
+	// Directories are the operator's added roots (ADR-0046).
+	Directories DirectoriesConfig `toml:"directories"`
 
 	// Sources records where each setting's effective value came from,
 	// keyed by its TOML path ("llm.model"). Three precedence layers with
@@ -172,6 +174,30 @@ func canonicalPath(p string) string {
 		return r
 	}
 	return p
+}
+
+// DirectoriesConfig lists the directories the operator adds as roots
+// beside the project (ADR-0046): Write ones the file tools and the write
+// and operator lanes write like the project, Read ones nothing writes.
+// Nothing in them is loaded — no instructions, servers, policy or
+// skills. Global config only: the project file refuses the table (its
+// loader takes [approval.tools] and [mcp].exclude alone), so a
+// repository cannot grant itself writes outside itself.
+type DirectoriesConfig struct {
+	Write []string `toml:"write"`
+	Read  []string `toml:"read"`
+}
+
+// Paths returns the lists with a leading ~ resolved, the way operators
+// write paths. RefuseRoot resolves and judges them.
+func (d DirectoriesConfig) Paths() (write, read []string) {
+	for _, p := range d.Write {
+		write = append(write, expandHome(p))
+	}
+	for _, p := range d.Read {
+		read = append(read, expandHome(p))
+	}
+	return write, read
 }
 
 // expandHome resolves a leading ~ so trusted_projects entries may be

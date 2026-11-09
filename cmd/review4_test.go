@@ -38,7 +38,7 @@ func TestRotateWorkDirMovesEveryConsumer(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	execFn, enf, _, err := buildExecFn(true, project, oldWork, nil, nil, nil)
+	execFn, enf, _, err := buildExecFn(true, project, oldWork, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func TestRotateWorkDirMovesEveryConsumer(t *testing.T) {
 	if err := registry.UseWorkDir(oldWork); err != nil {
 		t.Fatal(err)
 	}
-	notes := rotateWorkDir(registry, shellExec, true, project, newWork, nil, nil, false, nil)
+	notes := rotateWorkDir(registry, shellExec, true, project, newWork, nil, nil, false, nil, nil)
 	if len(notes) != 0 {
 		t.Fatalf("rotation raised notes: %v", notes)
 	}
@@ -70,7 +70,7 @@ func TestRotateWorkDirMovesEveryConsumer(t *testing.T) {
 		t.Error("sandbox still allows the old work directory")
 	}
 	// No work directory at all: the second root is removed, not kept.
-	if notes := rotateWorkDir(registry, shellExec, true, project, "", nil, nil, false, nil); len(notes) != 0 {
+	if notes := rotateWorkDir(registry, shellExec, true, project, "", nil, nil, false, nil, nil); len(notes) != 0 {
 		t.Fatalf("rotation to none raised notes: %v", notes)
 	}
 	if registry.WorkDir() != "" {
@@ -193,7 +193,7 @@ func TestClearSequenceMatchesTheADR(t *testing.T) {
 		"rotateWorkDir(",
 		"adv.Reset()",
 		"reconnectMCP(false)",
-		"ag.AnnounceSession(",
+		"announceFacts(",
 	}
 	last := -1
 	for _, s := range steps {
