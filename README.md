@@ -193,6 +193,28 @@ run, so give third-party text to `-p`.
   — see the RFP and
   [ADR-0002](docs/en/adr/0002-features-not-reproduced.md).
 
+## Working outside the project
+
+File tools stay inside the project, and sandboxed shell commands cannot
+write outside it. To work in another directory, such as notes, a vault or
+a sibling checkout, add it:
+
+| How | Written like the project | Read, never written |
+|---|---|---|
+| At startup | `--add-dir <path>` | `--read-dir <path>` |
+| In the config file | `[directories].write` | `[directories].read` |
+| During a session | `/add-dir <path>` | `/read-dir <path>` |
+
+`/dirs` lists what is in force. The model can ask for a directory too, and
+you always answer. Added directories come under the same sandbox lanes, and
+nothing in one (its `AGENTS.md`, `.mcp.json`, skills) is loaded. A directory
+added during a session lasts until lagent exits. A folder in Google Drive,
+Dropbox, OneDrive or iCloud Drive can be a write directory.
+
+Do not add a directory above projects you open with an agent as a write
+directory. A command can move a directory holding an `AGENTS.md` or a git
+hook into it; lagent tells you when that happens, but does not stop it.
+
 ## Attachments
 
 `@<path>` attaches a project file or directory; `@<image>` attaches an

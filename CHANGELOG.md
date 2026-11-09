@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Directories outside the project, under the same lanes** (ADR-0046).
+  `--add-dir <path>` adds a directory the file tools and the write and
+  operator lanes write like the project; `--read-dir <path>` adds one that
+  is read and written by nothing. Both repeat, and `[directories]` in the
+  global config file lists them too. Nothing in an added directory is
+  loaded: not its instruction files, MCP servers or skills.
+- **Adding a directory during a session.** `/add-dir <path>` and
+  `/read-dir <path>` add one at the prompt, for as long as lagent runs, and
+  `/dirs` lists what is in force. The model can ask with
+  `request_directory`, which you always answer.
+
 ## [0.26.0] - 2026-11-09
 
 ### Documentation

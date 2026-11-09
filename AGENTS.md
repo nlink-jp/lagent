@@ -195,7 +195,11 @@ cmd/               cobra root command, REPL loop, wiring, system prompt; `versio
                    the MCP advertiser and mcp_load (cmd/mcpload.go, ADR-0004); skill
                    discovery, load_skill, /skill and /skills (cmd/skills.go, ADR-0011);
                    hook config → runner (cmd/hooks.go, ADR-0012); save_memory / delete_memory,
-                   /memory, /remember, /forget (cmd/memory.go, ADR-0013)
+                   /memory, /remember, /forget (cmd/memory.go, ADR-0013);
+                   added directories (ADR-0046): startup judgement (cmd/addeddirs.go),
+                   the persistent-file watch (cmd/addedwatch.go), and the one
+                   mid-session grant path behind /add-dir, /read-dir, /dirs and
+                   request_directory (cmd/grant.go)
 internal/config/   strict-decode TOML + env/flag precedence ([llm], [model], [sandbox],
                    [agent], [mcp], [tui], [approval]); the policy file
 internal/llm/      Backend interface + the OpenAI-compatible client (stdlib net/http,
@@ -353,6 +357,14 @@ answers.
   `~/Library/Caches/.env` was readable unasked. Any new read re-allow
   goes before `writeCredentialBlock`;
   `TestCredentialBlockIsTheLastReadRule` fails the build otherwise.
+- **Added directories are one root set with many consumers** (ADR-0046).
+  A new consumer of "the project and the work directory" must take
+  `Registry.AddedDirs()` too; `rootForWrite` is the floor for file writes.
+  The model learns the roots from `sessionFacts`, never the system prompt
+  (ADR-0003), and a grant only marks the facts stale: `announceGrant` sends
+  them where a turn starts, because `AnnounceSession` is a between-turns
+  operation. A typed grant runs inside the TUI's update, so it must never
+  reach `notice` (`prog.Send` would wait on its own event loop).
 - **The session's roots are read under a reach denial** (ADR-0036,
   `ownRootsUnderReach`): a project or work directory strictly inside
   `~/Library` (cloud storage lives in `~/Library/CloudStorage`),

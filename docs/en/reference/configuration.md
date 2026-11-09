@@ -30,6 +30,8 @@ Unknown keys are errors (strict decode).
 | `[sandbox].enabled` | `true` | wrap `shell_exec` in sandbox-exec; the lane the model declares is enforced by the kernel. Off, every shell call is yours to approve |
 | `[sandbox].read_lane_deny_exec` | (unset) | programs the read lane may not launch, added to the built-in list |
 | `[sandbox].read_lane_prompts` | `false` | keep the approval prompt for read-lane commands too |
+| `[directories].write` | (unset) | directories outside the project the file tools and the write and operator lanes write like the project (ADR-0046). Global file only. A path that is not there now, holds this project or is already covered is skipped with a note |
+| `[directories].read` | (unset) | directories outside the project the file tools and the read lane read, and no lane writes. Global file only |
 | `[sandbox.scratch_caches]` | `GOCACHE = "go-build"` | toolchain caches every `shell_exec` points into the session scratch, environment variable = directory name; the read lane's copy is in the scratch, the write and operator lanes' in a separate directory beside the work directory (ADR-0042). Add a row for another toolchain (`PIP_CACHE_DIR`, `UV_CACHE_DIR`, `npm_config_cache`), set one to `""` to remove it; regenerable caches only — loader variables and the ones the lane decides are refused, and a project file cannot set it |
 | `[agent].max_turns` | `50` | round budget per turn; a checkpoint interactively, a stop in `-p`; a hard cap of 3x |
 | `[agent].shell_timeout_sec` | `120` | per-command timeout for `shell_exec` |
@@ -267,6 +269,9 @@ In a session:
 | `/forget [global] <name>` | remove a memory |
 | `/auto on|off` | switch auto-approve for the session (shift+tab does the same) |
 | `/readonly on|off` | switch the lane ceiling for the session |
+| `/add-dir <path>` | add a directory outside the project, written like the project, until lagent exits (ADR-0046). The rest of the line is the path; a path through a link adds nothing and names its real path |
+| `/read-dir <path>` | add a directory outside the project, read only, until lagent exits |
+| `/dirs` | list the project, the work directory and the added directories; a bare `/add-dir` or `/read-dir` does too |
 | `/settings` | view and edit settings, with provenance |
 | `/usage` | token statement for this session |
 | `/version` | the version line |
@@ -281,6 +286,7 @@ In a session:
 | `--auto` | start in auto-approve mode: rule-tier Safe calls run unasked |
 | `--allow` | tools that never ask this run: names or `mcp__server__*` prefixes; a credential read still asks |
 | `--read-only` / `--writable` | cap the session at the read lane, or state that it is not capped |
+| `--add-dir`, `--read-dir` | add a directory outside the project, written like the project or read only (repeatable, ADR-0046); a path refused here stops the start |
 | `-c`, `--continue` | resume this project's most recent session |
 | `--resume` | resume a specific session id |
 | `--model` | override `[llm].model` for this run |

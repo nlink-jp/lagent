@@ -30,6 +30,8 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `[sandbox].enabled` | `true` | `shell_exec` を sandbox-exec で包む。モデルが宣言したレーンをカーネルが強制。off だと全シェル呼び出しが操作者の承認待ち |
 | `[sandbox].read_lane_deny_exec` | （未設定） | read レーンが起動してはならないプログラム。組込一覧に追加 |
 | `[sandbox].read_lane_prompts` | `false` | read レーンのコマンドにも承認プロンプトを残す |
+| `[directories].write` | （未設定） | ファイルツールと write・operator レーンがプロジェクトと同じように書く、プロジェクト外のディレクトリ（ADR-0046）。グローバル設定のみ。今は無いパス、このプロジェクトを含むパス、すでに覆われているパスは注記して飛ばす |
+| `[directories].read` | （未設定） | ファイルツールと read レーンが読み、どのレーンも書かない、プロジェクト外のディレクトリ。グローバル設定のみ |
 | `[sandbox.scratch_caches]` | `GOCACHE = "go-build"` | 全 `shell_exec` がセッション scratch に向けるツールチェインのキャッシュ。環境変数 = ディレクトリ名。read レーン用は scratch に、write と operator レーン用は作業ディレクトリの隣の別のディレクトリに置く（ADR-0042）。別のツールチェインは行を足す（`PIP_CACHE_DIR`、`UV_CACHE_DIR`、`npm_config_cache`）、`""` で行を消す。再生成できるキャッシュだけ — ローダ変数とレーンが決める変数は拒否され、プロジェクトファイルからは設定できない |
 | `[agent].max_turns` | `50` | 1 ターンのラウンド予算。対話中はチェックポイント、`-p` では停止。絶対上限は 3 倍 |
 | `[agent].shell_timeout_sec` | `120` | `shell_exec` のコマンドごとのタイムアウト |
@@ -254,6 +256,9 @@ MCP サーバも、フックも同じです。read レーンの素の `env` は�
 | `/forget [global] <name>` | メモリを削除 |
 | `/auto on|off` | セッションの自動承認を切り替え（shift+tab も同じ） |
 | `/readonly on|off` | セッションのレーン天井を切り替え |
+| `/add-dir <path>` | プロジェクト外のディレクトリを、プロジェクトと同じく書ける形で lagent の終了まで足す（ADR-0046）。行の残りがパス。リンクを経由するパスは何も足さず実パスを示す |
+| `/read-dir <path>` | プロジェクト外のディレクトリを、読むだけの形で lagent の終了まで足す |
+| `/dirs` | プロジェクト、作業ディレクトリ、追加ディレクトリの一覧。引数なしの `/add-dir` と `/read-dir` も同じ |
 | `/settings` | 設定の表示と編集（出所つき） |
 | `/usage` | このセッションのトークン明細 |
 | `/version` | 版数の行 |
@@ -268,6 +273,7 @@ MCP サーバも、フックも同じです。read レーンの素の `env` は�
 | `--auto` | 自動承認モードで開始: 規則層で Safe の呼び出しは尋ねずに走る |
 | `--allow` | この実行で尋ねないツール: 名前または `mcp__server__*` 接頭辞。資格情報の読取は尋ねる |
 | `--read-only` / `--writable` | セッションを read レーンに上限で抑える / 上限が無いことを明示 |
+| `--add-dir`, `--read-dir` | プロジェクト外のディレクトリを、書ける形または読むだけの形で足す（繰り返し可、ADR-0046）。ここで拒否されたパスは起動を止める |
 | `-c`, `--continue` | このプロジェクトの直近セッションを再開 |
 | `--resume` | 特定のセッション id を再開 |
 | `--model` | この実行の `[llm].model` を上書き |

@@ -82,6 +82,24 @@ enabled = true
 #UV_CACHE_DIR = "uv"
 #npm_config_cache = "npm"
 
+[directories]
+# Directories outside the project to work in, under the same lanes
+# (ADR-0046). "write": the file tools and the write and operator lanes
+# write it like the project, its AGENTS.md / CLAUDE.md / .mcp.json and
+# .git hooks protected the same way. "read": read like the project,
+# written by nothing; the read lane reads it even on an external volume.
+# Nothing in them is loaded: their instruction files, MCP servers and
+# skills are not read. Refused: /, your home, anything holding a
+# credential location or the configuration or state directory, anything
+# in or around a shared temporary directory or /dev, /Volumes and
+# /Network themselves, and for write ~/Library (except a synced folder:
+# a provider's account folder in ~/Library/CloudStorage or below it, or
+# iCloud Drive) or the config file in use. A path that is not there now,
+# holds the project you start in, or is already covered is skipped with
+# a note. --add-dir / --read-dir add more.
+#write = ["~/notes"]
+#read = ["/Volumes/Archive/reference"]
+
 [agent]
 # Round budget for one turn. Reaching it is a checkpoint, not a
 # guillotine: interactively you are asked whether to continue (the
