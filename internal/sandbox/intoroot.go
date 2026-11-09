@@ -1,6 +1,6 @@
 // Ported from gem-agent internal/sandbox/intoroot.go at e42f89e95c054425e0f13b14cce242b9a3866fb8 (v0.99.0),
-// ADR-0001 / ADR-0041. gem-agent's added directories are not in lagent (ADR-0001):
-// the roots are the project and the session work directory.
+// ADR-0001 / ADR-0041. The roots are the project, the session work directory
+// and the operator's added directories (ADR-0046).
 
 package sandbox
 

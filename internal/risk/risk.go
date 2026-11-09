@@ -117,12 +117,14 @@ var blockPatterns = []blockPattern{
 // ordinary places for a session to write. args come straight from the
 // model. mutating is the tool's own word on whether this call changes
 // state — for shell_exec that depends on the lane (tools.Tool.MutatesFor).
-func Classify(toolName string, mutating bool, args map[string]any, projectDir, workDir string) Verdict {
+// added are the operator's added directories (ADR-0046): a write root
+// is an ordinary place to write like the project, a read root is not.
+func Classify(toolName string, mutating bool, args map[string]any, projectDir, workDir string, added ...sandbox.AddedRoot) Verdict {
 	if toolName == "shell_exec" {
 		// Judged before the read-only shortcut: the Block floor applies
 		// to a read-lane command too (a `sudo` the cage would refuse is
 		// still something the operator wants to see).
-		return classifyShell(args, mutating)
+		return classifyShell(args, mutating, hasWriteRoot(added))
 	}
 	if !mutating {
 		// A single-file read tool naming credential material is the
@@ -144,7 +146,7 @@ func Classify(toolName string, mutating bool, args map[string]any, projectDir, w
 			return Verdict{Tier: Block, Reason: "copies credential material (" + from + ")"}
 		}
 		p, _ := args["path"].(string)
-		if v, blocked := classifyPath(p, projectDir, workDir); blocked {
+		if v, blocked := classifyPath(p, projectDir, workDir, added); blocked {
 			return v
 		}
 		// Content is not inspected here: the file tools cannot execute
@@ -154,6 +156,15 @@ func Classify(toolName string, mutating bool, args map[string]any, projectDir, w
 		if workDir != "" && filepath.IsAbs(p) && withinDir(workDir, filepath.Clean(p)) {
 			return Verdict{Tier: Safe, Reason: "edits a file inside the session work directory"}
 		}
+		if a, ok := innermostAdded(p, added); ok {
+			// classifyPath refused a read root; a write root is judged
+			// like the project, relative to itself (ADR-0046).
+			rel, _ := pathid.Rel(a.Dir, aliasOrClean(p, a.Dir))
+			if v, ok := persistentTarget(rel); ok {
+				return v
+			}
+			return Verdict{Tier: Safe, Reason: "edits a file inside an added directory"}
+		}
 		// What the file is decides the rest (gem-agent ADR-0072 §4): version
 		// control internals and the files later sessions take
 		// instructions or configuration from are not ordinary edits.
@@ -162,6 +173,18 @@ func Classify(toolName string, mutating bool, args map[string]any, projectDir, w
 		}
 		return Verdict{Tier: Safe, Reason: "edits a file inside the project"}
 
+	case "request_directory":
+		// The model asking for reach (ADR-0046): the proposer cannot be
+		// the judge, so the operator alone answers, in every mode — the
+		// floor OperatorOnly carries.
+		access, _ := args["access"].(string)
+		p, _ := args["path"].(string)
+		what := "read only — nothing may write it"
+		if access == "write" {
+			what = "written like the project — later writes there under auto-approval run without asking"
+		}
+		return Verdict{Tier: Review, OperatorOnly: true,
+			Reason: "adds " + p + " to the session's roots, " + what + "; the operator decides"}
 	}
 
 	// A persisted memory reappears in every later session's facts, so a
@@ -183,7 +206,7 @@ func Classify(toolName string, mutating bool, args map[string]any, projectDir, w
 // first, in every lane; then the lane decides. mutating is false only
 // when the registry has a read lane and the call asked for it — a
 // read-lane request with no sandbox to back it is a write-lane call.
-func classifyShell(args map[string]any, mutating bool) Verdict {
+func classifyShell(args map[string]any, mutating, writeRoots bool) Verdict {
 	command, _ := args["command"].(string)
 	access, _ := args["access"].(string)
 	trimmed := strings.TrimSpace(command)
@@ -211,6 +234,9 @@ func classifyShell(args map[string]any, mutating bool) Verdict {
 		// operator decides (review V7: the reason once said "off").
 		return Verdict{Tier: Review, Reason: "read lane declared, but read-lane commands ask in this session — the operator is asked"}
 	}
+	if writeRoots {
+		return Verdict{Tier: Review, Reason: "write lane: writes the project, the work directory and the added write directories, reaches the network — the operator is asked"}
+	}
 	return Verdict{Tier: Review, Reason: "write lane: writes the project and the work directory, reaches the network — the operator is asked"}
 }
 
@@ -237,7 +263,7 @@ func blockFloor(trimmed string) (Verdict, bool) {
 	return Verdict{}, false
 }
 
-func classifyPath(p, projectDir, workDir string) (Verdict, bool) {
+func classifyPath(p, projectDir, workDir string, added []sandbox.AddedRoot) (Verdict, bool) {
 	if p == "" {
 		return Verdict{Tier: Review, Reason: "missing path argument"}, true
 	}
@@ -248,10 +274,18 @@ func classifyPath(p, projectDir, workDir string) (Verdict, bool) {
 		// Either spelling of a macOS alias (/tmp, /private/tmp) is the
 		// same place to the kernel and to the registry's resolved root.
 		c := filepath.Clean(p)
-		if !withinAnyRoot(c, projectDir, workDir) && !withinAnyRoot(aliasResolve(c), projectDir, workDir) {
-			return Verdict{Tier: Block, Reason: outsideRootsReason("absolute path", workDir)}, true
+		if withinAnyRoot(c, projectDir, workDir) || withinAnyRoot(aliasResolve(c), projectDir, workDir) {
+			return Verdict{}, false
 		}
-		return Verdict{}, false
+		if a, ok := innermostAdded(p, added); ok {
+			if !a.Write {
+				// Judged as a write outside every root (ADR-0046), with
+				// the reason that says why.
+				return Verdict{Tier: Block, Reason: "absolute path in a directory added read-only (" + a.Dir + ")"}, true
+			}
+			return Verdict{}, false
+		}
+		return Verdict{Tier: Block, Reason: outsideRootsReason("absolute path", workDir, len(added) > 0)}, true
 	}
 	if strings.Contains(p, "..") {
 		return Verdict{Tier: Block, Reason: "path escapes the project directory"}, true
@@ -571,11 +605,55 @@ func withinAnyRoot(p string, roots ...string) bool {
 // outsideRootsReason names what the operator actually configured: with
 // no work directory the old wording stays, so the message never claims
 // a root that does not exist.
-func outsideRootsReason(what, workDir string) string {
-	if workDir == "" {
+func outsideRootsReason(what, workDir string, added bool) string {
+	switch {
+	case added && workDir == "":
+		return what + " outside the project and added directories"
+	case added:
+		return what + " outside the project, session work and added directories"
+	case workDir == "":
 		return what + " outside the project directory"
 	}
 	return what + " outside the project and session work directories"
+}
+
+// innermostAdded returns the innermost added root containing the
+// absolute path p (either spelling of a macOS alias): a write root may
+// sit inside a read root, and the inner one decides.
+func innermostAdded(p string, added []sandbox.AddedRoot) (sandbox.AddedRoot, bool) {
+	if !filepath.IsAbs(p) {
+		return sandbox.AddedRoot{}, false
+	}
+	c := filepath.Clean(p)
+	var best sandbox.AddedRoot
+	found := false
+	for _, a := range added {
+		if withinDir(a.Dir, c) || withinDir(a.Dir, aliasResolve(c)) {
+			if !found || len(a.Dir) > len(best.Dir) {
+				best, found = a, true
+			}
+		}
+	}
+	return best, found
+}
+
+// aliasOrClean returns p cleaned, or its alias-resolved spelling when
+// that is the one inside dir.
+func aliasOrClean(p, dir string) string {
+	c := filepath.Clean(p)
+	if withinDir(dir, c) {
+		return c
+	}
+	return aliasResolve(c)
+}
+
+func hasWriteRoot(added []sandbox.AddedRoot) bool {
+	for _, a := range added {
+		if a.Write {
+			return true
+		}
+	}
+	return false
 }
 
 // hasCredentialPath reports credential material named anywhere in s —

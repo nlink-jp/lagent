@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -269,5 +270,31 @@ func TestModelTierNoticeIsPerSession(t *testing.T) {
 	a.judge(context.Background(), tc, a.decide(tc).Verdict)
 	if len(*notices) != 2 {
 		t.Errorf("want one notice per session, got %v", *notices)
+	}
+}
+
+// The added directories ride the payload with their levels (ADR-0046),
+// for the work directory's reason: a write into a write root is
+// ordinary, and a reviewer that does not know the root reads an escape.
+func TestRiskEvaluatorIsToldTheAddedDirectories(t *testing.T) {
+	b := &autoBackend{verdict: `{"approve": true, "confidence": 0.9, "reason": "ok"}`}
+	a, _, _ := tierAgent(t, b, &recordingGate{}, nil, confined)
+	reg := a.registry
+	notes, _ := filepath.EvalSymlinks(t.TempDir())
+	ref, _ := filepath.EvalSymlinks(t.TempDir())
+	if err := reg.AddDirs([]sandbox.AddedRoot{{Dir: notes, Write: true}, {Dir: ref}}); err != nil {
+		t.Fatal(err)
+	}
+	runOne(t, a, b, writeLane("mkdir -p "+notes+"/x"), "ノートを整理して")
+	if len(b.evals) == 0 {
+		t.Fatal("the reviewer was never consulted")
+	}
+	for i, payload := range b.evals {
+		if !strings.Contains(payload, "added directory (write): "+notes) || !strings.Contains(payload, "added directory (read): "+ref) {
+			t.Errorf("round %d does not state the added directories:\n%s", i, payload)
+		}
+	}
+	if !strings.Contains(b.evalSystems[0], "added write directories") {
+		t.Errorf("the instructions never mention the added directories:\n%s", b.evalSystems[0])
 	}
 }

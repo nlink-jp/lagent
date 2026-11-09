@@ -183,7 +183,7 @@ gem-agent の iTerm2 で計測: 行数の宣言は既に正しいのに、画像
 ### 5. 何を描いてよいかは、ここでは決めない — 決まったのは制約 1 つ
 
 3 度書かれ、3 度反証された。いずれもそのラウンドの最悪の指摘だった。モデルが名指すパスは
-ツール名で引かれる強制者を迂回し（`PathJudged`、[risk.go:331](../../../internal/risk/risk.go)）、
+ツール名で引かれる強制者を迂回し（`PathJudged`、[risk.go:365](../../../internal/risk/risk.go)）、
 intake が書いたパスは先回りされうる。`write` が `os.Stat` で短絡し
 （[mcpresult.go:344](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに work dir を
 `_meta` で渡すからである（[client.go:639](../../../internal/mcp/client.go)）。そして第 3 稿の

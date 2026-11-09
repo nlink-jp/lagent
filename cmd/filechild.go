@@ -68,6 +68,11 @@ type fileChildRequest struct {
 	WorkDir    string         `json:"work_dir"`
 	Tool       string         `json:"tool"`
 	Args       map[string]any `json:"args"`
+	// Added carries the operator's added roots with their levels
+	// (ADR-0046): the child rebuilds the parent's root set, so a read in
+	// an added root is kernel-confined like a project read and never
+	// falls back to the parent.
+	Added []sandbox.AddedRoot `json:"added,omitempty"`
 	// Allot is the runtime's allotment for this call (ADR-0034 §2), in
 	// bytes; absent when the runtime set none. It rides here because a
 	// context value never crosses into the child process.
@@ -102,6 +107,13 @@ func newFileChildCmd() *cobra.Command {
 				// with it, and the error carries an absolute path the
 				// model must not see (gem-agent ADR-0021, independent review).
 				_ = reg.UseWorkDir(req.WorkDir)
+			}
+			// One at a time, a failure skipped: an added root that will
+			// not open (an ejected volume, a renamed directory) must not
+			// take every project read down with it — a path under it then
+			// fails on its own, as a work directory's does above.
+			for _, a := range req.Added {
+				_ = reg.AddDirs([]sandbox.AddedRoot{a})
 			}
 			if req.Tool == tools.CopySourceOp {
 				// write_file's copy source (ADR-0039 §2): raw bytes, the
@@ -149,10 +161,10 @@ func newFileChildCmd() *cobra.Command {
 
 // fileChildRunner builds the runner the registry calls for a covered
 // read. profileHome is the home the credential filters are anchored to.
-func fileChildRunner(self, profileHome string, projectDir func() string, workDir func() string) tools.FileChildFunc {
+func fileChildRunner(self, profileHome string, projectDir func() string, workDir func() string, added func() []sandbox.AddedRoot) tools.FileChildFunc {
 	profile := sandbox.FileReadProfile(profileHome)
 	return func(ctx context.Context, tool string, args map[string]any) (string, error) {
-		creq := fileChildRequest{ProjectDir: projectDir(), WorkDir: workDir(), Tool: tool, Args: args}
+		creq := fileChildRequest{ProjectDir: projectDir(), WorkDir: workDir(), Added: added(), Tool: tool, Args: args}
 		if n, ok := tools.Allot(ctx); ok {
 			creq.Allot = &n
 		}
@@ -303,7 +315,7 @@ func installFileChildWith(reg *tools.Registry, self, home, probeDir string) stri
 	if err := sandbox.VerifyFileReadLane(probeDir, home, probe); err != nil {
 		return degradedNote(err)
 	}
-	reg.SetFileChild(fileChildRunner(self, home, reg.ProjectDir, reg.WorkDir))
+	reg.SetFileChild(fileChildRunner(self, home, reg.ProjectDir, reg.WorkDir, reg.AddedDirs))
 	return ""
 }
 

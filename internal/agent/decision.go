@@ -103,7 +103,7 @@ func (a *Agent) decide(tc llm.ToolCall) Decision {
 		// keeps its spelling and fails at the open as before.
 		args = a.realPathArgs(tc.Args)
 	}
-	v := risk.Classify(tc.Name, mutating, args, a.registry.ProjectDir(), a.registry.WorkDir())
+	v := risk.Classify(tc.Name, mutating, args, a.registry.ProjectDir(), a.registry.WorkDir(), a.registry.AddedDirs()...)
 	if tc.Name == tools.ShellExecName && !a.registry.Confined() && v.Tier != risk.Block {
 		// Unconfined mode (--no-sandbox): the approval buys none of the
 		// lane's constraints, so it is not an ordinary write-lane call
@@ -260,7 +260,7 @@ func (a *Agent) intoRoots(tc llm.ToolCall) llm.ToolCall {
 	if !pathArgTools[tc.Name] {
 		return tc
 	}
-	roots := []string{a.registry.ProjectDir(), a.registry.WorkDir()}
+	roots := append([]string{a.registry.ProjectDir(), a.registry.WorkDir()}, addedDirNames(a.registry.AddedDirs())...)
 	var out map[string]any
 	set := func(k string, v any) {
 		if out == nil {
