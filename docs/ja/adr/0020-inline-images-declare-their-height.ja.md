@@ -33,12 +33,12 @@ ADR-0005 は、画像が**モデル**へ届く道を決めた。ドロップさ�
 
 ### カウンタに見えるもの、見えないもの
 
-`emit`（[model.go:996](../../../internal/tui/model.go)）は 1 行を scrollback へ印字し、
+`emit`（[model.go:999](../../../internal/tui/model.go)）は 1 行を scrollback へ印字し、
 その物理行数を数える。bottom pin はその数に乗っている。`go.mod:11` が固定している版 —
 gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.6 で実測すると、
 `ansi.StringWidth` は iTerm2 の `OSC 1337 File=`、kitty の `APC _G`、sixel の `DCS q` の
 いずれにも **0** を返し、`ansi.Strip` は空文字を返す。`ansi.Hardwrap` は 3 方式とも
-バイト同一で通すので、`wrapForScrollback`（[model.go:1256](../../../internal/tui/model.go)）は
+バイト同一で通すので、`wrapForScrollback`（[model.go:1259](../../../internal/tui/model.go)）は
 何も切り刻まない。
 
 ただしカウンタは盲目ではない。`physicalRows`
@@ -52,11 +52,11 @@ gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.
 **移植しない。** それらが測るのは端末であってランタイムではなく、このリポジトリに
 `tools/` は無い。`pinprobe` は向こうのランタイムの本番 Model をその本番 emit 経路で
 駆動するが、それはこちらの emit 経路でもある — 関数ごとに同一である
-（[model.go:996, :1256, :1269](../../../internal/tui/model.go) が gem-agent の :872・:1130・
+（[model.go:999, :1256, :1269](../../../internal/tui/model.go) が gem-agent の :872・:1130・
 :1143 に対応し、後ろ 2 つは `diff` が空を返す）。
 
 領域は仮定ではなく構成する。pin の padding は `height − printed − view − 1` で、正の分岐は
-「screen not full」とラベルされている（[model.go:1954](../../../internal/tui/model.go)）。
+「screen not full」とラベルされている（[model.go:1969](../../../internal/tui/model.go)）。
 30 行のペイン用に選んだ filler の行数が、80 行の窓をその反対側に置き、両記録の以前の稿は
 それらの実行を誤ったラベルの下で報告した。
 
@@ -97,7 +97,7 @@ iTerm2 はスクリプト経由で駆動し画面を読み戻し、フレーム�
 
 gem-agent は描画前に応答を分割する。`diagram.Split` が art segment を verbatim で端末へ
 渡す。gem-agent ADR-0063 が向こうで mermaid のために作ったレーンである。**このランタイムにそのレーンは
-無い。** `newGlamourRenderer`（[model.go:501](../../../internal/tui/model.go)、描画は `:514`）は
+無い。** `newGlamourRenderer`（[model.go:503](../../../internal/tui/model.go)、描画は `:514`）は
 応答を丸ごと 1 個として glamour に通す。`Split` も segment 型も verbatim 経路も無い（本記録の
 実装後、後ろ 2 つは存在する — `Segment` と `emitSegments` の verbatim 分岐である。いまも無いのは
 `Split` であり、応答が分割されることはなく、画像は応答の外からレーンへ入る）。よって
@@ -208,7 +208,7 @@ view 層の読み取りを開く）は、いまや先送りした決定に属す
 この一文だけが立っているのを見つけた。この一文自身の規則により、それは「現時点では」に
 すぎない。テストは後から書かれ、いまこの一文は意図ではなく実在を述べている。これは既存の
 面を塞いだと主張するものではない。非テストコードで `ansi.Strip` が呼ばれるのは 1 箇所
-（[model.go:1274](../../../internal/tui/model.go)）、`physicalRows` の中で幅を**測る**ためだけ
+（[model.go:1277](../../../internal/tui/model.go)）、`physicalRows` の中で幅を**測る**ためだけ
 である。シェル出力の生エスケープは既に端末へ届いている。既存であり、ここで広がらず、
 ここで直しもしない。
 

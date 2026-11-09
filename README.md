@@ -71,7 +71,9 @@ rule-tier Safe calls run unasked, and with `[approval].model_tier =
 of them ran unasked on a month of real prompts, and no exfiltration or
 injection case passed —
 [ADR-0032](docs/en/adr/0032-the-model-tier-judges-write-lane-shell.md));
-`-p "…"` runs one prompt and exits.
+`-p "…"` runs one prompt and exits; a pipe into it is attached as data.
+Without `-p`, a pipe is your own input, as if typed: `!` commands in it
+run, so give third-party text to `-p`.
 `/help` lists the slash commands.
 
 ## What it does

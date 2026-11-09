@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Documentation
+
+- **What a pipe without `-p` means is now stated** (ADR-0045). It is your own
+  input, as if typed: `!` commands and slash commands in it run. To hand a
+  pipe to the model as data, use `-p`.
+
 ### Changed
 
 - **The approval dialog shows the whole call and scrolls** (ADR-0044). Long

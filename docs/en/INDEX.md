@@ -435,6 +435,7 @@ excepted).
 - [`ADR-0042`](adr/0042-the-approved-cache-is-out-of-the-unasked-lanes-reach.md) — the approved lanes' toolchain cache lies outside everything that runs unasked (**Accepted**, implemented; ports gem-agent ADR-0109): it moves from inside the read lane's scratch to the session's own directory beside the work directory, denied to the read lane by the kernel and probed at startup
 - [`ADR-0043`](adr/0043-the-output-of-a-bang-command-is-data.md) — the output of a `!` command is data (**Accepted**, implemented; ports gem-agent ADR-0111): the command stays the operator's text and the output is a text attachment, wrapped at send
 - [`ADR-0044`](adr/0044-the-approval-dialog-carries-the-whole-call.md) — the approval dialog carries the whole call, and scrolls (**Accepted**, implemented; ports gem-agent ADR-0112): every argument up to 64 KiB, short ones first, and ↑↓ PgUp PgDn Home End scroll the dialog
+- [`ADR-0045`](adr/0045-a-pipe-without-p-is-the-operators-own-input.md) — a pipe without `-p` is the operator's own input, and two audit limits are accepted (**Accepted**; ports gem-agent ADR-0110 and part of ADR-0113): no behaviour changes; the README states the pipe's meaning
   a path is judged where it leads, and a probe that cannot remove itself says so (**Accepted**, implemented; ported
   from gem-agent ADR-0108 and ADR-0107 §4): a full path through a link outside the roots (`~/Dropbox` → `~/Library/CloudStorage/Dropbox`)
   is rewritten once to its real path where the call comes in, and a probe file left in the project is named
