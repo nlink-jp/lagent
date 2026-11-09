@@ -115,47 +115,50 @@ func TestLaneEnvRedirectsToolchainCachesInEveryLane(t *testing.T) {
 	parent := []string{"PATH=/bin", "GOCACHE=/Users/someone/Library/Caches/go-build", "AWS_SECRET_ACCESS_KEY=x", "LAGENT_API_KEY=sk"}
 	caches := map[string]string{"GOCACHE": "go-build", "PIP_CACHE_DIR": "pip"}
 	for _, lane := range []sandbox.Lane{sandbox.LaneRead, sandbox.LaneWrite, sandbox.LaneOperator} {
-		env := strings.Join(laneEnv(lane, "/scratch", caches, parent), "\n")
+		env := strings.Join(laneEnv(lane, "/scratch", "/approved", caches, parent), "\n")
 		// The unasked lane and the approved lanes never share a cache
 		// directory: a shared content-addressed cache is a route from a
 		// read-lane command to an approved build's output.
-		suffix := "-approved"
+		root := "/approved"
 		if lane == sandbox.LaneRead {
-			suffix = ""
+			root = "/scratch"
 		}
-		for _, want := range []string{"GOCACHE=/scratch/go-build" + suffix, "PIP_CACHE_DIR=/scratch/pip" + suffix} {
+		for _, want := range []string{"GOCACHE=" + root + "/go-build", "PIP_CACHE_DIR=" + root + "/pip"} {
 			if !strings.Contains(env+"\n", want+"\n") {
 				t.Errorf("%s lane: %s not in the environment:\n%s", lane, want, env)
 			}
 		}
-		if idx := strings.LastIndex(env, "GOCACHE="); !strings.HasPrefix(env[idx:], "GOCACHE=/scratch/go-build") {
+		if idx := strings.LastIndex(env, "GOCACHE="); !strings.HasPrefix(env[idx:], "GOCACHE="+root+"/go-build") {
 			t.Errorf("%s lane: the redirected GOCACHE must come last so it wins:\n%s", lane, env)
 		}
 	}
 	// ADR-0017: no lane filters the operator's environment; every lane
 	// loses the runtime's own configuration variables.
-	read := strings.Join(laneEnv(sandbox.LaneRead, "/scratch", caches, parent), "\n")
+	read := strings.Join(laneEnv(sandbox.LaneRead, "/scratch", "/approved", caches, parent), "\n")
 	if !strings.Contains(read, "TMPDIR=/scratch") || !strings.Contains(read, "AWS_SECRET_ACCESS_KEY") {
 		t.Errorf("the read lane keeps the operator's environment and points TMPDIR at the scratch:\n%s", read)
 	}
 	for _, lane := range []sandbox.Lane{sandbox.LaneRead, sandbox.LaneWrite, sandbox.LaneOperator} {
-		if env := strings.Join(laneEnv(lane, "/scratch", caches, parent), "\n"); strings.Contains(env, "LAGENT_API_KEY") {
+		if env := strings.Join(laneEnv(lane, "/scratch", "/approved", caches, parent), "\n"); strings.Contains(env, "LAGENT_API_KEY") {
 			t.Errorf("%s lane: the runtime's own key reached the child:\n%s", lane, env)
 		}
 	}
-	write := strings.Join(laneEnv(sandbox.LaneWrite, "/scratch", caches, parent), "\n")
+	write := strings.Join(laneEnv(sandbox.LaneWrite, "/scratch", "/approved", caches, parent), "\n")
 	if strings.Contains(write, "TMPDIR=/scratch") {
 		t.Errorf("the write lane keeps its own TMPDIR:\n%s", write)
 	}
-	if env := laneEnv(sandbox.LaneWrite, "", caches, parent); len(env) != len(parent)-1 {
+	if env := laneEnv(sandbox.LaneWrite, "", "", caches, parent); len(env) != len(parent)-1 {
 		t.Errorf("no scratch, no redirect — only the runtime's own removed: %v", env)
 	}
 	// The table renders in name order, so the environment is stable
 	// across runs; an empty table renders nothing.
-	if got := strings.Join(toolchainCacheEnv("/s", sandbox.LaneRead, caches), " "); got != "GOCACHE=/s/go-build PIP_CACHE_DIR=/s/pip" {
+	if got := strings.Join(toolchainCacheEnv("/s", "/a", sandbox.LaneRead, caches), " "); got != "GOCACHE=/s/go-build PIP_CACHE_DIR=/s/pip" {
 		t.Errorf("toolchainCacheEnv = %q", got)
 	}
-	if got := toolchainCacheEnv("/s", sandbox.LaneWrite, nil); len(got) != 0 {
+	if got := toolchainCacheEnv("/s", "", sandbox.LaneWrite, caches); len(got) != 0 {
+		t.Errorf("approved lane without a directory rendered %v", got)
+	}
+	if got := toolchainCacheEnv("/s", "/a", sandbox.LaneWrite, nil); len(got) != 0 {
 		t.Errorf("empty table rendered %v", got)
 	}
 	if scratchCachesLabel(caches) != "GOCACHE→go-build, PIP_CACHE_DIR→pip" || scratchCachesLabel(nil) != "(none)" {

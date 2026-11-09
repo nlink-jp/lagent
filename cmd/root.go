@@ -1515,7 +1515,8 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// The argv first message (gem-agent ADR-0064) runs before the first read,
 	// through the same handling a read line gets; the echoed "> line"
 	// keeps the terminal record showing what ran. Piped stdin lines
-	// follow as they always have (gem-agent ADR-0055's boundary is untouched).
+	// follow as they always have: without -p, a pipe is the operator's
+	// own input (gem-agent ADR-0055 §3, gem-agent ADR-0110).
 	pending := initialInput
 	for {
 		var input string
@@ -1958,7 +1959,7 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 			// runtime's own configuration variables do not reach it
 			// either. There is no scratch here, so no temporary
 			// directory and no toolchain cache to point into one.
-			cmd.Env = laneEnv(lane, "", nil, os.Environ())
+			cmd.Env = laneEnv(lane, "", "", nil, os.Environ())
 			return cmd
 		}, sandbox.Enforcement{}, nil, nil
 	}
@@ -2000,6 +2001,11 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 		notes = append(notes, fmt.Sprintf("read lane disabled: no private scratch directory (%v); every shell_exec asks", err))
 	} else {
 		spec.ReadScratch = scratch
+		if approved, err := approvedCacheDir(spec.WorkDir); err != nil {
+			notes = append(notes, fmt.Sprintf("the approved lanes' toolchain caches stay unredirected: %v", err))
+		} else {
+			spec.ApprovedCacheRoot = approved
+		}
 	}
 	profiles := map[sandbox.Lane]string{}
 	for _, lane := range []sandbox.Lane{sandbox.LaneRead, sandbox.LaneWrite, sandbox.LaneOperator} {
@@ -2038,11 +2044,11 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 	if len(leftovers) > 0 {
 		notes = append(notes, sandbox.LeftoverNote(leftovers))
 	}
-	scratch := spec.ReadScratch
+	scratch, approved := spec.ReadScratch, spec.ApprovedCacheRoot
 	return func(ctx context.Context, command string, lane sandbox.Lane) *exec.Cmd {
 		argv := sandbox.Wrap(profiles[lane], shell, command)
 		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
-		cmd.Env = laneEnv(lane, scratch, caches, os.Environ())
+		cmd.Env = laneEnv(lane, scratch, approved, caches, os.Environ())
 		return cmd
 	}, enf, notes, nil
 }
@@ -2053,11 +2059,10 @@ func buildExecFn(sandboxOn bool, projectDir, workDir string, denyExec []string, 
 // filtered, because which one a program needs is not a question this
 // runtime can answer. The read lane's temporary directory is the
 // private scratch. Every lane gets the toolchain caches pointed into that
-// scratch (ADR-0008 §1): the sandbox denies every write outside the
-// project, the work directory and the scratch, so a cache under
-// ~/Library would fail a build in any lane — and the read lane must
-// not write a shared cache anyway.
-func laneEnv(lane sandbox.Lane, scratch string, caches map[string]string, parent []string) []string {
+// scratch or, for the approved lanes, into approved (ADR-0008 §1,
+// ADR-0042): a cache under ~/Library would fail a build in any lane — and
+// the read lane must not write a shared cache anyway.
+func laneEnv(lane sandbox.Lane, scratch, approved string, caches map[string]string, parent []string) []string {
 	// The runtime's own configuration variables go to no child
 	// (ADR-0017 §2); the operator's environment is not touched.
 	env := sandbox.ChildEnv(parent)
@@ -2067,7 +2072,7 @@ func laneEnv(lane sandbox.Lane, scratch string, caches map[string]string, parent
 		}
 	}
 	if scratch != "" {
-		env = append(env, toolchainCacheEnv(scratch, lane, caches)...)
+		env = append(env, toolchainCacheEnv(scratch, approved, lane, caches)...)
 	}
 	return env
 }
@@ -2077,26 +2082,30 @@ func laneEnv(lane sandbox.Lane, scratch string, caches map[string]string, parent
 // variable points at its directory under the session scratch. The
 // table is the operator's; Go's build cache is the shipped row.
 //
-// The unasked lane and the approved lanes get separate directories. A
-// build cache is content-addressed and trusted on read, so one shared
-// directory would let a read-lane command — which runs unasked, and
-// can be steered by what it read — plant an object that an approved
-// build later links and the operator then runs (gem-agent ADR-0084's
-// review). The read lane's directory is the table's name; write and
-// operator share "<name>-approved".
-func toolchainCacheEnv(scratch string, lane sandbox.Lane, caches map[string]string) []string {
+// The unasked lane and the approved lanes get separate roots. A build
+// cache is content-addressed and trusted on read, so a directory an
+// unasked writer can reach would let a command steered by what it read
+// plant an object that an approved build later links and the operator
+// then runs. The read lane's root is the session scratch; write and
+// operator share approved, which the kernel denies the read lane and
+// which lies outside the work directory the file tools write
+// (ADR-0042). With no approved directory those lanes get no redirection.
+func toolchainCacheEnv(scratch, approved string, lane sandbox.Lane, caches map[string]string) []string {
 	names := make([]string, 0, len(caches))
 	for name := range caches {
 		names = append(names, name)
 	}
 	sort.Strings(names)
+	root := scratch
+	if lane != sandbox.LaneRead {
+		root = approved
+	}
+	if root == "" {
+		return nil
+	}
 	env := make([]string, 0, len(names))
 	for _, name := range names {
-		dir := caches[name]
-		if lane != sandbox.LaneRead {
-			dir += "-approved"
-		}
-		env = append(env, name+"="+filepath.Join(scratch, dir))
+		env = append(env, name+"="+filepath.Join(root, caches[name]))
 	}
 	return env
 }
@@ -2135,6 +2144,17 @@ var (
 	fallbackScratchMu sync.Mutex
 	fallbackScratch   string
 )
+
+// approvedCacheDir creates the session's directory for the approved
+// lanes' toolchain caches, beside its work directory (ADR-0042), and
+// returns its real path. A session with no work directory has none.
+func approvedCacheDir(workDir string) (string, error) {
+	dir, err := workdir.EnsureApprovedCache(workDir)
+	if err != nil || dir == "" {
+		return "", err
+	}
+	return sandbox.ResolveWriteDir(dir)
+}
 
 // removeFallbackScratch deletes the process's fallback scratch
 // directory, if one was created — a directory this process made under

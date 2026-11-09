@@ -432,6 +432,7 @@ excepted).
   from gem-agent ADR-0106, Issue #3 there): up to 1,024 characters with a note
   when cut, and multi-line YAML values (`>`, `|`, continued plain scalars) read whole
 - [`ADR-0041`](adr/0041-a-path-is-judged-where-it-leads.md) —
+- [`ADR-0042`](adr/0042-the-approved-cache-is-out-of-the-unasked-lanes-reach.md) — the approved lanes' toolchain cache lies outside everything that runs unasked (**Accepted**, implemented; ports gem-agent ADR-0109): it moves from inside the read lane's scratch to the session's own directory beside the work directory, denied to the read lane by the kernel and probed at startup
   a path is judged where it leads, and a probe that cannot remove itself says so (**Accepted**, implemented; ported
   from gem-agent ADR-0108 and ADR-0107 §4): a full path through a link outside the roots (`~/Dropbox` → `~/Library/CloudStorage/Dropbox`)
   is rewritten once to its real path where the call comes in, and a probe file left in the project is named

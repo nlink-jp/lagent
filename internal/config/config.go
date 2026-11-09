@@ -328,9 +328,9 @@ type SandboxConfig struct {
 	// ScratchCaches is the table of toolchain caches redirected into
 	// the session scratch (ADR-0008 §1, revised after the review in
 	// gem-agent ADR-0084): environment variable → the directory name
-	// under the scratch. Every shell_exec runs with each variable pointing there —
-	// the read lane at the name itself, the approved lanes at
-	// "<name>-approved" — so a build cache no lane may write under
+	// under the scratch. Every shell_exec runs with each variable pointing at
+	// that name — in the scratch for the read lane, in the session's separate
+	// approved cache for the others (ADR-0042) — so a build cache no lane may write under
 	// ~/Library stops sending inspection to the write lane. Only
 	// regenerable caches belong here; the default row is Go's. An empty
 	// value removes a row (the default one included). Global config

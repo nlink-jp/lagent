@@ -323,5 +323,6 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
   スキルの説明は Claude Code と同じに読む（**Accepted**、実装済み。gem-agent ADR-0106 から移植。発端はその Issue #3）:
   1,024 文字まで示し、切ったら注記する。複数行の YAML の値（`>`・`|`・字下げで続くプレーンスカラー）も丸ごと読む
 - [`ADR-0041`](adr/0041-a-path-is-judged-where-it-leads.ja.md) —
+- [`ADR-0042`](adr/0042-the-approved-cache-is-out-of-the-unasked-lanes-reach.ja.md) — 承認済みレーンのツールチェーンキャッシュは、聞かずに走るものすべての外に置く（**Accepted**、実装済み。gem-agent ADR-0109 の移植）: read レーンの scratch の中から、作業ディレクトリの隣のセッション専用ディレクトリへ移し、read レーンにはカーネルで拒否して起動時に確かめる
   パスは行き着く先で判定し、自分を消せなかったプローブはそう言う（**Accepted**、実装済み。gem-agent ADR-0108 と ADR-0107 §4 から移植）:
   ルートの外のリンク（`~/Dropbox` → `~/Library/CloudStorage/Dropbox`）を通した完全なパスは、呼び出しが入ってきたところで一度だけ実パスに書き換え、プロジェクトに残ったプローブのファイルは名前を示す
