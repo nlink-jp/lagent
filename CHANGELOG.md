@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-11-09
+
 ### Changed
 
 - **`/clear` keeps the added directories that still work** (ADR-0047). When
