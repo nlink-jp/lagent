@@ -1815,7 +1815,7 @@ func effectiveCeiling(a config.AgentConfig) sandbox.Ceiling {
 // ApproveOnce refuses like Approve: the answer set differs, the
 // absence of a human does not.
 func (d denyGate) ApproveOnce(toolName, detail, _, reason string) (bool, string) {
-	fmt.Fprintf(d.out, "[denied: %s %s — %s]\n", toolName, detail, reason)
+	fmt.Fprintf(d.out, "[denied: %s %s — %s]\n", toolName, agent.ClipDetail(detail), reason)
 	return false, ""
 }
 
@@ -1823,7 +1823,7 @@ func (d denyGate) ApproveOnce(toolName, detail, _, reason string) (bool, string)
 // ceiling holds and the reason goes to stderr like every other denial
 // here (gem-agent ADR-0080 §4). --read-only is how a run says it meant this.
 func (d denyGate) ApproveLift(toolName, detail, _, reason string) (bool, string) {
-	fmt.Fprintf(d.out, "[denied: %s %s — %s]\n", toolName, detail, reason)
+	fmt.Fprintf(d.out, "[denied: %s %s — %s]\n", toolName, agent.ClipDetail(detail), reason)
 	return false, ""
 }
 
@@ -1840,7 +1840,7 @@ func (d denyGate) Approve(toolName, detail, purpose, reason string, mustPrompt b
 		// (gem-agent ADR-0053 §3).
 		why = reason + " — nobody to ask in one-shot mode"
 	}
-	fmt.Fprintf(d.out, "[denied: %s %s — %s]\n", toolName, detail, why)
+	fmt.Fprintf(d.out, "[denied: %s %s — %s]\n", toolName, agent.ClipDetail(detail), why)
 	// What it wanted, on the record: a one-shot run that ends in denials
 	// is exactly the case where the operator has to reconstruct the
 	// agent's plan afterwards (gem-agent ADR-0047 §5).

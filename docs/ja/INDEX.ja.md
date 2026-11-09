@@ -325,5 +325,6 @@ Phase 1 の計測で表面が落ち着くのに合わせて書く。
 - [`ADR-0041`](adr/0041-a-path-is-judged-where-it-leads.ja.md) —
 - [`ADR-0042`](adr/0042-the-approved-cache-is-out-of-the-unasked-lanes-reach.ja.md) — 承認済みレーンのツールチェーンキャッシュは、聞かずに走るものすべての外に置く（**Accepted**、実装済み。gem-agent ADR-0109 の移植）: read レーンの scratch の中から、作業ディレクトリの隣のセッション専用ディレクトリへ移し、read レーンにはカーネルで拒否して起動時に確かめる
 - [`ADR-0043`](adr/0043-the-output-of-a-bang-command-is-data.ja.md) — `!` コマンドの出力はデータである（**Accepted**、実装済み。gem-agent ADR-0111 の移植）: コマンドは操作者のテキストのまま、出力はテキスト添付にして送信時に包む
+- [`ADR-0044`](adr/0044-the-approval-dialog-carries-the-whole-call.ja.md) — 承認ダイアログは呼び出しの全体を運び、スクロールできる（**Accepted**、実装済み。gem-agent ADR-0112 の移植）: 64 KiB まで全引数を短いものから表示し、↑↓ PgUp PgDn Home End でスクロールできる
   パスは行き着く先で判定し、自分を消せなかったプローブはそう言う（**Accepted**、実装済み。gem-agent ADR-0108 と ADR-0107 §4 から移植）:
   ルートの外のリンク（`~/Dropbox` → `~/Library/CloudStorage/Dropbox`）を通した完全なパスは、呼び出しが入ってきたところで一度だけ実パスに書き換え、プロジェクトに残ったプローブのファイルは名前を示す

@@ -7,12 +7,15 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/nlink-jp/lagent/internal/llm"
 	"github.com/nlink-jp/lagent/internal/mention"
@@ -1376,8 +1379,8 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 			a.notify(fmt.Sprintf(a.msgs.CeilingRefusedAgainFmt, tc.Name))
 			return refused, false, false, floorRan, nil
 		}
-		detail, purpose := a.Describe(tc)
-		ok, denyReason := a.gate.ApproveLift(tc.Name, detail, purpose, a.ceilingPrompt(d, tc))
+		_, purpose := a.Describe(tc)
+		ok, denyReason := a.gate.ApproveLift(tc.Name, a.approvalDetail(tc), purpose, a.ceilingPrompt(d, tc))
 		if !ok {
 			a.liftDeclined = true
 			record("refused")
@@ -1502,7 +1505,7 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 					reason += " · " + a.msgs.CeilingUnboundedReason
 				}
 			}
-			ok, fromAllowlist, denyReason := a.askGate(tc, detail, purpose, reason, mustPrompt, d)
+			ok, fromAllowlist, denyReason := a.askGate(tc, a.approvalDetail(tc), purpose, reason, mustPrompt, d)
 			decision := "denied"
 			if ok {
 				decision = "approved"
@@ -1776,8 +1779,8 @@ func (a *Agent) gated(d Decision, tc llm.ToolCall) bool {
 	}
 }
 
-// CallDetail renders a one-line human-readable summary of a tool call for
-// the approval prompt and event display.
+// CallDetail renders a one-line human-readable summary of a tool call
+// for events and records. A question to the operator uses FullCallDetail.
 func CallDetail(tc llm.ToolCall) string {
 	// The interesting argument first, whole-line, for the common tools.
 	if cmd, ok := tc.Args["command"].(string); ok && tc.Name == "shell_exec" {
@@ -1801,6 +1804,108 @@ func CallDetail(tc llm.ToolCall) string {
 		return "(no arguments)"
 	}
 	return clip(strings.Join(parts, " "), 300)
+}
+
+// ClipDetail is the one-line form of an approval detail, for a place
+// that reports a call rather than asking about it.
+func ClipDetail(detail string) string {
+	return clip(strings.Join(strings.Fields(detail), " "), 300)
+}
+
+// approvalDetailCap bounds what one approval carries, names and values
+// together: a model can pass any size of write_file and choose any name.
+const approvalDetailCap = 64 << 10
+
+// FullCallDetail renders every argument of a call for the question the
+// operator answers (ADR-0044), and how many bytes it left out. The path
+// comes first, then the other short values, then the long ones, so a long
+// body cannot push a short argument out of the first screen. A long value
+// is indented under its name. That is for reading: the text is the
+// model's, and no layout can prove which row is which.
+func FullCallDetail(tc llm.ToolCall) (detail string, omitted int) {
+	if cmd, ok := tc.Args["command"].(string); ok && tc.Name == "shell_exec" {
+		return capValue(cmd, approvalDetailCap)
+	}
+	if len(tc.Args) == 0 {
+		return "(no arguments)", 0
+	}
+	type arg struct {
+		name, text string
+		rank       int
+	}
+	args := make([]arg, 0, len(tc.Args))
+	total := 0
+	for k, v := range tc.Args {
+		text := argText(v)
+		total += len(k) + len(text)
+		rank := 1
+		switch {
+		case k == "path":
+			rank = 0
+		case isLongValue(text):
+			rank = 2
+		}
+		args = append(args, arg{k, text, rank})
+	}
+	sort.Slice(args, func(i, j int) bool {
+		if args[i].rank != args[j].rank {
+			return args[i].rank < args[j].rank
+		}
+		return args[i].name < args[j].name
+	})
+	// Only a call over the limit is cut, and then only what is over its
+	// share, so the short arguments are untouched.
+	limit := approvalDetailCap
+	if total > approvalDetailCap {
+		limit = approvalDetailCap / len(args)
+	}
+	parts := make([]string, 0, len(args))
+	for _, a := range args {
+		v, cut := capValue(a.text, limit)
+		omitted += cut
+		name, nameCut := capValue(a.name, limit)
+		omitted += nameCut
+		if strings.ContainsAny(name, "\r\n") {
+			name = strconv.Quote(name)
+		}
+		if isLongValue(v) {
+			parts = append(parts, name+":\n  "+strings.ReplaceAll(v, "\n", "\n  "))
+			continue
+		}
+		parts = append(parts, name+"="+v)
+	}
+	return strings.Join(parts, "\n"), omitted
+}
+
+func isLongValue(v string) bool {
+	return strings.Contains(v, "\n") || utf8.RuneCountInString(v) > 120
+}
+
+// argText is an argument's exact text: a string as it is, anything else
+// as JSON, which keeps a list's boundaries and a number's form.
+func argText(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	var b strings.Builder
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return fmt.Sprintf("%v", v)
+	}
+	return strings.TrimSuffix(b.String(), "\n")
+}
+
+// capValue keeps the head and the tail of an over-long value, since the
+// end of a command is where its effect can be, and says what is between.
+func capValue(s string, limit int) (string, int) {
+	if len(s) <= limit {
+		return s, 0
+	}
+	head := strings.ToValidUTF8(s[:limit*3/4], "")
+	tail := strings.ToValidUTF8(s[len(s)-limit/4:], "")
+	omitted := len(s) - len(head) - len(tail)
+	return head + fmt.Sprintf("\n… [%d bytes not shown] …\n", omitted) + tail, omitted
 }
 
 // notify reports an in-turn event the operator should see (a retry, a
@@ -1879,7 +1984,7 @@ func clip(s string, limit int) string {
 func (a *Agent) credentialRetry(ctx context.Context, tool *tools.Tool, tc llm.ToolCall) (string, floorState, error, bool) {
 	detail, purpose := a.Describe(tc)
 	reason := tools.ErrCredentialRead.Error()
-	ok, _, denyReason := a.askGate(tc, detail, purpose, reason, true, Decision{
+	ok, _, denyReason := a.askGate(tc, a.approvalDetail(tc), purpose, reason, true, Decision{
 		Tool: tool, Verdict: risk.Verdict{Tier: risk.Review, OperatorOnly: true, CredentialRead: true, Reason: reason},
 	})
 	a.logRecord("gate_decision", map[string]any{
