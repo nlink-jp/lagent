@@ -26,7 +26,11 @@ Japanese: [README.ja.md](README.ja.md)
 
 ## Requirements
 
-- macOS on Apple silicon (isolation is built on `sandbox-exec`)
+- macOS on Apple silicon (isolation is built on `sandbox-exec`). There is
+  no Linux version, and running under WSL2 is the same case: Linux's
+  unprivileged sandboxing cannot refuse the creation of a new instruction
+  file by its name, which the write lane depends on
+  ([ADR-0048](docs/en/adr/0048-no-linux-version-the-write-lanes-denial-by-name-does-not-carry-over.md))
 - A local LLM server with an OpenAI-compatible API:
   [LM Studio](https://lmstudio.ai/) (the tested backend, model
   `google/gemma-4-26b-a4b-qat`),

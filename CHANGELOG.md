@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Documentation
+
+- **There is no Linux version, and the reason is recorded** (ADR-0048,
+  from gem-agent ADR-0115). Landlock and namespaces protect an instruction
+  file that exists, and neither can refuse the creation of a new one by
+  name, which the write lane depends on. lagent stays macOS-only; running
+  under WSL2 is the same case.
+
 ## [0.27.1] - 2026-11-09
 
 ### Changed

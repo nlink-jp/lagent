@@ -24,7 +24,10 @@ English: [README.md](README.md)
 
 ## 動作要件
 
-- Apple silicon の macOS（隔離は `sandbox-exec` に基づく）
+- Apple silicon の macOS（隔離は `sandbox-exec` に基づく）。Linux 版はなく、
+  WSL2 で動かす場合も同じです。Linux の非特権サンドボックスは、新しい指示
+  ファイルの作成を名前で断ることができず、write レーンはそれに頼っています
+  （[ADR-0048](docs/ja/adr/0048-no-linux-version-the-write-lanes-denial-by-name-does-not-carry-over.ja.md)）
 - OpenAI 互換 API を持つローカル LLM サーバ:
   [LM Studio](https://lmstudio.ai/)（検証済みバックエンド、モデル
   `google/gemma-4-26b-a4b-qat`）、

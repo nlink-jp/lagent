@@ -349,7 +349,12 @@ answers.
   that X can see the call at all.
 
 - **macOS-only by design** — isolation is built on sandbox-exec, as in
-  gem-agent. Do not add linux/windows targets to the Makefile.
+  gem-agent. Do not add linux/windows targets to the Makefile. A Linux
+  version was measured for gem-agent and declined in both (ADR-0048,
+  gem-agent ADR-0115): Landlock and namespaces protect a persistent file
+  that exists, and neither refuses the creation of a new one by name, so a
+  write-lane `shell_exec` could plant an `AGENTS.md` or `.mcp.json`. Do not
+  put `internal/sandbox` behind an interface for a second mechanism either.
 - **The credential block is a lane profile's last file-read rule** —
   Seatbelt is last-match-wins, so a `(allow file-read* …)` written after
   `writeCredentialBlock` re-opens every credential name inside that tree:
