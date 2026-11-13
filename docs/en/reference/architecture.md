@@ -74,7 +74,9 @@ the server sent, or synthetic ones when a transcript carries none.
 Streaming folds text deltas to the caller as they arrive and assembles
 tool calls from their indexed deltas; the final usage chunk fills the
 four accounting buckets. A transient failure (429, 5xx, a dropped
-connection) retries with backoff only while nothing has been consumed.
+connection) retries with backoff only while nothing has been consumed:
+up to five attempts, waiting 0.5 s doubled at each step, give or take a
+quarter second, so no retry is sent at once.
 A `finish_reason` of `length` is returned as a partial result with the
 text that arrived, never discarded.
 

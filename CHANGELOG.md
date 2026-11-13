@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A retry of a model call always waits first.** The backoff's jitter was
+  a full second either way on a half-second base, so one first retry in
+  four was sent with no wait at all, and one second retry in eight within
+  a quarter second. The jitter is now half the base at every step: the
+  first retry waits 0.25–0.75 s (it was 0–1.5 s), and the later ones 1 s,
+  2 s and 4 s give or take a quarter second (it was a second). Which
+  errors are retried, and how many times, is unchanged.
+
 ### Documentation
 
 - **There is no Linux version, and the reason is recorded** (ADR-0048,
