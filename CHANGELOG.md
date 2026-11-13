@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.27.2] - 2026-11-14
+
 ### Fixed
 
 - **A retry of a model call always waits first.** The backoff's jitter was
