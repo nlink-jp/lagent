@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [0.27.3] - 2026-11-14
+
+### Security
+
+- **goldmark is updated from v1.7.13 to v1.7.17** (GO-2026-5320, cross-site
+  scripting in its HTML renderer). lagent did not run that code: replies are
+  rendered for the terminal by glamour, which replaces goldmark's HTML
+  renderer with its own. `govulncheck` reported it as reachable because both
+  renderers sit behind one interface. The update puts the fixed renderer in
+  the build instead of leaving that argument to be made again.
+- **`golang.org/x/net` is updated from v0.38.0 to v0.62.0**, with `x/text`
+  v0.43.0, `x/sys` v0.49.0 and `x/term` v0.47.0. `govulncheck` listed
+  advisories in `x/net/html` without finding the affected functions called.
+
+### Changed
+
+- **Building from source needs Go 1.27.4 or later** (`go.mod`; it was 1.26.2),
+  the release whose standard library carries the fixes published so far. The
+  binaries of v0.27.2 were already built with it.
+- **`make package` runs the vulnerability check first** (`make vuln`), so a
+  release cannot be built past a finding.
+
 ## [0.27.2] - 2026-11-14
 
 ### Fixed
