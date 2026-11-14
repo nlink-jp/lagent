@@ -11,7 +11,7 @@ DIST_DIR := dist
 CODESIGN_IDENTITY ?= Developer ID Application
 NOTARY_PROFILE    ?= nlink-jp-notary
 
-.PHONY: build build-all package verify-release test vet lint docs-check gate-check check clean bench-build
+.PHONY: build build-all package verify-release test vet lint docs-check gate-check check clean bench-build vuln
 
 build:
 	@mkdir -p $(DIST_DIR)
@@ -25,10 +25,17 @@ build-all:
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY)-darwin-arm64 .
 	@scripts/codesign-darwin.sh $(DIST_DIR)/$(BINARY)-darwin-arm64 "$(CODESIGN_IDENTITY)" "$(BINARY)"
 
+## vuln: known vulnerabilities in the modules and the standard library this
+## build uses (govulncheck). `package` depends on it, so a release cannot be
+## built past a finding. It needs the network, and its database changes under
+## an unchanged tree: a finding can appear without a commit.
+vuln:
+	govulncheck ./...
+
 ## package: Archive the darwin build with the canonical binary name +
 ## README.md + LICENSE, then notarize. Asset naming follows the org
 ## Release Archive Standard (lagent-vX.Y.Z-darwin-arm64.zip).
-package: build-all
+package: vuln build-all
 	@cd $(DIST_DIR) && \
 		stage=_pkg; rm -rf $$stage; mkdir -p $$stage; \
 		cp "$(BINARY)-darwin-arm64" "$$stage/$(BINARY)"; \

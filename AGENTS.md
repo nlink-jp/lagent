@@ -174,6 +174,7 @@ reads as an oversight to the next person, and gets "fixed" wrongly.
 | Docs mirror only | `make docs-check` |
 | Release gate's own test | `make gate-check` |
 | Release binary | `make build-all` (darwin/arm64 only; signs the binary) |
+| Vulnerability check | `make vuln` — govulncheck over the build; `make package` runs it first and stops on a finding. Not part of `make check`: it needs the network and its database changes under an unchanged tree |
 | Release archive | `make package` → `dist/lagent-vX.Y.Z-darwin-arm64.zip`, notarized |
 | Release gate | `make verify-release` — refuses a zip with no notarisation marker, one rebuilt after its marker, one that does not unpack, or one whose binary does not run or reports another tag's version |
 | Homebrew formula | `make brew` after `make package` — generates `Formula/lagent.rb` from the built zip into the local `nlink-jp/homebrew-tap` checkout and pushes it (`make brew-print` renders only) |
