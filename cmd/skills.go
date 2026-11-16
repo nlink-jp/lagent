@@ -59,6 +59,25 @@ func discoverSkills(projectDir string, grant projectGrant) ([]skills.Skill, []st
 	return kept, notes
 }
 
+// regrant re-reads what the grant lets the project, and the operator's
+// own directories, tell the model: the instruction files and the skills.
+// /clear calls it after re-checking the pins, so the new session is
+// built from what the grant allows NOW — a project file that changed
+// during the old session is left out, as the note about it says, and an
+// edit the operator approved, or made to a file of their own, takes
+// effect without a restart. The list being replaced is closed.
+//
+// The caller applies both halves: the system prompt is rebuilt from the
+// returned section, and the skill catalog rides the next facts message.
+// Files that did not change give the same section, so the prompt stays
+// byte-identical and the server's prefix cache survives (ADR-0003).
+func regrant(projectDir string, grant projectGrant, old []skills.Skill) (section string, list []skills.Skill, notes []string) {
+	section, _, notes = loadInstructions(projectDir, grant)
+	list, skillNotes := discoverSkills(projectDir, grant)
+	skills.CloseAll(old)
+	return section, list, append(notes, skillNotes...)
+}
+
 // registerSkillTool adds load_skill to the registry. Read-only and
 // ungated: it can only read inside discovered skill directories, which
 // is also what bounds the agent's unwrap exemption for its results.

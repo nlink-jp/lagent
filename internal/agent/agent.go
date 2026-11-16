@@ -760,10 +760,12 @@ func (a *Agent) RefreshTools() {
 	a.toolDefs, a.purposeTools = toolDefs(a.registry, a.advertise)
 }
 
-// SetSystem replaces the system prompt (gem-agent ADR-0039: a skills reload
-// rebuilt its skill section). The byte-identical request prefix
-// changes with it, so the implicit cache (gem-agent ADR-0018) re-warms on the
-// next round — the deliberate cost of an operator-initiated reload.
+// SetSystem replaces the system prompt. Here /clear is the one caller:
+// it rebuilds the prompt from the instruction files as the re-checked
+// grant allows them (in gem-agent a skills reload rebuilt its skill
+// section too, ADR-0039). A prompt that differs re-processes the request
+// prefix on the next round; one rebuilt from unchanged files is the
+// same bytes and costs nothing (ADR-0003).
 // Same between-turns discipline as AddContext.
 func (a *Agent) SetSystem(s string) { a.system = s }
 

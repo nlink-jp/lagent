@@ -1416,15 +1416,17 @@ about resuming:
 
 ### 8.3 Starting over with /clear
 
-`/clear` wipes the conversation and starts a new session.
+`/clear` wipes the conversation and starts a new session. It is almost the same
+as restarting lagent.
 
 - The conversation up to then remains as a record and can be resumed later with
   `--resume`.
 - The new session is given a new ID and a new work directory.
 - MCP servers are reconnected.
 - Memory is read again.
-- Instruction files and skills are not read again. To make an edit to them
-  take effect, restart lagent.
+- Instruction files and skills are read again. One that belongs to the project
+  and whose content has changed since you trusted it is not loaded, and you
+  are told so ([11.3](#113-asked-again-when-content-changes)).
 - Directories added with `/add-dir` and the like stay as they are.
 - Allows given by answering `a` in a dialog, and the `/usage` totals, also
   stay as they are. These last until you exit lagent.
@@ -1951,7 +1953,7 @@ are only reported.
 - If you answer `y`, the new content is recorded as trusted.
 - If you answer `N`, that file is not loaded this time. It asks again at the
   next start.
-- Where it cannot ask, such as a one-shot run or `/mcp reload`, a
+- Where it cannot ask, such as a one-shot run, `/clear` or `/mcp reload`, a
   changed file is not loaded and you are told so.
 
 To update the record after editing a file yourself, without waiting to be
@@ -2278,7 +2280,10 @@ each skill. The body is loaded when the skill is used.
 ```
 
 `/skills` shows the list of installed skills, and where they are kept. A skill
-installed partway through a session can be used from the next start.
+put into `~/.config/lagent/skills/` partway through a session can be used after
+`/clear`, or after a restart. A skill added to the project can be used once you
+restart and answer `y` to the question
+([11.3](#113-asked-again-when-content-changes)).
 
 ### 13.3 Put procedures you want followed in a skill
 
@@ -3192,7 +3197,7 @@ values, write them in that server's `env` in `mcp.json`.
 
 | Symptom | Cause and fix |
 |---|---|
-| You fixed an instruction file but it has no effect | Instruction files are loaded at startup. `/clear` does not read them again, so start lagent again |
+| You fixed an instruction file but it has no effect | Instruction files are loaded at startup and at `/clear`. When you edited one of the project's instruction files outside lagent, `/clear` does not load it and tells you so. Start lagent again and answer `y` to the question ([11.3](#113-asked-again-when-content-changes)) |
 | The project's `AGENTS.md` is not loaded | Look at the state with `lagent trust`. Either it is not trusted, or its content changed after you trusted it ([chapter 11](#11-project-instruction-files-and-trust)) |
 | A rule written in an instruction file is not kept | Local models tend to overlook the rules in a long instruction file. Put a short pointer in memory ([8.6](#86-memory)), or turn the procedure into a skill ([13.3](#133-put-procedures-you-want-followed-in-a-skill)) |
 | `"never"` in `.lagent.toml` has no effect | That project has to be listed in `[approval].trusted_projects` ([11.4](#114-projects-trusted-without-asking)) |

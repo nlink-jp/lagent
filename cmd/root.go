@@ -595,7 +595,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// --- skills (ADR-0011): Claude Code's format from lagent's own
 	// global directory and the trusted project's .claude/skills ---
 	skillsList, skillNotes := discoverSkills(projectDir, grant)
-	defer skills.CloseAll(skillsList)
+	defer func() { skills.CloseAll(skillsList) }() // reads the variable: /clear replaces it
 	for _, n := range skillNotes {
 		fmt.Fprintf(stderr, "warning: skills: %s\n", n)
 	}
@@ -1323,14 +1323,17 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		watch.report("clear", func(kind string, data any) error { return curLog.Log(kind, data) })
 		ag.Restart(newLog)
 		// The new session re-checks the pins: a file that changed during
-		// the old one is left out, and the system prompt is composed
-		// from what the grant allows.
-		var pinNotes []string
+		// the old one is left out, and the system prompt and the skill
+		// list are rebuilt from what the grant allows. Unchanged files
+		// give the same prompt bytes, so the server's prefix cache
+		// survives the clear (ADR-0003); the skill catalog rides the
+		// facts message announced below.
+		var pinNotes, regrantNotes []string
 		grant.excluded, pinNotes = checkPins(cfg, policyFile, policyPath, projectDir, projectTrusted, false, nil, io.Discard, msgs)
 		notes = append(notes, pinNotes...)
-		projectContext, contextLabels, contextNotes = loadInstructions(projectDir, grant)
-		_ = contextLabels
-		notes = append(notes, contextNotes...)
+		projectContext, skillsList, regrantNotes = regrant(projectDir, grant, skillsList)
+		ag.SetSystem(composeSystem())
+		notes = append(notes, regrantNotes...)
 		if curLog != nil {
 			_ = curLog.Close()
 		}

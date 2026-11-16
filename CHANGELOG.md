@@ -15,6 +15,24 @@
   safety model does and does not cover, and appendices for looking a name
   up. No behaviour changes.
 
+### Fixed
+
+- **`/clear` now applies the instruction files and skills it re-reads.**
+  It re-checked the trusted files and re-read the instruction files, then
+  went on with the system prompt built at startup, and it never looked
+  for skills again. So an instruction file you edited took effect only
+  after a restart; a project file reported as "changed since you trusted
+  it — not loaded" stayed in the prompt with its old content; and a skill
+  installed during the session was not offered until the next start. The
+  new session is now built from what is on disk and what the trust record
+  allows: your own instruction files and skills are picked up, and a
+  project file that changed outside lagent is really left out until you
+  restart and accept it. When nothing changed the system prompt is the
+  same bytes as before, so the LLM server's cache still carries over a
+  `/clear`. Checked on a real session: the request after `/clear` carried
+  the operator's edited file and the new skill, and no longer the project
+  file that had changed.
+
 ## [0.27.3] - 2026-11-14
 
 ### Security

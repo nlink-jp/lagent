@@ -451,6 +451,19 @@ answers.
   is the one tool whose results are sent unwrapped;
   `internal/archtest` pins `InstructionTools` to that one name, and a
   second exemption needs its own ADR.
+- **`/clear` applies what it re-reads.** After re-checking the pins it
+  calls `regrant` (cmd/skills.go) — instruction files and skills as the
+  grant allows them now — then `ag.SetSystem(composeSystem())`, and the
+  facts message announced later carries the new skill catalog. The
+  port once dropped the `SetSystem` call with `rotateWorkDir`'s callback
+  (ADR-0003 moved the work directory out of the prompt, and that
+  callback was also what applied the re-read files), so `/clear` printed
+  "not loaded" and kept the startup prompt. No behavioural test reaches
+  that closure; `TestClearAppliesWhatItReread` pins the call site.
+  Unchanged files must give the same bytes, or every `/clear` pays the
+  cold prefix again. The pins `/clear` checks against are the ones this
+  process holds: a `lagent trust --accept` run elsewhere is not seen
+  until the next start.
 - **Pre-tool hooks are a floor, and their contract is measured, not
   documented** (ADR-0012) — `internal/hooks` denies on Claude Code's real
   stdout-JSON and exit-2 forms and fails open on everything else, with
