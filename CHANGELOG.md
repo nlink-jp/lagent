@@ -41,9 +41,11 @@
   Every comparison now reads the record from the policy file as it is at
   that moment — at `/clear`, at `/mcp reload`, in the note after a `!`
   command, and before an approved edit of a trusted file is recorded. If
-  the policy file is missing or cannot be read, the session keeps
-  comparing with what it last read, so a changed file is still left out
-  rather than loaded; an unreadable file is reported. Checked on a real
+  the policy file is missing, cannot be read, or no longer holds the
+  record this session has for the project, the session keeps comparing
+  with what it last read, so a changed file is still left out rather
+  than loaded, and the last two cases are reported. `.lagent.toml` is the
+  exception to the reload: it is read once, at startup. Checked on a real
   session: after `trust --accept` elsewhere, the notices stopped and
   `/clear` loaded the file.
 

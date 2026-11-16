@@ -881,7 +881,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		ClipboardImage: clipboardImage,
 		BeforeOperatorWrite: func(tc llm.ToolCall) {
 			if name := pinNameForWrite(projectDir, tc); name != "" {
-				writes.begin(tc, name, pinIsCurrent(policyFile, policyPath, projectDir, name))
+				writes.begin(tc, name, repinnable(policyFile, policyPath, projectDir, name, grant.excluded))
 			}
 		},
 		OnOperatorWrite: func(tc llm.ToolCall) {

@@ -279,6 +279,9 @@ left out; nothing mid-session can ask, so re-trusting it takes
 Each comparison reads the trust record from the policy file as it is at
 that moment, not from the copy the process read when it started, which
 is why an `--accept` made in another terminal reaches a running session.
+A record that has lost the project's pins is not taken as the record,
+so a comparison can leave a changed file out but never load one.
+`.lagent.toml` is read once, at startup.
 
 ## Memory
 
