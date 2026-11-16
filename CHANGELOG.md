@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.27.4] - 2026-11-17
+
 ### Added
 
 - **A user manual** (`docs/en/manual.md`, `docs/ja/manual.ja.md`). The
@@ -45,7 +47,9 @@
   record this session has for the project, the session keeps comparing
   with what it last read, so a changed file is still left out rather
   than loaded, and the last two cases are reported. `.lagent.toml` is the
-  exception to the reload: it is read once, at startup.
+  exception to the reload: it is read once, at startup. Checked on a real
+  session: after `trust --accept` elsewhere, the notices stopped and
+  `/clear` loaded the file.
 - **A `/settings` change no longer makes a session forget the project's
   trusted files.** Every policy write replaced the session's copy of the
   trust record with the file. If the policy file had been deleted while
@@ -53,9 +57,7 @@
   copy followed, and from then on `/clear` and the reloads treated the
   project as never pinned and loaded files that had changed. The
   session now keeps the record it holds when the file has none. Found
-  by the review of this release; earlier versions had it. Checked on a real
-  session: after `trust --accept` elsewhere, the notices stopped and
-  `/clear` loaded the file.
+  by the review of this release; earlier versions had it.
 
 ## [0.27.3] - 2026-11-14
 
