@@ -276,7 +276,7 @@ In a session:
 | `/usage` | token statement for this session |
 | `/version` | the version line |
 | `/compact` | summarise the older part of the conversation now; the recent messages stay verbatim (ADR-0033) |
-| `/clear` | start a new conversation in the same session |
+| `/clear` | start a new session: a new conversation, session id, transcript and work directory; the old session stays resumable |
 | `/quit` | leave (`/exit` is the same) |
 
 | Flag | Meaning |
