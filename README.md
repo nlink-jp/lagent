@@ -24,6 +24,11 @@ approval), the same drop-in reading of a project's AGENTS.md / CLAUDE.md /
 
 Japanese: [README.ja.md](README.ja.md)
 
+**[The user manual](docs/en/manual.md)** is the place to learn the tool — one
+book in reading order, from installation through daily use, configuration,
+tuning the LLM server and the model, and the safety model. This README is the
+overview and the gist of each feature.
+
 ## Requirements
 
 - macOS on Apple silicon (isolation is built on `sandbox-exec`). There is
@@ -252,6 +257,8 @@ make check      # vet + lint + test + docs mirror + release gate + build
 
 ## Documentation
 
+- [docs/en/manual.md](docs/en/manual.md) — the user manual (the one book for
+  people who use the tool)
 - [docs/en/INDEX.md](docs/en/INDEX.md) — specification (RFP), reference,
   ADRs
 

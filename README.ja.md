@@ -22,6 +22,10 @@ skills をそのまま読む drop-in 互換、同じセッション記録。
 
 English: [README.md](README.md)
 
+使い方は **[取扱説明書](docs/ja/manual.ja.md)** にまとめてある — 導入から
+日々の操作、設定、LLM サーバーとモデルの整え方、安全の仕組みまでを順に
+読める 1 冊。この README は概要と、各機能の要点。
+
 ## 動作要件
 
 - Apple silicon の macOS（隔離は `sandbox-exec` に基づく）。Linux 版はなく、
@@ -228,6 +232,7 @@ make check      # vet + lint + test + docs ミラー + リリースゲート + b
 
 ## ドキュメント
 
+- [docs/ja/manual.ja.md](docs/ja/manual.ja.md) — 取扱説明書（使う人のための 1 冊）
 - [docs/ja/INDEX.ja.md](docs/ja/INDEX.ja.md) — 仕様（RFP）、リファレンス、ADR
 
 ## ライセンス

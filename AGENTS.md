@@ -14,6 +14,13 @@ change goes through the org's breaking-change process.
 - **Series:** cli-series (local path `cli-series/lagent`; lab-series until ADR-0023)
 - **Spec:** `docs/en/lagent-rfp.md` / `docs/ja/lagent-rfp.ja.md` (canonical)
 - **Docs entry point:** `docs/en/INDEX.md` / `docs/ja/INDEX.ja.md`
+- **User manual:** `docs/en/manual.md` / `docs/ja/manual.ja.md` — the one
+  document written for operators. A change to anything an operator sees or
+  does (a flag, key, default, limit, command, key binding, dialog, notice,
+  file location) updates the chapter that explains it **and** the appendix
+  table that lists it, in the same commit. About half of its sections are
+  shared word for word with gem-agent's manual: fix a shared section in
+  both.
 
 ## The sibling runtime
 
@@ -285,7 +292,7 @@ bench/             the task bench (ADR-0006): runner + report (package main), co
                    _results/ is ignored by git (and by go's ./..., which is why the underscore)
 scripts/           codesign-darwin.sh / notarize-darwin.sh (org templates, verbatim),
                    docs-mirror-check.sh, verify-release-selftest.sh (make check)
-docs/en/, docs/ja/ INDEX + reference/ + adr/ + the RFP (en: no suffix; ja: .ja.md)
+docs/en/, docs/ja/ INDEX + manual + reference/ + adr/ + the RFP (en: no suffix; ja: .ja.md)
 ```
 
 Every package under internal/ that came from gem-agent says so in its
