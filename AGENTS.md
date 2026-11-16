@@ -461,9 +461,20 @@ answers.
   "not loaded" and kept the startup prompt. No behavioural test reaches
   that closure; `TestClearAppliesWhatItReread` pins the call site.
   Unchanged files must give the same bytes, or every `/clear` pays the
-  cold prefix again. The pins `/clear` checks against are the ones this
-  process holds: a `lagent trust --accept` run elsewhere is not seen
-  until the next start.
+  cold prefix again.
+- **A pin is compared with the policy file as it is at that moment,
+  never with the copy read at startup** (`recordedPolicy`, cmd/pins.go).
+  The session's copy follows the file only when this process writes it,
+  so `/clear`, `/mcp reload`, the note after a `!` command and the
+  check before an approved write all answered "changed" for a file the
+  operator had re-trusted with `lagent trust --accept` in another
+  terminal — the very thing the notice tells them to run. It is the
+  read side of what `MutatePolicyFile` closed for writes. The read does
+  not replace the session's copy (other goroutines read it), and a file
+  that is gone or does not parse leaves that copy as the record: the
+  comparison may leave a changed file out, never load one.
+  `TestNoPinIsComparedWithTheStartupCopy` keeps a new reader from
+  going back to `policyFile.PinsFor`. gem-agent has the same fix.
 - **Pre-tool hooks are a floor, and their contract is measured, not
   documented** (ADR-0012) — `internal/hooks` denies on Claude Code's real
   stdout-JSON and exit-2 forms and fails open on everything else, with

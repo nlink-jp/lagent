@@ -1975,6 +1975,10 @@ trusted files: 1 recorded (2026-11-16T15:08:19Z)
 this command to make trusted a project for which you have not yet answered the
 trust question.
 
+When a session is running, run `lagent trust --accept` in another terminal and
+then type `/clear` in that session. The new content is loaded without a
+restart.
+
 When you approve the model editing an instruction file inside lagent, the
 record for that one file is updated automatically.
 
@@ -2282,7 +2286,7 @@ each skill. The body is loaded when the skill is used.
 `/skills` shows the list of installed skills, and where they are kept. A skill
 put into `~/.config/lagent/skills/` partway through a session can be used after
 `/clear`, or after a restart. A skill added to the project can be used once you
-restart and answer `y` to the question
+have updated the trust record
 ([11.3](#113-asked-again-when-content-changes)).
 
 ### 13.3 Put procedures you want followed in a skill
@@ -3197,7 +3201,7 @@ values, write them in that server's `env` in `mcp.json`.
 
 | Symptom | Cause and fix |
 |---|---|
-| You fixed an instruction file but it has no effect | Instruction files are loaded at startup and at `/clear`. When you edited one of the project's instruction files outside lagent, `/clear` does not load it and tells you so. Start lagent again and answer `y` to the question ([11.3](#113-asked-again-when-content-changes)) |
+| You fixed an instruction file but it has no effect | Instruction files are loaded at startup and at `/clear`. When you edited one of the project's instruction files outside lagent, `/clear` does not load it and tells you so. Run `lagent trust --accept` in another terminal and type `/clear` once more. Starting lagent again and answering `y` to the question works too ([11.3](#113-asked-again-when-content-changes)) |
 | The project's `AGENTS.md` is not loaded | Look at the state with `lagent trust`. Either it is not trusted, or its content changed after you trusted it ([chapter 11](#11-project-instruction-files-and-trust)) |
 | A rule written in an instruction file is not kept | Local models tend to overlook the rules in a long instruction file. Put a short pointer in memory ([8.6](#86-memory)), or turn the procedure into a skill ([13.3](#133-put-procedures-you-want-followed-in-a-skill)) |
 | `"never"` in `.lagent.toml` has no effect | That project has to be listed in `[approval].trusted_projects` ([11.4](#114-projects-trusted-without-asking)) |

@@ -274,8 +274,11 @@ from the instruction files the grant still allows, and the skill list
 the next facts message names is discovered afresh. Files that did not
 change give the same prompt bytes, so the server's cache survives the
 clear (ADR-0003). A project file that changed since it was trusted is
-left out; nothing mid-session can ask, so re-trusting it takes an
-interactive start.
+left out; nothing mid-session can ask, so re-trusting it takes
+`lagent trust --accept` and another `/clear`, or an interactive start.
+Each comparison reads the trust record from the policy file as it is at
+that moment, not from the copy the process read when it started, which
+is why an `--accept` made in another terminal reaches a running session.
 
 ## Memory
 

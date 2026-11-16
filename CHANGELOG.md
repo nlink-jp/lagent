@@ -27,11 +27,25 @@
   new session is now built from what is on disk and what the trust record
   allows: your own instruction files and skills are picked up, and a
   project file that changed outside lagent is really left out until you
-  restart and accept it. When nothing changed the system prompt is the
+  re-trust it. When nothing changed the system prompt is the
   same bytes as before, so the LLM server's cache still carries over a
   `/clear`. Checked on a real session: the request after `/clear` carried
   the operator's edited file and the new skill, and no longer the project
   file that had changed.
+- **`lagent trust --accept` in another terminal now reaches a running
+  session.** When a project file changes outside lagent, `/clear` leaves
+  it out and says to re-trust it with `lagent trust --accept`. Doing that
+  changed nothing for the session that said it: it compared the file with
+  the copy of the trust record it had read at startup, so the next
+  `/clear` printed the same notice, and only a restart loaded the file.
+  Every comparison now reads the record from the policy file as it is at
+  that moment — at `/clear`, at `/mcp reload`, in the note after a `!`
+  command, and before an approved edit of a trusted file is recorded. If
+  the policy file is missing or cannot be read, the session keeps
+  comparing with what it last read, so a changed file is still left out
+  rather than loaded; an unreadable file is reported. Checked on a real
+  session: after `trust --accept` elsewhere, the notices stopped and
+  `/clear` loaded the file.
 
 ## [0.27.3] - 2026-11-14
 
