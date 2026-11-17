@@ -2381,8 +2381,9 @@ Things to know:
   piped run the skill is not loaded, and you are told so. Record it again with
   `lagent trust --accept` and it can be loaded.
 - **If the content changes again while you are being asked, it asks once
-  more.** If it is still changing after that, the skill is not loaded this
-  time and you are told so. Use it again when the change has finished.
+  more.** If it is still changing after that, the skill is not loaded, you
+  are told so, and it does not ask again in that turn. Use it again when the
+  change has finished.
 - **To bring a disabled skill back in the same session,** run
   `lagent trust --accept` in another terminal, then `/clear`.
 - **A skill that cannot be checked is not loaded.** A skill with more than
