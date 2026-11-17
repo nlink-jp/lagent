@@ -23,7 +23,7 @@ func TestCmdToolsAreKeptWhole(t *testing.T) {
 	if err := registerMemoryTools(reg, memoryStore{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := registerSkillTool(reg, func() []skills.Skill { return nil }); err != nil {
+	if err := registerSkillTool(reg, func() []skills.Skill { return nil }, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := registerMCPLoadTool(reg, newMCPAdvertiser(false, nil, nil), func() {}); err != nil {

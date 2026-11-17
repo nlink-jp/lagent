@@ -602,7 +602,12 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// load_skill is registered whether or not any skill was found, so
 	// the tool set — and the cached prefix — does not depend on what the
 	// operator has installed.
-	if err := registerSkillTool(registry, func() []skills.Skill { return skillsList }); err != nil {
+	// skillTrust compares a project skill with the trust record each
+	// time it is used (ADR-0049). It needs the notice strip and the
+	// question dialog, which exist further down; the tool reads the
+	// variable when it runs, and it can only run inside a turn.
+	var skillTrust *skillGuard
+	if err := registerSkillTool(registry, func() []skills.Skill { return skillsList }, func() *skillGuard { return skillTrust }); err != nil {
 		return err
 	}
 	// --- memory (ADR-0013): two scopes under the state root; recall
@@ -820,6 +825,42 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	granter.notice = notice
 	for _, n := range tierNotes {
 		notice(n)
+	}
+	skillTrust = &skillGuard{
+		cfg: cfg, policyFile: policyFile, policyPath: policyPath, projectDir: projectDir,
+		trusted: projectTrusted, interactive: interactive, msgs: msgs, notice: notice,
+		// A skill the operator has just trusted is no longer one the
+		// session left out (ADR-0049 §4).
+		include: func(pin string) { delete(grant.excluded, pin) },
+		// The trust question (ADR-0049 §2–§3): the question dialog under
+		// the runtime's own heading on the TUI, a numbered prompt on the
+		// plain REPL. -1 is every way of not answering, an answer that
+		// arrives after the turn was interrupted included. The guard
+		// does not ask where nobody is at a terminal; a one-shot run
+		// answers -1 here as well.
+		ask: func(askCtx context.Context, heading, question string, options []string, def int) int {
+			if flagPrompt != "" || askCtx.Err() != nil {
+				return -1
+			}
+			var idx int
+			if prog != nil {
+				resp := make(chan int, 1)
+				prog.Send(tui.AskRequest{Heading: heading, Question: question, Options: options, Default: def, Resp: resp})
+				idx = <-resp
+			} else {
+				idx = plainTrustAsk(stdin, cmd.ErrOrStderr(), heading, question, options)
+			}
+			if askCtx.Err() != nil {
+				return -1
+			}
+			return idx
+		},
+		// Read at call time: /clear replaces the transcript.
+		log: func(kind string, data any) {
+			if curLog != nil {
+				_ = curLog.Log(kind, data)
+			}
+		},
 	}
 	// --- pre-tool hooks (ADR-0012): the operator's floor before the
 	// ladder. What a hook learns about the session: the transcript path
@@ -1333,6 +1374,9 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		notes = append(notes, pinNotes...)
 		projectContext, skillsList, regrantNotes = regrant(projectDir, grant, skillsList)
 		ag.SetSystem(composeSystem())
+		// The list was rebuilt: a "disable" answer about a skill in the
+		// old list is forgotten here, and only here (ADR-0049 §5).
+		skillTrust.forget()
 		notes = append(notes, regrantNotes...)
 		if curLog != nil {
 			_ = curLog.Close()
@@ -1549,8 +1593,13 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			Settings:        &settingsData,
 			ApplySetting:    settings.Apply,
 			RefreshSettings: settings.data,
+			// Parsed here, read later: this runs on the event loop,
+			// and reading a skill may have to ask the operator first
+			// (ADR-0049 §9). The line itself is the turn; StartTurn
+			// expands it.
 			ExpandInput: func(in string) (string, bool, string) {
-				return expandSkillInput(in, skillsList)
+				_, handled, errMsg := parseSkillInput(in, skillsList)
+				return in, handled, errMsg
 			},
 			Shell: func(shellCtx context.Context, command string) {
 				go func() {
@@ -1579,6 +1628,24 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			},
 			StartTurn: func(turnCtx context.Context, input string) {
 				go func() {
+					if _, isSkill, _ := parseSkillInput(input, skillsList); isSkill {
+						// /skill: the compare, the question and the read
+						// happen here, before any model call. A refused
+						// skill ends the turn; the operator has been told.
+						turn, _, errMsg := expandSkillInput(turnCtx, input, skillsList, skillTrust)
+						if errMsg != "" {
+							notice(errMsg)
+						}
+						if turn == "" {
+							var err error
+							if turnCtx.Err() != nil {
+								err = context.Canceled
+							}
+							prog.Send(tui.TurnDone{Err: err})
+							return
+						}
+						input = turn
+					}
 					announceGrant()
 					_, err := ag.Run(turnCtx, input, func(s string) { prog.Send(tui.TextDelta(s)) })
 					if err != nil && turnCtx.Err() != nil {
@@ -1679,10 +1746,13 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			}
 			continue
 		}
-		if turn, handled, errMsg := expandSkillInput(input, skillsList); handled {
+		if turn, handled, errMsg := expandSkillInput(ctx, input, skillsList, skillTrust); handled {
 			if errMsg != "" {
 				fmt.Fprintln(stderr, errMsg)
 				continue
+			}
+			if turn == "" {
+				continue // refused; the operator has been told (ADR-0049 §9)
 			}
 			runErr := runTurnWith(ctx, ladder, func(turnCtx context.Context) error {
 				announceGrant()

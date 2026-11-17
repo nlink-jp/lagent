@@ -202,6 +202,8 @@ cmd/               cobra root command, REPL loop, wiring, system prompt; `versio
                    `sessions`, `trust`, `workdirs` subcommands; ask_user, MCP intake,
                    the MCP advertiser and mcp_load (cmd/mcpload.go, ADR-0004); skill
                    discovery, load_skill, /skill and /skills (cmd/skills.go, ADR-0011);
+                   the compare-and-ask a project skill goes through when it is used
+                   (cmd/skilltrust.go, ADR-0049);
                    hook config → runner (cmd/hooks.go, ADR-0012); save_memory / delete_memory,
                    /memory, /remember, /forget (cmd/memory.go, ADR-0013);
                    added directories (ADR-0046): startup judgement (cmd/addeddirs.go),
@@ -462,6 +464,27 @@ answers.
   that closure; `TestClearAppliesWhatItReread` pins the call site.
   Unchanged files must give the same bytes, or every `/clear` pays the
   cold prefix again.
+- **A project skill is compared when it is USED, not only when it is
+  listed** (ADR-0049; cmd/skilltrust.go). The list is built at startup
+  and `/clear`; the body and files are read from disk on every
+  `load_skill` and `/skill`, and up to and including v0.27.4 nothing
+  compared them then — a skill rewritten mid-session reached the model
+  unwrapped (measured). Every read goes through `skillGuard`: a new read site
+  that calls `Body`/`File` directly brings the hole back, and
+  `TestSkillTrustIsWiredIn` enumerates the sites. The digest is
+  `trustpin.DigestRoot` over the skill's own open root — one
+  implementation for the pin and the comparison, held byte-equal to the
+  old path walk by a reference copy in the test, because every pin on
+  disk was taken with that walk. The question is the question dialog
+  under a runtime heading (`tui.AskRequest.Heading`), not the approval
+  gate: the gate would offer "allow for this session" and count an
+  interrupt as no. It opens on "not now". A tool reaches a dialog by
+  returning `tools.NeedsOperator`; the agent resolves it OUTSIDE
+  `runWithFloor` and re-runs the tool — never ask from inside `Run`.
+  Refusals to the model are constants plus the validated name
+  (`load_skill` results are unwrapped). `!` cannot run `lagent trust
+  --accept` from inside a session: the operator lane does not write the
+  config directory (measured), which is why the question exists.
 - **A pin is compared with the policy file as it is at that moment,
   never with the copy read at startup** (`recordedPolicy`, cmd/pins.go).
   The session's copy follows the file only when this process writes it,

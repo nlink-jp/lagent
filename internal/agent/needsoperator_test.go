@@ -85,7 +85,7 @@ func TestNeedsOperatorIsBounded(t *testing.T) {
 		return "", &probeQuestion{resolves: &resolves, again: true}
 	})
 	out, _, _, _ := a.execCall(context.Background(), credCall("probe", nil))
-	if out != "still unresolved" || resolves != operatorResolves || runs != operatorResolves+1 {
+	if out != "still unresolved" || resolves != tools.OperatorResolves || runs != tools.OperatorResolves+1 {
 		t.Errorf("out=%q resolves=%d runs=%d", out, resolves, runs)
 	}
 }

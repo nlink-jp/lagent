@@ -16,6 +16,11 @@ import "context"
 // and the result the model is given instead. The agent resolves at most
 // twice for one call; if the tool still reports the condition after
 // that, StillUnresolved is the result.
+// OperatorResolves bounds how often one call may put its question: the
+// question, and once more when what it was about moved while the
+// operator was answering.
+const OperatorResolves = 2
+
 type NeedsOperator interface {
 	error
 	Resolve(ctx context.Context) (retry context.Context, result string)

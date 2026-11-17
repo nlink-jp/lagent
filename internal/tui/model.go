@@ -2419,6 +2419,12 @@ func (m Model) updateAsk(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.phase = phaseRunning
 	m.status = m.msgs.StatusToolWait
 	req.Resp <- answer
+	if answer < 0 && req.Heading != "" {
+		// The runtime's own question, left unanswered: "denied" would
+		// say a decision was made. The asker's notice says what
+		// happens instead.
+		return m, nil
+	}
 	chosen := m.msgs.VerdictDenied
 	if answer >= 0 {
 		chosen = req.Options[answer]

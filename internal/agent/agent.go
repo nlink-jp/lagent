@@ -2012,11 +2012,6 @@ func (a *Agent) credentialRetry(ctx context.Context, tool *tools.Tool, tc llm.To
 	return out, state, err, false
 }
 
-// operatorResolves bounds how often one call may put its own question
-// to the operator (tools.NeedsOperator): the question, and once more
-// when what it was about moved while they were answering.
-const operatorResolves = 2
-
 // resolveOperatorQuestion handles a tool that reported it cannot go on
 // until the operator answers (tools.NeedsOperator, ADR-0049 §8). The
 // question is put here, outside runWithFloor — only the run is under the
@@ -2030,7 +2025,7 @@ func (a *Agent) resolveOperatorQuestion(ctx, runCtx context.Context, tool *tools
 		if state == floorAbandoned || !errors.As(err, &ask) {
 			return out, state, err
 		}
-		if resolved == operatorResolves {
+		if resolved == tools.OperatorResolves {
 			return ask.StillUnresolved(), state, nil
 		}
 		if ctx.Err() != nil {

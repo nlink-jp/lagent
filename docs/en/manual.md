@@ -1955,6 +1955,8 @@ are only reported.
   next start.
 - Where it cannot ask, such as a one-shot run, `/clear` or `/mcp reload`, a
   changed file is not loaded and you are told so.
+- A skill is compared when it is used, too. If it has changed, it asks then
+  and there ([13.5](#135-a-skill-that-changed-partway-through)).
 
 To update the record after editing a file yourself, without waiting to be
 asked, use the following commands.
@@ -2333,6 +2335,55 @@ Of the settings at the top of `SKILL.md`, lagent reads only `name`,
 specifies the tools that may be used. Approval is decided by lagent's own
 mechanism. When a script inside a skill is run as a command, too, the sandbox
 and approval apply to it the same as to any other command.
+
+### 13.5 A skill that changed partway through
+
+A project's skills are compared with the content you trusted, just like
+instruction files ([11.3](#113-asked-again-when-content-changes)). A skill is
+read from its files every time it is used, so it is compared **when it is
+used**, too. If a skill's content changes partway through a session — after a
+`git pull`, for example — then the next time the skill is about to be used,
+whether the model loads it or you type `/skill` yourself, lagent asks before
+loading it.
+
+```
+⚠ project trust — a skill is not what you trusted
+The skill greet has changed since you trusted it.
+Look at its files before you answer: "/Users/you/work/demo/.claude/skills/greet"
+Trust records this content as trusted — for later sessions too — and loads it.
+Disable keeps the skill off for the rest of this session.
+  1) Trust and load
+  2) Disable for this session
+▶ 3) Not now — ask again next time
+```
+
+| Answer | What happens |
+|---|---|
+| Trust and load | Records that one skill as trusted again and loads it. Later sessions do not ask |
+| Disable for this session | It is not loaded. For the rest of this session it is refused without asking, with a one-line notice each time |
+| Not now (Esc does the same) | It is not loaded this once. Nothing is recorded, and the next use asks again |
+
+Things to know:
+
+- **The dialog opens on "Not now".** Pressing Enter by mistake records
+  nothing and disables nothing.
+- **Only you answer it.** Neither auto-approve mode nor "allow for this
+  session" answers this question.
+- **Look at the content before you answer.** The dialog shows where the skill
+  is kept. The change is not necessarily yours.
+- **Where nobody is at the terminal, it does not ask.** In a one-shot run or a
+  piped run the skill is not loaded, and you are told so. Record it again with
+  `lagent trust --accept` and it can be loaded.
+- **If the content changes again while you are being asked, it asks once
+  more.** If it is still changing after that, the skill is not loaded this
+  time and you are told so. Use it again when the change has finished.
+- **To bring a disabled skill back in the same session,** run
+  `lagent trust --accept` in another terminal, then `/clear`.
+- **Only project skills are compared.** Your own skills in
+  `~/.config/lagent/skills/` are not.
+- **Scripts are separate.** If only a script of a skill changes after the
+  skill was loaded, running the script goes through the same sandbox and
+  approval as any other command.
 
 ## 14. Building in your own rules with hooks
 
@@ -3206,6 +3257,7 @@ values, write them in that server's `env` in `mcp.json`.
 | The project's `AGENTS.md` is not loaded | Look at the state with `lagent trust`. Either it is not trusted, or its content changed after you trusted it ([chapter 11](#11-project-instruction-files-and-trust)) |
 | A rule written in an instruction file is not kept | Local models tend to overlook the rules in a long instruction file. Put a short pointer in memory ([8.6](#86-memory)), or turn the procedure into a skill ([13.3](#133-put-procedures-you-want-followed-in-a-skill)) |
 | `"never"` in `.lagent.toml` has no effect | That project has to be listed in `[approval].trusted_projects` ([11.4](#114-projects-trusted-without-asking)) |
+| You were about to use a skill and were asked whether to trust it | The skill's content changed partway through the session. Look at the content in the place the dialog shows, then answer ([13.5](#135-a-skill-that-changed-partway-through)) |
 | A skill's script cannot be read, and it fails | Check whether it is a symbolic link to `~/.claude`, and change it to a copy ([13.1](#131-install-a-skill)) |
 | An MCP server does not connect | See [12.7](#127-when-something-is-wrong) |
 | The model does not try to use an MCP server's tools | The server may not be loaded. Load it with `/mcp load <server>`, or list it in `[mcp].preload` |

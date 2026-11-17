@@ -58,9 +58,14 @@ func TestAskHeadedQuestionUnanswered(t *testing.T) {
 			next, _ := m.Update(trustAsk(resp))
 			m = next.(Model)
 			m.askAt = time.Time{}
-			press(m, tea.KeyMsg{Type: key})
+			next, cmd := m.Update(tea.KeyMsg{Type: key})
 			if got := <-resp; got != -1 {
 				t.Errorf("%s = %d, want -1", name, got)
+			}
+			// Nothing is printed for it: "denied" would say the operator
+			// decided something. The asker's own notice follows.
+			if cmd != nil || next.(Model).phase != phaseRunning {
+				t.Errorf("%s: a verdict line was emitted for an unanswered question (phase %v)", name, next.(Model).phase)
 			}
 		})
 	}
