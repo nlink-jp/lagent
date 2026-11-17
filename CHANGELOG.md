@@ -23,6 +23,10 @@
   measured too and never waited. The configuration file you pass with
   `--config` is unchanged — a FIFO there still waits until it is
   written, which may be what you mean.
+- **A trace file is created, never opened over what is there.** With
+  `LAGENT_LLM_TRACE` set, each request's trace was opened to truncate,
+  and a FIFO under the name it would take held the request before it
+  was sent. A name already taken is now an error for that turn.
 
 ## [0.29.0] - 2026-11-17
 
