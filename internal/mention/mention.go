@@ -430,7 +430,7 @@ func openConfined(abs string, roots ...string) (*os.File, error) {
 		if dir == "" || !within(dir, abs) {
 			continue
 		}
-		root, err := os.OpenRoot(dir)
+		root, err := bounded.OpenRoot(dir)
 		if err != nil {
 			return nil, err
 		}

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/nlink-jp/lagent/internal/bounded"
 	"github.com/nlink-jp/lagent/internal/config"
 	"github.com/nlink-jp/lagent/internal/instructions"
 	"github.com/nlink-jp/lagent/internal/mcp"
@@ -214,7 +215,7 @@ func readLineUnbuffered(in io.Reader) string {
 const trustProbeCap = 1000
 
 func readDirBounded(dir string, n int) ([]os.DirEntry, bool, error) {
-	d, err := os.Open(dir)
+	d, err := bounded.OpenDir(dir)
 	if err != nil {
 		return nil, false, err
 	}

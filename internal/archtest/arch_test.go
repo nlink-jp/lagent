@@ -252,6 +252,32 @@ func TestReadsAreBounded(t *testing.T) {
 	})
 }
 
+// TestOpensDoNotWait: a plain open waits on a FIFO for as long as
+// nobody writes to it, os.OpenRoot opens plainly, and an open for
+// writing waits for a reader (ADR-0050 — measured at every open the
+// two sweeps found). An open of a name goes through internal/bounded,
+// which opens a directory as a directory and a file only when it is a
+// regular one; what is left is listed with why.
+func TestOpensDoNotWait(t *testing.T) {
+	calls := collectCalls(t, repoRoot(t), boundedPackages, []string{
+		"os.Open", "os.OpenRoot", "os.WriteFile", "toml.DecodeFile", ".Open", ".OpenRoot",
+	})
+	var kept []call
+	for _, c := range calls {
+		if c.pkg == "internal/bounded" {
+			continue
+		}
+		kept = append(kept, c)
+	}
+	report(t, kept, map[string]string{
+		"cmd descriptorPathOf":               "`.` of a root that is already open",
+		"cmd fileSHA256":                     "lstat'd just before as a regular file of the size that was saved; ADR-0020 and ADR-0021 cite this file by line",
+		"internal/config LoadWithOverrides":  "the operator's own configuration, named with --config: a FIFO or a process substitution there may be meant (ADR-0050 §5, undecided)",
+		"internal/sandbox verifyAddedRoot":   "probe files inside a directory just made under a random name",
+		"internal/trustpin manifestWalk.dir": "`.` of the directory held open, and a sub-directory by name after its listed kind: Root.OpenRoot takes no flags (the residual in ADR-0050)",
+	})
+}
+
 // TestOneDecisionPoint: the rule tier is consulted in exactly one
 // function of the agent, and every gate reads that function's result
 // (gem-agent ADR-0072 §1.1, §4.5, §4.9 — three re-implementations of the floors,

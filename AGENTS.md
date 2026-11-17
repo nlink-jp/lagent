@@ -234,7 +234,8 @@ internal/inert/    the one predicate that makes outside text inert for a termina
                    streams, terminal only)
 internal/bounded/  the one place a read, listing or process output is capped —
                    every primitive returns the `more` fact
-internal/archtest/ AST tests pinning confined opens, bounded reads and the
+internal/archtest/ AST tests pinning confined opens, bounded reads, opens that
+                   cannot wait on a FIFO (ADR-0050) and the
                    single decision point
 internal/mcp/      .mcp.json parsing + stdio JSON-RPC client (kill-and-respawn)
 internal/mcpfilter/ the one predicate behind `[mcp] exclude`
@@ -486,7 +487,18 @@ answers.
   files, `.mcp.json`, the project config) is opened with
   `bounded.OpenRegular` — the kind is looked at before the open, regular
   files only — because a FIFO of that name held the read, and startup,
-  until somebody wrote to it. On the caps: the review showed `SKILL.md` itself could be
+  until somebody wrote to it. The same holds for every other open of a
+  name (ADR-0050): a directory that is listed is opened with
+  `bounded.OpenDir` (`O_DIRECTORY` — the kernel refuses a FIFO at the
+  open), a root with `bounded.OpenRoot`, a file under a fixed name with
+  `bounded.OpenRegularPath`, and one written under a fixed name with
+  `bounded.WriteFile` — the write lane can leave a FIFO where the work
+  directory, an added directory or the project directory was, and the
+  state files are held to the same rule. `TestOpensDoNotWait`
+  (`internal/archtest`) fails on a plain `os.Open`, `os.OpenRoot`,
+  `os.WriteFile` or `toml.DecodeFile` outside `internal/bounded`; the
+  operator's own `--config` is on its list, undecided.
+  On the caps: the review showed `SKILL.md` itself could be
   the uncovered part. The digest is
   `trustpin.DigestRoot` over the skill's own open root — one
   implementation for the pin and the comparison, held byte-equal to the
