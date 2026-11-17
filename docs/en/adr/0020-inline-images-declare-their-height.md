@@ -36,14 +36,14 @@ server saved is, on this surface, a path in a line of text.
 
 ### What the counter can and cannot see
 
-`emit` ([model.go:999](../../../internal/tui/model.go)) prints one line into
+`emit` ([model.go:1002](../../../internal/tui/model.go)) prints one line into
 scrollback and counts its physical rows; the bottom pinning rests on that
 count. Measured against `charmbracelet/x/ansi` v0.11.6 — the version
 `go.mod:11` pins, the same one gem-agent pins — `ansi.StringWidth` returns
 **0** and `ansi.Strip` the empty string for an iTerm2 `OSC 1337 File=`, a
 kitty `APC _G` and a sixel `DCS q` alike, and `ansi.Hardwrap` leaves all
 three byte-identical, so `wrapForScrollback`
-([model.go:1259](../../../internal/tui/model.go)) shears nothing.
+([model.go:1262](../../../internal/tui/model.go)) shears nothing.
 
 The counter is not blind, though. `physicalRows`
 ([model.go:1269](../../../internal/tui/model.go)) starts at `rows, cells :=
@@ -249,7 +249,7 @@ the sentence standing alone, which by the rule in it makes the claim "as of
 today"; the test was written afterwards, and the sentence now describes what
 exists rather than what was intended. This does not close the existing surface:
 `ansi.Strip` is called at one site in non-test code
-([model.go:1277](../../../internal/tui/model.go)), inside `physicalRows`, to
+([model.go:1280](../../../internal/tui/model.go)), inside `physicalRows`, to
 *measure* — so raw escapes from shell output already reach the terminal.
 Pre-existing, not widened here, not repaired here.
 
