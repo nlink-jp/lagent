@@ -471,7 +471,14 @@ answers.
   compared them then — a skill rewritten mid-session reached the model
   unwrapped (measured). Every read goes through `skillGuard`: a new read site
   that calls `Body`/`File` directly brings the hole back, and
-  `TestSkillTrustIsWiredIn` enumerates the sites. The digest is
+  `TestSkillTrustIsWiredIn` enumerates the sites across cmd. A compare
+  before the read is not enough: the read is held to the MANIFEST of the
+  digest that matched (`skills.Verify`, `trustpin.Manifest.Line`), so
+  only bytes that tree holds for that file are returned. And nothing a
+  pin does not cover is served — `skills.ReadCap` equals
+  `trustpin.FileCap` (a test holds it), and a skill whose digest was cut
+  at 2,000 files is refused: the review showed `SKILL.md` itself could be
+  the uncovered part. The digest is
   `trustpin.DigestRoot` over the skill's own open root — one
   implementation for the pin and the comparison, held byte-equal to the
   old path walk by a reference copy in the test, because every pin on

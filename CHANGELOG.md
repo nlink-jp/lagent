@@ -12,18 +12,31 @@
   session started — by a `git pull`, or by a write to a directory the
   skill links to — reached the model as your own instructions, through
   `/skill` and through the model's own `load_skill` (measured on
-  v0.27.4). Every use now compares first, and once more after the read,
-  so a change that lands in between is not returned either. When the
-  skill is not what you trusted, lagent asks before loading it: **trust**
-  records that one
+  v0.27.4). Every use now compares first, and what is returned is held
+  to what was compared: the bytes read for a file are returned only if
+  they are the bytes the trusted skill holds for that file, so a change
+  that lands between the compare and the read is not returned either.
+  When the skill is not what you trusted, lagent asks before loading it:
+  **trust** records that one
   skill again and loads it, **disable** keeps it off for the rest of the
   session, and **not now** — where the dialog opens, and what Esc does —
-  loads nothing this once and changes nothing. Auto-approve and "allow
-  for this session" do not answer it. In a one-shot or piped run nothing
+  loads nothing, changes nothing, and is not asked again until your
+  next message. One answer records lasting trust, so it takes a
+  deliberate key: a digit only moves the selection and Enter confirms
+  (on the plain screen, the word `trust` or `disable`). Auto-approve and
+  "allow for this session" do not answer it. In a one-shot or piped run nothing
   is asked and the skill is not loaded. If the content changes again
   while you are answering, it asks once more and then stops. Checked on
   a real session: each of the three answers, Esc, and the model's
   `load_skill` on a disabled skill.
+- **Nothing a trust record does not cover is served from a skill.** A
+  record covers a file's bytes up to 1 MiB and a skill's first 2,000
+  files. A `SKILL.md` over 1 MiB could keep its body past that megabyte,
+  and a skill with more than 2,000 files could have `SKILL.md` among the
+  uncovered ones; in both cases the instructions could change without
+  the record noticing (found by the review of this release, and present
+  in earlier versions). A `SKILL.md` over 1 MiB is now not a skill, and a
+  project skill with more than 2,000 files is not loaded, with a notice.
 - **A skill directory whose name, or the path it resolves to, holds a
   control or format character is not listed.** The name a skill declares
   was always validated; its directory was not, and the new question

@@ -323,14 +323,18 @@ type Messages struct {
 	SkillTrustOptTrust      string
 	SkillTrustOptDisable    string
 	SkillTrustOptLater      string
-	SkillTrustedFmt         string // recorded and loaded
-	SkillDisabledFmt        string // disabled for the session; also on each later use
-	SkillLaterFmt           string // not answered: not loaded this once
-	SkillChangingFmt        string // moved again while being answered
-	SkillUnattendedFmt      string // nobody at a terminal
-	SkillGoneFmt            string // the directory is gone
-	PersistentSinceLastFmt  string // %s = comma list — changed since the previous session
-	PersistentSessionFmt    string // %s = comma list — added/changed by this session
+	// SkillTrustHint replaces the question dialog's hint for this
+	// question: a digit selects, and only Enter confirms.
+	SkillTrustHint         string
+	SkillTrustedFmt        string // recorded
+	SkillDisabledFmt       string // disabled for the session; also on each later use
+	SkillLaterFmt          string // not answered: not loaded, not asked again this turn
+	SkillUncoveredFmt      string // more files than a pin covers
+	SkillChangingFmt       string // moved again while being answered
+	SkillUnattendedFmt     string // nobody at a terminal
+	SkillGoneFmt           string // the directory is gone
+	PersistentSinceLastFmt string // %s = comma list — changed since the previous session
+	PersistentSessionFmt   string // %s = comma list — added/changed by this session
 	// The same report for a write root the operator added (ADR-0046):
 	// %s = the directory, %s = comma list.
 	AddedPersistentSinceLastFmt string
@@ -554,10 +558,12 @@ keys:
 	SkillTrustExplain:           "Trust records this content as trusted — for later sessions too — and loads it. Disable keeps the skill off for the rest of this session.",
 	SkillTrustOptTrust:          "Trust and load",
 	SkillTrustOptDisable:        "Disable for this session",
-	SkillTrustOptLater:          "Not now — ask again next time",
-	SkillTrustedFmt:             "project trust: skill %s re-trusted",
+	SkillTrustOptLater:          "Not now — ask again after my next message",
+	SkillTrustHint:              "↑↓/Tab or 1-3 select · Enter confirm · Esc leaves it undecided",
+	SkillTrustedFmt:             "project trust: skill %s trusted",
 	SkillDisabledFmt:            "project trust: skill %s is disabled for this session — not loaded; `lagent trust --accept` in another terminal, then /clear, brings it back",
-	SkillLaterFmt:               "project trust: skill %s not loaded this time — its next use asks again",
+	SkillLaterFmt:               "project trust: skill %s not loaded — using it after your next message asks again",
+	SkillUncoveredFmt:           "project trust: skill %s holds more files than the trust check covers (2,000) — not loaded",
 	SkillChangingFmt:            "project trust: skill %s is still changing — not loaded; use it again when the change has finished",
 	SkillUnattendedFmt:          "project trust: skill %s is not what you trusted — not loaded; re-trust with `lagent trust --accept`",
 	SkillGoneFmt:                "project trust: skill %s — its directory is gone; /clear lists the skills again",
@@ -764,10 +770,12 @@ var ja = Messages{
 	SkillTrustExplain:           "信用する: この内容を信用済みとして記録し（以後のセッションにも有効）、読み込みます。無効にする: このセッションの間、このスキルを使いません。",
 	SkillTrustOptTrust:          "信用して読み込む",
 	SkillTrustOptDisable:        "このセッションでは無効にする",
-	SkillTrustOptLater:          "今は決めない — 次に使うときにまた尋ねる",
-	SkillTrustedFmt:             "project trust: スキル %s を再信用しました",
+	SkillTrustOptLater:          "今は決めない — 次の発言の後で、また尋ねる",
+	SkillTrustHint:              "↑↓/Tab・1-3 で選択 · Enter 決定 · Esc 今は決めない",
+	SkillTrustedFmt:             "project trust: スキル %s を信用しました",
 	SkillDisabledFmt:            "project trust: スキル %s はこのセッションでは無効です — 読み込みません。戻すには、別のターミナルで `lagent trust --accept` を実行してから /clear",
-	SkillLaterFmt:               "project trust: スキル %s は今回は読み込みません — 次に使うときにまた尋ねます",
+	SkillLaterFmt:               "project trust: スキル %s は読み込みません — 次の発言の後で使うときに、また尋ねます",
+	SkillUncoveredFmt:           "project trust: スキル %s は、信用の確認が見られる数（2,000）を超えるファイルを持っています — 読み込みません",
 	SkillChangingFmt:            "project trust: スキル %s はまだ変わり続けています — 読み込みません。変更が終わってから使い直してください",
 	SkillUnattendedFmt:          "project trust: スキル %s は信用した内容と違います — 読み込みません。`lagent trust --accept` で再信用",
 	SkillGoneFmt:                "project trust: スキル %s のディレクトリがありません — /clear でスキルの一覧を作り直します",
