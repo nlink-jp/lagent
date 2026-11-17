@@ -171,13 +171,18 @@ func (e *ChangedError) Error() string {
 	return "skill " + e.Name + " differs from its trusted record"
 }
 
-// unsafeEntry reports a directory entry name that could write into a
-// dialog or a note that shows it: a control character (a line break
-// above all) or a format character such as a bidirectional override.
-// The name a skill declares is validated by namePattern; the directory
-// entry is not, and it is the entry that the trust question shows
-// (ADR-0049 §11).
+// unsafeEntry reports a name or path that could write into a dialog or
+// a note that shows it: a control character (a line break above all), a
+// format character such as a bidirectional override, or bytes that are
+// not text at all. The name a skill declares is validated by
+// namePattern; its directory is not, and the trust question shows the
+// directory (ADR-0049 §11). Both spellings are checked: the entry under
+// the skills root, and the path it resolves to — an entry with a plain
+// name may be a link to a directory that has neither.
 func unsafeEntry(name string) bool {
+	if !utf8.ValidString(name) {
+		return true
+	}
 	for _, r := range name {
 		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			return true
@@ -243,7 +248,7 @@ func Discover(globalDir, projectDir string, lim Limits) ([]Skill, []string) {
 			if unsafeEntry(e.Name()) {
 				// Before anything is read from it, and quoted: the note
 				// must not carry the characters it is about.
-				notes = append(notes, fmt.Sprintf("skill directory %q skipped: its name holds a control or format character", e.Name()))
+				notes = append(notes, fmt.Sprintf("skill directory %q skipped: its name holds a control or format character, or is not valid text", e.Name()))
 				continue
 			}
 			dir := filepath.Join(root, e.Name())
@@ -304,6 +309,11 @@ func readSkill(dir, scope string, lim Limits) (*Skill, error) {
 	realDir, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		return nil, err
+	}
+	if unsafeEntry(realDir) {
+		// Dir is what the base-directory line and the trust question
+		// show. Quoted here too: the error becomes a note.
+		return nil, fmt.Errorf("it resolves to %q, which holds a control or format character", realDir)
 	}
 	// The root is opened first and SKILL.md read through it: the
 	// description enters the system prompt, and must come from inside
