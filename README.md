@@ -168,7 +168,10 @@ run, so give third-party text to `-p`.
   `~/.config/lagent/skills/<name>/` and a trusted project's
   `.claude/skills/<name>/`. One line per skill tells the model what
   each is for; it loads one with `load_skill`, and you invoke one by
-  hand with `/skill <name>` (ADR-0011). The description is listed up to
+  hand with `/skill <name>` (ADR-0011). A project skill is compared with
+  what you trusted every time it is used, and one that changed asks you —
+  trust, disable for the session, or not now — before it loads (ADR-0049).
+  The description is listed up to
   1,024 characters, Claude Code's limit — a longer one is cut with a note
   naming the skill — and a multi-line YAML value (`>`, `|`) is read whole
   (ADR-0040). A skill arrives as instructions;
