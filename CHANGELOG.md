@@ -12,8 +12,10 @@
   session started — by a `git pull`, or by a write to a directory the
   skill links to — reached the model as your own instructions, through
   `/skill` and through the model's own `load_skill` (measured on
-  v0.27.4). Every use now compares first. When the skill is not what you
-  trusted, lagent asks before loading it: **trust** records that one
+  v0.27.4). Every use now compares first, and once more after the read,
+  so a change that lands in between is not returned either. When the
+  skill is not what you trusted, lagent asks before loading it: **trust**
+  records that one
   skill again and loads it, **disable** keeps it off for the rest of the
   session, and **not now** — where the dialog opens, and what Esc does —
   loads nothing this once and changes nothing. Auto-approve and "allow

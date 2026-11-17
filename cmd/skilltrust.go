@@ -177,17 +177,35 @@ func skillTrustFrom(ctx context.Context, entry string) (string, bool) {
 // the fixed sentence for the model and nothing was read. An error that
 // is a *skillQuestion means the operator has to be asked first.
 //
+// Every read is bracketed: the directory is digested before it and
+// once more after it, and what was read is returned only when both
+// digests are the one the record holds. A check before the read alone
+// leaves the read itself open — content swapped in between would be
+// returned under the name of the content that was compared.
+//
 // With a trust answer in ctx the order is the one §4 fixes: the
 // directory is digested again and must still be what was asked about;
 // only then is that digest recorded; the read runs; and the directory
-// is digested once more, so content that moved during the read is not
-// returned as trusted.
+// is digested once more.
 func (g *skillGuard) attempt(ctx context.Context, s skills.Skill, load func() (string, error)) (out, refusal string, err error) {
 	state, digest := g.check(s)
-	switch state {
-	case skillCurrent:
+	if state == skillCurrent {
 		out, err = load()
-		return out, "", err
+		after, d := g.check(s)
+		if after == skillCurrent && d == digest {
+			return out, "", err
+		}
+		// It moved during the read. What was read is discarded — every
+		// return below names its own result — and the skill is handled
+		// as what it is now.
+		if after == skillCurrent {
+			// The record moved with it (a re-trust elsewhere, mid-read):
+			// what was read may be either content. Not this call.
+			return "", "", &skillQuestion{g: g, s: s, moved: true}
+		}
+		state, digest = after, d
+	}
+	switch state {
 	case skillDisabled:
 		g.event(s, "refused")
 		g.say(g.msgs.SkillDisabledFmt, s)

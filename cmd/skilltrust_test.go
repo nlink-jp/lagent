@@ -486,6 +486,59 @@ func TestContentThatMovesDuringTheReadIsNotReturned(t *testing.T) {
 	}
 }
 
+// §1: the ordinary read is bracketed too. A skill that is what the
+// record holds when it is compared, and something else by the time it
+// has been read, is not returned: the read is discarded and the skill is
+// handled as what it has become — a question where somebody can answer,
+// a refusal where nobody can.
+func TestAReadThatRacesAChangeIsNotReturned(t *testing.T) {
+	swap := func(r *guardRig) func() (string, error) {
+		return func() (string, error) {
+			r.write(skillV2) // lands after the compare
+			return r.s.Body(skills.DefaultLimits())
+		}
+	}
+	t.Run("nobody at a terminal", func(t *testing.T) {
+		r := newGuardRig(t)
+		r.g.interactive = false
+		out, refusal, err := r.g.attempt(context.Background(), r.s, swap(r))
+		if out != "" || err != nil || !strings.Contains(refusal, "nobody is at the terminal") {
+			t.Errorf("out=%q refusal=%q err=%v", out, refusal, err)
+		}
+	})
+	t.Run("somebody is there: it becomes the question", func(t *testing.T) {
+		r := newGuardRig(t)
+		out, refusal, err := r.g.attempt(context.Background(), r.s, swap(r))
+		var q *skillQuestion
+		if out != "" || refusal != "" || !errors.As(err, &q) || q.moved {
+			t.Fatalf("out=%q refusal=%q err=%v", out, refusal, err)
+		}
+		if _, now := r.g.check(r.s); q.digest != now {
+			t.Error("the question is not about the content that is there now")
+		}
+	})
+	t.Run("the read that did not race is returned", func(t *testing.T) {
+		r := newGuardRig(t)
+		out, refusal, err := r.g.attempt(context.Background(), r.s, func() (string, error) { return r.s.Body(skills.DefaultLimits()) })
+		if !strings.Contains(out, skillV1) || refusal != "" || err != nil {
+			t.Errorf("out=%q refusal=%q err=%v", out, refusal, err)
+		}
+	})
+	t.Run("the record moved with it", func(t *testing.T) {
+		r := newGuardRig(t)
+		out, _, err := r.g.attempt(context.Background(), r.s, func() (string, error) {
+			body, e := r.s.Body(skills.DefaultLimits())
+			r.write(skillV2)
+			acceptElsewhere(t, r.policyPath, r.proj) // a re-trust in another terminal, mid-read
+			return body, e
+		})
+		var q *skillQuestion
+		if out != "" || !errors.As(err, &q) || !q.moved {
+			t.Errorf("out=%q err=%v", out, err)
+		}
+	})
+}
+
 // §1: a directory that is gone is an error, not a question. The skill's
 // root still sees the tree it was opened on, so a directory replaced
 // under the same name is "gone" too, not silently the new one.
