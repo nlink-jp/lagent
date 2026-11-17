@@ -46,7 +46,7 @@ What changes the file mid-session is mostly the operator's own doing — a `! gi
 ## Consequences
 
 - "Compare before consuming" holds for skills at the moment of use. After a `git pull` that touches a skill, the first use asks once, in the session, and the operator answers with one key.
-- A read of a project skill costs one digest of its directory and one of the file it returns; a trust answer adds a digest (bound: 2,000 files of 1 MiB). To be measured on the largest installed skill.
+- A read of a project skill costs one digest of its directory and one of the file it returns; a trust answer adds a digest (bound: 2,000 files of 1 MiB). Measured on an Apple Silicon machine, APFS, warm cache: the installed skills (1 to 21 files, up to 126 KiB) take 0.1 to 2.7 ms per digest; a whole skill repository checked out as a skill, `.git` included (248 files, 1 MiB), takes 135 ms.
 - The agent gains a way for a tool to say it needs the operator; the question dialog gains a heading and an opening choice; `/skill` stops being a text expansion on the event loop and becomes a step of the turn; the pin's digest moves onto a root. The design review estimated more — a new method on every approval gate — before the existing question dialog was found to have the three outcomes already.
 - The question, its two labels, the hint and the notices go in the catalog in both languages. The refusals are model-facing and fixed.
 - ADR-0011 §5 stands: `/skill` spends no model round.
