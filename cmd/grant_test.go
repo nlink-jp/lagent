@@ -674,7 +674,9 @@ func TestEveryInteractiveTurnAnnouncesGrants(t *testing.T) {
 	lines := strings.Split(string(src), "\n")
 	runs := 0
 	for i, l := range lines {
-		if !strings.Contains(l, "ag.Run(turnCtx,") || strings.Contains(l, "flagPrompt") {
+		// -p's turn is the one that names the prompt flag (read through
+		// runFlags since ADR-0054).
+		if !strings.Contains(l, "ag.Run(turnCtx,") || strings.Contains(l, "flagPrompt") || strings.Contains(l, "fl.prompt") {
 			continue
 		}
 		runs++

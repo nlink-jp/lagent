@@ -61,27 +61,27 @@ func TestResolveAddedDirs(t *testing.T) {
 		t.Fatal(err)
 	}
 	withDirFlags(t, nil, []string{ref, sub})
-	_, _, err := resolveAddedDirs(cfg, project, "", "")
+	_, _, err := resolveAddedDirs(cfg, project, "", "", flagAddDir, flagReadDir)
 	if err == nil || !strings.Contains(err.Error(), "--read-dir") || !strings.Contains(err.Error(), "already covered") {
 		t.Fatalf("a read root inside a write root: %v", err)
 	}
 	// The same directory twice is one root; read then write is the write.
 	withDirFlags(t, []string{notes}, []string{ref})
-	if got, _, err := resolveAddedDirs(cfg, project, "", ""); err != nil || len(got) != 2 {
+	if got, _, err := resolveAddedDirs(cfg, project, "", "", flagAddDir, flagReadDir); err != nil || len(got) != 2 {
 		t.Errorf("a duplicate --add-dir: %v %+v", err, got)
 	}
 	upgrade := &config.Config{Directories: config.DirectoriesConfig{Read: []string{notes}}}
 	withDirFlags(t, []string{filepath.Join(notes, "..", "notes")}, nil)
-	if got, _, err := resolveAddedDirs(upgrade, project, "", ""); err != nil || len(got) != 1 || !got[0].Write || got[0].Source != "flag" {
+	if got, _, err := resolveAddedDirs(upgrade, project, "", "", flagAddDir, flagReadDir); err != nil || len(got) != 1 || !got[0].Write || got[0].Source != "flag" {
 		t.Errorf("a configured read root raised to write by flag: %v %+v", err, got)
 	}
 	// A write root may not hold the configuration file in use.
 	withDirFlags(t, []string{ref}, nil)
-	if _, _, err := resolveAddedDirs(&config.Config{}, project, "", filepath.Join(ref, "lagent.toml")); err == nil || !strings.Contains(err.Error(), "configuration file in use") {
+	if _, _, err := resolveAddedDirs(&config.Config{}, project, "", filepath.Join(ref, "lagent.toml"), flagAddDir, flagReadDir); err == nil || !strings.Contains(err.Error(), "configuration file in use") {
 		t.Errorf("--add-dir holding --config: %v", err)
 	}
 	withDirFlags(t, nil, []string{ref})
-	got, _, err := resolveAddedDirs(cfg, project, "", "")
+	got, _, err := resolveAddedDirs(cfg, project, "", "", flagAddDir, flagReadDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,11 +94,11 @@ func TestResolveAddedDirs(t *testing.T) {
 	}
 	home, _ := os.UserHomeDir()
 	withDirFlags(t, []string{home}, nil)
-	if _, _, err := resolveAddedDirs(&config.Config{}, project, "", ""); err == nil || !strings.Contains(err.Error(), "--add-dir") || !strings.Contains(err.Error(), "home directory") {
+	if _, _, err := resolveAddedDirs(&config.Config{}, project, "", "", flagAddDir, flagReadDir); err == nil || !strings.Contains(err.Error(), "--add-dir") || !strings.Contains(err.Error(), "home directory") {
 		t.Errorf("--add-dir ~: %v", err)
 	}
 	withDirFlags(t, nil, nil)
-	if got, _, err := resolveAddedDirs(&config.Config{}, project, "", ""); err != nil || len(got) != 0 {
+	if got, _, err := resolveAddedDirs(&config.Config{}, project, "", "", flagAddDir, flagReadDir); err != nil || len(got) != 0 {
 		t.Errorf("no added directories: %v %v", got, err)
 	}
 }
@@ -205,12 +205,12 @@ func TestConfiguredDirectoriesThatDoNotApplyAreSkipped(t *testing.T) {
 	gone := filepath.Join(filepath.Dir(project), "not-mounted")
 	withDirFlags(t, nil, nil)
 	cfg := &config.Config{Directories: config.DirectoriesConfig{Write: []string{filepath.Dir(project), project, gone}}}
-	got, skipped, err := resolveAddedDirs(cfg, sub, "", "")
+	got, skipped, err := resolveAddedDirs(cfg, sub, "", "", flagAddDir, flagReadDir)
 	if err != nil || len(got) != 0 || len(skipped) != 3 {
 		t.Fatalf("got %v skipped %v err %v", got, skipped, err)
 	}
 	withDirFlags(t, []string{gone}, nil)
-	if _, _, err := resolveAddedDirs(&config.Config{}, sub, "", ""); err == nil || !strings.Contains(err.Error(), "--add-dir") {
+	if _, _, err := resolveAddedDirs(&config.Config{}, sub, "", "", flagAddDir, flagReadDir); err == nil || !strings.Contains(err.Error(), "--add-dir") {
 		t.Errorf("a typed path that is not there must stop the start: %v", err)
 	}
 }

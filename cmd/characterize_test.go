@@ -43,7 +43,11 @@ const (
 	charScriptEnv = "LAGENT_CHARACTERIZE_SCRIPT"
 	charRecordEnv = "LAGENT_CHARACTERIZE_RECORD"
 	charArgsEnv   = "LAGENT_CHARACTERIZE_ARGS"
-	charVersion   = "v0.0.0-characterize"
+	// Not LAGENT_-prefixed: the /clear scenario prints the session's
+	// LAGENT_ environment, and the harness's own switch is not part of it.
+	charExitEnv = "CHARACTERIZE_LAGENT_EXIT"
+	charFailEnv = "LAGENT_CHARACTERIZE_MODEL_FAILS"
+	charVersion = "v0.0.0-characterize"
 )
 
 func TestMain(m *testing.M) {
@@ -68,7 +72,22 @@ func runCharacterizeChild() int {
 	}
 	rec := &scriptRecorder{path: os.Getenv(charRecordEnv)}
 	newModelClient = func(_ *config.Config, model string) (modelClient, error) {
+		if os.Getenv(charFailEnv) != "" {
+			return nil, errors.New("the scripted model refuses to start")
+		}
 		return &scriptedModel{script: script, rec: rec, model: model}, nil
+	}
+	if path := os.Getenv(charExitEnv); path != "" {
+		cleanupTrace = func(name string) {
+			f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+			if err != nil {
+				panic(err)
+			}
+			defer func() { _ = f.Close() }()
+			if _, err := f.WriteString(name + "\n"); err != nil {
+				panic(err)
+			}
+		}
 	}
 	appVersion = charVersion
 	rootCmd.Version = charVersion
@@ -252,12 +271,17 @@ type charResult struct {
 	status         int
 	calls          string
 	transcripts    string
+	// exit is the teardown as it ran, one step name per entry; checked
+	// against ADR-0054 §2.5 directly, not through the references.
+	exit []string
 }
 
 func runCharacterize(t *testing.T, e charEnv, turns []scriptTurn, stdin []string, args ...string) charResult {
 	t.Helper()
 	scriptPath := filepath.Join(e.root, "script.json")
 	recordPath := filepath.Join(e.root, "calls.jsonl")
+	exitPath := filepath.Join(e.root, "exit.txt")
+	_ = os.Remove(exitPath)
 	raw, err := json.Marshal(turns)
 	if err != nil {
 		t.Fatal(err)
@@ -278,7 +302,7 @@ func runCharacterize(t *testing.T, e charEnv, turns []scriptTurn, stdin []string
 	env := []string{}
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
-		if strings.HasPrefix(k, "LAGENT_") || k == "HOME" || k == "LANG" || k == "LC_ALL" {
+		if (strings.HasPrefix(k, "LAGENT_") && k != charFailEnv) || k == "HOME" || k == "LANG" || k == "LC_ALL" {
 			continue
 		}
 		env = append(env, kv)
@@ -289,6 +313,7 @@ func runCharacterize(t *testing.T, e charEnv, turns []scriptTurn, stdin []string
 		charChildEnv+"=1",
 		charScriptEnv+"="+scriptPath,
 		charRecordEnv+"="+recordPath,
+		charExitEnv+"="+exitPath,
 		charArgsEnv+"="+string(argv),
 	)
 	in, err := cmd.StdinPipe()
@@ -332,12 +357,14 @@ func runCharacterize(t *testing.T, e charEnv, turns []scriptTurn, stdin []string
 		t.Fatal(runErr)
 	}
 	calls, _ := os.ReadFile(recordPath)
+	exitRaw, _ := os.ReadFile(exitPath)
 	return charResult{
 		stdout:      stdout.String(),
 		stderr:      stderr.String(),
 		status:      status,
 		calls:       prettyCalls(t, calls),
 		transcripts: readTranscripts(t, filepath.Join(e.home, ".local", "state", "lagent", "sessions")),
+		exit:        splitExit(string(exitRaw)),
 	}
 }
 
@@ -512,6 +539,16 @@ func TestCharacterizeOneShot(t *testing.T) {
 	}
 	r := runCharacterize(t, e, turns, nil, "--no-sandbox", "-p", "What do the notes say?")
 	checkCharacterization(t, "oneshot", r.render(e))
+	checkExitSequence(t, r.exit, []string{
+		"report the added roots' persistent files",
+		"report the project's persistent files",
+		"run the session-end hooks",
+		"close the MCP clients",
+		"close the skills' roots",
+		"remove the work directory if empty",
+		"remove the fallback scratch",
+		"close the transcript",
+	})
 }
 
 // The plain REPL: piped stdin without -p is the operator's own input.
@@ -537,6 +574,17 @@ func TestCharacterizePlainREPL(t *testing.T) {
 	}
 	r := runCharacterize(t, e, turns, stdin, "--no-sandbox")
 	checkCharacterization(t, "plain", r.render(e))
+	checkExitSequence(t, r.exit, []string{
+		"report the added roots' persistent files",
+		"report the project's persistent files",
+		"print the exit summary",
+		"run the session-end hooks",
+		"close the MCP clients",
+		"close the skills' roots",
+		"remove the work directory if empty",
+		"remove the fallback scratch",
+		"close the transcript",
+	})
 }
 
 // /clear starts a new session: what a child process sees of the session
@@ -568,6 +616,17 @@ command = "cat >> %[1]s/session_end.jsonl; echo >> %[1]s/session_end.jsonl"
 	ended, _ := os.ReadFile(filepath.Join(e.root, "session_end.jsonl"))
 	checkCharacterization(t, "clear", r.render(e)+normalize(e,
 		"=== session_start hook payloads\n"+string(started)+"=== session_end hook payloads\n"+string(ended)))
+	checkExitSequence(t, r.exit, []string{
+		"report the added roots' persistent files",
+		"report the project's persistent files",
+		"print the exit summary",
+		"run the session-end hooks",
+		"close the MCP clients",
+		"close the skills' roots",
+		"remove the work directory if empty",
+		"remove the fallback scratch",
+		"close the transcript",
+	})
 }
 
 // ADR-0054 Found 1, in the plain REPL: the notices hooks raise while
@@ -587,5 +646,69 @@ command = "echo context-from-hook"
 	cleared := strings.Index(r.stderr, "history cleared")
 	if at < 0 || cleared < 0 || at > cleared {
 		t.Fatalf("want the hook's notice in /clear's output, before its report:\n%s", r.stderr)
+	}
+}
+
+func splitExit(raw string) []string {
+	var out []string
+	for _, l := range strings.Split(strings.TrimSpace(raw), "\n") {
+		if l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// checkExitSequence compares the teardown as it ran with ADR-0054 §2.5's
+// order (clearing the direct-shell hook, its last step, is no longer
+// state to undo: runDirectShell takes it as an argument).
+func checkExitSequence(t *testing.T, got, want []string) {
+	t.Helper()
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("the exit sequence changed (ADR-0054 §2.5)\ngot:\n  %s\nwant:\n  %s",
+			strings.Join(got, "\n  "), strings.Join(want, "\n  "))
+	}
+}
+
+// A start that fails undoes what it set up and nothing else (ADR-0054
+// §2.5): each case fails in a different part of the start, for the
+// reason it names, and the teardown that ran is what was pushed before.
+func TestExitSequenceOnStartupFailure(t *testing.T) {
+	after := []string{"remove the work directory if empty", "remove the fallback scratch", "close the transcript"}
+	cases := []struct {
+		name   string
+		env    string
+		args   []string
+		reason string
+		want   []string
+	}{
+		{"config: a bad --mcp value", "", []string{"--mcp", "loud"}, "loud", nil},
+		{"admission: a bare * in --allow", "", []string{"--allow", "*"}, `"*"`, nil},
+		{"transcript: nothing to continue", "", []string{"--continue"}, "no previous session", nil},
+		// HOME is the child's: --add-dir refuses the operator's home.
+		{"confinement: --add-dir names a home directory", "", []string{"--add-dir", "HOME"}, "home directory", after},
+		{"models: the model client fails", charFailEnv + "=1", nil, "refuses to start", append([]string{
+			"close the MCP clients", "close the skills' roots"}, after...)},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			e := newCharEnv(t)
+			args := []string{"--no-sandbox", "-p", "hi"}
+			for _, a := range c.args {
+				if a == "HOME" {
+					a = e.home
+				}
+				args = append(args, a)
+			}
+			if c.env != "" {
+				k, v, _ := strings.Cut(c.env, "=")
+				t.Setenv(k, v)
+			}
+			r := runCharacterize(t, e, nil, nil, args...)
+			if r.status == 0 || !strings.Contains(r.stderr, c.reason) {
+				t.Fatalf("want a failed start naming %q, got status %d:\n%s", c.reason, r.status, r.stderr)
+			}
+			checkExitSequence(t, r.exit, c.want)
+		})
 	}
 }

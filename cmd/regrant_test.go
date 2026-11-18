@@ -197,7 +197,9 @@ func TestClearAppliesWhatItReread(t *testing.T) {
 	if announce := find(re, "announceFacts()"); announce < 0 {
 		t.Error("no facts message follows the regrant: the model would keep the old skill catalog")
 	}
-	if find(0, "defer func() { skills.CloseAll(skillsList) }()") < 0 {
+	// A closure that reads the variable at exit — a cleanup since
+	// ADR-0054 — not a defer that evaluated it at startup.
+	if find(0, "func() { skills.CloseAll(skillsList) }") < 0 {
 		t.Error("the exit path does not close the skill list /clear leaves (a plain defer keeps the startup list)")
 	}
 }
