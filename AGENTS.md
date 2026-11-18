@@ -464,7 +464,7 @@ answers.
   cold prefix again.
 - **A project skill is compared when the list is built, not when it is
   used** (ADR-0053 §2, superseding ADR-0049). The list is built at
-  startup, `/clear` and `/skills reload`, and that is where a changed
+  startup and at `/clear` (there is no `/skills reload` here), and that is where a changed
   skill is left out and named, as an instruction file is. A skill
   changed mid-session (a `git pull`) reaches the model until then: its
   author already writes the project's code, and the commands the text
@@ -473,8 +473,9 @@ answers.
   dialog heading and walk bounds past the 2,000-file cap were built for
   it and taken out — do not build them again without the four answers
   of ADR-0053 §1. The digest is the v0.27.4 path walk
-  (`trustpin.Compute`), and every pin on disk was taken with a walk that
-  digests the same within its bounds.
+  (`trustpin.Compute`), with the file cap met only by a file about to be
+  added (`TestTheFileCapCountsFilesOnly`): v0.27.4 met it at the next
+  entry of any kind and cut a skill of exactly 2,000 files.
 - **Opens are the standard library's** (ADR-0053 §4, superseding
   ADR-0050). A FIFO where the runtime opens a name makes it wait until
   the operator interrupts; git carries no FIFO, so it takes an approved

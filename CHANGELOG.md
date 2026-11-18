@@ -22,7 +22,9 @@
 - **Files and folders are opened the ordinary way again** (ADR-0053).
   v0.30.0 opened the runtime's own files, the session's folders, the
   folders you add and the trace file so that a named pipe (FIFO) put
-  where one of them was could not make lagent wait. Git cannot carry a
+  where one of them was could not make lagent wait, and v0.29.0 did the
+  same for a skill's files, the instruction files, `.mcp.json` and
+  `.lagent.toml`. Git cannot carry a
   named pipe, so one gets there only through a command you approved or
   a program outside lagent, and all it does is make lagent wait until
   you interrupt it. The special opens and the test that held them are
@@ -32,9 +34,11 @@
   made in, write and remove only through those, and give every test
   command ten seconds, so that a program replacing their test files
   while they run could not make them write or remove elsewhere. That
-  needs a program written to race the check. The test files still get
-  names nobody can guess, and are made so that nothing already there is
-  opened. The clipboard capture's file is made in the temporary folder
+  needs a program written to race the check. The test files in the
+  project, the shared temporary folder and the folders you add still
+  get names nobody can guess, and are made so that nothing already there
+  is opened; the one in the session's own scratch folder, which only the
+  read-only sandbox writes, has a fixed name again. The clipboard capture's file is made in the temporary folder
   again, under a name nobody can guess.
 - **The trust record on disk is the record, even when it no longer
   holds the project's pins** (ADR-0053). v0.27.4 kept the pins a
@@ -52,11 +56,13 @@
   `git pull`, and whoever wrote the change already writes the project's
   code, which you build and run; the commands the skill's text leads to
   still go through the sandbox and your approval. A changed skill is now
-  left out and named at the next start, `/clear` or `/skills reload`,
-  as a changed `AGENTS.md` is. Gone with the question: the limits of
-  4,000 files and folders and 32 levels on a skill (the limit of 2,000
-  files stays), and the rule that kept a skill whose name or folder
-  holds a control character out of the list. Trust records stay valid:
+  left out and named at the next start or `/clear`, as a changed
+  `AGENTS.md` is. Gone with the question: the limits of
+  4,000 files and folders and 32 levels on a skill, and the rule that
+  kept a skill whose name or folder holds a control character out of
+  the list. As before v0.28.0, a skill with more than 2,000 files, or a
+  `SKILL.md` over 1 MiB, loads again; its trust record covers the first
+  2,000 files and the first megabyte of each. Trust records stay valid:
   a skill digests as before, except one past the 4,000-entry or
   32-level limit, which v0.28.0–v0.30.0 cut short and which now asks
   once at the next start.
