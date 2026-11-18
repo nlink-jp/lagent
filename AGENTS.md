@@ -543,6 +543,23 @@ answers.
   (`load_skill` results are unwrapped). `!` cannot run `lagent trust
   --accept` from inside a session: the operator lane does not write the
   config directory (measured), which is why the question exists.
+- **The lanes' anchors are the first answer their names gave**
+  (ADR-0052 §2; `sandbox.ResolveKept`, `internal/sandbox/kept.go`) — the
+  lanes are built again at `/clear` and at each grant, and a lane can
+  replace its work directory, or a project with no protected name in
+  it, by a link: resolved again, the name anchored the write lane on
+  the link's target (measured). A directory a profile is anchored on
+  is resolved with `ResolveKept`, never `ResolveWriteDir`, wherever
+  the call can run after a lane has run. A `*sandbox.ReplacedError`
+  from the build is not "keep the previous profile": `rotateWorkDir`
+  and `dirGranter.grant` put every command before the operator
+  (`sandbox.Enforcement{}`) and say so (`replacedNote`). The same
+  comparison stands before the runtime writes under such a name
+  itself (`keptWorkDir` in the MCP intake's `write`) and before an
+  added directory's probes. Nothing is held open for it and no file
+  is compared by device and number — that was built and not released;
+  ADR-0052 §1 says what the sandbox is held against, and a finding that
+  needs a program racing the runtime is recorded, not built against.
 - **The sandbox checks touch only the probes they made** (ADR-0051) —
   the probes are made where the lanes write, so a process in a lane
   can replace one between its making and its use. Measured under the
