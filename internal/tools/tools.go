@@ -13,7 +13,6 @@ import (
 	"github.com/nlink-jp/lagent/internal/sandbox"
 
 	"github.com/nlink-jp/lagent/internal/bounded"
-	"github.com/nlink-jp/lagent/internal/place"
 
 	"bufio"
 	"bytes"
@@ -178,9 +177,13 @@ func New(projectDir string, execFn ExecFunc, shellTimeout time.Duration) (*Regis
 	if err != nil {
 		return nil, err
 	}
-	real, projectRoot, err := openPlace(abs)
+	real, err := filepath.EvalSymlinks(abs)
 	if err != nil {
 		return nil, fmt.Errorf("project directory: %w", err)
+	}
+	projectRoot, err := bounded.OpenRoot(real)
+	if err != nil {
+		return nil, err
 	}
 	r := &Registry{
 		projectDir:   real,
@@ -195,30 +198,6 @@ func New(projectDir string, execFn ExecFunc, shellTimeout time.Duration) (*Regis
 		r.order = append(r.order, t.Name)
 	}
 	return r, nil
-}
-
-// openPlace opens the directory at abs as a root and gives its real
-// path. A place the session took is opened as that place: the root is
-// the directory held, and a name that no longer leads to it is an
-// error (ADR-0052) — the name is not resolved again, which is how a
-// work directory replaced by a link became the file tools' root. A
-// directory nobody took is resolved and opened by its path: the
-// file-read child, which is a process of its own and takes nothing.
-func openPlace(abs string) (string, *os.Root, error) {
-	p, err := place.Of(abs)
-	if err == nil {
-		root, err := p.OpenRoot()
-		return p.Real(), root, err
-	}
-	if !errors.Is(err, place.ErrNotTaken) {
-		return "", nil, err
-	}
-	real, err := filepath.EvalSymlinks(abs)
-	if err != nil {
-		return "", nil, err
-	}
-	root, err := bounded.OpenRoot(real)
-	return real, root, err
 }
 
 // ProjectDir returns the resolved project directory.
@@ -411,7 +390,11 @@ func (r *Registry) UseWorkDir(dir string) error {
 	if err != nil {
 		return err
 	}
-	real, root, err := openPlace(abs)
+	real, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return fmt.Errorf("work directory: %w", err)
+	}
+	root, err := bounded.OpenRoot(real)
 	if err != nil {
 		return fmt.Errorf("work directory: %w", err)
 	}

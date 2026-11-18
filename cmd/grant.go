@@ -14,7 +14,6 @@ import (
 	"sync/atomic"
 
 	"github.com/nlink-jp/lagent/internal/bounded"
-	"github.com/nlink-jp/lagent/internal/place"
 	"github.com/nlink-jp/lagent/internal/sandbox"
 	"github.com/nlink-jp/lagent/internal/tools"
 	"github.com/nlink-jp/lagent/internal/uitext"
@@ -209,7 +208,7 @@ func (g *dirGranter) grant(ctx context.Context, path string, write bool, source 
 	}
 	current := g.registry.AddedDirs()
 	rc := g.base
-	rc.ProjectDir, rc.WorkDir, rc.Roots = g.projectDir, takenOrSelf(g.workDir()), current
+	rc.ProjectDir, rc.WorkDir, rc.Roots = g.projectDir, realOrSelf(g.workDir()), current
 	judged, err := sandbox.RefuseRoot(real, write, rc)
 	if err != nil {
 		var cov *sandbox.CoveredError
@@ -281,14 +280,6 @@ func (g *dirGranter) grant(ctx context.Context, path string, write bool, source 
 		// The build's notes repeat what startup already said; only the
 		// probes' leftovers are news (ADR-0041 §2).
 		fn, enf, _, leftovers, err = build(g.sandboxOn, g.projectDir, g.workDir(), g.denyExec, g.caches, g.parents(), next)
-		if errors.Is(err, place.ErrReplaced) {
-			// Not the directory that was asked for: the project or the
-			// work directory is no longer the one the session took, and
-			// from here every shell command asks (ADR-0052 §3).
-			_ = root.Close()
-			g.registry.SetLaneExec(g.shellExec.run, sandbox.Enforcement{})
-			return "", g.tellLeftovers(source, leftovers, errors.New(replacedNote(err)), &notices)
-		}
 		if err != nil {
 			_ = root.Close()
 			return "", g.tellLeftovers(source, leftovers, fmt.Errorf(m.GrantNotAddedFmt, canonical, err), &notices)
