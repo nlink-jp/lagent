@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Accepted** (2026-11-18) |
+| Status | **Accepted** (2026-11-18); §1 extended, and §3, §4, §5 and the list of §6 withdrawn, by [ADR-0053](0053-the-line-comes-before-the-fix.md) |
 | Date | 2026-11-18 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |

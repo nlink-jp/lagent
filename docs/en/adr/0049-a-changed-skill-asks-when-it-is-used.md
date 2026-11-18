@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Accepted** (2026-11-17), implemented; §1's hold on the bytes a read returns withdrawn by ADR-0052 |
+| Status | **Superseded by [ADR-0053](0053-the-line-comes-before-the-fix.md)** (2026-11-18) — accepted 2026-11-17 and implemented; taken out |
 | Date | 2026-11-17 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |

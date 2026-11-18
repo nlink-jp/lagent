@@ -2,7 +2,7 @@
 
 | 項目 | 値 |
 |-------|-----|
-| Status | **Accepted**（2026-11-18） |
+| Status | **Accepted**（2026-11-18） — §1 は [ADR-0053](0053-the-line-comes-before-the-fix.ja.md) が広げ、§3・§4・§5 と §6 の一覧は同 ADR で撤回 |
 | Date | 2026-11-18 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Proposed** (2026-11-18) |
+| Status | **Accepted** (2026-11-18) — implemented |
 | Date | 2026-11-18 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
@@ -25,7 +25,7 @@ The code is the code gem-agent has, ported, and the reading of it is the same. T
 
 2. **A project skill is no longer compared when it is used** (ADR-0049 superseded). Origin C, and B through a pull: the upstream author already writes the project's code; the changed text reaches the model until the next `/clear` or start, which compare it; the commands it leads to still go through the lanes and the approval. Taken out: the compare at use, the question and its outcomes, the disable state, `tools.NeedsOperator` and the agent's handling of it, the question dialog's heading and opening choice, the plain prompt's word answer, `/skill` as a step of the turn, the skill-trust records, and the rule that a skill whose entry or resolved path holds a control or format character is not listed (the terminal streams and the TUI make text inert at their ingress, ADR-0024).
 
-3. **A skill's digest is taken by the walk v0.27.4 shipped**, with its cap of 2,000 files; the bounds on entries and depth and the handle per level are taken out. A tree within the bounds v0.30.0 had digests as before.
+3. **A skill's digest is taken by the walk v0.27.4 shipped**, with its cap of 2,000 files; the bounds on entries and depth and the handle per level are taken out. Compared on the ten trees gem-agent ADR-0123 lists, every pin and note is the same before and after — and the same digests gem-agent gives — except a skill nested 40 deep: v0.28.0–v0.30.0 cut it at 32 levels, and its whole tree is digested now, so a pin taken of it then asks once at the next start.
 
 4. **Opens are the standard library's again** (ADR-0050 superseded), as in v0.27.4 — the trace file and the rulebook included. Taken out: the `bounded` open helpers and the test of the opens. A FIFO at a name makes an open wait until interrupted; git carries none. Kept: the file tools' own open, which does not wait, and the file-read child opening only the roots a call names (ADR-0047).
 
