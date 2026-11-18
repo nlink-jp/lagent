@@ -581,13 +581,13 @@ func TestCharacterizePlainREPL(t *testing.T) {
 	checkExitSequence(t, r.exit, []string{
 		"report the added roots' persistent files",
 		"report the project's persistent files",
-		"print the exit summary",
 		"run the session-end hooks",
 		"close the MCP clients",
 		"close the skills' roots",
 		"remove the work directory if empty",
 		"remove the fallback scratch",
 		"close the transcript",
+		"print the exit summary",
 	})
 }
 
@@ -623,13 +623,13 @@ command = "cat >> %[1]s/session_end.jsonl; echo >> %[1]s/session_end.jsonl"
 	checkExitSequence(t, r.exit, []string{
 		"report the added roots' persistent files",
 		"report the project's persistent files",
-		"print the exit summary",
 		"run the session-end hooks",
 		"close the MCP clients",
 		"close the skills' roots",
 		"remove the work directory if empty",
 		"remove the fallback scratch",
 		"close the transcript",
+		"print the exit summary",
 	})
 }
 
@@ -714,5 +714,33 @@ func TestExitSequenceOnStartupFailure(t *testing.T) {
 			}
 			checkExitSequence(t, r.exit, c.want)
 		})
+	}
+}
+
+// ADR-0054 Found 3: the exit summary — the resume command and the totals
+// — is the last thing in the scrollback, after anything the session-end
+// hooks say. A hook that fails says so at exit.
+func TestExitSummaryIsLastAfterASessionEndHook(t *testing.T) {
+	e := newCharEnvWith(t, `
+[[hooks.session_end]]
+command = "exit 3"
+`)
+	r := runCharacterize(t, e, []scriptTurn{{Text: "Hello."}}, []string{"hi"}, "--no-sandbox")
+	if r.status != 0 {
+		t.Fatalf("status %d:\n%s", r.status, r.stderr)
+	}
+	lines := strings.Split(strings.TrimRight(r.stderr, "\n"), "\n")
+	hook := -1
+	for i, l := range lines {
+		if strings.Contains(l, "exit 3") {
+			hook = i
+		}
+	}
+	if hook < 0 {
+		t.Fatalf("the failing hook said nothing:\n%s", r.stderr)
+	}
+	n := len(lines)
+	if n < 2 || !strings.Contains(lines[n-2], "resume: lagent -c") || !strings.Contains(lines[n-1], "1 rounds") || hook > n-3 {
+		t.Fatalf("want the exit summary as the last two lines, after the hook's notice:\n%s", r.stderr)
 	}
 }

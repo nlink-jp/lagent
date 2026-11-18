@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- **The exit summary is the last thing on screen again when a
+  `session_end` hook speaks.** The resume command and the totals printed
+  before the session-end hooks ran, so a hook's notice (a failure, a
+  timeout) came after them. The summary now follows everything else.
 - **`/clear` no longer freezes the TUI when a `session_start` hook
   prints.** The hook's output is attached to the next turn and the
   operator is told; that notice was sent to the screen from inside the

@@ -939,11 +939,12 @@ func assembleSession(sess *liveSession, cmd *cobra.Command, cl *cleanups, rs run
 
 	// Exit summary (operator request): every interactive exit route —
 	// /quit, Ctrl+C, Ctrl+D — ends with the resume hint and the cost
-	// line as the last thing in the scrollback. Deferred so no route
-	// can forget it; one-shot mode stays clean for pipelines.
+	// line as the last thing in the scrollback. A final cleanup: after
+	// everything else, the session-end hooks and what they say included
+	// (ADR-0054, Found 3). One-shot mode stays clean for pipelines.
 	if !rs.oneShot {
 		out := cmd.ErrOrStderr()
-		cl.push("print the exit summary", func() {
+		cl.pushFinal("print the exit summary", func() {
 			for _, l := range exitSummary(sess.ag.Usage(), sess.sessionID, sess.msgs) {
 				fmt.Fprintln(out, l)
 			}
