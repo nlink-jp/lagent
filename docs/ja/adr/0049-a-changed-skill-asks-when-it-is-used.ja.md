@@ -2,7 +2,7 @@
 
 | 項目 | 値 |
 |-------|-----|
-| Status | **Accepted**（2026-11-17）、実装済み |
+| Status | **Accepted**（2026-11-17）、実装済み — §1 のうち、読んで返すバイト列を縛る部分は ADR-0052 で撤回 |
 | Date | 2026-11-17 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
