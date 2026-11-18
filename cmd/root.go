@@ -2375,7 +2375,7 @@ func removeFallbackScratch() {
 	fallbackScratchMu.Lock()
 	defer fallbackScratchMu.Unlock()
 	if fallbackScratch != "" && strings.Contains(filepath.Base(fallbackScratch), "lagent-read-scratch-") {
-		_ = os.RemoveAll(fallbackScratch)
+		_ = bounded.RemoveAll(fallbackScratch)
 		fallbackScratch = ""
 	}
 }

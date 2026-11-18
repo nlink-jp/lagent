@@ -509,16 +509,22 @@ answers.
   name (ADR-0050): a directory that is listed is opened with
   `bounded.OpenDir` (`O_DIRECTORY` — the kernel refuses a FIFO at the
   open), a root with `bounded.OpenRoot`, a file under a fixed name with
-  `bounded.OpenRegularPath`, and one written under a fixed name with
-  `bounded.WriteFile` — the write lane can leave a FIFO where the work
+  `bounded.OpenRegularPath` (`bounded.OpenRegularPathNoFollow` where
+  a link must not be followed: a saved result in the work
+  directory), one written under a fixed name with
+  `bounded.WriteFile`, and a tree removed with `bounded.RemoveAll`
+  (`os.RemoveAll` opens the parent plainly once the first removal
+  fails; ADR-0050 §9) — the write lane can leave a FIFO where the work
   directory, an added directory or the project directory was, and the
   state files are held to the same rule. `TestOpensDoNotWait`
   (`internal/archtest`) fails on an `os.Open`, `os.OpenFile`,
-  `os.OpenRoot`, `os.Create`, `os.WriteFile` or `toml.DecodeFile`, and
+  `os.OpenRoot`, `os.Create`, `os.WriteFile`, `os.RemoveAll`,
+  `os.OpenInRoot` or `toml.DecodeFile`, and
   on an `os.Root` method that opens, and on a raw `unix.Open` /
   `unix.Openat` / `syscall.Open`, outside `internal/bounded` — each
   exception is listed there with why it cannot wait (`O_EXCL`,
-  `O_NONBLOCK`, read-write); the
+  `O_NONBLOCK`, read-write — a look before a plain open is not such
+  a reason: the release review found one on the list, and it waited); the
   operator's own `--config` is on its list, undecided.
   On the caps: the review showed `SKILL.md` itself could be
   the uncovered part. The digest is
