@@ -287,7 +287,7 @@ func TestOpensDoNotWait(t *testing.T) {
 		"internal/llm openTraceFile":               "O_EXCL: a trace file is created, never opened over what is there",
 		"internal/mention openConfined":            "the opener handed to openRegular, which opens with O_NONBLOCK and looks at what it holds",
 		"internal/sandbox CanonicalDir":            "O_NONBLOCK|O_DIRECTORY",
-		"internal/sandbox VerifyFileReadLane":      "O_EXCL: a probe file is created, never opened over what is there",
+		"internal/sandbox probes.fileNamed":        "bounded.Dir.Create: O_EXCL from a directory held open — what is under the name is never opened",
 		"internal/session Open":                    "O_EXCL: a new transcript is created, never opened over what is there",
 		"internal/session Reopen":                  "opened read-write, which does not wait on a FIFO (measured); the lock that follows refuses one",
 		"internal/tools Registry.openRead":         "the opener handed to openRegular, which opens with O_NONBLOCK and looks at what it holds",
@@ -295,7 +295,26 @@ func TestOpensDoNotWait(t *testing.T) {
 		"internal/tools Registry.shellSpoolOpener": "O_EXCL: a spool is created, never opened over what is there",
 		"cmd descriptorPathOf":                     "`.` of a root that is already open",
 		"internal/config LoadWithOverrides":        "the operator's own configuration, named with --config: a FIFO or a process substitution there may be meant (ADR-0050 §5, undecided)",
-		"internal/sandbox verifyAddedRoot":         "probe files inside a directory just made under a random name",
+	})
+}
+
+// TestTheChecksGoThroughHeldDirectories: the sandbox checks make their
+// probes where the lanes write, and whatever they did there by path —
+// made, wrote, removed — or handed to a shell outside the sandbox, they
+// did to whatever a process in a lane had put under that path by then:
+// measured as a write through a link, files removed beside the project
+// and a start that waited (ADR-0051). The package holds no call that
+// names a file by path and one place that starts a probe command; the
+// next probe that is added cannot bring either back unseen.
+func TestTheChecksGoThroughHeldDirectories(t *testing.T) {
+	calls := collectCalls(t, repoRoot(t), []string{"internal/sandbox"}, []string{
+		"os.CreateTemp", "os.MkdirTemp", "os.Mkdir", "os.MkdirAll", "os.Remove", "os.RemoveAll",
+		"os.Rename", "os.WriteFile", "os.Symlink", "os.Link", "os.Chmod", "os.Create",
+		"exec.Command", "exec.CommandContext",
+	})
+	report(t, calls, map[string]string{
+		"internal/sandbox RunProbe":  "the one place a probe command is started: bounded in time, in a process group of its own",
+		"internal/sandbox Available": "sandbox-exec itself running /usr/bin/true: it names no file a lane writes",
 	})
 }
 
