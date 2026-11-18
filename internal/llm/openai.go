@@ -63,24 +63,13 @@ const TraceEnv = "LAGENT_LLM_TRACE"
 // A trace is private to the operator: the same modes the transcript
 // uses (internal/session), because the trace holds strictly more — the
 // system prompt with the instruction files, every tool result, and the
-// reasoning deltas no other file keeps. An existing directory keeps
-// its mode; these apply to what the runtime creates.
-//
-// A trace file is always new — its name carries the time and a
-// sequence number — so it is created with O_EXCL. It used to be opened
-// to truncate, and an open for writing waits on a FIFO of that name
-// for a reader (ADR-0050): the request never left. What is already
-// there under the name is not this request's to write over either.
+// reasoning deltas no other file keeps. An existing directory or file
+// keeps its mode; these apply to what the runtime creates.
 const (
 	traceDirMode   = 0o700
 	traceFileMode  = 0o600
-	traceFileFlags = os.O_WRONLY | os.O_CREATE | os.O_EXCL
+	traceFileFlags = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 )
-
-// openTraceFile creates one trace file.
-func openTraceFile(path string) (*os.File, error) {
-	return os.OpenFile(path, traceFileFlags, traceFileMode)
-}
 
 // Providers ContextWindow knows how to ask.
 const (
@@ -138,11 +127,11 @@ func (o *OpenAI) traceFiles() (reqW, respW *os.File, err error) {
 		return nil, nil, fmt.Errorf("llm trace: %w", err)
 	}
 	stamp := fmt.Sprintf("%s-%03d", time.Now().Format("20060102-150405.000"), o.traceSeq.Add(1))
-	reqW, err = openTraceFile(filepath.Join(o.traceDir, stamp+"-request.json"))
+	reqW, err = os.OpenFile(filepath.Join(o.traceDir, stamp+"-request.json"), traceFileFlags, traceFileMode)
 	if err != nil {
 		return nil, nil, fmt.Errorf("llm trace: %w", err)
 	}
-	respW, err = openTraceFile(filepath.Join(o.traceDir, stamp+"-response.sse"))
+	respW, err = os.OpenFile(filepath.Join(o.traceDir, stamp+"-response.sse"), traceFileFlags, traceFileMode)
 	if err != nil {
 		_ = reqW.Close()
 		return nil, nil, fmt.Errorf("llm trace: %w", err)

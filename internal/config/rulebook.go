@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -36,7 +37,7 @@ func RulebookPath(cfgPath string) string {
 // normal and returns "". clipped reports the clip so the caller can tell
 // the operator too.
 func LoadRulebook(cfgPath string) (text string, clipped bool, err error) {
-	f, err := bounded.OpenRegularPath(RulebookPath(cfgPath))
+	f, err := os.Open(RulebookPath(cfgPath))
 	if errors.Is(err, fs.ErrNotExist) {
 		return "", false, nil
 	}

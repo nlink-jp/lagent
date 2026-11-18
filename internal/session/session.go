@@ -422,7 +422,7 @@ func forEachLine(f io.Reader, fn func(rec *rawRecord) (bool, error)) error {
 // skipped counts unreadable lines so the caller can say "N lines lost"
 // instead of presenting a shorter conversation as complete.
 func Load(path string) ([]llm.Message, Header, int, error) {
-	f, err := bounded.OpenRegularPath(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, Header{}, 0, err
 	}
@@ -497,7 +497,7 @@ func Load(path string) ([]llm.Message, Header, int, error) {
 // session re-loads an MCP server whose mcp_load call was summarised
 // away. Unreadable lines are skipped; Load reports them.
 func CallArgs(path, tool, arg string) ([]string, error) {
-	f, err := bounded.OpenRegularPath(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -578,7 +578,7 @@ const ListCap = 10000
 // readDirCapped lists at most ListCap entries of dir, reporting
 // whether the directory held more.
 func readDirCapped(dir string) ([]os.DirEntry, bool, error) {
-	d, err := bounded.OpenDir(dir)
+	d, err := os.Open(dir)
 	if err != nil {
 		return nil, false, err
 	}
@@ -595,7 +595,7 @@ func readDirCapped(dir string) ([]os.DirEntry, bool, error) {
 // tolerance: a torn tail must not cost the whole file. fn stops the walk
 // by returning an error, which Scan returns as-is.
 func Scan(path string, fn func(kind string, ts time.Time, data json.RawMessage) error) error {
-	f, err := bounded.OpenRegularPath(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
@@ -767,7 +767,7 @@ func Latest(dir, projectDir string) (meta Meta, found bool, more bool, err error
 // loading the whole conversation — a listing must stay cheap even when
 // the transcripts are large.
 func describe(path, id string) (Meta, error) {
-	f, err := bounded.OpenRegularPath(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return Meta{}, err
 	}
@@ -889,7 +889,7 @@ func InUse(dir, projectDir, id string) bool {
 	if err != nil {
 		return false
 	}
-	f, err := bounded.OpenRegularPath(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return false
 	}
