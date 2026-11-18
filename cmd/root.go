@@ -646,7 +646,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	_ = mcpSummary
 
 	// --- LLM backend ---
-	backend, err := llm.NewOpenAI(cfg.LLM.BaseURL, cfg.LLM.Model, cfg.LLM.APIKey, cfg.LLM.Provider)
+	backend, err := newModelClient(cfg, cfg.LLM.Model)
 	if err != nil {
 		return err
 	}
@@ -663,7 +663,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		riskModel = cfg.LLM.Model
 	}
 	if cfg.Approval.ModelTier == "shell" {
-		rb, err := llm.NewOpenAI(cfg.LLM.BaseURL, riskModel, cfg.LLM.APIKey, cfg.LLM.Provider)
+		rb, err := newModelClient(cfg, riskModel)
 		if err != nil {
 			return err
 		}
