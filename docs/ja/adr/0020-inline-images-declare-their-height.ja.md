@@ -107,7 +107,7 @@ gem-agent は描画前に応答を分割する。`diagram.Split` が art segment
 材料の残り半分は既にここにある。`mcp.Client` はツール結果のバイナリブロックを `base64.StdEncoding.DecodeString` に通し
 （[client.go:669](../../../internal/mcp/client.go)。`:575` は以前の稿が代わりに引いた
 `Content` の運搬体である）、intake は画像を**セッションの work dir へ書き出して**、モデルには `[image saved at <path> … use view_image on that path]` を渡す
-（[mcpresult.go:304](../../../cmd/mcpresult.go)）。初稿はそれらを「モデルへ転送される」と
+（[mcpresult.go:302](../../../cmd/mcpresult.go)）。初稿はそれらを「モデルへ転送される」と
 書いたが、そうではない。バイトはインラインで戻らない。
 
 **こちら側固有の訂正。** 初稿は、決定 7 の根拠となる危険が「継承ではなくこのコードに
@@ -188,8 +188,8 @@ intake が書いたパスは先回りされうる。`write` が `os.Stat` で短
 （[mcpresult.go:344](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに work dir を
 `_meta` で渡すからである（[client.go:639](../../../internal/mcp/client.go)）。そして第 3 稿の
 デコード済みバイト列には運搬体が無い。`render` は `string` を返し
-（[mcpresult.go:65](../../../cmd/mcpresult.go)）、`Tool.Run` は
-`func(ctx, args) (string, error)` である（[tools.go:77](../../../internal/tools/tools.go)）。
+（[mcpresult.go:63](../../../cmd/mcpresult.go)）、`Tool.Run` は
+`func(ctx, args) (string, error)` である（[tools.go:78](../../../internal/tools/tools.go)）。
 
 同じ場所の 3 稿は 1 つの誤りである。**配管が存在するまで、供給源は名指せない。** [ADR-0021](0021-an-images-bytes-never-become-a-path.ja.md) へ先送りし、3 稿すべてに
 対して成立した制約 1 つだけを引き継がせる: **view 層はファイルを
@@ -214,7 +214,7 @@ view 層の読み取りを開く）は、いまや先送りした決定に属す
 
 ### 7. 描画は TUI 限定。能力の検出は 1 度だけ
 
-`tea.NewProgram` が構築されるのは 1 箇所（[root.go:1672](../../../cmd/root.go)）。
+`tea.NewProgram` が構築されるのは 1 箇所（[root.go:1673](../../../cmd/root.go)）。
 one-shot `-p` と素の REPL はそれを作らず、描かない。探針はその構築の**前**に走りキャッシュ
 される。理由は `newGlamourRenderer` が `WithAutoStyle` について記録しているとおりで、これは
 移植元から継承した記述であり、ここでも真である。探針は問い合わせ前に排出し、応答が無いことを

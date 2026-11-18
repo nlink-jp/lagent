@@ -124,7 +124,7 @@ result's binary blocks through `base64.StdEncoding.DecodeString`
 `:575` is the `Content` carrier an earlier draft cited instead),
 and the intake **writes an image into the session work directory** and hands
 the model `[image saved at <path> … use view_image on that path]`
-([mcpresult.go:304](../../../cmd/mcpresult.go)). The first draft said such
+([mcpresult.go:302](../../../cmd/mcpresult.go)). The first draft said such
 blocks were "forwarded to the model"; they are not — the bytes never ride
 back inline.
 
@@ -223,8 +223,8 @@ path the intake wrote can be pre-empted, because `write` short-circuits on
 hands the server the work directory in `_meta`
 ([client.go:639](../../../internal/mcp/client.go)); and the third draft's
 decoded bytes have no carrier at all — `render` returns a `string`
-([mcpresult.go:65](../../../cmd/mcpresult.go)) and `Tool.Run` is
-`func(ctx, args) (string, error)` ([tools.go:77](../../../internal/tools/tools.go)).
+([mcpresult.go:63](../../../cmd/mcpresult.go)) and `Tool.Run` is
+`func(ctx, args) (string, error)` ([tools.go:78](../../../internal/tools/tools.go)).
 
 Three drafts in one place is one mistake: **the source cannot be named until
 the plumbing exists.** It is deferred to [ADR-0021](0021-an-images-bytes-never-become-a-path.md),
@@ -256,7 +256,7 @@ Pre-existing, not widened here, not repaired here.
 ### 7. Drawing is TUI-only, and the capability is probed once
 
 `tea.NewProgram` is constructed at one site
-([root.go:1672](../../../cmd/root.go)); one-shot `-p` and the plain REPL
+([root.go:1673](../../../cmd/root.go)); one-shot `-p` and the plain REPL
 never build it and never draw. The probe runs **before** that construction
 and is cached, for the reason `newGlamourRenderer` records about
 `WithAutoStyle` — inherited from the porting source, and true here. It

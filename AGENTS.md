@@ -234,6 +234,8 @@ internal/inert/    the one predicate that makes outside text inert for a termina
                    streams, terminal only)
 internal/bounded/  the one place a read, listing or process output is capped —
                    every primitive returns the `more` fact
+internal/place/    the directories the session took, opened once and held: asked
+                   for by name, never resolved again (ADR-0052)
 internal/archtest/ AST tests pinning confined opens, bounded reads, opens that
                    cannot wait on a FIFO (ADR-0050) and the
                    single decision point
@@ -543,6 +545,25 @@ answers.
   (`load_skill` results are unwrapped). `!` cannot run `lagent trust
   --accept` from inside a session: the operator lane does not write the
   config directory (measured), which is why the question exists.
+- **A place is taken once — never use a lane-writable directory's
+  name again** (ADR-0052). The project, the work directory, its
+  scratch and its cache are opened once and held (`internal/place`):
+  `place.Take` where the session takes them (the first build of the
+  lanes; `workdir.Ensure`), `place.Of(name)` everywhere after, which
+  looks that the name still leads to the directory held and returns
+  `ErrReplaced` when it does not — and `ErrNotTaken` for a name
+  nothing took, because a place taken late is whatever a lane put
+  there. A lane can remove its work directory and leave a link: the
+  lanes were rebuilt from names (`/clear`, a grant) and the write lane
+  then wrote where the link led, checks passing (measured on both
+  runtimes). Profiles are anchored on `Place.Real()`; nothing in
+  `buildLanes` resolves a name. What the runtime makes in a place goes
+  through `Place.Dir()` by one name (`saveResult`, the scratch, the
+  check directories). A new by-path call fails
+  `TestEveryPathCallHasItsClass` (`internal/archtest`) until it has
+  one of six classes — and there is none for making, writing or
+  removing by path where a lane writes. A test that makes a work
+  directory itself takes it (`taken(t, dir)` in `cmd`).
 - **The sandbox checks touch only the probes they made** (ADR-0051) —
   the probes are made where the lanes write, so a process in a lane
   can replace one between its making and its use. Measured under the

@@ -52,7 +52,10 @@ per-session work directory under the state root), `internal/trustpin`
 (content pins of the agent-facing files and the persistent-file
 snapshot), `internal/uitext` (ja/en UI string catalogs),
 `internal/bounded` (the capped read/list/capture primitives every other
-package uses), `internal/inert` (the one predicate that makes outside text
+package uses), `internal/place` (the directories a session took — the project, the work
+directory, its scratch and cache — opened once and held, asked for by name and
+never resolved again — ADR-0052),
+`internal/inert` (the one predicate that makes outside text
 inert for a terminal — control characters removed, nothing else — and the
 hold on a renderer's output, SGR kept; imported only by the TUI's ingress
 file and the plain entrances' stream setup — ADR-0024), `internal/archtest` (AST tests that pin the structural
