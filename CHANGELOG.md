@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`lagent workdirs clean` takes a session id's first characters**,
+  four or more, as `--resume` does. `lagent sessions` shows eight, and
+  only the full id was accepted. A prefix that matches more than one
+  directory asks for more characters, and the confirmation names the
+  directories in full before anything is deleted.
+
 ### Fixed
 
 - **Tab completes `/show`.** The command worked and `/help` listed it,

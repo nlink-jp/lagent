@@ -1584,7 +1584,7 @@ pile up (a work directory that nothing went into is cleared away on exit).
 ```sh
 lagent workdirs              # list this project's work directories
 lagent workdirs clean        # show what would be deleted, confirm, then delete
-lagent workdirs clean <ID>   # delete only the given session's (the full ID, not a prefix)
+lagent workdirs clean <ID>   # delete only the given session's (the ID's first 4 or more characters will do)
 ```
 
 - Before deleting, it shows the list of targets and their total size and asks
@@ -3006,7 +3006,7 @@ the way you use it.
 | `lagent sessions [--all]` | Lists the sessions that can be resumed. `--all` covers every project |
 | `lagent trust [--accept]` | Shows the state of the project's trust. `--accept`, in a project that is already trusted, records the current content afresh |
 | `lagent workdirs` | Lists this project's work directories of past sessions |
-| `lagent workdirs clean [ID…] [--yes]` | Deletes work directories after confirming. `--yes` deletes without confirming |
+| `lagent workdirs clean [ID…] [--yes]` | Deletes work directories after confirming. An ID may be given by its first 4 or more characters. `--yes` deletes without confirming |
 | `lagent completion <shell>` | Prints a shell completion script |
 | `lagent version`, `lagent --version` | Prints the version |
 

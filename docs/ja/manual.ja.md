@@ -1517,7 +1517,7 @@ gem-usage-lens は既定では gem-agent の記録を読むので、lagent の�
 ```sh
 lagent workdirs              # このプロジェクトの作業ディレクトリを一覧
 lagent workdirs clean        # 消す対象を示して、確かめてから消す
-lagent workdirs clean <ID>   # 指定したセッションのものだけ消す（ID は省略しない完全なもの）
+lagent workdirs clean <ID>   # 指定したセッションのものだけ消す（ID は先頭の 4 文字以上でもよい）
 ```
 
 - 消す前に、対象の一覧と合計の大きさを示して確認します。`y` 以外の答えでは
@@ -2878,7 +2878,7 @@ lagent は起動しません。黙ってサンドボックスなしで動くこ�
 | `lagent sessions [--all]` | 再開できるセッションの一覧。`--all` ですべてのプロジェクト |
 | `lagent trust [--accept]` | プロジェクトの信用の状態を表示。`--accept` は、信用済みのプロジェクトで、今の中身を記録し直す |
 | `lagent workdirs` | このプロジェクトの、過去のセッションの作業ディレクトリの一覧 |
-| `lagent workdirs clean [ID…] [--yes]` | 作業ディレクトリを、確かめてから消す。`--yes` で確かめずに消す |
+| `lagent workdirs clean [ID…] [--yes]` | 作業ディレクトリを、確かめてから消す。ID は先頭の 4 文字以上でもよい。`--yes` で確かめずに消す |
 | `lagent completion <シェル>` | シェルの補完スクリプトを出力する |
 | `lagent version`、`lagent --version` | 版を表示する |
 
