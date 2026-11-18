@@ -73,11 +73,8 @@ func TestTUIOptionsWiring(t *testing.T) {
 // advertised and the catalog is decoration. Pinned on the source: the
 // wiring is a closure over the session.
 func TestAdvertiseIsWiredIntoTheAgent(t *testing.T) {
-	src, err := os.ReadFile("root.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(src), "Advertise:      adv.Advertise,") && !strings.Contains(string(src), "Advertise: adv.Advertise,") {
+	src := wiringSource(t)
+	if !strings.Contains(src, "Advertise:      adv.Advertise,") && !strings.Contains(src, "Advertise: adv.Advertise,") {
 		t.Fatal("agent.New is not given adv.Advertise")
 	}
 }
@@ -97,11 +94,8 @@ func TestUnattendedIsWiredIntoTheAgent(t *testing.T) {
 // ADR-0009: the operator's reasoning_effort must reach the backend, or
 // the config key is decoration.
 func TestReasoningEffortIsWiredIntoTheBackend(t *testing.T) {
-	src, err := os.ReadFile("root.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(src), "backend.SetReasoningEffort(cfg.LLM.ReasoningEffort)") {
+	src := wiringSource(t)
+	if !strings.Contains(src, "backend.SetReasoningEffort(cfg.LLM.ReasoningEffort)") {
 		t.Fatal("the backend is not given cfg.LLM.ReasoningEffort")
 	}
 }

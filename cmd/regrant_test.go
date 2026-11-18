@@ -168,11 +168,9 @@ func TestRegrantClosesTheListItReplaces(t *testing.T) {
 // re-checked, /clear regrants and sets the system prompt from it, and
 // the exit path closes the list /clear may have replaced.
 func TestClearAppliesWhatItReread(t *testing.T) {
-	src, err := os.ReadFile("root.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	lines := strings.Split(string(src), "\n")
+	// The session wiring since ADR-0054 (liveSession.clear), with the
+	// receiver dropped.
+	lines := strings.Split(wiringSource(t), "\n")
 	find := func(from int, want string) int {
 		for i := from; i < len(lines); i++ {
 			if strings.Contains(lines[i], want) {

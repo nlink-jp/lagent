@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -117,11 +116,8 @@ func TestExitSummaryNamesAbandonedCalls(t *testing.T) {
 // ADR-0033: one-shot runs its turn at once, so the window must be known
 // before it — automatic compaction is off while it is not.
 func TestOneShotSettlesTheWindowBeforeTheTurn(t *testing.T) {
-	src, err := os.ReadFile("root.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(src)
+	// The session wiring since ADR-0054, receiver dropped.
+	s := wiringSource(t)
 	start := strings.Index(s, "// --- one-shot mode")
 	end := strings.Index(s[start:], "ag.Run(")
 	if start < 0 || end < 0 {

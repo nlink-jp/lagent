@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -34,18 +33,15 @@ func TestCheckRiskModel(t *testing.T) {
 // ADR-0032 §4: the judge's reasoning_effort and the tier switch must
 // reach the agent, or the config keys are decoration.
 func TestModelTierIsWired(t *testing.T) {
-	src, err := os.ReadFile("root.go")
-	if err != nil {
-		t.Fatal(err)
-	}
+	src := wiringSource(t)
 	for _, want := range []string{
 		"rb.SetReasoningEffort(cfg.LLM.RiskReasoningEffort)",
 		`if cfg.Approval.ModelTier == "shell"`,
 		"ModelTier:        riskBackend != nil",
 		"Rulebook:         rulebook",
 	} {
-		if !strings.Contains(string(src), want) {
-			t.Errorf("root.go lacks %q", want)
+		if !strings.Contains(src, want) {
+			t.Errorf("the session wiring lacks %q", want)
 		}
 	}
 }

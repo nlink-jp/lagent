@@ -30,7 +30,6 @@ import (
 	"github.com/nlink-jp/lagent/internal/config"
 	"github.com/nlink-jp/lagent/internal/hooks"
 	"github.com/nlink-jp/lagent/internal/llm"
-	"github.com/nlink-jp/lagent/internal/mcp"
 	"github.com/nlink-jp/lagent/internal/mcpfilter"
 	"github.com/nlink-jp/lagent/internal/memory"
 	"github.com/nlink-jp/lagent/internal/mention"
@@ -141,9 +140,13 @@ func reloadWarnings(report string) string {
 const workDirNoteFloor = 10 << 20 // 10 MiB
 
 func runREPL(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-	if ctx == nil {
-		ctx = context.Background()
+	// The session's state and the parts its methods call into (ADR-0054
+	// §2.2): filled as startup builds them.
+	sess := newLiveSession()
+	sess.version = cmd.Root().Version
+	sess.ctx = cmd.Context()
+	if sess.ctx == nil {
+		sess.ctx = context.Background()
 	}
 	// Text from outside the runtime reaches a terminal inert and a pipe
 	// verbatim (ADR-0024) — before the first print, so every one after it
@@ -160,7 +163,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// milliseconds and vanished (gem-agent ADR-0021) — so the recorded lines ride
 	// the banner too.
 	notes := &startupNotes{w: cmd.ErrOrStderr()}
-	var stderr io.Writer = notes
+	sess.stderr = notes
 
 	// --- config ---
 	cfgPath := fl.config
@@ -176,7 +179,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	cfg, err := config.LoadWithOverrides(cfgPath, config.Overrides{
+	sess.cfg, err = config.LoadWithOverrides(cfgPath, config.Overrides{
 		Model: fl.model, MCP: fl.mcp, Auto: fl.auto, ReadOnly: roFlag})
 	if err != nil {
 		return err
@@ -190,30 +193,30 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	}
 	// Everything downstream reads this one effective value, never the
 	// raw config field.
-	autoOn := effectiveAuto(cfg.Agent.AutoApprove, oneShot, fl.auto)
+	autoOn := effectiveAuto(sess.cfg.Agent.AutoApprove, oneShot, fl.auto)
 	// The ceiling this run starts with, resolved once for the same
 	// reason (gem-agent ADR-0080 §1).
-	ceiling := effectiveCeiling(cfg.Agent)
+	ceiling := effectiveCeiling(sess.cfg.Agent)
 	// UI language, resolved once (gem-agent ADR-0029): the chrome that follows —
 	// prompts, TUI, slash output — is built with it.
-	uiLang := uitext.Resolve(cfg.TUI.Language, os.Getenv)
-	msgs := uitext.For(uiLang)
+	uiLang := uitext.Resolve(sess.cfg.TUI.Language, os.Getenv)
+	sess.msgs = uitext.For(uiLang)
 	// The escape ladder for turns outside the TUI (gem-agent ADR-0065 §3): the
 	// TUI has its own three-press exit; the plain REPL and one-shot
 	// mode get the same one here. The quit skips the deferred flushes
 	// on purpose — the transcript is per event, and the warning that
 	// preceded it says so.
 	ladder := &interruptLadder{
-		Interrupting: func() { fmt.Fprintln(cmd.ErrOrStderr(), msgs.StatusInterrupting) },
-		Warn:         func() { fmt.Fprintln(cmd.ErrOrStderr(), msgs.InterruptStuckWarn) },
+		Interrupting: func() { fmt.Fprintln(cmd.ErrOrStderr(), sess.msgs.StatusInterrupting) },
+		Warn:         func() { fmt.Fprintln(cmd.ErrOrStderr(), sess.msgs.InterruptStuckWarn) },
 		Quit: func() {
-			fmt.Fprintln(cmd.ErrOrStderr(), msgs.Bye)
+			fmt.Fprintln(cmd.ErrOrStderr(), sess.msgs.Bye)
 			os.Exit(130)
 		},
 	}
 
 	// --- project directory ---
-	projectDir, err := currentProject()
+	sess.projectDir, err = currentProject()
 	if err != nil {
 		return err
 	}
@@ -224,34 +227,35 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// a scripted -p must behave deterministically.
 	interactive := !oneShot && term.IsTerminal(int(os.Stdin.Fd()))
 	home, _ := os.UserHomeDir()
-	if reason := broadRoot(projectDir, home); reason != "" {
-		if err := confirmBroadRoot(reason, projectDir, interactive, os.Stdin, cmd.ErrOrStderr(), msgs); err != nil {
+	if reason := broadRoot(sess.projectDir, home); reason != "" {
+		if err := confirmBroadRoot(reason, sess.projectDir, interactive, os.Stdin, cmd.ErrOrStderr(), sess.msgs); err != nil {
 			return err
 		}
 	}
 
-	policyPath := config.PolicyPath(cfgPath)
-	policyFile, err := config.LoadPolicyFile(policyPath)
+	sess.policyPath = config.PolicyPath(cfgPath)
+	sess.policyFile, err = config.LoadPolicyFile(sess.policyPath)
 	if err != nil {
 		return err
 	}
 
 	// --- first-run project trust (gem-agent ADR-0023): does this project's own
 	// instruction files / .mcp.json / skills get loaded at all? ---
-	projectTrusted, trustNote := resolveProjectTrust(
-		cfg, policyFile, policyPath, projectDir, interactive, os.Stdin, cmd.ErrOrStderr(), msgs)
+	var trustNote string
+	sess.projectTrusted, trustNote = resolveProjectTrust(
+		sess.cfg, sess.policyFile, sess.policyPath, sess.projectDir, interactive, os.Stdin, cmd.ErrOrStderr(), sess.msgs)
 	if trustNote != "" {
-		fmt.Fprintf(stderr, "%s\n", trustNote)
+		fmt.Fprintf(sess.stderr, "%s\n", trustNote)
 	}
 	// Content pins (gem-agent ADR-0074): trust was given to a directory; what is
 	// loaded is content, and content that changed since asks again.
 	// Decided before anything of the project is read — .lagent.toml
 	// below included.
-	grant := projectGrant{trusted: projectTrusted}
+	sess.grant = projectGrant{trusted: sess.projectTrusted}
 	var pinNotes []string
-	grant.excluded, pinNotes = checkPins(cfg, policyFile, policyPath, projectDir, projectTrusted, interactive, os.Stdin, cmd.ErrOrStderr(), msgs)
+	sess.grant.excluded, pinNotes = checkPins(sess.cfg, sess.policyFile, sess.policyPath, sess.projectDir, sess.projectTrusted, interactive, os.Stdin, cmd.ErrOrStderr(), sess.msgs)
 	for _, n := range pinNotes {
-		fmt.Fprintf(stderr, "%s\n", n)
+		fmt.Fprintf(sess.stderr, "%s\n", n)
 	}
 
 	// --- per-tool approval policy (gem-agent ADR-0008) ---
@@ -259,7 +263,8 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// operator trusted this directory and its content is what they
 	// trusted: a checked-out repository must not be able to switch the
 	// gate off.
-	projectCfg, projectMayLoosen, err := loadProjectConfig(cfg, projectDir, grant)
+	var projectMayLoosen bool
+	sess.projectCfg, projectMayLoosen, err = loadProjectConfig(sess.cfg, sess.projectDir, sess.grant)
 	if err != nil {
 		return err
 	}
@@ -270,17 +275,17 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// exclusion that does not do what it says is worse than none, and
 	// falling back to "exclude nothing" would silently hand back the
 	// write functions the operator took away.
-	mcpFilter, err := mcpfilter.Build(cfg.MCP.Exclude, policyScope(policyFile), projectCfg.MCP.Exclude)
+	sess.mcpFilter, err = mcpfilter.Build(sess.cfg.MCP.Exclude, policyScope(sess.policyFile), sess.projectCfg.MCP.Exclude)
 	if err != nil {
 		return err
 	}
 	mergedTools := map[string]string{}
-	for k, v := range cfg.Approval.Tools {
+	for k, v := range sess.cfg.Approval.Tools {
 		mergedTools[k] = v
 	}
 	// The machine-owned file wins: a change made through /settings must
 	// not be silently overridden by the hand-written config (gem-agent ADR-0009).
-	for k, v := range policyFile.ForProject(projectDir) {
+	for k, v := range sess.policyFile.ForProject(sess.projectDir) {
 		mergedTools[k] = v
 	}
 	// --allow entries sit above both files (flags > machine-owned >
@@ -297,12 +302,12 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// to end. Ignoring them only ever tightens. The note tells the
 	// operator where the entries live.
 	approvalPolicy, policyNotes, err := policy.Build(
-		mergedTools, projectCfg.Approval.Tools, nil, projectMayLoosen)
+		mergedTools, sess.projectCfg.Approval.Tools, nil, projectMayLoosen)
 	if err != nil {
 		return err
 	}
-	if n := len(policyFile.CommandsFor(projectDir)); n > 0 {
-		fmt.Fprintf(stderr, "note: %s has %d obsolete [projects.<dir>.commands] entries — ignored; delete them to silence this note\n", policyPath, n)
+	if n := len(sess.policyFile.CommandsFor(sess.projectDir)); n > 0 {
+		fmt.Fprintf(sess.stderr, "note: %s has %d obsolete [projects.<dir>.commands] entries — ignored; delete them to silence this note\n", sess.policyPath, n)
 	}
 
 	// The persistent-file snapshot (gem-agent ADR-0074 §3/§4): what this session
@@ -310,58 +315,41 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// compared again at the end so what the session added or changed
 	// is said — the parent directories it names are denied by name in
 	// the write lane.
-	persistentSnap, persistentCut := trustpin.Snapshot(projectDir)
+	var persistentCut bool
+	sess.persistentSnap, persistentCut = trustpin.Snapshot(sess.projectDir)
 	if persistentCut {
-		fmt.Fprintf(stderr, "note: change detection covers the first %d files under the project only\n", trustpin.WalkEntries)
+		fmt.Fprintf(sess.stderr, "note: change detection covers the first %d files under the project only\n", trustpin.WalkEntries)
 	}
-	persistentPath, persistentPathErr := persistentStateFile(projectDir)
-	if persistentPathErr == nil {
-		if prev := loadPersistentSnapshot(persistentPath); prev != nil {
-			if a, c, r := trustpin.SnapshotDiff(prev, persistentSnap); len(a)+len(c)+len(r) > 0 {
-				fmt.Fprintf(stderr, msgs.PersistentSinceLastFmt+"\n", describeSnapshotDiff(a, c, r))
+	sess.persistentPath, sess.persistentPathErr = persistentStateFile(sess.projectDir)
+	if sess.persistentPathErr == nil {
+		if prev := loadPersistentSnapshot(sess.persistentPath); prev != nil {
+			if a, c, r := trustpin.SnapshotDiff(prev, sess.persistentSnap); len(a)+len(c)+len(r) > 0 {
+				fmt.Fprintf(sess.stderr, sess.msgs.PersistentSinceLastFmt+"\n", describeSnapshotDiff(a, c, r))
 			}
 		}
-		_ = savePersistentSnapshot(persistentPath, persistentSnap)
-	}
-	reportPersistent := func(reason string, log func(kind string, data any) error) {
-		now, a, c, r, cut := persistentReport(persistentSnap, func() (map[string]string, bool) { return trustpin.Snapshot(projectDir) })
-		if cut {
-			fmt.Fprintf(stderr, "note: change detection covers the first %d files under the project only\n", trustpin.WalkEntries)
-		}
-		if len(a)+len(c)+len(r) > 0 || cut {
-			if len(a)+len(c)+len(r) > 0 {
-				fmt.Fprintf(stderr, msgs.PersistentSessionFmt+"\n", describeSnapshotDiff(a, c, r))
-			}
-			if log != nil {
-				_ = log("persistent_changes", map[string]any{"reason": reason, "added": a, "changed": c, "removed": r, "cut": cut})
-			}
-		}
-		persistentSnap = now
-		if persistentPathErr == nil {
-			_ = savePersistentSnapshot(persistentPath, now)
-		}
+		_ = savePersistentSnapshot(sess.persistentPath, sess.persistentSnap)
 	}
 	// What a `!` command changed in the files later sessions trust is
 	// said after its output.
 	afterShell := func() string {
-		return pinChangesNote(cfg, policyFile, policyPath, projectDir, projectTrusted, msgs)
+		return pinChangesNote(sess.cfg, sess.policyFile, sess.policyPath, sess.projectDir, sess.projectTrusted, sess.msgs)
 	}
 
 	// --- session transcript: the log, and the resume source (gem-agent ADR-0005) ---
 	if fl.continueLast && fl.resume != "" {
 		return fmt.Errorf("--continue and --resume name different sessions; use one")
 	}
-	sessionDir, sessionDirErr := session.DefaultDir()
+	sess.sessionDir, sess.sessionDirErr = session.DefaultDir()
 
 	var restored []llm.Message
 	var restoredLoads []string
 	resumedID := ""
 	var resumedFrom time.Time // when a resumed conversation began (ADR-0030)
 	if fl.continueLast || fl.resume != "" {
-		if sessionDirErr != nil {
-			return fmt.Errorf("cannot resume: %w", sessionDirErr)
+		if sess.sessionDirErr != nil {
+			return fmt.Errorf("cannot resume: %w", sess.sessionDirErr)
 		}
-		meta, err := resolveResume(sessionDir, projectDir, cfg.LLM.Model, fl.resume)
+		meta, err := resolveResume(sess.sessionDir, sess.projectDir, sess.cfg.LLM.Model, fl.resume)
 		if err != nil {
 			return err
 		}
@@ -374,36 +362,36 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// session, and degrading beats refusing to start. A broken *resume*
 	// is fatal, though — the operator asked for that history, and
 	// continuing without it silently would be worse than stopping.
-	var sessionLog agent.SessionLog
-	sessionPath := "(disabled)"
-	sessionID := ""
+
+	sess.sessionPath = "(disabled)"
+	sess.sessionID = ""
 	// curLog is the transcript in use; /clear replaces it (gem-agent ADR-0071 §2),
 	// so the exit-time close reads the variable, not a snapshot.
-	var curLog *session.Logger
+
 	cl.push("close the transcript", func() {
-		if curLog != nil {
-			_ = curLog.Close()
+		if sess.curLog != nil {
+			_ = sess.curLog.Close()
 		}
 	})
-	if sessionDirErr != nil {
-		fmt.Fprintf(stderr, "warning: session log disabled: %v\n", sessionDirErr)
+	if sess.sessionDirErr != nil {
+		fmt.Fprintf(sess.stderr, "warning: session log disabled: %v\n", sess.sessionDirErr)
 	} else {
-		lg, err := openSessionLog(sessionDir, resumedID, projectDir, cfg.LLM.Model, cmd.Root().Version)
+		lg, err := openSessionLog(sess.sessionDir, resumedID, sess.projectDir, sess.cfg.LLM.Model, cmd.Root().Version)
 		switch {
 		case err != nil && resumedID != "":
 			return fmt.Errorf("cannot append to session %s: %w", resumedID, err)
 		case err != nil:
-			fmt.Fprintf(stderr, "warning: session log disabled: %v\n", err)
+			fmt.Fprintf(sess.stderr, "warning: session log disabled: %v\n", err)
 		default:
-			curLog = lg
-			sessionLog = lg
-			sessionPath = lg.Path()
-			sessionID = lg.ID()
+			sess.curLog = lg
+			sess.sessionLog = lg
+			sess.sessionPath = lg.Path()
+			sess.sessionID = lg.ID()
 			// Exported before any MCP server starts, so a registration
 			// line can hand the session to a server that keeps
 			// per-session state (gem-agent ADR-0069 addendum 2).
-			if err := session.Export(sessionID); err != nil {
-				fmt.Fprintf(stderr, "warning: cannot set %s: %v\n", session.EnvVar, err)
+			if err := session.Export(sess.sessionID); err != nil {
+				fmt.Fprintf(sess.stderr, "warning: cannot set %s: %v\n", session.EnvVar, err)
 			}
 			if resumedID != "" {
 				// Under the flock (Reopen holds it): the file we read
@@ -414,7 +402,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 					return err
 				}
 				for _, n := range resumeNotes {
-					fmt.Fprintf(stderr, "warning: %s\n", n)
+					fmt.Fprintf(sess.stderr, "warning: %s\n", n)
 				}
 				restored = history
 				// Same file, same lock: the servers the session loaded,
@@ -440,32 +428,32 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// back in the directory its earlier self used.
 	// The project directory is the third fact a child sees (gem-agent ADR-0071
 	// §3), beside the session id and the work directory.
-	if err := os.Setenv(workdir.ProjectEnvVar, projectDir); err != nil {
-		fmt.Fprintf(stderr, "warning: cannot set %s: %v\n", workdir.ProjectEnvVar, err)
+	if err := os.Setenv(workdir.ProjectEnvVar, sess.projectDir); err != nil {
+		fmt.Fprintf(sess.stderr, "warning: cannot set %s: %v\n", workdir.ProjectEnvVar, err)
 	}
-	workDir := ""
+	sess.workDir = ""
 	cl.push("remove the fallback scratch", removeFallbackScratch)
 	cl.push("remove the work directory if empty", func() {
-		if workDir != "" {
-			workdir.RemoveIfEmpty(workDir)
+		if sess.workDir != "" {
+			workdir.RemoveIfEmpty(sess.workDir)
 		}
 	})
-	if sessionID != "" {
-		if dir, err := workdir.Ensure(projectDir, sessionID); err != nil {
+	if sess.sessionID != "" {
+		if dir, err := workdir.Ensure(sess.projectDir, sess.sessionID); err != nil {
 			// A missing work directory degrades the session (oversized
 			// MCP results get truncated with a note); it does not stop
 			// the session from starting.
-			fmt.Fprintf(stderr, "warning: session work directory unavailable: %v\n", err)
+			fmt.Fprintf(sess.stderr, "warning: session work directory unavailable: %v\n", err)
 			// An inherited value (a nested launch) must not stand in.
 			_ = os.Unsetenv(workdir.EnvVar)
 		} else {
-			workDir = dir
+			sess.workDir = dir
 			// Exported, not passed: this is what puts the path in front
 			// of shell_exec's child, every MCP server (internal/mcp
 			// inherits os.Environ), and every hook, without any of them
 			// needing to know lagent's layout.
-			if err := exportWorkDir(workDir); err != nil {
-				fmt.Fprintf(stderr, "warning: cannot set %s: %v\n", workdir.EnvVar, err)
+			if err := exportWorkDir(sess.workDir); err != nil {
+				fmt.Fprintf(sess.stderr, "warning: cannot set %s: %v\n", workdir.EnvVar, err)
 			}
 			// Gated on bytes, not on the count (gem-agent ADR-0078 §4): two empty
 			// leftovers are not an accumulation, and a line reading "0B"
@@ -474,21 +462,21 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			// a truncated sweep whose partial sum is under the floor
 			// would suppress the note the floor exists to make
 			// meaningful (pre-release review).
-			if dirs, bytes, more, err := workdir.Sweep(projectDir, sessionID); err == nil &&
+			if dirs, bytes, more, err := workdir.Sweep(sess.projectDir, sess.sessionID); err == nil &&
 				(bytes >= workDirNoteFloor || (more && bytes > 0)) {
 				plus := ""
 				if more {
 					plus = "+" // the startup scan was cut: a lower bound
 				}
-				fmt.Fprintf(stderr, "note: %d%s earlier session work dir(s) hold %s%s — delete them with 'lagent workdirs clean'\n",
+				fmt.Fprintf(sess.stderr, "note: %d%s earlier session work dir(s) hold %s%s — delete them with 'lagent workdirs clean'\n",
 					dirs, plus, humanBytes(bytes), plus)
 			}
 		}
 	}
 
 	// --- shell execution strategy (gem-agent ADR-0001 defense-in-depth) ---
-	sandboxOn := cfg.Sandbox.Enabled && !fl.noSandbox
-	if sandboxOn {
+	sess.sandboxOn = sess.cfg.Sandbox.Enabled && !fl.noSandbox
+	if sess.sandboxOn {
 		// Fail closed (gem-agent ADR-0073 §5): a sandbox that cannot apply here
 		// (a nested Seatbelt) must not degrade silently into unconfined
 		// execution — the operator says --no-sandbox, or nothing runs.
@@ -499,78 +487,78 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// The operator's added directories (ADR-0046): judged by the one
 	// rule before anything uses them, and a refusal stops the start —
 	// the operator typed the path and must hear it did not apply.
-	added, skippedDirs, err := resolveAddedDirs(cfg, projectDir, workDir, cfgPath, fl.addDir, fl.readDir)
+	added, skippedDirs, err := resolveAddedDirs(sess.cfg, sess.projectDir, sess.workDir, cfgPath, fl.addDir, fl.readDir)
 	if err != nil {
 		return err
 	}
 	for _, s := range skippedDirs {
-		fmt.Fprintf(stderr, msgs.AddedSkippedFmt+"\n", s)
+		fmt.Fprintf(sess.stderr, sess.msgs.AddedSkippedFmt+"\n", s)
 	}
-	if len(added) > 0 && sessionLog != nil {
-		_ = sessionLog.Log("added_directories", addedDirsRecord(added))
+	if len(added) > 0 && sess.sessionLog != nil {
+		_ = sess.sessionLog.Log("added_directories", addedDirsRecord(added))
 	}
 	// Persistent files in the write roots are watched: what changed
 	// since the previous session is said now, what this session changes
 	// at /clear and at exit.
-	watch := newAddedWatch(added, projectDir, stderr, msgs)
-	execFn, enforcement, laneNotes, err := buildExecFn(sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.Caches(), trustpin.Parents(projectDir, persistentSnap), rootsOf(added))
+	sess.watch = newAddedWatch(added, sess.projectDir, sess.stderr, sess.msgs)
+	execFn, enforcement, laneNotes, err := buildExecFn(sess.sandboxOn, sess.projectDir, sess.workDir, sess.cfg.Sandbox.ReadLaneDenyExec, sess.cfg.Sandbox.Caches(), trustpin.Parents(sess.projectDir, sess.persistentSnap), rootsOf(added))
 	if err != nil {
 		return err
 	}
-	if cfg.Sandbox.ReadLanePrompts {
+	if sess.cfg.Sandbox.ReadLanePrompts {
 		// The operator's opt-out (gem-agent ADR-0073 §5): read-lane commands keep
 		// their cage and their prompt.
 		enforcement.ReadLane = false
 	}
 	for _, n := range laneNotes {
-		fmt.Fprintf(stderr, "warning: %s\n", n)
+		fmt.Fprintf(sess.stderr, "warning: %s\n", n)
 	}
 	// The strategy is swapped when /clear rotates the work directory
 	// (gem-agent ADR-0071 §2): the sandbox profile names the directory, so a
 	// profile built at startup denied every write to the new one.
-	shellExec := &liveExec{fn: execFn}
+	sess.shellExec = &liveExec{fn: execFn}
 
-	registry, err := tools.New(projectDir, nil, time.Duration(cfg.Agent.ShellTimeoutSec)*time.Second)
+	sess.registry, err = tools.New(sess.projectDir, nil, time.Duration(sess.cfg.Agent.ShellTimeoutSec)*time.Second)
 	if err != nil {
 		return err
 	}
 	// The lanes (gem-agent ADR-0073): a read-lane command runs without approval
 	// only where the read lane's denials were verified on this machine;
 	// with the sandbox off every shell call is the operator's alone.
-	registry.SetLaneExec(shellExec.run, enforcement)
-	if workDir != "" {
+	sess.registry.SetLaneExec(sess.shellExec.run, enforcement)
+	if sess.workDir != "" {
 		// The file tools get the work directory as a second root, so a
 		// result the intake saved is one read_file can read back. Without
 		// it the model sees paths it cannot open and routes around the
 		// built-ins with shell redirection, which is less reviewable.
-		if err := registry.UseWorkDir(workDir); err != nil {
-			fmt.Fprintf(stderr, "warning: session work directory not readable by the file tools: %v\n", err)
+		if err := sess.registry.UseWorkDir(sess.workDir); err != nil {
+			fmt.Fprintf(sess.stderr, "warning: session work directory not readable by the file tools: %v\n", err)
 		}
 	}
-	if err := registry.AddDirs(rootsOf(added)); err != nil {
+	if err := sess.registry.AddDirs(rootsOf(added)); err != nil {
 		return err
 	}
 	// Mid-session grants (ADR-0046): the operator's /add-dir and
 	// /read-dir and the model's request_directory share this one path.
-	granter := &dirGranter{
-		registry: registry, shellExec: shellExec, sandboxOn: sandboxOn,
-		projectDir: realOrSelf(projectDir), workDir: func() string { return workDir },
-		denyExec: cfg.Sandbox.ReadLaneDenyExec, caches: cfg.Sandbox.Caches(), readLanePrompts: cfg.Sandbox.ReadLanePrompts,
-		parents: func() []string { return trustpin.Parents(projectDir, persistentSnap) },
-		base:    rootBaseContext(cfgPath), watch: watch, sources: map[string]string{}, msgs: msgs,
+	sess.granter = &dirGranter{
+		registry: sess.registry, shellExec: sess.shellExec, sandboxOn: sess.sandboxOn,
+		projectDir: realOrSelf(sess.projectDir), workDir: func() string { return sess.workDir },
+		denyExec: sess.cfg.Sandbox.ReadLaneDenyExec, caches: sess.cfg.Sandbox.Caches(), readLanePrompts: sess.cfg.Sandbox.ReadLanePrompts,
+		parents: func() []string { return trustpin.Parents(sess.projectDir, sess.persistentSnap) },
+		base:    rootBaseContext(cfgPath), watch: sess.watch, sources: map[string]string{}, msgs: sess.msgs,
 		log: func(kind string, data any) error {
-			if sessionLog == nil {
+			if sess.sessionLog == nil {
 				return nil
 			}
-			return sessionLog.Log(kind, data)
+			return sess.sessionLog.Log(kind, data)
 		},
 	}
 	for _, a := range added {
-		granter.sources[a.Dir] = a.Source
+		sess.granter.sources[a.Dir] = a.Source
 	}
 	if !oneShot {
 		// Only where a human answers: under -p it could only be denied.
-		if err := registerRequestDirectory(registry, granter); err != nil {
+		if err := registerRequestDirectory(sess.registry, sess.granter); err != nil {
 			return err
 		}
 	}
@@ -579,14 +567,14 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// machine before it is trusted. Where it cannot be proven the reads
 	// stay in process with the matcher as the boundary, and the note
 	// says so rather than letting the banner imply a cage.
-	if probeDir, doneProbe := fileProbeDir(workDir); probeDir != "" {
-		note := installFileChild(registry, home, probeDir)
+	if probeDir, doneProbe := fileProbeDir(sess.workDir); probeDir != "" {
+		note := installFileChild(sess.registry, home, probeDir)
 		doneProbe()
 		if note != "" {
-			fmt.Fprintf(stderr, "warning: %s\n", note)
+			fmt.Fprintf(sess.stderr, "warning: %s\n", note)
 		}
 	} else {
-		fmt.Fprintf(stderr, "warning: file reads are not sandboxed (no probe directory)\n")
+		fmt.Fprintf(sess.stderr, "warning: file reads are not sandboxed (no probe directory)\n")
 	}
 
 	// --- project instruction files (drop-in: AGENTS.md and friends,
@@ -594,38 +582,40 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// Read here, with the skills, before any process the project names
 	// (an MCP server) starts: the pins were digested moments ago, and
 	// the gap between digest and read is kept to this (gem-agent ADR-0074).
-	projectContext, contextLabels, contextNotes := loadInstructions(projectDir, grant)
+	var contextLabels, contextNotes []string
+	sess.projectContext, contextLabels, contextNotes = loadInstructions(sess.projectDir, sess.grant)
 	for _, n := range contextNotes {
-		fmt.Fprintf(stderr, "warning: instruction file %s\n", n)
+		fmt.Fprintf(sess.stderr, "warning: instruction file %s\n", n)
 	}
 	// --- skills (ADR-0011): Claude Code's format from lagent's own
 	// global directory and the trusted project's .claude/skills ---
-	skillsList, skillNotes := discoverSkills(projectDir, grant)
-	cl.push("close the skills' roots", func() { skills.CloseAll(skillsList) }) // reads the variable: /clear replaces it
+	var skillNotes []string
+	sess.skillsList, skillNotes = discoverSkills(sess.projectDir, sess.grant)
+	cl.push("close the skills' roots", func() { skills.CloseAll(sess.skillsList) }) // reads the variable: /clear replaces it
 	for _, n := range skillNotes {
-		fmt.Fprintf(stderr, "warning: skills: %s\n", n)
+		fmt.Fprintf(sess.stderr, "warning: skills: %s\n", n)
 	}
 	// load_skill is registered whether or not any skill was found, so
 	// the tool set — and the cached prefix — does not depend on what the
 	// operator has installed.
-	if err := registerSkillTool(registry, func() []skills.Skill { return skillsList }); err != nil {
+	if err := registerSkillTool(sess.registry, func() []skills.Skill { return sess.skillsList }); err != nil {
 		return err
 	}
 	// --- memory (ADR-0013): two scopes under the state root; recall
 	// rides the facts message, the operator writes with /remember, the
 	// model proposes through gated tools ---
-	memStore := memoryStore{Project: projectDir}
+	sess.memStore = memoryStore{Project: sess.projectDir}
 	if base, err := memory.DefaultDir(); err == nil {
-		memStore.Base = base
+		sess.memStore.Base = base
 	} else {
-		fmt.Fprintf(stderr, "warning: memory is off: %v\n", err)
+		fmt.Fprintf(sess.stderr, "warning: memory is off: %v\n", err)
 	}
-	if err := registerMemoryTools(registry, memStore); err != nil {
+	if err := registerMemoryTools(sess.registry, sess.memStore); err != nil {
 		return err
 	}
-	if _, memNotes := memStore.load(); len(memNotes) > 0 {
+	if _, memNotes := sess.memStore.load(); len(memNotes) > 0 {
 		for _, n := range memNotes {
-			fmt.Fprintf(stderr, "warning: memory: %s\n", n)
+			fmt.Fprintf(sess.stderr, "warning: memory: %s\n", n)
 		}
 	}
 
@@ -636,9 +626,9 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// sends through it now is show_image, which the model calls, and
 	// /show, which the operator types. Unbound it is inert.
 	screen := tui.NewScreen()
-	mcpClients, mcpSummary, mcpInv := connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, stderr, grant, mcpFilter)
+	sess.mcpClients, sess.mcpSummary, sess.mcpInv = connectMCPServers(sess.ctx, sess.cfg, sess.projectDir, cmd.Root().Version, sess.registry, sess.stderr, sess.grant, sess.mcpFilter)
 	cl.push("close the MCP clients", func() {
-		for _, c := range mcpClients {
+		for _, c := range sess.mcpClients {
 			c.Close()
 		}
 	})
@@ -646,17 +636,16 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// are registered; only a loaded server's are advertised. A --allow
 	// grant naming a server is a preload — the operator's declaration
 	// that this run needs it.
-	adv := newMCPAdvertiser(cfg.MCP.Advertise == "all", cfg.MCP.Preload, fl.allow)
-	adv.setInventory(mcpInv)
-	mcpStatus := func() []string { return mcpInv.summaryLinesWith(adv.Loaded) }
-	_ = mcpSummary
+	sess.adv = newMCPAdvertiser(sess.cfg.MCP.Advertise == "all", sess.cfg.MCP.Preload, fl.allow)
+	sess.adv.setInventory(sess.mcpInv)
+	_ = sess.mcpSummary
 
 	// --- LLM backend ---
-	backend, err := newModelClient(cfg, cfg.LLM.Model)
+	sess.backend, err = newModelClient(sess.cfg, sess.cfg.LLM.Model)
 	if err != nil {
 		return err
 	}
-	backend.SetReasoningEffort(cfg.LLM.ReasoningEffort)
+	sess.backend.SetReasoningEffort(sess.cfg.LLM.ReasoningEffort)
 
 	// --- the model tier (ADR-0032): its own backend on the same server,
 	// because the judge's reasoning_effort is its own even on the main
@@ -664,17 +653,17 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	var riskBackend llm.Backend
 	var rulebook string
 	var tierNotes []string
-	riskModel := cfg.LLM.RiskModel
+	riskModel := sess.cfg.LLM.RiskModel
 	if riskModel == "" {
-		riskModel = cfg.LLM.Model
+		riskModel = sess.cfg.LLM.Model
 	}
-	if cfg.Approval.ModelTier == "shell" {
-		rb, err := newModelClient(cfg, riskModel)
+	if sess.cfg.Approval.ModelTier == "shell" {
+		rb, err := newModelClient(sess.cfg, riskModel)
 		if err != nil {
 			return err
 		}
-		rb.SetReasoningEffort(cfg.LLM.RiskReasoningEffort)
-		if err := checkRiskModel(ctx, rb, cfg.LLM.Provider, cfg.LLM.RiskModel); err != nil {
+		rb.SetReasoningEffort(sess.cfg.LLM.RiskReasoningEffort)
+		if err := checkRiskModel(sess.ctx, rb, sess.cfg.LLM.Provider, sess.cfg.LLM.RiskModel); err != nil {
 			return err
 		}
 		riskBackend = rb
@@ -707,7 +696,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// two places.
 	images := termimg.None
 	if useTUI {
-		images = resolveImages(cfg.TUI.Images)
+		images = resolveImages(sess.cfg.TUI.Images)
 	}
 	var gate agent.Approver
 	var tuiGate *tui.Gate
@@ -716,29 +705,29 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// One-shot runs non-interactively (stdin may be a pipe): a
 		// blocking approval prompt would hang, so mutating tools are
 		// denied outright. Read-only pipelines still work.
-		gate = denyGate{out: stderr}
+		gate = denyGate{out: sess.stderr}
 	case useTUI:
 		tuiGate = tui.NewGate()
 		gate = tuiGate
 	default:
-		gate = approve.New(stdin, stderr)
+		gate = approve.New(stdin, sess.stderr)
 	}
-	reader := repl.NewReader(stdin, stderr)
+	reader := repl.NewReader(stdin, sess.stderr)
 
 	// prog is assigned before the TUI runs; the agent only executes
 	// inside prog.Run, so the callbacks below never see it half-set.
 	var prog *tea.Program
 	// Where operator-facing output goes (ADR-0054 §2.3): the TUI once
 	// prog runs, stderr until then and without one.
-	surf := &surface{w: stderr, msgs: msgs, oneShot: oneShot, plainAsk: plainAsk(stdin, cmd.ErrOrStderr())}
+	sess.surf = &surface{w: sess.stderr, msgs: sess.msgs, oneShot: oneShot, plainAsk: plainAsk(stdin, cmd.ErrOrStderr())}
 	// Turn observability (gem-agent ADR-0033): stream heartbeat, retries, and
 	// thought summaries reach the TUI when one is running; the plain
 	// REPL and one-shot mode stay quiet — their output goes to pipes.
-	backend.SetObserver(func(ev llm.StreamEvent) {
-		if ev.Kind == "thought" && !cfg.TUI.ShowThoughts {
+	sess.backend.SetObserver(func(ev llm.StreamEvent) {
+		if ev.Kind == "thought" && !sess.cfg.TUI.ShowThoughts {
 			return
 		}
-		surf.stream(ev)
+		sess.surf.stream(ev)
 	})
 
 	// --- ask_user: a structured mid-turn choice (gem-agent ADR-0036) ---
@@ -749,15 +738,15 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// The plain-REPL asker reads the SHARED stdin reader: a second
 	// bufio.Reader over the same fd strands typed-ahead input in one
 	// buffer while the other blocks (AGENTS.md gotcha; review round 3).
-	askOperator := surf.ask
-	if err := registerAskTool(registry, askOperator); err != nil {
+	askOperator := sess.surf.ask
+	if err := registerAskTool(sess.registry, askOperator); err != nil {
 		return err
 	}
 	// mcp_load (ADR-0004): registered before agent.New, which caches the
 	// declarations; the refresh closure reads `ag` lazily — the tool can
 	// only run inside ag.Run, so the pointer is set by then.
-	var ag *agent.Agent
-	if err := registerMCPLoadTool(registry, adv, func() { ag.RefreshTools() }); err != nil {
+
+	if err := registerMCPLoadTool(sess.registry, sess.adv, func() { sess.ag.RefreshTools() }); err != nil {
 		return err
 	}
 
@@ -775,102 +764,87 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			}
 			evidence := ""
 			if len(recent) > 0 {
-				evidence = fmt.Sprintf(msgs.RoundRecentCallsFmt, clipRunes(strings.Join(recent, "\n  "), 600))
+				evidence = fmt.Sprintf(sess.msgs.RoundRecentCallsFmt, clipRunes(strings.Join(recent, "\n  "), 600))
 			}
 			var q string
 			if info.Trigger == "loop" {
-				q = fmt.Sprintf(msgs.RoundLoopAskFmt, clipRunes(info.Detail, 80), evidence)
+				q = fmt.Sprintf(sess.msgs.RoundLoopAskFmt, clipRunes(info.Detail, 80), evidence)
 			} else {
-				q = fmt.Sprintf(msgs.RoundLimitAskFmt, info.Rounds, info.Cap, evidence)
+				q = fmt.Sprintf(sess.msgs.RoundLimitAskFmt, info.Rounds, info.Cap, evidence)
 			}
-			idx, err := askOperator(rctx, q, []string{msgs.RoundContinue, msgs.RoundStop})
+			idx, err := askOperator(rctx, q, []string{sess.msgs.RoundContinue, sess.msgs.RoundStop})
 			return err == nil && idx == 0
 		}
 	}
 
-	// The system prompt is composed in ONE place so a skills reload
-	// rebuilds exactly what startup built (gem-agent ADR-0039). It says nothing
-	// about diagrams on any surface (gem-agent ADR-0063): fence rendering is a
-	// view-layer concern the model is never told about, and both a
-	// prohibition and a format instruction were measured steering the
-	// model away from the behavior its own prior already had.
-	composeSystem := func() string {
-		return buildSystemPrompt(projectDir, projectContext)
-	}
 	// writes pairs the agent's before/after hooks around an
 	// operator-approved write (gem-agent ADR-0074 §1).
 	writes := &writeGuard{}
 	// notice puts a one-line warning in front of the operator wherever
 	// they are: the TUI's note strip when it runs, stderr otherwise.
-	notice := surf.notice
-	granter.notice = notice
+	notice := sess.surf.notice
+	sess.granter.notice = notice
 	for _, n := range tierNotes {
 		notice(n)
 	}
 	// --- pre-tool hooks (ADR-0012): the operator's floor before the
 	// ladder. What a hook learns about the session: the transcript path
 	// only while a log is actually being written. /clear re-points it.
-	hookSession := hooks.Session{ID: sessionID, CWD: projectDir}
-	if sessionID != "" {
-		hookSession.TranscriptPath = sessionPath
+	sess.hookSession = hooks.Session{ID: sess.sessionID, CWD: sess.projectDir}
+	if sess.sessionID != "" {
+		sess.hookSession.TranscriptPath = sess.sessionPath
 	}
 	// Hook notices are collected while a slash command runs the hooks
 	// (surface.hookNotice says why: ADR-0054, Found 1).
-	hookNotify := surf.hookNotice
-	var hookRunner *hooks.Runner
-	if len(cfg.Hooks.PreToolUse)+len(cfg.Hooks.SessionStart)+len(cfg.Hooks.UserPromptSubmit)+len(cfg.Hooks.SessionEnd) > 0 {
-		hookRunner = hooks.New(hooks.Hooks{
-			PreToolUse:       hookEntries(cfg.Hooks.PreToolUse),
-			SessionStart:     hookEntries(cfg.Hooks.SessionStart),
-			UserPromptSubmit: hookEntries(cfg.Hooks.UserPromptSubmit),
-			SessionEnd:       hookEntries(cfg.Hooks.SessionEnd),
+	hookNotify := sess.surf.hookNotice
+
+	if len(sess.cfg.Hooks.PreToolUse)+len(sess.cfg.Hooks.SessionStart)+len(sess.cfg.Hooks.UserPromptSubmit)+len(sess.cfg.Hooks.SessionEnd) > 0 {
+		sess.hookRunner = hooks.New(hooks.Hooks{
+			PreToolUse:       hookEntries(sess.cfg.Hooks.PreToolUse),
+			SessionStart:     hookEntries(sess.cfg.Hooks.SessionStart),
+			UserPromptSubmit: hookEntries(sess.cfg.Hooks.UserPromptSubmit),
+			SessionEnd:       hookEntries(sess.cfg.Hooks.SessionEnd),
 		}, hookNotify)
 	}
 	var preToolHook func(ctx context.Context, name string, args map[string]any) (bool, string)
-	if hookRunner != nil && hookRunner.HasPreToolUse() {
+	if sess.hookRunner != nil && sess.hookRunner.HasPreToolUse() {
 		preToolHook = func(ctx context.Context, name string, args map[string]any) (bool, string) {
-			return hookRunner.Pre(ctx, hookSession, name, args)
+			return sess.hookRunner.Pre(ctx, sess.hookSession, name, args)
 		}
 	}
 	// The context hooks (ADR-0014): a prompt hook sees the typed input
 	// before the turn starts; session-start output rides the next turn
 	// as a data attachment; session end runs on exit and on /clear.
 	var promptHook agent.PromptHook
-	if hookRunner != nil && hookRunner.HasPromptSubmit() {
+	if sess.hookRunner != nil && sess.hookRunner.HasPromptSubmit() {
 		promptHook = func(ctx context.Context, input string) (string, bool, string) {
-			return hookRunner.PromptSubmit(ctx, hookSession, input)
+			return sess.hookRunner.PromptSubmit(ctx, sess.hookSession, input)
 		}
 	}
-	sessionEndHooks := func(reason string) {
-		if hookRunner == nil || !hookRunner.HasSessionEnd() {
-			return
-		}
-		hookRunner.SessionEnd(ctx, hookSession, reason)
-	}
-	cl.push("run the session-end hooks", func() { sessionEndHooks("exit") })
-	ag = agent.New(agent.Options{
+	cl.push("run the session-end hooks", func() { sess.sessionEndHooks("exit") })
+	sess.ag = agent.New(agent.Options{
 		// resolveWindow below always answers, a configured window included.
 		WindowLookup: true,
 		// The operator's language for the notices the agent writes
 		// mid-turn (gem-agent ADR-0029 §3: they are chrome, not error chains).
-		Msgs: msgs,
+		Msgs: sess.msgs,
 		// Accounting only (gem-agent ADR-0057): the model name that goes into
 		// this session's usage records.
-		Model:          cfg.LLM.Model,
-		Backend:        backend,
-		Registry:       registry,
+		Model:          sess.cfg.LLM.Model,
+		Backend:        sess.backend,
+		Registry:       sess.registry,
 		Gate:           gate,
-		Log:            sessionLog,
-		System:         composeSystem(),
-		MaxTurns:       cfg.Agent.MaxTurns,
+		Log:            sess.sessionLog,
+		System:         sess.composeSystem(),
+		MaxTurns:       sess.cfg.Agent.MaxTurns,
 		Policy:         approvalPolicy,
-		Advertise:      adv.Advertise,
+		Advertise:      sess.adv.Advertise,
 		PreToolHook:    preToolHook,
 		PromptHook:     promptHook,
 		ClipboardImage: clipboardImage,
 		BeforeOperatorWrite: func(tc llm.ToolCall) {
-			if name := pinNameForWrite(projectDir, tc); name != "" {
-				writes.begin(tc, name, repinnable(policyFile, policyPath, projectDir, name, grant.excluded))
+			if name := pinNameForWrite(sess.projectDir, tc); name != "" {
+				writes.begin(tc, name, repinnable(sess.policyFile, sess.policyPath, sess.projectDir, name, sess.grant.excluded))
 			}
 		},
 		OnOperatorWrite: func(tc llm.ToolCall) {
@@ -883,17 +857,17 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			// its text, not its effect on those files, so it re-pins
 			// nothing; what now differs is named and the next start
 			// asks.
-			if name := pinNameForWrite(projectDir, tc); name != "" {
+			if name := pinNameForWrite(sess.projectDir, tc); name != "" {
 				if !writes.end(tc, name) {
-					notice(fmt.Sprintf(msgs.PinStaleWriteFmt, name))
+					notice(fmt.Sprintf(sess.msgs.PinStaleWriteFmt, name))
 					return
 				}
-				if err := repinName(policyPath, projectDir, name, policyFile, grant.excluded); err != nil {
+				if err := repinName(sess.policyPath, sess.projectDir, name, sess.policyFile, sess.grant.excluded); err != nil {
 					notice(fmt.Sprintf("could not refresh the trust pin of %s: %v", name, err))
 				}
 				return
 			}
-			if n := pinChangesNote(cfg, policyFile, policyPath, projectDir, projectTrusted, msgs); n != "" {
+			if n := pinChangesNote(sess.cfg, sess.policyFile, sess.policyPath, sess.projectDir, sess.projectTrusted, sess.msgs); n != "" {
 				notice(n)
 			}
 		},
@@ -902,14 +876,14 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			// which tools it added the purpose field to, and a tool that
 			// publishes an argument of that name must keep it visible
 			// among the arguments (gem-agent ADR-0047 §2).
-			detail, purpose := ag.Describe(tc)
-			surf.toolCall(tc.Name, detail, purpose)
+			detail, purpose := sess.ag.Describe(tc)
+			sess.surf.toolCall(tc.Name, detail, purpose)
 		},
 		// The tool-finished signal (review round 3): the TUI's stall
 		// detector re-arms on this, never on stream chunks — a risk or
 		// progress review's side-stream used to look like "the tool
 		// returned" and produced false stall warnings.
-		OnToolDone: func(tc llm.ToolCall) { surf.toolDone(tc.Name) },
+		OnToolDone: func(tc llm.ToolCall) { sess.surf.toolDone(tc.Name) },
 		OnAttach: func(atts []mention.Attachment, problems []mention.Problem) {
 			lines := make([]string, 0, len(atts))
 			for _, a := range atts {
@@ -919,10 +893,10 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			for _, p := range problems {
 				notes = append(notes, fmt.Sprintf("@%s: %s", p.Ref, p.Reason))
 			}
-			surf.attached(lines, notes)
+			sess.surf.attached(lines, notes)
 		},
 		OnNotice: notice,
-		OnUsage:  surf.usage,
+		OnUsage:  sess.surf.usage,
 		// The round limit is an intervention ladder on the main loop.
 		RoundReview:  true,
 		OnRoundLimit: onRoundLimit,
@@ -939,63 +913,35 @@ func runREPL(cmd *cobra.Command, args []string) error {
 
 		// ADR-0033: the history is compacted before a request would fill
 		// the window, one-shot included.
-		AutoCompact:  cfg.Agent.AutoCompact,
-		CompactAtPct: cfg.Agent.CompactAtPct,
+		AutoCompact:  sess.cfg.Agent.AutoCompact,
+		CompactAtPct: sess.cfg.Agent.CompactAtPct,
 
 		OnAutoDecision: func(tc llm.ToolCall, d agent.AutoDecision) {
 			if !d.Approved {
 				return // the escalation shows up in the approval prompt
 			}
-			surf.autoApproved(tc.Name, d.Reason, d.Tier.String())
+			sess.surf.autoApproved(tc.Name, d.Reason, d.Tier.String())
 		},
 	})
 	if len(restored) > 0 {
-		ag.SetHistory(restored)
+		sess.ag.SetHistory(restored)
 		// The servers the earlier session loaded are loaded again, so
 		// it sees what it saw (ADR-0004).
-		if replayLoads(restoredLoads, adv, registry) > 0 {
-			ag.RefreshTools()
+		if replayLoads(restoredLoads, sess.adv, sess.registry) > 0 {
+			sess.ag.RefreshTools()
 		}
 	}
 	// The session's dates are captured once (ADR-0030): a facts message
 	// re-sent mid-session states the same day; /clear captures a new one.
-	dates := sessionDates{Start: time.Now(), ResumedFrom: resumedFrom}
-	// announceFacts sends the facts as they stand. One place, because each
-	// caller's copy of this list would be one more to forget a root in.
-	announceFacts := func() {
-		granter.factsStale.Store(false)
-		ag.AnnounceSession(sessionFacts(workDir, dates, append(append(mcpInv.catalogLines(adv), skills.CatalogLines(skillsList)...), memStore.factsLines()...), registry.AddedDirs()...))
-	}
-	// announceGrant is called where a turn starts: a directory granted
-	// since the last turn reaches the model in a fresh facts message
-	// (ADR-0046), which appends and leaves the earlier prefix cached.
-	announceGrant := func() {
-		if granter.factsStale.Load() {
-			announceFacts()
-		}
-	}
+	sess.dates = sessionDates{Start: time.Now(), ResumedFrom: resumedFrom}
 	// The per-session facts open the conversation (after SetHistory: the
 	// isolation tag is fresh, and the restored history's own opening
 	// message named the old one). The MCP catalog rides with them.
-	announceFacts()
-	// Session-start hooks (ADR-0014 §4): the output rides the next
-	// turn's user message as a data attachment — never the system
-	// prompt (ADR-0003), never the typed input.
-	sessionStartHooks := func(source string) {
-		if hookRunner == nil || !hookRunner.HasSessionStart() {
-			return
-		}
-		out := hookRunner.SessionStart(ctx, hookSession, source)
-		if out == "" {
-			return
-		}
-		ag.AttachData("session_start", agent.HookAttachmentKind, out)
-		hookNotify(fmt.Sprintf("session_start hook (%s) attached %d bytes of context as data for the next turn", source, len(out)))
-	}
+	sess.announceFacts()
 	if resumedID != "" {
-		sessionStartHooks("resume")
+		sess.sessionStartHooks("resume")
 	} else {
-		sessionStartHooks("startup")
+		sess.sessionStartHooks("startup")
 	}
 
 	// Exit summary (operator request): every interactive exit route —
@@ -1005,7 +951,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	if !oneShot {
 		out := cmd.ErrOrStderr()
 		cl.push("print the exit summary", func() {
-			for _, l := range exitSummary(ag.Usage(), sessionID, msgs) {
+			for _, l := range exitSummary(sess.ag.Usage(), sess.sessionID, sess.msgs) {
 				fmt.Fprintln(out, l)
 			}
 		})
@@ -1029,336 +975,58 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 		return nil
 	}
-	registry.SetShowImage(showImage)
+	sess.registry.SetShowImage(showImage)
 
 	// showPath is /show: the OPERATOR names the file, so it is admitted
 	// under the rules of an `@<image>` attachment — a project path, or an
 	// absolute or ~ path for an image (ADR-0005) — rather than under the
 	// tools' project confinement. The rules, not the grammar: see newShowPath.
-	showPath := newShowPath(projectDir, showImage)
+	showPath := newShowPath(sess.projectDir, showImage)
 
-	settings := &settingsStore{
-		cfg: cfg, projectCfg: projectCfg, mayLoosen: projectMayLoosen, policyFile: policyFile,
-		policyPath: policyPath, projectDir: projectDir,
-		registry: registry, ag: ag, current: approvalPolicy,
-		filter: mcpFilter, inv: mcpInv, images: images,
+	sess.settings = &settingsStore{
+		cfg: sess.cfg, projectCfg: sess.projectCfg, mayLoosen: projectMayLoosen, policyFile: sess.policyFile,
+		policyPath: sess.policyPath, projectDir: sess.projectDir,
+		registry: sess.registry, ag: sess.ag, current: approvalPolicy,
+		filter: sess.mcpFilter, inv: sess.mcpInv, images: images,
 	}
-	settingsData := settings.data()
+	settingsData := sess.settings.data()
 
-	// --- in-session integration reload (gem-agent ADR-0039) ---
-	// Both closures reuse the startup code paths and the startup trust
-	// verdict — a reload can never widen what the trust gate allowed.
-	// They run only between turns (slash commands cannot be queued), so
-	// reassigning the captured variables is single-writer safe.
-	// reconnectMCP is /mcp reload; /clear calls it after its own pin
-	// check, so recheck is false there and the note is not printed twice.
-	reconnectMCP := func(recheck bool) string {
-		if !cfg.MCP.Enabled {
-			return msgs.MCPDisabled
-		}
-		registry.RemoveByPrefix("mcp__")
-		for _, c := range mcpClients {
-			c.Close()
-		}
-		// Warnings go into the command output: under the TUI a stderr
-		// write would corrupt the display.
-		var warn bytes.Buffer
-		// A changed .mcp.json is re-checked against its pin first
-		// (gem-agent ADR-0074); mid-session there is nobody at a prompt, so a
-		// change is left out and named.
-		if recheck {
-			var pinNotes []string
-			grant.excluded, pinNotes = checkPins(cfg, policyFile, policyPath, projectDir, projectTrusted, false, nil, &warn, msgs)
-			for _, n := range pinNotes {
-				fmt.Fprintf(&warn, "%s\n", n)
-			}
-		}
-		mcpClients, mcpSummary, mcpInv = connectMCPServers(ctx, cfg, projectDir, cmd.Root().Version, registry, &warn, grant, mcpFilter)
-		adv.setInventory(mcpInv)
-		ag.RefreshTools()
-		mcpTools := 0
-		for _, t := range registry.List() {
-			if strings.HasPrefix(t.Name, "mcp__") {
-				mcpTools++
-			}
-		}
-		// The panel reads this snapshot; only a panel-driven reload used
-		// to refresh it, so a server added to .mcp.json and picked up by
-		// `/mcp reload` had no row and could not be excluded until some
-		// other toggle healed it (pre-release review).
-		settings.inv = mcpInv
-		if sessionLog != nil {
-			_ = sessionLog.Log("mcp_reload", map[string]any{
-				"servers": len(mcpClients), "tools": mcpTools})
-		}
-		var b strings.Builder
-		fmt.Fprintf(&b, msgs.MCPReloadedFmt, len(mcpClients), mcpTools)
-		for _, s := range mcpSummary {
-			b.WriteString("  " + s + "\n")
-		}
-		if warn.Len() > 0 {
-			b.WriteString(warn.String())
-		}
-		return b.String()
-	}
-	reloadMCP := func() string {
-		out := reconnectMCP(true)
-		// The catalog changed with the server set: the model is told
-		// through a fresh facts message (ADR-0003's lane), never through
-		// the system prompt.
-		announceFacts()
-		return out
-	}
-	loadMCP := func(server string) (string, bool) {
-		out, err := adv.Load(server, registry)
-		if err != nil {
-			return err.Error() + "\n", true
-		}
-		ag.RefreshTools()
-		return out, false
-	}
-	// The panel writes an exclusion for one server and then asks for
-	// this: the filter is re-derived from the files it just changed, and
-	// that one server is reconnected under it (gem-agent ADR-0039 + gem-agent ADR-0077 §3).
-	// Rebuilt rather than patched so the panel and the runtime read the
-	// same three files in the same order the next start will. One
-	// server, not the set: the edit names one, and reconnecting all of
-	// them killed and respawned every process on an arrow key, inside
-	// the TUI's event loop, so the keys typed meanwhile queued behind it
-	// (post-release field report).
-	settings.reloadMCP = func(server string) (mcpfilter.Filter, mcpInventory, string) {
-		f, err := mcpfilter.Build(cfg.MCP.Exclude, policyScope(policyFile), projectCfg.MCP.Exclude)
-		if err != nil {
-			// Saved but unusable: keep the running set and say so
-			// rather than dropping every exclusion on the floor.
-			return mcpFilter, mcpInv, "not applied: " + err.Error()
-		}
-		mcpFilter = f
-		var running *mcp.Client
-		others := make([]*mcp.Client, 0, len(mcpClients))
-		for _, c := range mcpClients {
-			if c.Name() == server {
-				running = c
-				continue
-			}
-			others = append(others, c)
-		}
-		// Only what went wrong goes back to the panel: an arrow key is
-		// not a command that asked for an inventory, and the warnings
-		// are still the operator's answer to "why did nothing appear"
-		// (pre-release review).
-		var warn bytes.Buffer
-		timeout := time.Duration(cfg.MCP.CallTimeoutSec) * time.Second
-		startupTimeout := time.Duration(cfg.MCP.StartupTimeoutSec) * time.Second
-		start := func() mcpServer {
-			return mcp.NewStdio(server, mcpInv.configs[server], timeout, startupTimeout, cmd.Root().Version, registry.WorkDir())
-		}
-		// The interface hides the type; a nil *mcp.Client inside it
-		// would not compare equal to nil, so the running client is
-		// passed only when there is one.
-		var runningServer mcpServer
-		if running != nil {
-			runningServer = running
-		}
-		kept := reconnectMCPServer(ctx, server, runningServer, start, startupTimeout, registry, &warn, mcpFilter, &mcpInv)
-		if kept != nil {
-			others = append(others, kept.(*mcp.Client))
-		}
-		mcpClients = others
-		mcpSummary = mcpInv.summaryLines()
-		adv.setInventory(mcpInv)
-		ag.RefreshTools()
-		settings.inv = mcpInv
-		mcpTools := mcpToolCount(registry)
-		if sessionLog != nil {
-			_ = sessionLog.Log("mcp_reload", map[string]any{
-				"servers": len(mcpClients), "tools": mcpTools, "server": server})
-		}
-		return mcpFilter, mcpInv, reloadWarnings(warn.String())
-	}
-	// resolveWindow settles the model's context window and hands it to
-	// everyone who needs it: the footer displays it. It runs in the
-	// background — the provider lookup must never delay the first
-	// prompt. A provider that does not answer leaves the window unknown
-	// and says so once; [model].context_window is the remedy.
-	resolveWindow := func() {
-		tokens := cfg.Model.ContextWindow
-		if tokens <= 0 {
-			mctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-			defer cancel()
-			w, err := backend.ContextWindow(mctx)
-			if err != nil {
-				notice(fmt.Sprintf(msgs.ContextWindowUnknownFmt, err))
-			}
-			tokens = w
-		}
-		ag.SetContextWindow(tokens)
-		surf.contextWindow(tokens)
-	}
+	sess.settings.reloadMCP = sess.reconnectServer
 
 	// One value for both surfaces, so a closure added to one cannot be
 	// missed in the other and read as an unknown command there.
 	addDirSlash := func(rest string, write bool) (string, bool) {
-		note, err := granter.grant(context.Background(), rest, write, "slash", granter.currentEpoch(), nil)
+		note, err := sess.granter.grant(context.Background(), rest, write, "slash", sess.granter.currentEpoch(), nil)
 		if err != nil {
 			return err.Error(), true
 		}
 		return note, false
 	}
-	reloads := slashReloads{mcp: reloadMCP, load: loadMCP, show: showPath, addDir: addDirSlash, dirs: granter.listing}
+	reloads := slashReloads{mcp: sess.reloadMCP, load: sess.loadMCP, show: showPath, addDir: addDirSlash, dirs: sess.granter.listing}
 
 	cl.push("report the project's persistent files", func() {
-		reportPersistent("exit", func(kind string, data any) error {
-			if sessionLog == nil {
+		sess.reportPersistent("exit", func(kind string, data any) error {
+			if sess.sessionLog == nil {
 				return nil
 			}
-			return sessionLog.Log(kind, data)
+			return sess.sessionLog.Log(kind, data)
 		})
 	})
 	// Cleanups run last-first: at exit the added roots are reported before
 	// the project.
 	cl.push("report the added roots' persistent files", func() {
-		watch.report("exit", func(kind string, data any) error {
-			if sessionLog == nil {
+		sess.watch.report("exit", func(kind string, data any) error {
+			if sess.sessionLog == nil {
 				return nil
 			}
-			return sessionLog.Log(kind, data)
+			return sess.sessionLog.Log(kind, data)
 		})
 	})
-
-	// /clear starts a new session: the old transcript is closed where
-	// the conversation ended and stays resumable by its id; a new id,
-	// transcript and work directory take over, exported to children
-	// like the first. If a new transcript cannot be opened the
-	// conversation is cleared in place, as before, and the operator is
-	// told.
-	onClear := func() string {
-		var notes []string
-		defer surf.collectHookNotices(&notes)()
-		note := func(format string, a ...any) { notes = append(notes, fmt.Sprintf(format, a...)) }
-		// The output is the slash command's: warnings first, then the
-		// MCP reconnection report (the same text /mcp reload prints).
-		var extra strings.Builder
-		render := func() string {
-			var b strings.Builder
-			for _, n := range notes {
-				fmt.Fprintf(&b, "[⚠ %s]\n", n)
-			}
-			b.WriteString(extra.String())
-			return b.String()
-		}
-		// The new transcript is opened before anything ends, so a
-		// failure leaves the session it found: cleared in place, the
-		// operator told. An unresolved state root must not be handed
-		// to Open.
-		if sessionDirErr != nil {
-			ag.Reset()
-			// Cleared in place: the dates start over (the conversation the
-			// resume line named is gone), and Reset changed the isolation
-			// tag, which only a fresh facts message tells the model.
-			dates = sessionDates{Start: time.Now()}
-			announceFacts()
-			note("history cleared; a new session could not be started (%v) — the conversation continues in this session", sessionDirErr)
-			return render()
-		}
-		newLog, err := openSessionLog(sessionDir, "", projectDir, cfg.LLM.Model, cmd.Root().Version)
-		if err != nil {
-			ag.Reset()
-			// Cleared in place: the dates start over (the conversation the
-			// resume line named is gone), and Reset changed the isolation
-			// tag, which only a fresh facts message tells the model.
-			dates = sessionDates{Start: time.Now()}
-			announceFacts()
-			note("history cleared; a new session could not be started (%v) — the conversation continues in this session", err)
-			return render()
-		}
-		// The old session's end hook runs before the new transcript
-		// takes over (ADR-0014 §5), then the audit event under the old id.
-		// From here to the runner's rebuild the session's identity, its
-		// transcript and its work directory change: a grant — a late one
-		// from an abandoned call included — waits, and one from the old
-		// session is dropped by the epoch advanced now (ADR-0046).
-		granter.beginClear()
-		sessionEndHooks("clear")
-		reportPersistent("clear", recordTo(curLog))
-		watch.report("clear", recordTo(curLog))
-		ag.Restart(newLog)
-		// The new session re-checks the pins: a file that changed during
-		// the old one is left out, and the system prompt and the skill
-		// list are rebuilt from what the grant allows. Unchanged files
-		// give the same prompt bytes, so the server's prefix cache
-		// survives the clear (ADR-0003); the skill catalog rides the
-		// facts message announced below.
-		var pinNotes, regrantNotes []string
-		grant.excluded, pinNotes = checkPins(cfg, policyFile, policyPath, projectDir, projectTrusted, false, nil, io.Discard, msgs)
-		notes = append(notes, pinNotes...)
-		projectContext, skillsList, regrantNotes = regrant(projectDir, grant, skillsList)
-		ag.SetSystem(composeSystem())
-		notes = append(notes, regrantNotes...)
-		if curLog != nil {
-			_ = curLog.Close()
-		}
-		curLog = newLog
-		sessionLog = newLog
-		sessionPath, sessionID = newLog.Path(), newLog.ID()
-		hookSession = hooks.Session{ID: sessionID, TranscriptPath: sessionPath, CWD: projectDir}
-		if len(registry.AddedDirs()) > 0 {
-			// The roots stay in force across /clear — startup, slash and
-			// requested alike — so the new transcript records them too
-			// (ADR-0046).
-			_ = newLog.Log("added_directories", granter.record())
-		}
-		if err := session.Export(sessionID); err != nil {
-			note("cannot set %s: %v", session.EnvVar, err)
-		}
-		if workDir != "" {
-			workdir.RemoveIfEmpty(workDir)
-		}
-		workDir = ""
-		if dir, err := workdir.Ensure(projectDir, sessionID); err != nil {
-			note("session work directory unavailable: %v", err)
-		} else {
-			workDir = dir
-		}
-		// Exported or UNSET: the MCP servers reconnected below inherit
-		// the environment, and the old directory must not survive in it.
-		if err := exportWorkDir(workDir); err != nil {
-			note("cannot set %s: %v", workdir.EnvVar, err)
-		}
-		// Every consumer of the work directory follows it: the file
-		// tools' second root, the sandbox profile, the MCP intake (it
-		// reads the registry), and the model — told through a fresh
-		// runtime-facts message, never through the system prompt, which
-		// stays byte-identical so the server's prefix cache survives
-		// the clear.
-		notes = append(notes, rotateWorkDir(registry, shellExec, sandboxOn, projectDir, workDir, cfg.Sandbox.ReadLaneDenyExec, cfg.Sandbox.Caches(), cfg.Sandbox.ReadLanePrompts, trustpin.Parents(projectDir, persistentSnap), registry.AddedDirs(), granter.forget)...)
-		// The rotate above ran under the grant lock: a late grant cannot
-		// swap in a runner built against the old work directory.
-		granter.endClear()
-		// The MCP servers — spawned at startup with the old id in their
-		// environment and arguments — are reconnected the way /mcp
-		// reload does, so a server keeping per-session state sees the
-		// session the environment reports. A cleared session starts
-		// unloaded, preloads aside (ADR-0004).
-		adv.Reset()
-		if cfg.MCP.Enabled {
-			extra.WriteString(reconnectMCP(false))
-		}
-		// A new session: a new start day, and no longer a resumed one.
-		dates = sessionDates{Start: time.Now()}
-		// Told last, once everything it names is in place: the work
-		// directory and the catalog ride one fresh facts message.
-		announceFacts()
-		// A cleared conversation is a fresh start to the operator's
-		// scripts (ADR-0014 §2): its output rides the first new turn.
-		sessionStartHooks("clear")
-		return render()
-	}
 
 	// --- one-shot mode: single turn, quiet stderr, exit ---
 	if oneShot {
 		for _, n := range policyNotes {
-			fmt.Fprintf(stderr, "warning: %s\n", n)
+			fmt.Fprintf(sess.stderr, "warning: %s\n", n)
 		}
 		// Settled before the turn, not beside it: the turn starts at
 		// once, and automatic compaction (ADR-0033) is off while the
@@ -1366,26 +1034,26 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// its first request unjudged and overflowed (measured). A local
 		// server answers in milliseconds; the lookup's own timeout
 		// bounds the rest.
-		resolveWindow()
+		sess.resolveWindow()
 		// The measured state, all four branches: passing constants meant
 		// one-shot printed nothing when the read lane was unverified —
 		// and every shell_exec then needs an approval nobody is there to
 		// give (pre-release review).
-		if line := banner.SandboxLine(registry.Confined(), registry.ReadLane(), cfg.Sandbox.ReadLanePrompts); line != "" {
-			fmt.Fprintln(stderr, line)
+		if line := banner.SandboxLine(sess.registry.Confined(), sess.registry.ReadLane(), sess.cfg.Sandbox.ReadLanePrompts); line != "" {
+			fmt.Fprintln(sess.stderr, line)
 		}
 		// One-shot returns before the banner is built, so the fact that
 		// this run approves its own mutating tools had no surface at all
 		// — in the mode where it matters most, since the ladder answers
 		// and nobody is at a prompt (pre-release review).
-		if ag.AutoApprove() {
-			fmt.Fprintln(stderr, banner.AutoApproveOneShotLine())
+		if sess.ag.AutoApprove() {
+			fmt.Fprintln(sess.stderr, banner.AutoApproveOneShotLine())
 		}
 		// Same argument for the ceiling: one-shot has no footer to carry
 		// it and no /readonly to type, so the only place this fact can
 		// appear is here (gem-agent ADR-0080 §1, gem-agent ADR-0078's test for a line).
-		if ag.CeilingState().ReadOnly {
-			fmt.Fprintln(stderr, banner.ReadOnlyOneShotLine(registry.Confined()))
+		if sess.ag.CeilingState().ReadOnly {
+			fmt.Fprintln(sess.stderr, banner.ReadOnlyOneShotLine(sess.registry.Confined()))
 		}
 		// Piped stdin becomes a nonce-wrapped data attachment
 		// (gem-agent ADR-0055) — never prompt text: the -p string alone is the
@@ -1399,21 +1067,21 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			waited := false
 			content, warning := readPipedStdinNoticing(cmd.InOrStdin(), stdinWaitNotice, func() {
 				waited = true
-				fmt.Fprintln(stderr, stdinWaitMessage)
+				fmt.Fprintln(sess.stderr, stdinWaitMessage)
 			})
 			if warning != "" {
-				fmt.Fprintf(stderr, "warning: %s\n", warning)
+				fmt.Fprintf(sess.stderr, "warning: %s\n", warning)
 			}
 			if content != "" {
-				ag.AttachData("-", "stdin", content)
+				sess.ag.AttachData("-", "stdin", content)
 			}
 			if line := stdinOutcomeLine(content, warning, waited); line != "" {
-				fmt.Fprintln(stderr, line)
+				fmt.Fprintln(sess.stderr, line)
 			}
 		}
 		wrote := false
-		runErr := runTurnWith(ctx, ladder, func(turnCtx context.Context) error {
-			_, err := ag.Run(turnCtx, fl.prompt, func(s string) {
+		runErr := runTurnWith(sess.ctx, ladder, func(turnCtx context.Context) error {
+			_, err := sess.ag.Run(turnCtx, fl.prompt, func(s string) {
 				wrote = wrote || s != ""
 				fmt.Fprint(cmd.OutOrStdout(), s)
 			})
@@ -1442,21 +1110,21 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	}
 	// The diagram font is read here, once, and only where pictures can be
 	// drawn (ADR-0025 §5); a setting that does not load is a warning.
-	picture, fontNotes := diagramPicture(images, cfg.TUI.Diagram, systemFonts)
+	picture, fontNotes := diagramPicture(images, sess.cfg.TUI.Diagram, systemFonts)
 	warnLines = append(warnLines, fontNotes...)
 	bannerLines := banner.Lines(banner.Facts{
-		Version: cmd.Root().Version, Model: cfg.LLM.Model,
+		Version: cmd.Root().Version, Model: sess.cfg.LLM.Model,
 		Instructions: contextLabels,
-		Servers:      len(mcpClients), Tools: mcpToolCount(registry),
+		Servers:      len(sess.mcpClients), Tools: mcpToolCount(sess.registry),
 		ResumedID: resumedID, Restored: len(restored),
 		// The measurement, not the intent: --no-sandbox is folded into
 		// sandboxOn already, but a failed write-lane probe zeroes the
 		// enforcement and left the banner saying "enabled" while
 		// /settings said "DISABLED" — in the one case the row exists for.
-		SandboxOn: registry.Confined(), ReadLane: registry.ReadLane(),
-		ReadLanePrompts: cfg.Sandbox.ReadLanePrompts,
-		AutoApprove:     ag.AutoApprove(),
-		ReadOnly:        ag.CeilingState(),
+		SandboxOn: sess.registry.Confined(), ReadLane: sess.registry.ReadLane(),
+		ReadLanePrompts: sess.cfg.Sandbox.ReadLanePrompts,
+		AutoApprove:     sess.ag.AutoApprove(),
+		ReadOnly:        sess.ag.CeilingState(),
 		Notes:           warnLines,
 	})
 
@@ -1477,45 +1145,45 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		// A dialog left waiting is told to the terminal (ADR-0038): the
 		// runtime's own fixed bytes, written between two renderer
 		// flushes. "off" passes no notifier, so nothing is scheduled.
-		notify := noticeWriter(cfg.TUI.Notify, sweep.Inject)
+		notify := noticeWriter(sess.cfg.TUI.Notify, sweep.Inject)
 		model := tui.New(tui.Options{
 			Sweep:   sweep,
 			Notify:  notify,
-			BaseCtx: ctx,
+			BaseCtx: sess.ctx,
 			// Msgs is the wiring gem-agent ADR-0029 shipped without: the catalog
 			// was resolved here but never handed to the TUI, so the
 			// whole chrome fell back to English (review round 2).
-			Msgs:    msgs,
-			Theme:   resolveTheme(cfg.TUI.Theme),
+			Msgs:    sess.msgs,
+			Theme:   resolveTheme(sess.cfg.TUI.Theme),
 			Images:  images,
 			Picture: picture,
 			// Bubble Tea draws on stdout; its cell size comes from an
 			// ioctl there, never from a query (ADR-0025 §3).
 			CellSize:      func() (termimg.Cell, bool) { return termimg.CellSize(int(os.Stdout.Fd())) },
-			ModelName:     cfg.LLM.Model,
-			ProjectDir:    abbreviateHome(projectDir),
+			ModelName:     sess.cfg.LLM.Model,
+			ProjectDir:    abbreviateHome(sess.projectDir),
 			Banner:        bannerLines,
 			InitialInput:  initialInput,
-			AutoMode:      ag.AutoApprove(),
-			AutoState:     ag.AutoApprove,
-			ReadOnlyState: ag.CeilingState,
+			AutoMode:      sess.ag.AutoApprove(),
+			AutoState:     sess.ag.AutoApprove,
+			ReadOnlyState: sess.ag.CeilingState,
 			ToggleAuto: func() bool {
-				ag.SetAutoApprove(!ag.AutoApprove())
-				return ag.AutoApprove()
+				sess.ag.SetAutoApprove(!sess.ag.AutoApprove())
+				return sess.ag.AutoApprove()
 			},
 			CompletePath: func(prefix string) []string {
-				return mention.Complete(projectDir, prefix, 24)
+				return mention.Complete(sess.projectDir, prefix, 24)
 			},
-			CompleteSlash:   slashCompletions(func() []skills.Skill { return skillsList }),
+			CompleteSlash:   slashCompletions(func() []skills.Skill { return sess.skillsList }),
 			Settings:        &settingsData,
-			ApplySetting:    settings.Apply,
-			RefreshSettings: settings.data,
+			ApplySetting:    sess.settings.Apply,
+			RefreshSettings: sess.settings.data,
 			ExpandInput: func(in string) (string, bool, string) {
-				return expandSkillInput(in, skillsList)
+				return expandSkillInput(in, sess.skillsList)
 			},
 			Shell: func(shellCtx context.Context, command string) {
 				go func() {
-					out := runDirectShell(shellCtx, registry, ag, command, afterShell)
+					out := runDirectShell(shellCtx, sess.registry, sess.ag, command, afterShell)
 					// Interrupted runs hand a queued message back instead
 					// of auto-sending it (gem-agent ADR-0007 via gem-agent ADR-0021).
 					prog.Send(tui.ShellDone{Output: out, Interrupted: shellCtx.Err() != nil})
@@ -1523,7 +1191,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			},
 			Compact: func(compactCtx context.Context) {
 				go func() {
-					res, note, err := compactNow(compactCtx, ag, msgs)
+					res, note, err := compactNow(compactCtx, sess.ag, sess.msgs)
 					if err == nil {
 						if res.Replaced > 0 {
 							prog.Send(tui.Compacted{})
@@ -1540,8 +1208,8 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			},
 			StartTurn: func(turnCtx context.Context, input string) {
 				go func() {
-					announceGrant()
-					_, err := ag.Run(turnCtx, input, func(s string) { prog.Send(tui.TextDelta(s)) })
+					sess.announceGrant()
+					_, err := sess.ag.Run(turnCtx, input, func(s string) { prog.Send(tui.TextDelta(s)) })
 					if err != nil && turnCtx.Err() != nil {
 						// Mirror runTurn's mapping: a cancellation-caused
 						// failure is an interrupt, not a backend error.
@@ -1551,31 +1219,31 @@ func runREPL(cmd *cobra.Command, args []string) error {
 				}()
 			},
 			Slash: func(in string) (string, bool, bool) {
-				if out, isErr, handled := memorySlash(in, memStore); handled {
+				if out, isErr, handled := memorySlash(in, sess.memStore); handled {
 					return out, isErr, false
 				}
-				return slashOutput(in, ag, registry, mcpStatus(), skillsList,
+				return slashOutput(in, sess.ag, sess.registry, sess.mcpStatus(), sess.skillsList,
 					reloads,
-					func() string { return usageReport(ag, cfg.LLM.Model) },
-					appVersion, msgs, onClear)
+					func() string { return usageReport(sess.ag, sess.cfg.LLM.Model) },
+					appVersion, sess.msgs, sess.clear)
 			},
 		})
 		prog = tea.NewProgram(model, tea.WithOutput(sweep))
-		surf.setProgram(prog)
+		sess.surf.setProgram(prog)
 		tuiGate.SetProgram(prog)
 		screen.SetProgram(prog)
-		go resolveWindow()
+		go sess.resolveWindow()
 		_, err := prog.Run()
 		return err
 	}
-	go resolveWindow()
+	go sess.resolveWindow()
 
 	// Plain REPL / one-shot: the banner is printed, the tee is done.
 	notes.freeze()
 	for _, line := range bannerLines {
-		fmt.Fprintln(stderr, line)
+		fmt.Fprintln(sess.stderr, line)
 	}
-	fmt.Fprintf(stderr, "/help for commands, Ctrl+D to quit\n")
+	fmt.Fprintf(sess.stderr, "/help for commands, Ctrl+D to quit\n")
 
 	// --- plain REPL loop (non-TTY fallback) ---
 	// The argv first message (gem-agent ADR-0064) runs before the first read,
@@ -1588,11 +1256,11 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		var input string
 		if pending != "" {
 			input, pending = pending, ""
-			fmt.Fprintf(stderr, "\n> %s\n", input)
+			fmt.Fprintf(sess.stderr, "\n> %s\n", input)
 		} else {
 			line, err := reader.Read("\n> ")
 			if errors.Is(err, io.EOF) {
-				fmt.Fprintln(stderr, msgs.Bye)
+				fmt.Fprintln(sess.stderr, sess.msgs.Bye)
 				return nil
 			}
 			if err != nil {
@@ -1612,14 +1280,14 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			// runTurn's signal handling: Ctrl+C interrupts the command,
 			// not the process (gem-agent ADR-0021 — outside it, the default action
 			// killed the whole session).
-			_ = runTurnWith(ctx, ladder, func(shellCtx context.Context) error {
-				fmt.Fprintln(cmd.OutOrStdout(), runDirectShell(shellCtx, registry, ag, command, afterShell))
+			_ = runTurnWith(sess.ctx, ladder, func(shellCtx context.Context) error {
+				fmt.Fprintln(cmd.OutOrStdout(), runDirectShell(shellCtx, sess.registry, sess.ag, command, afterShell))
 				return nil
 			})
 			continue
 		}
 		if input == "/settings" {
-			writeSettingsTable(stderr, settings.data())
+			writeSettingsTable(sess.stderr, sess.settings.data())
 			continue
 		}
 		if input == "/compact" {
@@ -1627,46 +1295,46 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			// nothing else can be happening while it waits for a line.
 			// runTurnWith makes Ctrl+C interrupt the summariser call
 			// rather than kill the process.
-			runErr := runTurnWith(ctx, ladder, func(compactCtx context.Context) error {
-				_, note, err := compactNow(compactCtx, ag, msgs)
+			runErr := runTurnWith(sess.ctx, ladder, func(compactCtx context.Context) error {
+				_, note, err := compactNow(compactCtx, sess.ag, sess.msgs)
 				if err == nil {
-					fmt.Fprintln(stderr, note)
+					fmt.Fprintln(sess.stderr, note)
 				}
 				return err
 			})
 			if errors.Is(runErr, errInterrupted) {
-				fmt.Fprintln(stderr, msgs.Interrupted)
+				fmt.Fprintln(sess.stderr, sess.msgs.Interrupted)
 			} else if runErr != nil {
-				fmt.Fprintf(stderr, "%s%v\n", msgs.ErrorPrefix, runErr)
+				fmt.Fprintf(sess.stderr, "%s%v\n", sess.msgs.ErrorPrefix, runErr)
 			}
 			continue
 		}
-		if turn, handled, errMsg := expandSkillInput(input, skillsList); handled {
+		if turn, handled, errMsg := expandSkillInput(input, sess.skillsList); handled {
 			if errMsg != "" {
-				fmt.Fprintln(stderr, errMsg)
+				fmt.Fprintln(sess.stderr, errMsg)
 				continue
 			}
-			runErr := runTurnWith(ctx, ladder, func(turnCtx context.Context) error {
-				announceGrant()
-				_, err := ag.Run(turnCtx, turn, func(s string) { fmt.Fprint(cmd.OutOrStdout(), s) })
+			runErr := runTurnWith(sess.ctx, ladder, func(turnCtx context.Context) error {
+				sess.announceGrant()
+				_, err := sess.ag.Run(turnCtx, turn, func(s string) { fmt.Fprint(cmd.OutOrStdout(), s) })
 				return err
 			})
 			fmt.Fprintln(cmd.OutOrStdout())
 			if runErr != nil && !errors.Is(runErr, errInterrupted) {
-				fmt.Fprintf(stderr, "error: %v\n", runErr)
+				fmt.Fprintf(sess.stderr, "error: %v\n", runErr)
 			}
 			continue
 		}
 		if strings.HasPrefix(input, "/") {
-			if out, _, handled := memorySlash(input, memStore); handled {
-				fmt.Fprint(stderr, out)
+			if out, _, handled := memorySlash(input, sess.memStore); handled {
+				fmt.Fprint(sess.stderr, out)
 				continue
 			}
-			out, _, quit := slashOutput(input, ag, registry, mcpStatus(), skillsList,
+			out, _, quit := slashOutput(input, sess.ag, sess.registry, sess.mcpStatus(), sess.skillsList,
 				reloads,
-				func() string { return usageReport(ag, cfg.LLM.Model) },
-				appVersion, msgs, onClear)
-			fmt.Fprint(stderr, out)
+				func() string { return usageReport(sess.ag, sess.cfg.LLM.Model) },
+				appVersion, sess.msgs, sess.clear)
+			fmt.Fprint(sess.stderr, out)
 			if quit {
 				return nil
 			}
@@ -1674,18 +1342,18 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		}
 
 		// SIGINT cancels the in-flight turn, not the process.
-		runErr := runTurnWith(ctx, ladder, func(turnCtx context.Context) error {
-			announceGrant()
-			_, err := ag.Run(turnCtx, input, func(s string) { fmt.Fprint(cmd.OutOrStdout(), s) })
+		runErr := runTurnWith(sess.ctx, ladder, func(turnCtx context.Context) error {
+			sess.announceGrant()
+			_, err := sess.ag.Run(turnCtx, input, func(s string) { fmt.Fprint(cmd.OutOrStdout(), s) })
 			return err
 		})
 		fmt.Fprintln(cmd.OutOrStdout())
 		if runErr != nil {
 			if errors.Is(runErr, errInterrupted) {
-				fmt.Fprintln(stderr, msgs.Interrupted)
+				fmt.Fprintln(sess.stderr, sess.msgs.Interrupted)
 				continue
 			}
-			fmt.Fprintf(stderr, "%s%v\n", msgs.ErrorPrefix, runErr)
+			fmt.Fprintf(sess.stderr, "%s%v\n", sess.msgs.ErrorPrefix, runErr)
 		}
 	}
 }
