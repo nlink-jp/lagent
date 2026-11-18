@@ -4,7 +4,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
 	"strings"
 	"testing"
 
@@ -82,11 +81,9 @@ func TestAdvertiseIsWiredIntoTheAgent(t *testing.T) {
 // ADR-0008 §2: a one-shot run's agent must know it is unattended, or a
 // denial keeps telling the model to ask a user who is not there.
 func TestUnattendedIsWiredIntoTheAgent(t *testing.T) {
-	src, err := os.ReadFile("root.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(src), "Unattended:   oneShot,") && !strings.Contains(string(src), "Unattended: oneShot,") {
+	// oneShot is the run settings' since ADR-0054.
+	src := wiringSource(t)
+	if !strings.Contains(src, "Unattended:   rs.oneShot,") && !strings.Contains(src, "Unattended: rs.oneShot,") {
 		t.Fatal("agent.New is not given Unattended: oneShot")
 	}
 }

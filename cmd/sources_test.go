@@ -11,7 +11,7 @@ import (
 // sessionWiringFiles are the files runREPL's session is assembled in
 // since ADR-0054. TestSessionWiringFilesAreComplete keeps the list from
 // falling behind.
-var sessionWiringFiles = []string{"root.go", "live.go", "surface.go", "cleanups.go", "modelclient.go"}
+var sessionWiringFiles = []string{"root.go", "startup.go", "live.go", "surface.go", "cleanups.go", "modelclient.go"}
 
 // cmdSources is every non-test Go file of this package, by name, in name
 // order. The tests that pin wiring by reading the source read all of it:

@@ -37,8 +37,9 @@ func TestModelTierIsWired(t *testing.T) {
 	for _, want := range []string{
 		"rb.SetReasoningEffort(cfg.LLM.RiskReasoningEffort)",
 		`if cfg.Approval.ModelTier == "shell"`,
-		"ModelTier:        riskBackend != nil",
-		"Rulebook:         rulebook",
+		// Read through the models phase's result since ADR-0054.
+		"ModelTier:        md.riskBackend != nil",
+		"Rulebook:         md.rulebook",
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("the session wiring lacks %q", want)
