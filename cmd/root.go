@@ -828,6 +828,21 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	if sessionID != "" {
 		hookSession.TranscriptPath = sessionPath
 	}
+	// uiNotes is non-nil while a slash command runs the hooks (/clear):
+	// the slash handler executes inside the TUI's Update, and
+	// Program.Send from there never returns — Bubble Tea's message
+	// channel is unbuffered and Update is its only consumer. A
+	// session_start hook that printed froze the TUI at /clear (ADR-0054,
+	// Found 1; gem-agent met and fixed the same). Notes raised there ride
+	// back in the slash output instead.
+	var uiNotes *[]string
+	hookNotify := func(warn string) {
+		if uiNotes != nil {
+			*uiNotes = append(*uiNotes, warn)
+			return
+		}
+		notice(warn)
+	}
 	var hookRunner *hooks.Runner
 	if len(cfg.Hooks.PreToolUse)+len(cfg.Hooks.SessionStart)+len(cfg.Hooks.UserPromptSubmit)+len(cfg.Hooks.SessionEnd) > 0 {
 		hookRunner = hooks.New(hooks.Hooks{
@@ -835,7 +850,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			SessionStart:     hookEntries(cfg.Hooks.SessionStart),
 			UserPromptSubmit: hookEntries(cfg.Hooks.UserPromptSubmit),
 			SessionEnd:       hookEntries(cfg.Hooks.SessionEnd),
-		}, notice)
+		}, hookNotify)
 	}
 	var preToolHook func(ctx context.Context, name string, args map[string]any) (bool, string)
 	if hookRunner != nil && hookRunner.HasPreToolUse() {
@@ -1032,7 +1047,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			return
 		}
 		ag.AttachData("session_start", agent.HookAttachmentKind, out)
-		notice(fmt.Sprintf("session_start hook (%s) attached %d bytes of context as data for the next turn", source, len(out)))
+		hookNotify(fmt.Sprintf("session_start hook (%s) attached %d bytes of context as data for the next turn", source, len(out)))
 	}
 	if resumedID != "" {
 		sessionStartHooks("resume")
@@ -1274,6 +1289,8 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// told.
 	onClear := func() string {
 		var notes []string
+		uiNotes = &notes
+		defer func() { uiNotes = nil }()
 		note := func(format string, a ...any) { notes = append(notes, fmt.Sprintf(format, a...)) }
 		// The output is the slash command's: warnings first, then the
 		// MCP reconnection report (the same text /mcp reload prints).

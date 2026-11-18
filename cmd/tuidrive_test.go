@@ -168,3 +168,26 @@ func TestTUITurnClearQuit(t *testing.T) {
 		t.Fatalf("want two transcripts (before and after /clear), got %d", n)
 	}
 }
+
+// ADR-0054 Found 1: a session_start hook that prints makes /clear report
+// the attached context, and the report went to the program from inside
+// Update — where a Send never returns. /clear must answer, and so must
+// the command typed after it.
+func TestTUIClearWithAPrintingSessionStartHook(t *testing.T) {
+	e := newCharEnvWith(t, `
+[[hooks.session_start]]
+command = "echo context-from-hook"
+`)
+	r := startTUI(t, e, nil, "--no-sandbox")
+	r.typeLine("/clear")
+	if !r.waitFor("history cleared", 10*time.Second) {
+		t.Fatalf("/clear did not answer — the TUI is frozen:\n%s", r.screen())
+	}
+	if !r.waitFor("session_start hook (clear) attached", 5*time.Second) {
+		t.Fatalf("the hook's notice is not in /clear's output:\n%s", r.screen())
+	}
+	r.typeLine("/version")
+	if !r.waitFor("darwin", 10*time.Second) {
+		t.Fatalf("the command after /clear did not answer:\n%s", r.screen())
+	}
+}

@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- **`/clear` no longer freezes the TUI when a `session_start` hook
+  prints.** The hook's output is attached to the next turn and the
+  operator is told; that notice was sent to the screen from inside the
+  command and never returned, so `/clear` and everything typed after it
+  hung. Notices from hooks during `/clear` are now part of its output,
+  in the TUI and the plain REPL alike.
 - **`/clear` no longer crashes a session that started without a
   transcript.** When the session log could not be opened at startup, a
   `/clear` that found persistent files changed during the session

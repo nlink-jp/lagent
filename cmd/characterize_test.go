@@ -569,3 +569,23 @@ command = "cat >> %[1]s/session_end.jsonl; echo >> %[1]s/session_end.jsonl"
 	checkCharacterization(t, "clear", r.render(e)+normalize(e,
 		"=== session_start hook payloads\n"+string(started)+"=== session_end hook payloads\n"+string(ended)))
 }
+
+// ADR-0054 Found 1, in the plain REPL: the notices hooks raise while
+// /clear runs are /clear's output, in its warnings, as gem-agent's are —
+// one place for them on every front end.
+func TestPlainClearCarriesTheHookNotice(t *testing.T) {
+	e := newCharEnvWith(t, `
+[[hooks.session_start]]
+command = "echo context-from-hook"
+`)
+	r := runCharacterize(t, e, nil, []string{"/clear"}, "--no-sandbox")
+	if r.status != 0 {
+		t.Fatalf("status %d:\n%s", r.status, r.stderr)
+	}
+	notice := "[⚠ session_start hook (clear) attached 17 bytes of context as data for the next turn]"
+	at := strings.Index(r.stderr, notice)
+	cleared := strings.Index(r.stderr, "history cleared")
+	if at < 0 || cleared < 0 || at > cleared {
+		t.Fatalf("want the hook's notice in /clear's output, before its report:\n%s", r.stderr)
+	}
+}
