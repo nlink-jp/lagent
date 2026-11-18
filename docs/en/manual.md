@@ -2999,9 +2999,7 @@ For this check, at every start and every `/clear`, lagent tries to create
 small files whose names start with `.lagent-lane-probe-` in the project
 directory and elsewhere, and deletes them at once. If the project directory
 cannot be written to, the check does not pass and the "could not be verified"
-handling above applies. The same holds when another program replaces one of
-those files while the check is running: the notice then says the file was
-replaced.
+handling above applies.
 
 The sandbox is built again at every `/clear` and each time you add a
 directory. If a command has replaced the project directory or the session's
