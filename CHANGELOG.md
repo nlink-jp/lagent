@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Internal: the session is assembled from parts** (ADR-0054). The
+  1,600-line function that started a session is ten startup phases, a
+  live session that owns what `/clear` and the reloads change, one
+  place that decides where output goes, and three front ends. Nothing
+  a session does changed beyond the fixes below; tests now run the whole
+  start against a scripted model, the TUI included, and compare
+  everything it leaves behind.
+
 ### Fixed
 
 - **The exit summary is the last thing on screen again when a

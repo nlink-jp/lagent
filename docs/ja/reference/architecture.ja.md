@@ -27,6 +27,16 @@ tools パッケージはプロジェクトディレクトリだけを要する 1
 `view_image`、`show_image`、`write_file`、`edit_file`、`shell_exec`）を持つ。`cmd/` は
 同じ `Register` で `ask_user` と `mcp_load` と全 MCP ツールを登録する。
 
+`cmd` はセッションを段に分けて組み立てる（ADR-0054、`cmd/startup.go`）。実行の設定を決め、
+プロジェクトを受け入れ（信頼・ピン・承認ポリシー）、記録ファイルを開き、作業ディレクトリを作り、
+レーンとレジストリを作り、指示・スキル・メモリ・MCP サーバを読み込み、モデルのクライアントを
+作り、入口を選び、残りのツールを登録し、エージェントを組み立てる。どの段も、前の段が返した
+ものを受け取る。その後に `/clear` や再読込が変えるものは 1 つの `liveSession`（`cmd/live.go`）に
+置き、そのメソッドはターンの合間にしか動かない。操作者に向けた出力の行き先（TUI のプログラムか
+stderr か）は `surface` の 1 か所で決め、セッションの後片づけは 1 つの積み上げで、終わるときに
+最後に積んだものから動き、終了の要約はほかのすべての後に出る。3 つの入口（`-p`・TUI・素の
+REPL）は、どのターンも `liveSession.turn` で始める。
+
 補助パッケージ: `internal/sandbox`（レーンごとの Seatbelt プロファイル
 生成、永続ファイルと資格情報の一覧）、`internal/approve`（plain REPL の
 ゲート）、`internal/risk`（自動承認の規則層）、`internal/policy`（ツール

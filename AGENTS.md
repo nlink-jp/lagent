@@ -198,7 +198,11 @@ config.example.toml  shipped config template (every section: [llm], [model], [sa
 lagent.example.project.toml  shipped <project>/.lagent.toml template
 mcp.example.json     shipped MCP server template (pinned by a loader test)
 main.go            entry point (package main, calls cmd.Execute(version))
-cmd/               cobra root command, REPL loop, wiring, system prompt; `version`,
+cmd/               cobra root command, wiring, system prompt; runREPL (root.go) is the
+                   prologue, the ten startup phases (startup.go) and the front-end choice
+                   (frontends.go); the live session and its mutators (live.go), where
+                   output goes (surface.go), the teardown stack (cleanups.go) and the
+                   model seam (modelclient.go) — ADR-0054; `version`,
                    `sessions`, `trust`, `workdirs` subcommands; ask_user, MCP intake,
                    the MCP advertiser and mcp_load (cmd/mcpload.go, ADR-0004); skill
                    discovery, load_skill, /skill and /skills (cmd/skills.go, ADR-0011);
@@ -306,6 +310,29 @@ answers.
 
 ## Gotchas
 
+- **The session is assembled from parts; keep it so** (ADR-0054). A
+  startup step goes into the phase it belongs to in `cmd/startup.go`,
+  never back into `runREPL`; a phase that needs another's result takes
+  it as an argument. State that `/clear` or a reload replaces lives on a
+  holder in `cmd/live.go`, read through it, and what changes it after
+  startup is a `liveSession` method. Output to the operator goes through
+  `surface`, teardown through `cleanups.push` (or `pushFinal`, for what
+  must come last). **Tool registration order is the order of the
+  declarations the model receives** — `request_directory` registers in
+  `buildConfinement` for that reason.
+- **The characterization tests judge what a session does**
+  (`cmd/characterize_test.go`, ADR-0054): the start run as a child
+  process against a scripted model, compared byte for byte with
+  `cmd/testdata/characterize/`; `cmd/tuidrive_test.go` drives the TUI
+  under tmux. A refactor never runs `-update`. Tests that pin wiring by
+  reading source read `cmdSources` or `wiringSource`
+  (`cmd/sources_test.go`), whose file list is itself checked — a check of
+  a file the code left passes on nothing.
+- **Hook notices raised inside a slash command are collected, never
+  sent** (ADR-0054, Found 1): the slash handler runs in Bubble Tea's
+  `Update`, where `Program.Send` never returns. Anything a slash command
+  triggers that wants to tell the operator goes into the command's output.
+
 - **A path through a link outside the roots is rewritten once, in the
   tool-call loop** (`Agent.intoRoots` → `sandbox.IntoRoot`, ADR-0041,
   ported from gem-agent ADR-0108): the approval, verdict, hooks, run and
@@ -331,7 +358,7 @@ answers.
   200), so `provider = "mlxserve"` is the only place a mistyped `[llm].model`
   shows — `mlxServeWindow` errors on an id `/v1/models` does not list, and
   that must stay an error, not a zero window. It runs only when
-  `[model].context_window` is 0 (`resolveWindow` in `cmd/root.go`). Its `reasoning_effort` is
+  `[model].context_window` is 0 (`liveSession.resolveWindow` in `cmd/live.go`). Its `reasoning_effort` is
   unvalidated (`none` off, every other word on, `off` included), and it sends
   no `reasoning_tokens`, so output tokens include thinking (ADR-0031).
   Measure a server with `bench serve`, one server loaded at a time.

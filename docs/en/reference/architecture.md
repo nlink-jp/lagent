@@ -28,6 +28,20 @@ directory: `list_files`, `list_tree`, `search_files`, `read_file`,
 `cmd/` registers `ask_user` and `mcp_load` through the same `Register`,
 plus every MCP tool.
 
+`cmd` assembles a session in phases (ADR-0054, `cmd/startup.go`): it
+resolves the run, admits the project (trust, pins, approval policy),
+opens the transcript, makes the work directory, builds the lanes and the
+registry, loads the instructions, skills, memory and MCP servers, builds
+the model clients, chooses the front end, registers the remaining tools
+and assembles the agent — each phase taking what the earlier ones
+returned. What `/clear` and the reloads change afterwards lives on one
+`liveSession` (`cmd/live.go`), whose methods run between turns only.
+Where operator-facing output goes — the TUI program or stderr — is
+decided in one place, `surface`, and the session's teardown is one
+stack, run last-first when the session ends, with the exit summary
+after everything else. The three front ends (`-p`, the TUI, the plain
+REPL) start every turn through `liveSession.turn`.
+
 Supporting packages: `internal/sandbox` (Seatbelt profile generation
 per lane, the persistent-file and credential lists), `internal/approve`
 (plain-REPL gate), `internal/risk` (auto-approve rule tier),

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Accepted** (2026-11-18) — being implemented |
+| Status | **Accepted** (2026-11-18) — implemented (see the addendum) |
 | Date | 2026-11-18 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
@@ -120,3 +120,36 @@ Nothing in gem-agent changes here, except what Found 4's measurement may lead th
 | Leave lagent as it is | The most-changed file is the least readable, the tests copy it, and it held two defects gem-agent had fixed (Found 1, Found 2). |
 | Copy gem-agent's new files over | The bodies differ throughout (no telemetry, facts messages instead of prompt rebuilds, the tier on its own client, other hooks wiring), and a copy would carry gem-agent code and text, which ADR-0002 forbids for the features it lists. The parts are taken; the bodies stay lagent's. |
 | Fix Found 1 and Found 2 and stop | They are instances of "output routed in nine places" and "state in closures"; fixing them without the restructure leaves the classes. They are fixed first anyway, on their own, so a release can carry them whatever happens to the rest. |
+
+## Addendum: the implementation (2026-11-18/19)
+
+Implemented on lagent `main` in the order of §3: the `/clear` panic fix (`e527ee4`), step 0 (`dbfe2bd`), the `/clear` freeze fix (`d99943a`), steps 1–5 (`a2666bd`, `a3085c2`, `0d70b25`, `7b5defb`, `e1c992f`), a test fix (`d35eff2`), the exit-summary fix (`5aecaa0`) and this record's step 6. Every step kept `make check` green and the characterization references equal; the one change to them is noted below.
+
+### Measured again
+
+| Measure | Before (v0.32.0) | After |
+|---|---|---|
+| `runREPL` | 1,587 lines, 226 branches | **66 lines** |
+| `cmd/root.go` | 2,808 lines | 1,307 lines (the rest in `startup.go` 1,021, `live.go` 505, `frontends.go` 353, `surface.go` 151, `cleanups.go` 62, `modelclient.go` 32) |
+| Largest function in the new files | — | under 150 lines (`assembleSession` split into `assembleHooks`, `assembleAgent` and the rest) |
+| `if prog != nil` outside `surface` | 9 | 0 |
+| Locals rewritten into fields | — | 611 uses of 40 locals, from the type checker's resolution; 5 mixed definitions by hand |
+
+### What the four findings came to
+
+1. **Found 1, the `/clear` freeze** — fixed in `d99943a`. `TestTUIClearWithAPrintingSessionStartHook` drives the TUI under tmux and failed on the commit before. The characterization references did not change: their hooks print nothing; the plain REPL's new form (the notices inside `/clear`'s output) is pinned by `TestPlainClearCarriesTheHookNotice`.
+2. **Found 2, the `/clear` panic** — fixed in `e527ee4`; `transcript.log` is the nil-safe path from step 3 on.
+3. **Found 3, the exit summary** — fixed in `5aecaa0` with `pushFinal`; `TestExitSummaryIsLastAfterASessionEndHook` failed on the commit before.
+4. **Found 4, measured: the display is not damaged, but the note is lost.** With AGENTS.md changed during a TUI session, `/clear` records `persistent_changes` in the transcript, and the line written to stderr — "note: this session added or changed: AGENTS.md" — shows neither on the screen nor in the terminal's scrollback: the TUI's redraw covers it. The plain REPL prints it. gem-agent writes the same way. Whether the TUI should show it, and how, is put to the maintainer; nothing here changes it.
+
+### Where the implementation differs from §2–§3, and why
+
+1. **`buildConfinement` returns only an error.** Nothing it builds is read by a later phase except through the session, so no result type was made.
+2. **The TUI comparison used `d99943a`, not v0.32.0.** The driver's configuration has a `session_start` hook that prints; v0.32.0 froze on `/clear` (Found 1), so the comparison ran against the commit that fixes it and restructures nothing. Transcripts were identical; screens differed only in random ids, a temporary directory's name and tmux's dead-pane time.
+3. **The characterization's exit switch is named `CHARACTERIZE_LAGENT_EXIT`.** The `/clear` scenario prints the session's `LAGENT_` environment, and the harness's own variable is not part of it.
+4. **A bare weekday is normalized** (`d35eff2`): the facts message writes the start day as "(Wednesday, JST)", and the references failed after midnight. They changed by exactly that substitution. gem-agent's references had the same gap and got the same fix.
+5. **The `request_directory` test reads the start's registration.** `buildConfinement` registers the tool, as the start does; the test no longer registers it a second time.
+
+### What judged it
+
+The characterization recorded on v0.32.0 plus the panic fix; the exit sequence on every scenario and on a start failing in five places; the TUI driven under tmux; the resume and grant tests calling `openTranscript` and `buildConfinement` instead of copies; the source-reading tests reading every file of `cmd` or the session wiring, whose list is itself checked — it named `startup.go` and `frontends.go` when they were missing, and the stdin-reader test was found reading `root.go` alone after the readers had left it. The release passes of §4 (the whole diff, then the fix diff) run before the release that ships this.
