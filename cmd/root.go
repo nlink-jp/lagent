@@ -728,6 +728,9 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// prog is assigned before the TUI runs; the agent only executes
 	// inside prog.Run, so the callbacks below never see it half-set.
 	var prog *tea.Program
+	// Where operator-facing output goes (ADR-0054 §2.3): the TUI once
+	// prog runs, stderr until then and without one.
+	surf := &surface{w: stderr, msgs: msgs, oneShot: oneShot, plainAsk: plainAsk(stdin, cmd.ErrOrStderr())}
 	// Turn observability (gem-agent ADR-0033): stream heartbeat, retries, and
 	// thought summaries reach the TUI when one is running; the plain
 	// REPL and one-shot mode stay quiet — their output goes to pipes.
@@ -735,10 +738,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 		if ev.Kind == "thought" && !cfg.TUI.ShowThoughts {
 			return
 		}
-		if prog != nil {
-			prog.Send(tui.StreamUpdate{Kind: ev.Kind, Thought: ev.Thought,
-				Attempt: ev.Attempt, Max: ev.Max, Cause: ev.Cause, DelayMS: ev.DelayMS})
-		}
+		surf.stream(ev)
 	})
 
 	// --- ask_user: a structured mid-turn choice (gem-agent ADR-0036) ---
@@ -749,21 +749,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// The plain-REPL asker reads the SHARED stdin reader: a second
 	// bufio.Reader over the same fd strands typed-ahead input in one
 	// buffer while the other blocks (AGENTS.md gotcha; review round 3).
-	askOperator := func(askCtx context.Context, question string, options []string) (int, error) {
-		if oneShot {
-			return oneShotAsk(askCtx, question, options)
-		}
-		if prog != nil {
-			resp := make(chan int, 1)
-			prog.Send(tui.AskRequest{Question: question, Options: options, Resp: resp})
-			idx := <-resp
-			if idx < 0 {
-				return 0, errAskDeclined
-			}
-			return idx, nil
-		}
-		return plainAsk(stdin, cmd.ErrOrStderr())(askCtx, question, options)
-	}
+	askOperator := surf.ask
 	if err := registerAskTool(registry, askOperator); err != nil {
 		return err
 	}
@@ -816,13 +802,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	writes := &writeGuard{}
 	// notice puts a one-line warning in front of the operator wherever
 	// they are: the TUI's note strip when it runs, stderr otherwise.
-	notice := func(msg string) {
-		if prog != nil {
-			prog.Send(tui.Attached{Notes: []string{msg}})
-			return
-		}
-		fmt.Fprintf(stderr, "[⚠ %s]\n", msg)
-	}
+	notice := surf.notice
 	granter.notice = notice
 	for _, n := range tierNotes {
 		notice(n)
@@ -834,21 +814,9 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	if sessionID != "" {
 		hookSession.TranscriptPath = sessionPath
 	}
-	// uiNotes is non-nil while a slash command runs the hooks (/clear):
-	// the slash handler executes inside the TUI's Update, and
-	// Program.Send from there never returns — Bubble Tea's message
-	// channel is unbuffered and Update is its only consumer. A
-	// session_start hook that printed froze the TUI at /clear (ADR-0054,
-	// Found 1; gem-agent met and fixed the same). Notes raised there ride
-	// back in the slash output instead.
-	var uiNotes *[]string
-	hookNotify := func(warn string) {
-		if uiNotes != nil {
-			*uiNotes = append(*uiNotes, warn)
-			return
-		}
-		notice(warn)
-	}
+	// Hook notices are collected while a slash command runs the hooks
+	// (surface.hookNotice says why: ADR-0054, Found 1).
+	hookNotify := surf.hookNotice
 	var hookRunner *hooks.Runner
 	if len(cfg.Hooks.PreToolUse)+len(cfg.Hooks.SessionStart)+len(cfg.Hooks.UserPromptSubmit)+len(cfg.Hooks.SessionEnd) > 0 {
 		hookRunner = hooks.New(hooks.Hooks{
@@ -935,27 +903,13 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			// publishes an argument of that name must keep it visible
 			// among the arguments (gem-agent ADR-0047 §2).
 			detail, purpose := ag.Describe(tc)
-			if prog != nil {
-				prog.Send(tui.ToolCall{Name: tc.Name, Detail: detail, Purpose: purpose})
-				return
-			}
-			fmt.Fprintf(stderr, "\n[tool] %s %s\n", tc.Name, detail)
-			// Headless runs (-p, piped stdin) get the declared purpose
-			// on its own line too (gem-agent ADR-0047 §5): the transcript of a
-			// scripted run is the only record it leaves behind.
-			if purpose != "" {
-				fmt.Fprintf(stderr, "[tool] ↪ %s\n", purpose)
-			}
+			surf.toolCall(tc.Name, detail, purpose)
 		},
 		// The tool-finished signal (review round 3): the TUI's stall
 		// detector re-arms on this, never on stream chunks — a risk or
 		// progress review's side-stream used to look like "the tool
 		// returned" and produced false stall warnings.
-		OnToolDone: func(tc llm.ToolCall) {
-			if prog != nil {
-				prog.Send(tui.ToolDone{Name: tc.Name})
-			}
-		},
+		OnToolDone: func(tc llm.ToolCall) { surf.toolDone(tc.Name) },
 		OnAttach: func(atts []mention.Attachment, problems []mention.Problem) {
 			lines := make([]string, 0, len(atts))
 			for _, a := range atts {
@@ -965,23 +919,10 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			for _, p := range problems {
 				notes = append(notes, fmt.Sprintf("@%s: %s", p.Ref, p.Reason))
 			}
-			if prog != nil {
-				prog.Send(tui.Attached{Lines: lines, Notes: notes})
-				return
-			}
-			for _, l := range lines {
-				fmt.Fprintln(stderr, "[📎 "+l+"]")
-			}
-			for _, n := range notes {
-				fmt.Fprintln(stderr, "[⚠ "+n+"]")
-			}
+			surf.attached(lines, notes)
 		},
 		OnNotice: notice,
-		OnUsage: func(u llm.Usage) {
-			if prog != nil {
-				prog.Send(tui.Usage{Prompt: u.Prompt, Output: u.Output, Cached: u.Cached})
-			}
-		},
+		OnUsage:  surf.usage,
 		// The round limit is an intervention ladder on the main loop.
 		RoundReview:  true,
 		OnRoundLimit: onRoundLimit,
@@ -1005,11 +946,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			if !d.Approved {
 				return // the escalation shows up in the approval prompt
 			}
-			if prog != nil {
-				prog.Send(tui.AutoApproved{Tool: tc.Name, Reason: d.Reason, Tier: d.Tier.String()})
-				return
-			}
-			fmt.Fprintf(stderr, "[%s]\n", fmt.Sprintf(strings.TrimSpace(msgs.AutoApprovedFmt), d.Tier, tc.Name+": "+d.Reason))
+			surf.autoApproved(tc.Name, d.Reason, d.Tier.String())
 		},
 	})
 	if len(restored) > 0 {
@@ -1256,9 +1193,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			tokens = w
 		}
 		ag.SetContextWindow(tokens)
-		if prog != nil {
-			prog.Send(tui.ContextWindow{Tokens: tokens})
-		}
+		surf.contextWindow(tokens)
 	}
 
 	// One value for both surfaces, so a closure added to one cannot be
@@ -1299,8 +1234,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	// told.
 	onClear := func() string {
 		var notes []string
-		uiNotes = &notes
-		defer func() { uiNotes = nil }()
+		defer surf.collectHookNotices(&notes)()
 		note := func(format string, a ...any) { notes = append(notes, fmt.Sprintf(format, a...)) }
 		// The output is the slash command's: warnings first, then the
 		// MCP reconnection report (the same text /mcp reload prints).
@@ -1627,6 +1561,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 			},
 		})
 		prog = tea.NewProgram(model, tea.WithOutput(sweep))
+		surf.setProgram(prog)
 		tuiGate.SetProgram(prog)
 		screen.SetProgram(prog)
 		go resolveWindow()
