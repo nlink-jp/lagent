@@ -478,3 +478,28 @@ func (sess *liveSession) clear() string {
 	sess.sessionStartHooks("clear")
 	return render()
 }
+
+// turn runs one turn of the conversation. A grant since the last turn is
+// announced first, as a fresh facts message (ADR-0003's lane) — between
+// turns, never during one. Every front end starts its turns here
+// (ADR-0054 §1); under -p no grant can happen, so the announcement is
+// idle.
+func (sess *liveSession) turn(ctx context.Context, input string, out func(string)) error {
+	sess.announceGrant()
+	_, err := sess.ag.Run(ctx, input, out)
+	return err
+}
+
+// slash runs a slash command against the live session: the memory
+// commands first, then the rest — what the TUI and the plain REPL each
+// did with the same arguments. slashOutput keeps its parameters, which
+// its tests hand only what each command needs.
+func (sess *liveSession) slash(input string, as assembled) (output string, isErr bool, quit bool) {
+	if out, isErr, handled := memorySlash(input, sess.memStore); handled {
+		return out, isErr, false
+	}
+	return slashOutput(input, sess.ag, sess.registry, sess.mcpStatus(), sess.skillsList,
+		as.reloads,
+		func() string { return usageReport(sess.ag, sess.cfg.LLM.Model) },
+		appVersion, sess.msgs, sess.clear)
+}

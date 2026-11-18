@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"os/exec"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -119,12 +120,16 @@ func TestOneShotSettlesTheWindowBeforeTheTurn(t *testing.T) {
 	// The session wiring since ADR-0054, receiver dropped.
 	s := wiringSource(t)
 	start := strings.Index(s, "// --- one-shot mode")
-	end := strings.Index(s[start:], "ag.Run(")
+	// The one-shot turn since ADR-0054: liveSession.turn.
+	end := strings.Index(s[start:], "turn(turnCtx, fl.prompt")
 	if start < 0 || end < 0 {
 		t.Fatal("one-shot block not found")
 	}
 	block := s[start : start+end]
-	if !strings.Contains(block, "\t\tresolveWindow()\n") || strings.Contains(block, "go resolveWindow()") {
+	// Called, not started: a line of its own, at whatever depth the
+	// one-shot front end has (runOneShot since ADR-0054).
+	settled := regexp.MustCompile(`\n\t+resolveWindow\(\)\n`)
+	if !settled.MatchString(block) || strings.Contains(block, "go resolveWindow()") {
 		t.Error("one-shot resolves the window beside the turn instead of before it")
 	}
 }

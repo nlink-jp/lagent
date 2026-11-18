@@ -672,27 +672,33 @@ func TestGrantReportsTheProbesLeftovers(t *testing.T) {
 
 // Every interactive turn goes through announceGrant before the model
 // runs, so a directory granted since the last turn reaches the model in
-// a facts message (ADR-0046). One-shot has no grants.
+// a facts message (ADR-0046). Since ADR-0054 every front end starts its
+// turns in liveSession.turn: the agent runs in exactly one place, right
+// after the announcement, and the three interactive sites (TUI, piped
+// REPL, REPL) call it. One-shot calls it too, where no grant can happen.
 func TestEveryInteractiveTurnAnnouncesGrants(t *testing.T) {
-	src, err := os.ReadFile("root.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	lines := strings.Split(string(src), "\n")
+	lines := strings.Split(wiringSource(t), "\n")
 	runs := 0
 	for i, l := range lines {
-		// -p's turn is the one that names the prompt flag (read through
-		// runFlags since ADR-0054).
-		if !strings.Contains(l, "ag.Run(turnCtx,") || strings.Contains(l, "flagPrompt") || strings.Contains(l, "fl.prompt") {
+		if !strings.Contains(l, "ag.Run(") {
 			continue
 		}
 		runs++
 		if i == 0 || !strings.Contains(lines[i-1], "announceGrant()") {
-			t.Errorf("root.go:%d runs a turn without announcing a grant: %s", i+1, strings.TrimSpace(l))
+			t.Errorf("the agent runs without a grant announced first: %s", strings.TrimSpace(l))
 		}
 	}
-	if runs != 3 {
-		t.Errorf("found %d interactive ag.Run sites, want 3 (TUI, piped REPL, REPL)", runs)
+	if runs != 1 {
+		t.Errorf("found %d ag.Run sites in the session wiring, want 1 (liveSession.turn)", runs)
+	}
+	interactive := 0
+	for _, l := range lines {
+		if strings.Contains(l, "turn(turnCtx,") && !strings.Contains(l, "fl.prompt") {
+			interactive++
+		}
+	}
+	if interactive != 3 {
+		t.Errorf("found %d interactive turn sites, want 3 (TUI, piped REPL, REPL)", interactive)
 	}
 }
 

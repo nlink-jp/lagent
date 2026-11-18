@@ -19,11 +19,8 @@ import (
 // wiring itself is the thing under test: every field listed here must
 // be set in the tui.Options composite literal in root.go.
 func TestTUIOptionsWiring(t *testing.T) {
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, "root.go", nil, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// In frontends.go since ADR-0054, found wherever it is in cmd.
+	names, src := cmdSources(t)
 	required := map[string]bool{
 		"Msgs":         false, // gem-agent ADR-0029: the field this test exists for
 		"Theme":        false,
@@ -31,7 +28,25 @@ func TestTUIOptionsWiring(t *testing.T) {
 		"CompletePath": false,
 		"Settings":     false,
 	}
-	found := false
+	found := 0
+	for _, name := range names {
+		f, err := parser.ParseFile(token.NewFileSet(), name, src[name], 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		inspectTUIOptions(f, required, &found)
+	}
+	if found != 1 {
+		t.Fatalf("%d tui.Options literals in cmd, want the one runTUI builds", found)
+	}
+	for field, set := range required {
+		if !set {
+			t.Errorf("tui.Options does not set %s — the TUI silently loses that wiring", field)
+		}
+	}
+}
+
+func inspectTUIOptions(f *ast.File, required map[string]bool, found *int) {
 	ast.Inspect(f, func(n ast.Node) bool {
 		lit, ok := n.(*ast.CompositeLit)
 		if !ok {
@@ -44,7 +59,7 @@ func TestTUIOptionsWiring(t *testing.T) {
 		if pkg, ok := sel.X.(*ast.Ident); !ok || pkg.Name != "tui" {
 			return true
 		}
-		found = true
+		*found++
 		for _, elt := range lit.Elts {
 			kv, ok := elt.(*ast.KeyValueExpr)
 			if !ok {
@@ -58,14 +73,6 @@ func TestTUIOptionsWiring(t *testing.T) {
 		}
 		return true
 	})
-	if !found {
-		t.Fatal("no tui.Options literal found in root.go")
-	}
-	for field, set := range required {
-		if !set {
-			t.Errorf("tui.Options in root.go does not set %s — the TUI silently loses that wiring", field)
-		}
-	}
 }
 
 // ADR-0004's predicate must reach agent.New, or every MCP tool is

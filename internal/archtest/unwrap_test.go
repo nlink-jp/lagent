@@ -74,7 +74,7 @@ func TestUnwrappedToolResultsAreOnlyTheSkillTool(t *testing.T) {
 		}
 	}
 	if seen != 1 {
-		t.Errorf("InstructionTools is set in %d places outside tests; the wiring in cmd/root.go is the one", seen)
+		t.Errorf("InstructionTools is set in %d places outside tests; the wiring in cmd/startup.go (assembleAgent) is the one", seen)
 	}
 }
 
