@@ -1591,7 +1591,6 @@ func (a *Agent) execCallInner(ctx context.Context, tc llm.ToolCall) (result stri
 	if credentialDenied {
 		return out, true, false, state, nil
 	}
-	out, state, err = a.resolveOperatorQuestion(ctx, runCtx, tool, tc, out, state, err)
 	if state == floorAbandoned {
 		return abandonedResult, false, false, state, nil
 	}
@@ -2010,33 +2009,6 @@ func (a *Agent) credentialRetry(ctx context.Context, tool *tools.Tool, tc llm.To
 	}
 	out, state, err := a.runWithFloor(tools.WithDirectRead(ctx), tool, tc)
 	return out, state, err, false
-}
-
-// resolveOperatorQuestion handles a tool that reported it cannot go on
-// until the operator answers (tools.NeedsOperator, ADR-0049 §8). The
-// question is put here, outside runWithFloor — only the run is under the
-// floor, never a dialog — and the tool then runs once more under the
-// context the answer returned. A turn that was cancelled asks nothing.
-// Whatever the tool's owner returns as the result is sent as it is: the
-// owner wrote it for the model.
-func (a *Agent) resolveOperatorQuestion(ctx, runCtx context.Context, tool *tools.Tool, tc llm.ToolCall, out string, state floorState, err error) (string, floorState, error) {
-	for resolved := 0; ; resolved++ {
-		var ask tools.NeedsOperator
-		if state == floorAbandoned || !errors.As(err, &ask) {
-			return out, state, err
-		}
-		if resolved == tools.OperatorResolves {
-			return ask.StillUnresolved(), state, nil
-		}
-		if ctx.Err() != nil {
-			return "error: interrupted before execution", floorInterrupted, nil
-		}
-		retry, result := ask.Resolve(runCtx)
-		if retry == nil {
-			return result, state, nil
-		}
-		out, state, err = a.runWithFloor(retry, tool, tc)
-	}
 }
 
 // approvalDecision renders a gate answer for the audit records.

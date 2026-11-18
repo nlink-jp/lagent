@@ -283,19 +283,6 @@ A record that has lost the project's pins is not taken as the record,
 so a comparison can leave a changed file out but never load one.
 `.lagent.toml` is read once, at startup.
 
-A project skill is also compared each time it is used (ADR-0049): its
-body and files are read from disk then, long after the list was built.
-`skillGuard` (cmd/skilltrust.go) digests the skill through its own open
-root — the tree the loader reads, by the implementation that took the
-pin — and a skill that is not what the record holds becomes the
-operator's question: trust (that digest is recorded and the skill
-loaded), disable (off until the list is rebuilt) or not now (this read
-is refused, nothing changes). `load_skill` reaches the question by
-returning `tools.NeedsOperator`, which the agent resolves outside the
-floor and then runs the tool again; `/skill` asks from the turn's own
-goroutine before it injects. Where nobody is at a terminal nothing is
-asked, and the model is given a fixed sentence.
-
 ## Memory
 
 Short facts recalled in every session (ADR-0013): global

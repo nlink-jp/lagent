@@ -33,12 +33,12 @@ ADR-0005 は、画像が**モデル**へ届く道を決めた。ドロップさ�
 
 ### カウンタに見えるもの、見えないもの
 
-`emit`（[model.go:1002](../../../internal/tui/model.go)）は 1 行を scrollback へ印字し、
+`emit`（[model.go:999](../../../internal/tui/model.go)）は 1 行を scrollback へ印字し、
 その物理行数を数える。bottom pin はその数に乗っている。`go.mod:11` が固定している版 —
 gem-agent が固定しているのと同じ版 — `charmbracelet/x/ansi` v0.11.6 で実測すると、
 `ansi.StringWidth` は iTerm2 の `OSC 1337 File=`、kitty の `APC _G`、sixel の `DCS q` の
 いずれにも **0** を返し、`ansi.Strip` は空文字を返す。`ansi.Hardwrap` は 3 方式とも
-バイト同一で通すので、`wrapForScrollback`（[model.go:1262](../../../internal/tui/model.go)）は
+バイト同一で通すので、`wrapForScrollback`（[model.go:1259](../../../internal/tui/model.go)）は
 何も切り刻まない。
 
 ただしカウンタは盲目ではない。`physicalRows`
@@ -208,13 +208,13 @@ view 層の読み取りを開く）は、いまや先送りした決定に属す
 この一文だけが立っているのを見つけた。この一文自身の規則により、それは「現時点では」に
 すぎない。テストは後から書かれ、いまこの一文は意図ではなく実在を述べている。これは既存の
 面を塞いだと主張するものではない。非テストコードで `ansi.Strip` が呼ばれるのは 1 箇所
-（[model.go:1280](../../../internal/tui/model.go)）、`physicalRows` の中で幅を**測る**ためだけ
+（[model.go:1277](../../../internal/tui/model.go)）、`physicalRows` の中で幅を**測る**ためだけ
 である。シェル出力の生エスケープは既に端末へ届いている。既存であり、ここで広がらず、
 ここで直しもしない。
 
 ### 7. 描画は TUI 限定。能力の検出は 1 度だけ
 
-`tea.NewProgram` が構築されるのは 1 箇所（[root.go:1672](../../../cmd/root.go)）。
+`tea.NewProgram` が構築されるのは 1 箇所（[root.go:1602](../../../cmd/root.go)）。
 one-shot `-p` と素の REPL はそれを作らず、描かない。探針はその構築の**前**に走りキャッシュ
 される。理由は `newGlamourRenderer` が `WithAutoStyle` について記録しているとおりで、これは
 移植元から継承した記述であり、ここでも真である。探針は問い合わせ前に排出し、応答が無いことを
