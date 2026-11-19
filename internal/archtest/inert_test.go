@@ -57,7 +57,8 @@ func TestOnlyTheIngressesMakeTextInert(t *testing.T) {
 }
 
 // TestThePlainStreamsAreMadeInertFirst pins where runREPL wires the plain
-// entrances (ADR-0024 §4): before its first print. Wired after, the lines
+// entrances (ADR-0024 §4): before its first print — a stream read in
+// runREPL itself, or a call handed cmd, which may read one. Wired after, the lines
 // before it — the startup notes, which quote MCP server output — would
 // still reach a terminal as they came.
 func TestThePlainStreamsAreMadeInertFirst(t *testing.T) {
@@ -76,8 +77,20 @@ func TestThePlainStreamsAreMadeInertFirst(t *testing.T) {
 				ast.Inspect(st, func(n ast.Node) bool {
 					switch n := n.(type) {
 					case *ast.CallExpr:
-						if id, ok := n.Fun.(*ast.Ident); ok && id.Name == "inertStreams" && wired < 0 {
-							wired = i
+						if id, ok := n.Fun.(*ast.Ident); ok && id.Name == "inertStreams" {
+							if wired < 0 {
+								wired = i
+							}
+							return true
+						}
+						// A call handed cmd can read its streams: since
+						// ADR-0054 the startup phases do, inside their own
+						// bodies, where a check of runREPL's statements
+						// alone did not see them (pre-release review).
+						for _, a := range n.Args {
+							if id, ok := a.(*ast.Ident); ok && id.Name == "cmd" && firstUse < 0 {
+								firstUse = i
+							}
 						}
 					case *ast.SelectorExpr:
 						if n.Sel.Name == "ErrOrStderr" || n.Sel.Name == "OutOrStdout" {
