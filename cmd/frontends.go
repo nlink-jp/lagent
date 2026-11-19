@@ -135,7 +135,7 @@ func buildBanner(sess *liveSession, cmd *cobra.Command, adm admission, op opened
 }
 
 // runTUI runs the interactive TUI until the operator leaves.
-func runTUI(sess *liveSession, cmd *cobra.Command, cl *cleanups, notes *startupNotes, rs runSettings, adm admission, ld loaded, md models, fe frontEnd, as assembled, bannerLines []string, picture diagram.Picture) error {
+func runTUI(sess *liveSession, notes *startupNotes, rs runSettings, adm admission, ld loaded, fe frontEnd, as assembled, bannerLines []string, picture diagram.Picture) error {
 	// --- interactive TUI (gem-agent ADR-0002/0003) ---
 	// prog is assigned before the TUI runs; the agent only executes
 	// inside prog.Run, so the callbacks below never see it half-set.
@@ -243,7 +243,7 @@ func runTUI(sess *liveSession, cmd *cobra.Command, cl *cleanups, notes *startupN
 
 // runPlain is the plain line REPL, the fallback when stdin or stdout is
 // not a terminal.
-func runPlain(sess *liveSession, cmd *cobra.Command, notes *startupNotes, rs runSettings, adm admission, ld loaded, md models, fe frontEnd, as assembled, bannerLines []string) error {
+func runPlain(sess *liveSession, cmd *cobra.Command, notes *startupNotes, rs runSettings, adm admission, fe frontEnd, as assembled, bannerLines []string) error {
 	// Plain REPL / one-shot: the banner is printed, the tee is done.
 	notes.freeze()
 	for _, line := range bannerLines {

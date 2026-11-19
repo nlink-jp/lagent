@@ -169,7 +169,7 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	if err := buildConfinement(sess, fl, rs, adm, wa); err != nil {
 		return err
 	}
-	ld, err := loadProject(sess, cmd, cl, fl, op)
+	ld, err := loadProject(sess, cl, fl)
 	if err != nil {
 		return err
 	}
@@ -189,9 +189,9 @@ func runREPL(cmd *cobra.Command, args []string) error {
 	}
 	bannerLines, picture := buildBanner(sess, cmd, adm, op, ld, fe)
 	if fe.useTUI {
-		return runTUI(sess, cmd, cl, notes, rs, adm, ld, md, fe, as, bannerLines, picture)
+		return runTUI(sess, notes, rs, adm, ld, fe, as, bannerLines, picture)
 	}
-	return runPlain(sess, cmd, notes, rs, adm, ld, md, fe, as, bannerLines)
+	return runPlain(sess, cmd, notes, rs, adm, fe, as, bannerLines)
 }
 
 var errInterrupted = errors.New("interrupted")

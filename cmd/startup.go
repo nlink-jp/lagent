@@ -538,7 +538,7 @@ func buildConfinement(sess *liveSession, fl runFlags, rs runSettings, adm admiss
 	return nil
 }
 
-func loadProject(sess *liveSession, cmd *cobra.Command, cl *cleanups, fl runFlags, op opened) (loaded, error) {
+func loadProject(sess *liveSession, cl *cleanups, fl runFlags) (loaded, error) {
 	// --- project instruction files (drop-in: AGENTS.md and friends,
 	// including ancestor directories, exactly as other agents read them)
 	// Read here, with the skills, before any process the project names
@@ -600,7 +600,6 @@ func loadProject(sess *liveSession, cmd *cobra.Command, cl *cleanups, fl runFlag
 	// that this run needs it.
 	sess.adv = newMCPAdvertiser(sess.cfg.MCP.Advertise == "all", sess.cfg.MCP.Preload, fl.allow)
 	sess.adv.setInventory(sess.mcpInv)
-	_ = sess.mcpSummary
 
 	return loaded{contextLabels: contextLabels, screen: screen}, nil
 }
