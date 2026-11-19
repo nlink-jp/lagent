@@ -85,8 +85,8 @@ func TestSessionWiringFilesAreComplete(t *testing.T) {
 }
 
 // wiringLocal matches a field reached through one of the session
-// wiring's locals — the liveSession and the phases' results.
-var wiringLocal = regexp.MustCompile(`\b(sess|fe|ld|md|as|rs|adm|op)\.[A-Za-z]`)
+// wiring's locals — runREPL's: the liveSession and the phases' results.
+var wiringLocal = regexp.MustCompile(`\b(sess|adm|as|cl|fe|fl|ld|md|notes|op|rg|rs|wa)\.[A-Za-z]`)
 
 // No string literal names a wiring local. The restructure rewrote locals
 // into fields and the rewrite reached two refusal messages ("inline
