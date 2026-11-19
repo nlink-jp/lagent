@@ -37,14 +37,31 @@ type surface struct {
 	prog atomic.Pointer[tea.Program]
 	// hookSink, while set, collects hook notices instead of showing them.
 	hookSink *[]string
+	// ended is set when the TUI has ended (endTUI). The exit's own
+	// speakers — the session_end hooks — reach the stream then; what a
+	// turn still running reports (one left behind by the third Ctrl+C on
+	// a wedged tool, a late window lookup) is dropped, as the ended
+	// program dropped it: it would land after the exit summary.
+	ended atomic.Bool
 }
 
-// setProgram routes output to p; nil routes it back to the stream.
+// setProgram routes output to p.
 func (s *surface) setProgram(p *tea.Program) { s.prog.Store(p) }
+
+// endTUI is called when the program has returned: a Send to an ended
+// program is dropped without a word, so the exit's hook notices go to
+// the stream, and the rest is dropped on purpose (ADR-0054, Found 5).
+func (s *surface) endTUI() {
+	s.ended.Store(true)
+	s.prog.Store(nil)
+}
 
 // notice puts a one-line warning in front of the operator wherever they
 // are: the TUI's note strip, stderr otherwise.
 func (s *surface) notice(msg string) {
+	if s.ended.Load() {
+		return
+	}
 	if p := s.prog.Load(); p != nil {
 		p.Send(tui.Attached{Notes: []string{msg}})
 		return
@@ -63,6 +80,12 @@ func (s *surface) hookNotice(msg string) {
 		*s.hookSink = append(*s.hookSink, msg)
 		return
 	}
+	if s.ended.Load() {
+		// The exit's session_end hooks: the program has ended, the
+		// stream is the operator's screen again.
+		fmt.Fprintf(s.w, "[⚠ %s]\n", msg)
+		return
+	}
 	s.notice(msg)
 }
 
@@ -77,6 +100,9 @@ func (s *surface) collectHookNotices(into *[]string) (stop func()) {
 // declared purpose on its own line too (gem-agent ADR-0047 §5): the
 // transcript of a scripted run is the only record it leaves behind.
 func (s *surface) toolCall(name, detail, purpose string) {
+	if s.ended.Load() {
+		return
+	}
 	if p := s.prog.Load(); p != nil {
 		p.Send(tui.ToolCall{Name: name, Detail: detail, Purpose: purpose})
 		return
@@ -89,12 +115,18 @@ func (s *surface) toolCall(name, detail, purpose string) {
 
 // toolDone is the tool-finished signal; only the TUI has state to leave.
 func (s *surface) toolDone(name string) {
+	if s.ended.Load() {
+		return
+	}
 	if p := s.prog.Load(); p != nil {
 		p.Send(tui.ToolDone{Name: name})
 	}
 }
 
 func (s *surface) attached(lines, notes []string) {
+	if s.ended.Load() {
+		return
+	}
 	if p := s.prog.Load(); p != nil {
 		p.Send(tui.Attached{Lines: lines, Notes: notes})
 		return
@@ -108,6 +140,9 @@ func (s *surface) attached(lines, notes []string) {
 }
 
 func (s *surface) autoApproved(tool, reason, tier string) {
+	if s.ended.Load() {
+		return
+	}
 	if p := s.prog.Load(); p != nil {
 		p.Send(tui.AutoApproved{Tool: tool, Reason: reason, Tier: tier})
 		return
@@ -118,12 +153,18 @@ func (s *surface) autoApproved(tool, reason, tier string) {
 // usage, stream and contextWindow feed the TUI's footer and status line;
 // a session without one shows none of them.
 func (s *surface) usage(u llm.Usage) {
+	if s.ended.Load() {
+		return
+	}
 	if p := s.prog.Load(); p != nil {
 		p.Send(tui.Usage{Prompt: u.Prompt, Output: u.Output, Cached: u.Cached})
 	}
 }
 
 func (s *surface) stream(ev llm.StreamEvent) {
+	if s.ended.Load() {
+		return
+	}
 	if p := s.prog.Load(); p != nil {
 		p.Send(tui.StreamUpdate{Kind: ev.Kind, Thought: ev.Thought,
 			Attempt: ev.Attempt, Max: ev.Max, Cause: ev.Cause, DelayMS: ev.DelayMS})
@@ -131,6 +172,9 @@ func (s *surface) stream(ev llm.StreamEvent) {
 }
 
 func (s *surface) contextWindow(tokens int) {
+	if s.ended.Load() {
+		return
+	}
 	if p := s.prog.Load(); p != nil {
 		p.Send(tui.ContextWindow{Tokens: tokens})
 	}
@@ -142,6 +186,9 @@ func (s *surface) contextWindow(tokens int) {
 // strands typed-ahead input in one buffer while the other blocks
 // (AGENTS.md gotcha; review round 3).
 func (s *surface) ask(ctx context.Context, question string, options []string) (int, error) {
+	if s.ended.Load() {
+		return 0, errAskDeclined
+	}
 	if s.oneShot {
 		return oneShotAsk(ctx, question, options)
 	}

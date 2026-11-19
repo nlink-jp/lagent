@@ -148,3 +148,31 @@ func TestSurfaceProgramRoute(t *testing.T) {
 		t.Fatalf("the stream got %q while a program ran", w.String())
 	}
 }
+
+// After the TUI has ended only the exit's hook notices reach the stream:
+// a turn still running (a wedged tool past the third Ctrl+C) or a late
+// window lookup reports nothing after the exit summary, and nothing
+// reads stdin for an answer.
+func TestSurfaceAfterTheTUIEnds(t *testing.T) {
+	var w bytes.Buffer
+	s := &surface{w: &w, msgs: uitext.For(uitext.EN), plainAsk: func(context.Context, string, []string) (int, error) {
+		t.Error("an ended session asked on stdin")
+		return 0, nil
+	}}
+	s.endTUI()
+	s.notice("late lookup")
+	s.toolCall("shell_exec", "cmd=sleep", "why")
+	s.toolDone("shell_exec")
+	s.attached([]string{"a"}, []string{"b"})
+	s.autoApproved("write_file", "safe", "Allow")
+	s.usage(llm.Usage{Prompt: 1})
+	s.stream(llm.StreamEvent{})
+	s.contextWindow(10)
+	if _, err := s.ask(context.Background(), "q", []string{"a", "b"}); err != errAskDeclined {
+		t.Errorf("ask after the end = %v, want declined", err)
+	}
+	s.hookNotice("session_end hook failed")
+	if got, want := w.String(), "[⚠ session_end hook failed]\n"; got != want {
+		t.Fatalf("after the end:\n%q\nwant:\n%q", got, want)
+	}
+}
