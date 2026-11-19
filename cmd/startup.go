@@ -786,7 +786,7 @@ func assembleHooks(sess *liveSession, cl *cleanups) (preToolHook func(ctx contex
 			return sess.hookRunner.PromptSubmit(ctx, sess.hookSession, input)
 		}
 	}
-	cl.push("run the session-end hooks", func() { sess.sessionEndHooks("exit") })
+	cl.push("run the session-end hooks", func() { sess.surf.sayingExit(func() { sess.sessionEndHooks("exit") }) })
 	return preToolHook, promptHook
 }
 

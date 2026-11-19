@@ -21,28 +21,31 @@ import (
 // what the nine `if prog != nil` branches it replaces printed.
 //
 // One concrete type whose program field decides: the program is
-// late-bound, so the same value is the stream before the TUI runs and
-// again after it ends.
+// late-bound, so the same value is the stream before the TUI runs. After
+// it ends (endTUI) only the exit's session_end hooks speak, to the
+// stream; the rest is dropped.
 type surface struct {
 	w        io.Writer
 	msgs     *uitext.Messages
 	oneShot  bool
 	plainAsk askFunc
-	// prog is set before the program runs and cleared when it returns:
-	// a Send to a program that has ended is dropped without a word
-	// (Bubble Tea selects on its cancelled context), so what the exit
-	// says — a session_end hook's notice — went nowhere (ADR-0054,
-	// Found 5). Atomic: a goroutine the session started may still be
+	// prog is set before the program runs and stays set: a Send to it
+	// after it has ended is dropped without a word (Bubble Tea selects on
+	// its cancelled context), which is what a late report should get —
+	// but what the exit says went nowhere too (ADR-0054, Found 5); ended
+	// routes that. Atomic: a goroutine the session started may still be
 	// reporting when the program ends.
 	prog atomic.Pointer[tea.Program]
 	// hookSink, while set, collects hook notices instead of showing them.
 	hookSink *[]string
 	// ended is set when the TUI has ended (endTUI). The exit's own
-	// speakers — the session_end hooks — reach the stream then; what a
-	// turn still running reports (one left behind by the third Ctrl+C on
-	// a wedged tool, a late window lookup) is dropped, as the ended
-	// program dropped it: it would land after the exit summary.
-	ended atomic.Bool
+	// speakers — the session_end hooks, while exitHooks runs them — reach
+	// the stream then; what a turn still running reports (one left
+	// behind by the third Ctrl+C on a wedged tool, its hooks, a late
+	// window lookup) is dropped, as the ended program dropped it: it
+	// would land after the exit summary.
+	ended     atomic.Bool
+	exitHooks atomic.Bool
 }
 
 // setProgram routes output to p.
@@ -51,9 +54,17 @@ func (s *surface) setProgram(p *tea.Program) { s.prog.Store(p) }
 // endTUI is called when the program has returned: a Send to an ended
 // program is dropped without a word, so the exit's hook notices go to
 // the stream, and the rest is dropped on purpose (ADR-0054, Found 5).
-func (s *surface) endTUI() {
-	s.ended.Store(true)
-	s.prog.Store(nil)
+// The program stays set: a method that read ended a moment before still
+// sends to it, and the ended program drops that too, where a cleared one
+// would have sent it to the stream.
+func (s *surface) endTUI() { s.ended.Store(true) }
+
+// sayingExit runs the exit's session_end hooks: their notices reach the
+// stream after the TUI has ended; any other hook's are dropped then.
+func (s *surface) sayingExit(run func()) {
+	s.exitHooks.Store(true)
+	defer s.exitHooks.Store(false)
+	run()
 }
 
 // notice puts a one-line warning in front of the operator wherever they
@@ -81,9 +92,12 @@ func (s *surface) hookNotice(msg string) {
 		return
 	}
 	if s.ended.Load() {
-		// The exit's session_end hooks: the program has ended, the
-		// stream is the operator's screen again.
-		fmt.Fprintf(s.w, "[⚠ %s]\n", msg)
+		// The program has ended: the exit's session_end hooks speak on
+		// the stream, the operator's screen again; a hook of a turn left
+		// running does not.
+		if s.exitHooks.Load() {
+			fmt.Fprintf(s.w, "[⚠ %s]\n", msg)
+		}
 		return
 	}
 	s.notice(msg)
