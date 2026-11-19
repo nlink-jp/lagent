@@ -467,6 +467,9 @@ var (
 	// A weekday on its own, as the session's facts write the start day
 	// ("(Wednesday, JST)"): it changes at midnight like the date beside it.
 	bareDayRe = regexp.MustCompile(`\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b`)
+	// The OS release /version reports: the references were recorded on
+	// one machine and must hold on another, and after a point update.
+	osRe = regexp.MustCompile(`on macOS [0-9][0-9.]* \(`)
 )
 
 // normalize replaces what differs between two runs of the same session —
@@ -482,6 +485,7 @@ func normalize(e charEnv, s string) string {
 	s = weekdayRe.ReplaceAllString(s, "<DAY>")
 	s = dateRe.ReplaceAllString(s, "<DATE>")
 	s = bareDayRe.ReplaceAllString(s, "<WEEKDAY>")
+	s = osRe.ReplaceAllString(s, "on macOS <OS> (")
 	ids := map[string]string{}
 	s = uuidRe.ReplaceAllStringFunc(s, func(id string) string {
 		if n, ok := ids[id]; ok {
@@ -526,7 +530,7 @@ func checkCharacterization(t *testing.T, name, got string) {
 	if got != string(want) {
 		// Outside t.TempDir, which is removed when the test ends: the
 		// file is what the reader compares.
-		dir := filepath.Join(os.TempDir(), "gem-agent-characterize")
+		dir := filepath.Join(os.TempDir(), "lagent-characterize")
 		_ = os.MkdirAll(dir, 0o755)
 		gotPath := filepath.Join(dir, name+".got.txt")
 		_ = os.WriteFile(gotPath, []byte(got), 0o644)

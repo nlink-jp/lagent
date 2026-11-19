@@ -76,7 +76,7 @@ invoke with /skill <name> [arguments]; the model can also load them itself when 
 work directory: <HOME>/.local/state/lagent/<PROJECT-ESCAPED>/work/<ID1> (write)
 no added directories — /add-dir <path> or /read-dir <path> adds one
 
-> lagent v0.0.0-characterize on macOS 27.2.1 (darwin/arm64)
+> lagent v0.0.0-characterize on macOS <OS> (darwin/arm64)
 
 > mcp reloaded: 0 server(s), 0 tool(s)
 history cleared — the next message starts a fresh conversation
