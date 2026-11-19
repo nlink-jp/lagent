@@ -332,6 +332,9 @@ answers.
   sent** (ADR-0054, Found 1): the slash handler runs in Bubble Tea's
   `Update`, where `Program.Send` never returns. Anything a slash command
   triggers that wants to tell the operator goes into the command's output.
+  So does anything written to a terminal stream: under the TUI the next
+  redraw covers it (Found 4). A reporter used both at `/clear` and at exit
+  takes its writer per call rather than keeping the startup one.
 
 - **A path through a link outside the roots is rewritten once, in the
   tool-call loop** (`Agent.intoRoots` → `sandbox.IntoRoot`, ADR-0041,
