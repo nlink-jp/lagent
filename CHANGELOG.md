@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.32.1] - 2026-11-19
 
 ### Changed
 
@@ -14,12 +14,6 @@
 
 ### Fixed
 
-- **An image that cannot be shown says why in plain words again.** The
-  internal restructure changed two refusals, which both `/show` and the
-  model's `show_image` read, to "cannot draw inline fe.images" and "has
-  no ld.screen". They read "cannot draw inline images" and "has no
-  screen" again, and a test now refuses any message that names an
-  internal variable.
 - **The plain REPL's "context window unknown" warning comes after the
   banner.** The lookup started before the banner was printed, so its
   warning could land between the banner's lines, and two threads wrote
