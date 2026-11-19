@@ -37,7 +37,7 @@ work dir の getter とバイト上限とプレビュー長だけで（[mcpresul
 
 必要な経路はこちらにも既にあり、しかも同じものである。エージェントループはツールコールの
 **最中に** UI へ話しかけている — `prog.Send(tui.ToolCall{…})`
-（[surface.go:74](../../../cmd/surface.go)）。文字列契約は 1 ミリも動かさなくてよい。
+（[surface.go:81](../../../cmd/surface.go)）。文字列契約は 1 ミリも動かさなくてよい。
 
 ### コスト
 

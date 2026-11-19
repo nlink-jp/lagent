@@ -20,6 +20,11 @@
   to the terminal while the TUI held the screen, and the next redraw
   covered it: it was in the transcript and nowhere on screen. It is now
   part of `/clear`'s output.
+- **Leaving the TUI shows what a `session_end` hook says.** A hook
+  that failed or timed out at exit was reported to the TUI after it had
+  already ended, which drops what it is sent: nothing reached the
+  screen. The plain REPL showed it. Output after the TUI ends now goes
+  to the terminal, before the exit summary.
 - **The exit summary is the last thing on screen again when a
   `session_end` hook speaks.** The resume command and the totals printed
   before the session-end hooks ran, so a hook's notice (a failure, a

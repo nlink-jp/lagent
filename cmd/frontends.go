@@ -235,6 +235,10 @@ func runTUI(sess *liveSession, cmd *cobra.Command, cl *cleanups, notes *startupN
 	ld.screen.SetProgram(prog)
 	go sess.resolveWindow()
 	_, err := prog.Run()
+	// What the exit says — the session_end hooks run in the cleanups —
+	// goes to the terminal: the ended program drops what it is sent
+	// (ADR-0054, Found 5).
+	sess.surf.setProgram(nil)
 	return err
 }
 

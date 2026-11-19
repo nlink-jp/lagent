@@ -105,6 +105,12 @@ func (r *tuiRun) screen() string {
 	return string(out)
 }
 
+// scrollback is the pane's whole history, what scrolled off included.
+func (r *tuiRun) scrollback() string {
+	out, _ := exec.Command("tmux", "-L", r.sock, "capture-pane", "-p", "-J", "-S", "-", "-t", "s").Output()
+	return string(out)
+}
+
 func (r *tuiRun) dead() bool {
 	out, _ := exec.Command("tmux", "-L", r.sock, "display-message", "-p", "-t", "s", "#{pane_dead}").Output()
 	return strings.TrimSpace(string(out)) == "1"
@@ -208,5 +214,33 @@ func TestTUIClearNamesAChangedPersistentFile(t *testing.T) {
 	}
 	if !r.waitFor("this session added or changed: AGENTS.md", 5*time.Second) {
 		t.Fatalf("the persistent-file note is not on the screen:\n%s", r.screen())
+	}
+}
+
+// ADR-0054 Found 5: what the exit says after the TUI has ended reaches
+// the terminal. A session_end hook's notice was sent to the ended
+// program, which drops it without a word; the plain REPL showed it. It
+// comes before the exit summary, as there.
+func TestTUIExitShowsTheSessionEndHookNotice(t *testing.T) {
+	e := newCharEnvWith(t, `
+[[hooks.session_end]]
+command = "exit 3"
+`)
+	r := startTUI(t, e, []scriptTurn{{Text: "Hello."}}, "--no-sandbox")
+	r.typeLine("hi")
+	if !r.waitFor("Hello.", 10*time.Second) {
+		t.Fatalf("the turn did not answer:\n%s", r.screen())
+	}
+	r.typeLine("/quit")
+	if !r.waitExit(10 * time.Second) {
+		t.Fatalf("/quit did not end the session:\n%s", r.screen())
+	}
+	s := r.scrollback()
+	hook, summary := strings.LastIndex(s, "exit 3"), strings.LastIndex(s, "resume: lagent -c")
+	if hook < 0 {
+		t.Fatalf("the failing hook's notice is not in the scrollback:\n%s", s)
+	}
+	if summary < hook {
+		t.Fatalf("want the exit summary after the hook's notice:\n%s", s)
 	}
 }
