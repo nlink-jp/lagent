@@ -334,7 +334,9 @@ answers.
   triggers that wants to tell the operator goes into the command's output.
   So does anything written to a terminal stream: under the TUI the next
   redraw covers it (Found 4). A reporter used both at `/clear` and at exit
-  takes its writer per call rather than keeping the startup one.
+  takes its writer per call rather than keeping the startup one. After
+  the TUI ends, `runTUI` clears the surface's program: an ended program
+  drops what it is sent (Found 5).
 
 - **A path through a link outside the roots is rewritten once, in the
   tool-call loop** (`Agent.intoRoots` → `sandbox.IntoRoot`, ADR-0041,

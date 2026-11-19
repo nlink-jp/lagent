@@ -135,12 +135,13 @@ TUI は、実際の端末（tmux、台本のモデル）でも、v0.32.0 と最�
 | `surface` の外の `if prog != nil` | 9 | 0 |
 | フィールドへ書き換えた局所変数 | — | 40 個の 611 か所。型検査器の解決から書き換え、混ざった定義 5 か所は手で直した |
 
-### 見つけた 4 件のその後
+### 見つけたもののその後
 
 1. **見つけたもの 1、`/clear` で固まる件** — `d99943a` で直した。`TestTUIClearWithAPrintingSessionStartHook` が tmux の中で TUI を動かし、直す前のコミットで落ちた。特性テストの基準は変わらなかった。その場面のフックは何も出力しないからである。素の REPL の新しい形（知らせが `/clear` の出力の中に入る）は `TestPlainClearCarriesTheHookNotice` が固定する。
 2. **見つけたもの 2、`/clear` の panic** — `e527ee4` で直した。手順 3 からは `transcript.log` が nil に強い道になった。
 3. **見つけたもの 3、終了の要約** — `5aecaa0` で `pushFinal` を使って直した。`TestExitSummaryIsLastAfterASessionEndHook` は直す前のコミットで落ちた。
 4. **見つけたもの 4、測った結果: 画面は壊れないが、知らせが消える。** TUI のセッションの途中で AGENTS.md を変えて `/clear` を打つと、記録ファイルには `persistent_changes` が残る。一方、stderr へ書いた行（"note: this session added or changed: AGENTS.md"）は、画面にも端末のスクロールバックにも出ない。TUI の再描画が上書きする。素の REPL では出る。gem-agent も同じ書き方をしている。保守者に諮り、見せるべきと決まった（2026-11-19）。直す前に、起動時に決めた書き先へ書く箇所のうち、TUI が画面を持っている間に動きうるものを全部挙げた。`/clear` でのプロジェクトの報告と追加ルートの報告の 2 つだけだった。MCP の再読み込みと付与時の監視は既に知らせを返り値で返し、残りは TUI の前か後に動く。両方の報告は、書き先を呼ぶたびに受け取るようにした。`/clear` は自分の出力を、終了時の後片づけは端末を渡す。`addedWatch` は書き先を持たないので、後から書く先が残らない（`f494514`）。`TestTUIClearNamesAChangedPersistentFile` が TUI で動かして確かめ、修正前は落ちる。gem-agent にも同じ修正を入れた。
+5. **見つけたもの 5（見つけたもの 4 の入口を挙げる途中で見つけた）: TUI が終わった後に言うことが消える。** 行が消える道は、TUI の実行中に端末へ書くことのほかに、もう終わったプログラムへ送ることがある。surface は `prog.Run` が戻った後もプログラムを持ち続けていた。Bubble Tea の `Send` は、終わったプログラムに対しては取り消し済みのコンテキストを選んで何もしない。tmux で測ると、終了時に失敗した `session_end` フックの知らせは、画面にもスクロールバックにも出なかった。素の REPL では出る。`runTUI` は `Run` が戻ったらプログラムを外すようにした。surface は再びストリームへ書き、知らせは終了の要約より前に出る（`abfa01a`）。セッションが起こしたゴルーチンがプログラムの終わりぎわにまだ報告しうるので、このフィールドは atomic にした。`TestTUIExitShowsTheSessionEndHookNotice` が確かめ、修正前は落ちる。gem-agent にも同じ修正を入れた。
 
 ### §2〜§3 と違うところと、その理由
 

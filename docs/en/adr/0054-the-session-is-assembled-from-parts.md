@@ -135,12 +135,13 @@ Implemented on lagent `main` in the order of §3: the `/clear` panic fix (`e527e
 | `if prog != nil` outside `surface` | 9 | 0 |
 | Locals rewritten into fields | — | 611 uses of 40 locals, from the type checker's resolution; 5 mixed definitions by hand |
 
-### What the four findings came to
+### What the findings came to
 
 1. **Found 1, the `/clear` freeze** — fixed in `d99943a`. `TestTUIClearWithAPrintingSessionStartHook` drives the TUI under tmux and failed on the commit before. The characterization references did not change: their hooks print nothing; the plain REPL's new form (the notices inside `/clear`'s output) is pinned by `TestPlainClearCarriesTheHookNotice`.
 2. **Found 2, the `/clear` panic** — fixed in `e527ee4`; `transcript.log` is the nil-safe path from step 3 on.
 3. **Found 3, the exit summary** — fixed in `5aecaa0` with `pushFinal`; `TestExitSummaryIsLastAfterASessionEndHook` failed on the commit before.
 4. **Found 4, measured: the display is not damaged, but the note is lost.** With AGENTS.md changed during a TUI session, `/clear` records `persistent_changes` in the transcript, and the line written to stderr — "note: this session added or changed: AGENTS.md" — shows neither on the screen nor in the terminal's scrollback: the TUI's redraw covers it. The plain REPL prints it. gem-agent writes the same way. Put to the maintainer, who decided it must show (2026-11-19). Before fixing, every write to a writer bound at startup that can run while the TUI holds the screen was listed: the project's report and the added roots' report at `/clear`, and nothing else — the MCP reloads and the grant's watch already return their notes, and the rest runs before the TUI or after it. Both reports now take their writer per call: `/clear` passes its own output, the exit cleanups the terminal; `addedWatch` keeps no writer, so none is left to write later (`f494514`). `TestTUIClearNamesAChangedPersistentFile` drives it in the TUI and fails before. gem-agent got the same fix.
+5. **Found 5, met while listing Found 4's entry points: what the exit says after the TUI is lost.** Writing to the terminal while the TUI runs was one way to lose a line; the other is sending it to the program after it has ended. The surface kept the program after `prog.Run` returned, and Bubble Tea's `Send` to an ended program selects on its cancelled context: a `session_end` hook that failed at exit said nothing on screen or in the scrollback, measured under tmux; the plain REPL showed it. `runTUI` now clears the program when `Run` returns, so the surface writes to the stream again, before the exit summary (`abfa01a`); the field is atomic, since a goroutine the session started may still report as the program ends. `TestTUIExitShowsTheSessionEndHookNotice` fails before. gem-agent got the same fix.
 
 ### Where the implementation differs from §2–§3, and why
 
