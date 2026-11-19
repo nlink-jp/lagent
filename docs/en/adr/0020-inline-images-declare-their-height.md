@@ -256,7 +256,7 @@ Pre-existing, not widened here, not repaired here.
 ### 7. Drawing is TUI-only, and the capability is probed once
 
 `tea.NewProgram` is constructed at one site
-([frontends.go:232](../../../cmd/frontends.go)); one-shot `-p` and the plain REPL
+([frontends.go:231](../../../cmd/frontends.go)); one-shot `-p` and the plain REPL
 never build it and never draw. The probe runs **before** that construction
 and is cached, for the reason `newGlamourRenderer` records about
 `WithAutoStyle` — inherited from the porting source, and true here. It
