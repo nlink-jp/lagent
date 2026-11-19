@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nlink-jp/lagent/internal/agent"
 	"github.com/nlink-jp/lagent/internal/sandbox"
 	"github.com/nlink-jp/lagent/internal/tools"
 	"github.com/nlink-jp/lagent/internal/uitext"
@@ -75,29 +74,6 @@ func TestRotateWorkDirMovesEveryConsumer(t *testing.T) {
 	}
 	if registry.WorkDir() != "" {
 		t.Errorf("file tools kept a root after rotation to none: %q", registry.WorkDir())
-	}
-}
-
-type countingLog struct{ n int }
-
-func (c *countingLog) Log(string, any) error { c.n++; return nil }
-
-// Review round 4: the side-call tools registered at startup log
-// through liveLog, which reads the variable /clear reassigns — the
-// value captured at startup wrote to the closed transcript.
-func TestLiveLogFollowsTheSwap(t *testing.T) {
-	first, second := &countingLog{}, &countingLog{}
-	var current agent.SessionLog = first
-	lg := liveLog{get: func() agent.SessionLog { return current }}
-	_ = lg.Log("usage", nil)
-	current = second
-	_ = lg.Log("usage", nil)
-	if first.n != 1 || second.n != 1 {
-		t.Fatalf("records: first=%d second=%d, want one each", first.n, second.n)
-	}
-	current = nil
-	if err := lg.Log("usage", nil); err == nil {
-		t.Fatal("a disabled log must fail the write, not drop it silently")
 	}
 }
 

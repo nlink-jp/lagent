@@ -39,6 +39,17 @@ type transcript struct {
 	sessionID   string
 }
 
+// log records to the transcript in use, and records nothing when there
+// is none — the one nil-safe path for the session's own records (ADR-0054
+// §2.2). /clear's report to the old transcript went through a nil
+// *session.Logger here once, and panicked (ADR-0054, found while reading).
+func (t *transcript) log(kind string, data any) error {
+	if t.sessionLog == nil {
+		return nil
+	}
+	return t.sessionLog.Log(kind, data)
+}
+
 // workArea is the session work directory; "" when there is none. /clear
 // rotates it.
 type workArea struct {
@@ -242,10 +253,8 @@ func (sess *liveSession) reconnectMCP(recheck bool) string {
 	// `/mcp reload` had no row and could not be excluded until some
 	// other toggle healed it (pre-release review).
 	sess.settings.inv = sess.mcpInv
-	if sess.sessionLog != nil {
-		_ = sess.sessionLog.Log("mcp_reload", map[string]any{
-			"servers": len(sess.mcpClients), "tools": mcpTools})
-	}
+	_ = sess.log("mcp_reload", map[string]any{
+		"servers": len(sess.mcpClients), "tools": mcpTools})
 	var b strings.Builder
 	fmt.Fprintf(&b, sess.msgs.MCPReloadedFmt, len(sess.mcpClients), mcpTools)
 	for _, s := range sess.mcpSummary {
@@ -328,10 +337,8 @@ func (sess *liveSession) reconnectServer(server string) (mcpfilter.Filter, mcpIn
 	sess.ag.RefreshTools()
 	sess.settings.inv = sess.mcpInv
 	mcpTools := mcpToolCount(sess.registry)
-	if sess.sessionLog != nil {
-		_ = sess.sessionLog.Log("mcp_reload", map[string]any{
-			"servers": len(sess.mcpClients), "tools": mcpTools, "server": server})
-	}
+	_ = sess.log("mcp_reload", map[string]any{
+		"servers": len(sess.mcpClients), "tools": mcpTools, "server": server})
 	return sess.mcpFilter, sess.mcpInv, reloadWarnings(warn.String())
 }
 
@@ -412,8 +419,8 @@ func (sess *liveSession) clear() string {
 	// The reports join the command's output: /clear runs inside the
 	// TUI, where a line written to the terminal is covered by the next
 	// redraw (ADR-0054, Found 4).
-	sess.reportPersistent("clear", &extra, recordTo(sess.curLog))
-	sess.watch.report("clear", &extra, recordTo(sess.curLog))
+	sess.reportPersistent("clear", &extra, sess.log)
+	sess.watch.report("clear", &extra, sess.log)
 	sess.ag.Restart(newLog)
 	// The new session re-checks the pins: a file that changed during
 	// the old one is left out, and the system prompt and the skill

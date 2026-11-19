@@ -457,8 +457,8 @@ func buildConfinement(sess *liveSession, fl runFlags, rs runSettings, adm admiss
 	for _, s := range skippedDirs {
 		fmt.Fprintf(sess.stderr, sess.msgs.AddedSkippedFmt+"\n", s)
 	}
-	if len(added) > 0 && sess.sessionLog != nil {
-		_ = sess.sessionLog.Log("added_directories", addedDirsRecord(added))
+	if len(added) > 0 {
+		_ = sess.log("added_directories", addedDirsRecord(added))
 	}
 	// Persistent files in the write roots are watched: what changed
 	// since the previous session is said now, what this session changes
@@ -509,12 +509,7 @@ func buildConfinement(sess *liveSession, fl runFlags, rs runSettings, adm admiss
 		denyExec: sess.cfg.Sandbox.ReadLaneDenyExec, caches: sess.cfg.Sandbox.Caches(), readLanePrompts: sess.cfg.Sandbox.ReadLanePrompts,
 		parents: func() []string { return trustpin.Parents(sess.projectDir, sess.persistentSnap) },
 		base:    rootBaseContext(rs.cfgPath), watch: sess.watch, sources: map[string]string{}, msgs: sess.msgs,
-		log: func(kind string, data any) error {
-			if sess.sessionLog == nil {
-				return nil
-			}
-			return sess.sessionLog.Log(kind, data)
-		},
+		log: sess.log,
 	}
 	for _, a := range added {
 		sess.granter.sources[a.Dir] = a.Source
@@ -999,22 +994,12 @@ func assembleSession(sess *liveSession, cmd *cobra.Command, cl *cleanups, rs run
 	reloads := slashReloads{mcp: sess.reloadMCP, load: sess.loadMCP, show: showPath, addDir: addDirSlash, dirs: sess.granter.listing}
 
 	cl.push("report the project's persistent files", func() {
-		sess.reportPersistent("exit", sess.stderr, func(kind string, data any) error {
-			if sess.sessionLog == nil {
-				return nil
-			}
-			return sess.sessionLog.Log(kind, data)
-		})
+		sess.reportPersistent("exit", sess.stderr, sess.log)
 	})
 	// Cleanups run last-first: at exit the added roots are reported before
 	// the project.
 	cl.push("report the added roots' persistent files", func() {
-		sess.watch.report("exit", sess.stderr, func(kind string, data any) error {
-			if sess.sessionLog == nil {
-				return nil
-			}
-			return sess.sessionLog.Log(kind, data)
-		})
+		sess.watch.report("exit", sess.stderr, sess.log)
 	})
 
 	return assembled{reloads: reloads, settingsData: settingsData}

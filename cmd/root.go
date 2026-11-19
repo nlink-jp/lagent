@@ -1175,33 +1175,6 @@ func (e *liveExec) set(fn tools.LaneExecFunc) {
 	e.mu.Unlock()
 }
 
-// liveLog is a SessionLog that forwards to whichever transcript is in
-// use — the value /clear reassigns (gem-agent ADR-0071 §2) — for the side-call
-// tools registered at startup. nil (session log disabled) fails the
-// write, which every side call already treats as best-effort.
-// recordTo is a record callback bound to one transcript. /clear reports
-// what the old session changed to the old transcript, which is absent
-// when the startup transcript could not be opened: a method value on the
-// nil *session.Logger locked a nil mutex and panicked the session, the
-// one transcript write in the REPL that did not check (ADR-0054, found
-// while reading; gem-agent had the same and fixed it). Absent, nothing
-// is recorded — what every other write does.
-func recordTo(lg *session.Logger) func(kind string, data any) error {
-	if lg == nil {
-		return func(string, any) error { return nil }
-	}
-	return lg.Log
-}
-
-type liveLog struct{ get func() agent.SessionLog }
-
-func (l liveLog) Log(kind string, data any) error {
-	if lg := l.get(); lg != nil {
-		return lg.Log(kind, data)
-	}
-	return errors.New("session log disabled")
-}
-
 // rotateWorkDir points every consumer of the session work directory at
 // dir ("" for none): the file tools' second root and the sandbox
 // profile. The MCP intake reads the registry, so it follows on its own;
