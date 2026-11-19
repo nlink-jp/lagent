@@ -59,7 +59,7 @@ func TestAddedWatchReportsPersistentFilesInWriteRoots(t *testing.T) {
 		}
 		return nil
 	}
-	w.report("clear", log)
+	w.report("clear", &out, log)
 	got := out.String()
 	if !strings.Contains(got, wroot) || !strings.Contains(got, "d/AGENTS.md (added)") {
 		t.Errorf("the /clear report = %q", got)
@@ -72,7 +72,7 @@ func TestAddedWatchReportsPersistentFilesInWriteRoots(t *testing.T) {
 	}
 	// Reported once: a second report with nothing new says nothing.
 	out.Reset()
-	w.report("exit", log)
+	w.report("exit", &out, log)
 	if out.Len() != 0 {
 		t.Errorf("an unchanged root was reported again: %q", out.String())
 	}
@@ -131,7 +131,7 @@ func TestAddedWatchCutAndStateFile(t *testing.T) {
 	cut = true // a command filled the root past the cap
 	snaps["a/AGENTS.md"] = "d3"
 	var recs []map[string]any
-	w.report("clear", func(kind string, data any) error {
+	w.report("clear", &buf, func(kind string, data any) error {
 		recs = append(recs, data.(map[string]any))
 		return nil
 	})
@@ -174,7 +174,7 @@ func TestAddedWatchCutAndStateFile(t *testing.T) {
 		t.Skipf("the state directory resolved anyway: %s", w.path)
 	}
 	snaps["z/AGENTS.md"] = "d4"
-	w.report("exit", nil)
+	w.report("exit", &buf, nil)
 	if !strings.Contains(buf.String(), "z/AGENTS.md (changed)") {
 		t.Errorf("without a state directory = %q", buf.String())
 	}
@@ -196,7 +196,7 @@ func TestWatchDoesNotReportAMissingRootAndForgets(t *testing.T) {
 	if err := os.Rename(root, moved); err != nil {
 		t.Fatal(err)
 	}
-	w.report("clear", nil)
+	w.report("clear", &out, nil)
 	if out.Len() != 0 {
 		t.Errorf("a missing root reported: %s", out.String())
 	}

@@ -14,6 +14,12 @@
 
 ### Fixed
 
+- **`/clear` in the TUI names the persistent files the session
+  changed.** The note "this session added or changed: …" — for the
+  project and for each directory added with write access — was written
+  to the terminal while the TUI held the screen, and the next redraw
+  covered it: it was in the transcript and nowhere on screen. It is now
+  part of `/clear`'s output.
 - **The exit summary is the last thing on screen again when a
   `session_end` hook speaks.** The resume command and the totals printed
   before the session-end hooks ran, so a hook's notice (a failure, a

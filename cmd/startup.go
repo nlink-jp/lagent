@@ -999,7 +999,7 @@ func assembleSession(sess *liveSession, cmd *cobra.Command, cl *cleanups, rs run
 	reloads := slashReloads{mcp: sess.reloadMCP, load: sess.loadMCP, show: showPath, addDir: addDirSlash, dirs: sess.granter.listing}
 
 	cl.push("report the project's persistent files", func() {
-		sess.reportPersistent("exit", func(kind string, data any) error {
+		sess.reportPersistent("exit", sess.stderr, func(kind string, data any) error {
 			if sess.sessionLog == nil {
 				return nil
 			}
@@ -1009,7 +1009,7 @@ func assembleSession(sess *liveSession, cmd *cobra.Command, cl *cleanups, rs run
 	// Cleanups run last-first: at exit the added roots are reported before
 	// the project.
 	cl.push("report the added roots' persistent files", func() {
-		sess.watch.report("exit", func(kind string, data any) error {
+		sess.watch.report("exit", sess.stderr, func(kind string, data any) error {
 			if sess.sessionLog == nil {
 				return nil
 			}

@@ -191,3 +191,22 @@ command = "echo context-from-hook"
 		t.Fatalf("the command after /clear did not answer:\n%s", r.screen())
 	}
 }
+
+// ADR-0054 Found 4: a persistent file changed during a TUI session is
+// named at /clear. The note was written to the terminal while the TUI
+// held the screen, and the next redraw covered it; it is the command's
+// output now.
+func TestTUIClearNamesAChangedPersistentFile(t *testing.T) {
+	e := newCharEnv(t)
+	r := startTUI(t, e, nil, "--no-sandbox")
+	if err := os.WriteFile(filepath.Join(e.project, "AGENTS.md"), []byte("# Project rules\n\nChanged during the session.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r.typeLine("/clear")
+	if !r.waitFor("history cleared", 10*time.Second) {
+		t.Fatalf("/clear did not answer:\n%s", r.screen())
+	}
+	if !r.waitFor("this session added or changed: AGENTS.md", 5*time.Second) {
+		t.Fatalf("the persistent-file note is not on the screen:\n%s", r.screen())
+	}
+}

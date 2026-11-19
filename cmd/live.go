@@ -124,14 +124,19 @@ func newLiveSession() *liveSession {
 	}
 }
 
-func (sess *liveSession) reportPersistent(reason string, log func(kind string, data any) error) {
+// reportPersistent says on out what this session added, changed or
+// removed among the project's persistent files, and records it. The
+// caller names out: at exit the terminal, at /clear the command's
+// output — under the TUI a write to the startup stream is covered by
+// the next redraw (ADR-0054, Found 4).
+func (sess *liveSession) reportPersistent(reason string, out io.Writer, log func(kind string, data any) error) {
 	now, a, c, r, cut := persistentReport(sess.persistentSnap, func() (map[string]string, bool) { return trustpin.Snapshot(sess.projectDir) })
 	if cut {
-		fmt.Fprintf(sess.stderr, "note: change detection covers the first %d files under the project only\n", trustpin.WalkEntries)
+		fmt.Fprintf(out, "note: change detection covers the first %d files under the project only\n", trustpin.WalkEntries)
 	}
 	if len(a)+len(c)+len(r) > 0 || cut {
 		if len(a)+len(c)+len(r) > 0 {
-			fmt.Fprintf(sess.stderr, sess.msgs.PersistentSessionFmt+"\n", describeSnapshotDiff(a, c, r))
+			fmt.Fprintf(out, sess.msgs.PersistentSessionFmt+"\n", describeSnapshotDiff(a, c, r))
 		}
 		if log != nil {
 			_ = log("persistent_changes", map[string]any{"reason": reason, "added": a, "changed": c, "removed": r, "cut": cut})
@@ -404,8 +409,11 @@ func (sess *liveSession) clear() string {
 	// session is dropped by the epoch advanced now (ADR-0046).
 	sess.granter.beginClear()
 	sess.sessionEndHooks("clear")
-	sess.reportPersistent("clear", recordTo(sess.curLog))
-	sess.watch.report("clear", recordTo(sess.curLog))
+	// The reports join the command's output: /clear runs inside the
+	// TUI, where a line written to the terminal is covered by the next
+	// redraw (ADR-0054, Found 4).
+	sess.reportPersistent("clear", &extra, recordTo(sess.curLog))
+	sess.watch.report("clear", &extra, recordTo(sess.curLog))
 	sess.ag.Restart(newLog)
 	// The new session re-checks the pins: a file that changed during
 	// the old one is left out, and the system prompt and the skill
