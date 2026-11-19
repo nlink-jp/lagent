@@ -154,3 +154,17 @@ Implemented on lagent `main` in the order of §3: the `/clear` panic fix (`e527e
 ### What judged it
 
 The characterization recorded on v0.32.0 plus the panic fix; the exit sequence on every scenario and on a start failing in five places; the TUI driven under tmux; the resume and grant tests calling `openTranscript` and `buildConfinement` instead of copies; the source-reading tests reading every file of `cmd` or the session wiring, whose list is itself checked — it named `startup.go` and `frontends.go` when they were missing, and the stdin-reader test was found reading `root.go` alone after the readers had left it. The release passes of §4 (the whole diff, then the fix diff) run before the release that ships this.
+
+### The review before release (2026-11-19)
+
+One independent pass over `v0.32.0..HEAD`, as §4 bounds it. Nine findings; each was triaged against this record:
+
+1. **Two refusal messages were changed by the restructure** (medium): the rewrite of locals into fields reached inside the strings, and `/show` and the model's `show_image` read "cannot draw inline fe.images" and "has no ld.screen". Fixed (`8bdb095`). Every string literal of `cmd` was then compared between v0.32.0 and HEAD with a Go parser: these two were the only ones changed. `TestNoStringLiteralNamesAWiringLocal` refuses the class, and `TestShowRefusalReadsItsReason` pins `/show`'s text end to end. gem-agent v0.108.1 shipped the same two strings.
+2. **The plain REPL's window lookup raced the startup tee** (present in v0.32.0): it started before the banner, and its warning wrote the tee while the start froze it. Fixed (`34da088`): the lookup starts after the banner, and the tee is locked.
+3. **The plain reference held this machine's macOS release.** Normalized (`c61f63b`).
+4. **The characterization covers less than "nothing observable changes"**: every scenario runs unsandboxed, with no MCP server, no resume, no added directory and no model tier. Recorded here as the limit of what judged §1–§2: those paths were checked by reading and by the resume and grant tests that call the phases, not by comparing output against v0.32.0. Recording them now would pin only the code as it is, not that the restructure kept them.
+5. **Found 5's fix sent every surface method back to the stream when the TUI ended**, so a turn left running past the third Ctrl+C could print after the exit summary. Fixed (`a539a7e`): `surface.endTUI` lets the exit's hook notices through and drops the rest.
+6. **`transcript.log`, which §2.2 promised, did not exist**: six inline nil checks and `recordTo` remained. Implemented (`7250378`); `recordTo` is gone.
+7. **`liveLog` had no caller outside its own test**, and `recordTo`'s comment had slid into it. Removed (`7250378`).
+8. **The inert-streams order check saw only `runREPL`'s own statements**, not the stream reads inside the phases. A call handed `cmd` now counts (`48838c5`).
+9. **Unused parameters** of the front ends and `loadProject`, a no-op read, and a directory name copied from gem-agent. Removed (`d466220`, `c61f63b`).

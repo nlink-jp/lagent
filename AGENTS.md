@@ -335,8 +335,12 @@ answers.
   So does anything written to a terminal stream: under the TUI the next
   redraw covers it (Found 4). A reporter used both at `/clear` and at exit
   takes its writer per call rather than keeping the startup one. After
-  the TUI ends, `runTUI` clears the surface's program: an ended program
-  drops what it is sent (Found 5).
+  the TUI ends, `runTUI` calls `surface.endTUI`: an ended program drops
+  what it is sent, so the exit's hook notices go to the stream and
+  everything else is dropped — a turn left running must not print after
+  the exit summary (Found 5). Text an operator or a model reads never
+  names a variable: `TestNoStringLiteralNamesAWiringLocal` refuses a
+  literal naming a wiring local, which a rename once reached.
 
 - **A path through a link outside the roots is rewritten once, in the
   tool-call loop** (`Agent.intoRoots` → `sandbox.IntoRoot`, ADR-0041,
