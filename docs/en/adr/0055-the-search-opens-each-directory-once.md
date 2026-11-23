@@ -30,8 +30,8 @@ The three changes of gem-agent ADR-0125 §1–§3, as written there, with lagent
 
 1. **Each directory is opened once, and its files are opened by one name** (gem-agent ADR-0125 §1).
    - The walk holds an `os.Root` for the directory it is in, opened from the one above it with `OpenRoot(name)`. The listing, the `.gitignore` and each file are reached through that handle.
-   - The start of the walk is first opened the way the file tools open, which does not wait. Only a directory is then opened as a root, so a FIFO or a regular file named as `path` gets today's answer.
-   - The residual is a directory swapped for a FIFO between the listing and its `OpenRoot`. It is judged on ADR-0053 §1's four answers as gem-agent ADR-0125 §1 judges it: it needs a program written to race the runtime (origin D), and it gives that program a search that waits until the operator interrupts.
+   - Every directory, the start included, is opened as `OpenRoot(name + "/.")`, which resolves the name as a directory and refuses anything else at once, a FIFO included. So a FIFO or a regular file named as `path` gets today's answer. *(Corrected by the review before release; see the addendum.)*
+   - A directory swapped for a FIFO between the listing and its open is refused the same way. The first version of this ADR accepted it as a residual; the review before release found that, in process, an interrupt did not end such a call.
 2. **Files are read and matched side by side, and used in walk order** (gem-agent ADR-0125 §2).
    - One goroutine walks as now and emits every step the loop counted.
    - Up to `min(GOMAXPROCS, 8)` workers read and match the files.
@@ -100,3 +100,16 @@ The breaks gem-agent used, put in and taken out again:
 - A worker that does not release its directory handle: the descriptor test failed.
 
 The references are v0.32.1's own. Sorted line by line, every one of the 25 holds the same lines as gem-agent's: only the order of the footers differs, as the Context says.
+
+## Addendum: the review before release (2026-11-23)
+
+One independent pass over the whole difference, and one over gem-agent's change it ports. Every finding of either applies to both, and both runtimes took the same fixes: see gem-agent ADR-0125's addendum "the review before release" for the five findings and what was done. In short:
+
+- A directory swapped for a FIFO held the call past an interrupt, in process. Directories, the start included, are now opened through `name/.` (corrected in §1 above).
+- A result waiting in walk order held its whole file; a worker now keeps only the clipped lines it prints.
+- The random equivalence test now crosses block edges.
+- Accepted, as recorded: descriptors grow with depth, and a walk finishes on the root it started with.
+
+lagent's footer assembly after the cap, and its allotment, were checked by the review and are unchanged.
+
+The findings have one cause, recorded with the full list in gem-agent ADR-0125's addendum ("why the design missed these"). The design restated only the old loop's output. The loop also held other properties, and moving its work onto goroutines changed them silently. Every property was listed and checked in both runtimes. The one that can return with a later edit — an open that waits — is held by the same test of the code's shape here: `TestFileToolOpensDoNotWait`.
