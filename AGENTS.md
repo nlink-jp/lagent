@@ -328,6 +328,15 @@ answers.
   reading source read `cmdSources` or `wiringSource`
   (`cmd/sources_test.go`), whose file list is itself checked — a check of
   a file the code left passes on nothing.
+- **`search_files` is judged by its own references**
+  (`internal/tools/searchjudge_test.go`, ADR-0055): its output over
+  generated trees equals `internal/tools/testdata/searchjudge/` byte for
+  byte, at one worker and at eight. Everything that reaches the output
+  is applied by the calling goroutine in walk order
+  (`internal/tools/searchwalk.go`): a new count travels in the stream
+  as an item, never kept by the walk or a worker. The references are
+  lagent's own — its footers come in a different order from
+  gem-agent's. `-update` only when the output is meant to change.
 - **Hook notices raised inside a slash command are collected, never
   sent** (ADR-0054, Found 1): the slash handler runs in Bubble Tea's
   `Update`, where `Program.Send` never returns. Anything a slash command

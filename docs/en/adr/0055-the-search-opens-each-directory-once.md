@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | **Accepted** (2026-11-23) |
+| Status | **Accepted** (2026-11-23) — implemented (see the addendum) |
 | Date | 2026-11-23 |
 | Binds | lagent |
 | Decision makers | nlink-jp maintainers |
@@ -70,3 +70,33 @@ The plan of gem-agent ADR-0125, one commit per step:
 
 - **Do nothing in lagent.** The two runtimes would differ in a tool they share by design, for no reason either has. lagent runs local models whose rounds are shorter than Vertex's, so 100 ms is a larger share of a turn there.
 - **Port only §1.** It is the timing-free half and needs no goroutines. It leaves `(?i)` at about 200 ms in the child, and the two runtimes would keep different search code that must be ported apart from now on.
+
+## Addendum: the implementation (2026-11-23)
+
+Implemented in the order of the plan, one commit per step: the judge, §1, §3, §2. Each change came from gem-agent's commit for the same step: `ceabbbe`, `32c94b9` and `061afe7`. ADR citations were renumbered to lagent's: ADR-0016 for the child, gem-agent's own numbers for what lagent did not renumber. The new files record their source commit.
+
+### Measured again
+
+The same script, trees and profile as the Context. Each figure is the median of five warm runs, both binaries measured in the same sitting.
+
+| Tree | Pattern | v0.32.1 | Now |
+|---|---|---|---|
+| gem-agent | literal, not found | 146 ms | 71 ms |
+| gem-agent | `func New` | 145 ms | 70 ms |
+| gem-agent | `func \w+Registry` | 149 ms | 70 ms |
+| gem-agent | `(?i)thought signature` | 297 ms | 93 ms |
+| cli-series | literal, not found | 319 ms | 111 ms |
+| cli-series | `(?i)thought signature` | 595 ms | 152 ms |
+
+The fixed cost is unchanged (35–38 ms). Every figure is at the expected gain.
+
+### What the judge was shown to catch
+
+The breaks gem-agent used, put in and taken out again:
+
+- §3 without the anchor exclusion: three scenarios failed.
+- §2 counting past the cap: the cap scenarios failed at both worker counts.
+- The walk taking directories before files: ten scenarios failed.
+- A worker that does not release its directory handle: the descriptor test failed.
+
+The references are v0.32.1's own. Sorted line by line, every one of the 25 holds the same lines as gem-agent's: only the order of the footers differs, as the Context says.

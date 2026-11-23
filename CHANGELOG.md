@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`search_files` is about twice as fast, and its output does not
+  change** (ADR-0055, the port of gem-agent's). Most of its time went
+  into opening files: each open resolved the path one directory at a
+  time from the project root. The search now opens each directory once
+  and its files by one name, reads and matches up to eight files side
+  by side, and, for a pattern with a literal prefix, checks each block
+  of 1024 lines before matching its lines one by one. Measured through
+  the sandbox on gem-agent's repository (789 files): 146 ms → 71 ms,
+  and 297 ms → 93 ms for a `(?i)` pattern; the 37 ms each call costs to
+  start is unchanged. The result is byte-for-byte what 0.32.1 returned,
+  checked by a test against its output.
+
 ## [0.32.1] - 2026-11-19
 
 ### Changed
