@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
-	"strings"
 	"sync/atomic"
 
 	"github.com/nlink-jp/lagent/internal/ignore"
@@ -42,6 +41,7 @@ type searchItemKind int
 
 const (
 	itemFile        searchItemKind = iota // a file handed to the workers; res carries its result
+	itemDirEntered                        // the walk is about to list a directory: counts nothing, but bounds the read-ahead
 	itemDirUnlisted                       // a directory that could not be opened or listed
 	itemDirOverCap                        // a directory with more than DirEntryCap entries
 	itemIgnoredDir                        // name is the ignored directory's
@@ -149,6 +149,13 @@ func (w *searchWalker) halted() bool {
 // false when the walk must end: a cancel, or the call stopped.
 func (w *searchWalker) dir(d *dirRef, dir string, rules *ignore.Rules) bool {
 	defer d.release()
+	// Entering a directory is a step of the stream like any other, so
+	// the read-ahead bound covers directories: a subtree with nothing
+	// else to emit is not listed ahead of the calling goroutine (third
+	// verification, ADR-0055).
+	if !w.emit(searchItem{kind: itemDirEntered}) {
+		return false
+	}
 	if searchTestHook != nil {
 		searchTestHook("dir", dir)
 	}
@@ -259,13 +266,11 @@ func searchWorker(ctx context.Context, stop <-chan struct{}, jobs <-chan searchJ
 			j.res <- fileResult{skip: skip, err: err}
 			continue
 		}
-		count, hits, cut := scanLines(data, re, blocks, searchPerFileCap, stopped)
 		// A result may wait for the calling goroutine; it keeps the
-		// clipped lines it will print, copied, not the file's text the
-		// hits point into (pre-release review of ADR-0055).
-		for i := range hits {
-			hits[i].text = strings.Clone(clipRunes(strings.TrimSpace(hits[i].text), searchLineClip))
-		}
+		// clipped lines it will print, and only what it keeps is read and
+		// copied out of the line (pre-release review and third
+		// verification of ADR-0055).
+		count, hits, cut := scanLines(data, re, blocks, searchPerFileCap, clipSearchLine, stopped)
 		j.res <- fileResult{count: count, hits: hits, cut: cut}
 	}
 }
