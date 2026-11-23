@@ -113,3 +113,5 @@ One independent pass over the whole difference, and one over gem-agent's change 
 lagent's footer assembly after the cap, and its allotment, were checked by the review and are unchanged.
 
 The findings have one cause, recorded with the full list in gem-agent ADR-0125's addendum ("why the design missed these"). The design restated only the old loop's output. The loop also held other properties, and moving its work onto goroutines changed them silently. Every property was listed and checked in both runtimes. The one that can return with a later edit — an open that waits — is held by the same test of the code's shape here: `TestFileToolOpensDoNotWait`.
+
+The verification of the fixes (one pass, bounded to that table) found one missing row (nothing is opened past the cap), one overstated row (memory) and five gaps in the open test. Both runtimes took the same fixes, recorded in gem-agent ADR-0125's table and its section "the verification of the fixes".
