@@ -116,7 +116,7 @@ them: they are part of the hook payload contract, and a hook that holds
 per-session state needs them to tie a call to its session. Their first
 consumer, agent-board, is archived; the contract is not.
 
-An MCP time budget is stated once, by the work that owns it (`withBudget` in
+An MCP time budget is stated once, by the work that owns it (`WithBudget` in
 `internal/mcp/client.go`). The handshake runs under `mcp.startup_timeout_sec`,
 an ordinary call under `mcp.call_timeout_sec`; `rawCall` and `send` take the
 budget their context already states instead of layering `c.timeout` on top.
@@ -525,7 +525,13 @@ answers.
   ADR-0050). A FIFO where the runtime opens a name makes it wait until
   the operator interrupts; git carries no FIFO, so it takes an approved
   command or a process outside the lanes. The file tools' own
-  non-waiting open is a different matter and stays.
+  non-waiting open is a different matter and stays: a directory the
+  walks open as a root goes through `openDirRoot` (`name/.`), because
+  `os.Root.OpenRoot` sets neither `O_DIRECTORY` nor `O_NONBLOCK` and a
+  FIFO put where a directory was listed held a walk past an interrupt
+  (ADR-0055). `TestFileToolOpensDoNotWait`
+  (`internal/tools/opens_test.go`) judges every open in tools and
+  `internal/ignore`, and admits a new one only with its reason.
 - **The lanes' anchors are the first answer their names gave**
   (ADR-0052 §2; `sandbox.ResolveKept`, `internal/sandbox/kept.go`) — the
   lanes are built again at `/clear` and at each grant, and a command in
