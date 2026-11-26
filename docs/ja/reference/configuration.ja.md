@@ -35,11 +35,11 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `[sandbox.scratch_caches]` | `GOCACHE = "go-build"` | 全 `shell_exec` がセッション scratch に向けるツールチェインのキャッシュ。環境変数 = ディレクトリ名。read レーン用は scratch に、write と operator レーン用は作業ディレクトリの隣の別のディレクトリに置く（ADR-0042）。別のツールチェインは行を足す（`PIP_CACHE_DIR`、`UV_CACHE_DIR`、`npm_config_cache`）、`""` で行を消す。再生成できるキャッシュだけ — ローダ変数とレーンが決める変数は拒否され、プロジェクトファイルからは設定できない |
 | `[agent].max_turns` | `50` | 1 ターンのラウンド予算。対話中はチェックポイント、`-p` では停止。絶対上限は 3 倍 |
 | `[agent].shell_timeout_sec` | `120` | `shell_exec` のコマンドごとのタイムアウト |
-| `[agent].auto_approve` | `false` | 自動承認で開始: 規則層で Safe の呼び出しは尋ねずに走り、Review と Block は尋ねる。**`-p` では無視** — そこでは `--auto` だけが有効。`/auto on|off` と shift+tab でセッション中に変更 |
-| `[agent].read_only` | `false` | レーン天井を有効にして開始: セッションのスクラッチの外は何も変えない。`-p` でも効く。`--read-only` / `--writable` で実行ごとに、`/readonly on|off` でセッション中に上書き。ランタイムが下げることはない |
+| `[agent].auto_approve` | `false` | 自動承認で開始: 規則層で Safe の呼び出しは尋ねずに走り、Review と Block は尋ねる。**`-p` では無視** — そこでは `--auto` だけが有効。`/auto on\|off` と shift+tab でセッション中に変更 |
+| `[agent].read_only` | `false` | レーン天井を有効にして開始: セッションのスクラッチの外は何も変えない。`-p` でも効く。`--read-only` / `--writable` で実行ごとに、`/readonly on\|off` でセッション中に上書き。ランタイムが下げることはない |
 | `[agent].auto_compact` | `true` | 要求が窓を埋める前に、会話の古い部分を要約に畳む（ADR-0033）。窓が分かっている必要がある（`[model].context_window` かプロバイダからの検出）。`/compact` はどちらでも使える。2 回続けて失敗するとそのセッションでは止まる。`/settings` でセッション中に切り替えられる |
 | `[agent].compact_at_pct` | `80` | 送る直前の要求の見込みの大きさが窓のこの割合に達すると発動する。10〜99。`/settings` に表示される。変えるには再起動 |
-| `[mcp].enabled` | `true` | `false` で global とプロジェクトの全 MCP サーバを無効化。`--mcp on|off` で実行ごとに上書き |
+| `[mcp].enabled` | `true` | `false` で global とプロジェクトの全 MCP サーバを無効化。`--mcp on\|off` で実行ごとに上書き |
 | `[mcp].call_timeout_sec` | `60` | MCP ツール呼び出しごとのタイムアウト |
 | `[mcp].startup_timeout_sec` | `30` | サーバーが挨拶を返すまでの猶予（spawn + `initialize` + 最初の `tools/list`）。呼び出し用とは別枠。サーバーは並列に起動するので、これが縛るのは合計ではなく最も遅い 1 本 |
 | `[mcp].exclude` | （未設定） | このセッションに無いサーバ、またはその一機能。プロジェクトの `.lagent.toml` は追加のみ可、削除は不可 |
@@ -208,9 +208,11 @@ command     = "/Users/you/hooks/session-end.sh"
 | `LAGENT_STATE_DIR` | 読む | 状態ルート（セッション、作業ディレクトリ、ピン）。既定は `~/.local/state` 下 |
 | `LAGENT_MCP_STDERR` | 読む | `1` で MCP サーバの stderr を端末に通す（デバッグ用。通常は捨てる） |
 | `LAGENT_LLM_TRACE` | 読む | ディレクトリ。モデルへの全リクエストを `<yyyymmdd-hhmmss.mmm>-<nnn>-request.json`、生の SSE 応答を `<yyyymmdd-hhmmss.mmm>-<nnn>-response.sse` として書き出す。試行ごとに 1 対（`<nnn>` はプロセス内の連番。ADR-0007 の再送も独自の 1 対）。リクエスト側は送った本文そのもの — 指示ファイルを含むシステムプロンプト、ツールスキーマ、ランタイム事実メッセージ、ツール結果を含む全履歴。応答側はストリームをバイト単位でそのまま保存するので、ADR-0009 が履歴にも transcript にも残さない `reasoning_content` の差分も含む（200 以外の応答本文もここに入る）。ディレクトリは `0700`、ファイルは `0600` で作る（transcript と同じ）。書き込みに失敗するとそのターンはエラーで終わる。ファイルは何も消さない — 診断が済んだら削除すること（デバッグとベンチの診断用。通常は off） |
+| `RUNEWIDTH_EASTASIAN` | 読む | CJK ロケール下で罫線を測るために固定した幅の扱いを差し替える（表示のデバッグ用。通常は設定しない） |
 | `LAGENT_SESSION_ID` | export | セッション id。`shell_exec` の子プロセスと `.mcp.json` の `${LAGENT_SESSION_ID}` 向け |
 | `LAGENT_WORK_DIR` | export | セッション作業ディレクトリ。同じく `.mcp.json` で展開できる |
 | `LAGENT_PROJECT_DIR` | export | プロジェクトディレクトリ。それを知る必要がある子プロセス向け |
+| `TMPDIR`、`TMP`、`TEMP` | export | read レーンの `shell_exec` 向け: セッションのスクラッチ |
 | `GOCACHE`（と `[sandbox.scratch_caches]` の全行） | export | 全レーンの `shell_exec` 向け: セッションのディレクトリ（read レーンは scratch、承認済みレーンは別のディレクトリ）。Go のコンパイル・vet・テストが read レーンで走る（sandbox は `~/Library` 下のキャッシュを拒否する）。あなた自身のキャッシュには触れない |
 
 **あなたが export した変数は絞り込みません**（ADR-0017）。コマンドが動かす
@@ -254,12 +256,13 @@ MCP サーバも、フックも同じです。read レーンの素の `env` は�
 | `/memory` | ディスク上のメモリを両スコープ・置き場所付きで一覧 |
 | `/remember [global] <name> <fact>` | メモリを保存: project スコープ、キーワードで global。同名は更新（ADR-0013） |
 | `/forget [global] <name>` | メモリを削除 |
-| `/auto on|off` | セッションの自動承認を切り替え（shift+tab も同じ） |
-| `/readonly on|off` | セッションのレーン天井を切り替え |
+| `/auto on\|off` | セッションの自動承認を切り替え（shift+tab も同じ） |
+| `/readonly on\|off` | セッションのレーン天井を切り替え |
 | `/add-dir <path>` | プロジェクト外のディレクトリを、プロジェクトと同じく書ける形で lagent の終了まで足す（ADR-0046）。行の残りがパス。リンクを経由するパスは何も足さず実パスを示す |
 | `/read-dir <path>` | プロジェクト外のディレクトリを、読むだけの形で lagent の終了まで足す |
 | `/dirs` | プロジェクト、作業ディレクトリ、追加ディレクトリの一覧。引数なしの `/add-dir` と `/read-dir` も同じ |
 | `/settings` | 設定の表示と編集（出所つき） |
+| `/show <path>` | PNG か JPEG の画像（2 MiB まで）を端末に描く。パスは空白を含んでも、引用符付きでも、ウィンドウへドラッグしたファイルでもよい（ADR-0022） |
 | `/usage` | このセッションのトークン明細 |
 | `/version` | 版数の行 |
 | `/compact` | 会話の古い部分をいま要約に畳む。直近のメッセージはそのまま残す（ADR-0033） |
@@ -277,6 +280,6 @@ MCP サーバも、フックも同じです。read レーンの素の `env` は�
 | `-c`, `--continue` | このプロジェクトの直近セッションを再開 |
 | `--resume` | 特定のセッション id を再開 |
 | `--model` | この実行の `[llm].model` を上書き |
-| `--mcp on|off` | この実行の `[mcp].enabled` を上書き |
+| `--mcp on\|off` | この実行の `[mcp].enabled` を上書き |
 | `--no-sandbox` | sandbox-exec ラッパを無効化（デバッグ専用、危険） |
 | `--config` | 設定ファイルのパス |

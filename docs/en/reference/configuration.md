@@ -35,11 +35,11 @@ Unknown keys are errors (strict decode).
 | `[sandbox.scratch_caches]` | `GOCACHE = "go-build"` | toolchain caches every `shell_exec` points into the session scratch, environment variable = directory name; the read lane's copy is in the scratch, the write and operator lanes' in a separate directory beside the work directory (ADR-0042). Add a row for another toolchain (`PIP_CACHE_DIR`, `UV_CACHE_DIR`, `npm_config_cache`), set one to `""` to remove it; regenerable caches only — loader variables and the ones the lane decides are refused, and a project file cannot set it |
 | `[agent].max_turns` | `50` | round budget per turn; a checkpoint interactively, a stop in `-p`; a hard cap of 3x |
 | `[agent].shell_timeout_sec` | `120` | per-command timeout for `shell_exec` |
-| `[agent].auto_approve` | `false` | start with auto-approve on: rule-tier Safe calls run unasked, Review and Block ask. **Ignored in `-p`** — only `--auto` arms it there. `/auto on|off` and shift+tab change it for the session |
-| `[agent].read_only` | `false` | start with the lane ceiling in force: nothing outside the session scratch may change. Applies in `-p` too; `--read-only` / `--writable` override it per run, `/readonly on|off` per session. Nothing in the runtime lowers it |
+| `[agent].auto_approve` | `false` | start with auto-approve on: rule-tier Safe calls run unasked, Review and Block ask. **Ignored in `-p`** — only `--auto` arms it there. `/auto on\|off` and shift+tab change it for the session |
+| `[agent].read_only` | `false` | start with the lane ceiling in force: nothing outside the session scratch may change. Applies in `-p` too; `--read-only` / `--writable` override it per run, `/readonly on\|off` per session. Nothing in the runtime lowers it |
 | `[agent].auto_compact` | `true` | summarise the older part of the conversation before a request would fill the window (ADR-0033). Needs a known window (`[model].context_window` or the provider's); `/compact` works either way. Two failed attempts turn it off for the session. `/settings` toggles it for the session |
 | `[agent].compact_at_pct` | `80` | the share of the window, projected for the request about to be sent, at which it fires; 10–99. Shown in `/settings`; restart to change |
-| `[mcp].enabled` | `true` | `false` disables every MCP server, global and project; `--mcp on|off` overrides per run |
+| `[mcp].enabled` | `true` | `false` disables every MCP server, global and project; `--mcp on\|off` overrides per run |
 | `[mcp].call_timeout_sec` | `60` | per-call timeout for an MCP tool |
 | `[mcp].startup_timeout_sec` | `30` | how long a server may take to say hello (spawn + `initialize` + the first `tools/list`). Separate from the call budget; servers are spawned in parallel, so this bounds the slowest one, not their sum |
 | `[mcp].exclude` | (unset) | servers or single functions this session does not have; a project's `.lagent.toml` may add to it, never remove |
@@ -220,9 +220,11 @@ Other environment variables the runtime reads or sets:
 | `LAGENT_STATE_DIR` | read | the state root (sessions, work directories, pins) instead of the default under `~/.local/state` |
 | `LAGENT_MCP_STDERR` | read | `1` passes MCP servers' stderr through to the terminal (debugging; it is discarded otherwise) |
 | `LAGENT_LLM_TRACE` | read | a directory; every model request is written there as `<yyyymmdd-hhmmss.mmm>-<nnn>-request.json` and its raw SSE reply as `<yyyymmdd-hhmmss.mmm>-<nnn>-response.sse`, one pair per attempt (`<nnn>` counts up within the process; a re-send under ADR-0007 is its own pair). The request file is the body as sent — the system prompt with the instruction files, the tool schemas, the runtime-facts message and the whole history, tool results included; the response file is the stream byte for byte, so it holds the `reasoning_content` deltas that ADR-0009 keeps out of the history and the transcript (a non-200 reply's body lands there too). The directory is created `0700` and the files `0600`, as the transcript is; a write failure ends the turn with an error. Nothing removes the files — delete them once the diagnosis is done (debugging and bench diagnosis; off otherwise) |
+| `RUNEWIDTH_EASTASIAN` | read | overrides the width model pinned for measuring box art under a CJK locale (debugging the display; unset otherwise) |
 | `LAGENT_SESSION_ID` | exported | the session id, for `shell_exec` children and `${LAGENT_SESSION_ID}` in `.mcp.json` |
 | `LAGENT_WORK_DIR` | exported | the per-session work directory, likewise expandable in `.mcp.json` |
 | `LAGENT_PROJECT_DIR` | exported | the project directory, for children that need to know it |
+| `TMPDIR`, `TMP`, `TEMP` | exported | for `shell_exec` in the read lane: the session scratch |
 | `GOCACHE` (and every `[sandbox.scratch_caches]` row) | exported | for `shell_exec` in every lane: a session directory (the scratch for the read lane, a separate one for the approved lanes), so Go compiles, vets and tests run in the read lane (the sandbox denies the cache under `~/Library`); your own cache is untouched |
 
 **Your exported variables are not filtered** (ADR-0017). Which one the
@@ -267,12 +269,13 @@ In a session:
 | `/memory` | list the memories on disk, both scopes, with where they live |
 | `/remember [global] <name> <fact>` | save a memory: project scope, or global with the keyword; the same name updates (ADR-0013) |
 | `/forget [global] <name>` | remove a memory |
-| `/auto on|off` | switch auto-approve for the session (shift+tab does the same) |
-| `/readonly on|off` | switch the lane ceiling for the session |
+| `/auto on\|off` | switch auto-approve for the session (shift+tab does the same) |
+| `/readonly on\|off` | switch the lane ceiling for the session |
 | `/add-dir <path>` | add a directory outside the project, written like the project, until lagent exits (ADR-0046). The rest of the line is the path; a path through a link adds nothing and names its real path |
 | `/read-dir <path>` | add a directory outside the project, read only, until lagent exits |
 | `/dirs` | list the project, the work directory and the added directories; a bare `/add-dir` or `/read-dir` does too |
 | `/settings` | view and edit settings, with provenance |
+| `/show <path>` | draw a PNG or JPEG image (up to 2 MiB) in the terminal; the path may hold spaces, be quoted, or be a file dragged into the window (ADR-0022) |
 | `/usage` | token statement for this session |
 | `/version` | the version line |
 | `/compact` | summarise the older part of the conversation now; the recent messages stay verbatim (ADR-0033) |
@@ -290,6 +293,6 @@ In a session:
 | `-c`, `--continue` | resume this project's most recent session |
 | `--resume` | resume a specific session id |
 | `--model` | override `[llm].model` for this run |
-| `--mcp on|off` | override `[mcp].enabled` for this run |
+| `--mcp on\|off` | override `[mcp].enabled` for this run |
 | `--no-sandbox` | disable the sandbox-exec wrapper (debugging only, unsafe) |
 | `--config` | config file path |

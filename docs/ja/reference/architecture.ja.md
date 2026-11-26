@@ -25,7 +25,8 @@ cmd/            flags, config load, project resolution, wiring, REPL/TUI
 tools パッケージはプロジェクトディレクトリだけを要する 10 の組込ツール
 （`list_files`、`list_tree`、`search_files`、`read_file`、`file_info`、
 `view_image`、`show_image`、`write_file`、`edit_file`、`shell_exec`）を持つ。`cmd/` は
-同じ `Register` で `ask_user` と `mcp_load` と全 MCP ツールを登録する。
+同じ `Register` で `ask_user`・`load_skill`・`save_memory`・`delete_memory`・
+`request_directory`・`mcp_load` と全 MCP ツールを登録する。
 
 `cmd` はセッションを段に分けて組み立てる（ADR-0054、`cmd/startup.go`）。実行の設定を決め、
 プロジェクトを受け入れ（信頼・ピン・承認ポリシー）、記録ファイルを開き、作業ディレクトリを作り、
