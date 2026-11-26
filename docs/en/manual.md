@@ -3164,6 +3164,7 @@ sandbox ([17.3](#173-checking-the-state-of-the-sandbox)).
 | `LAGENT_MCP_STDERR` | With `1`, MCP servers' error output goes to the terminal |
 | `LAGENT_LLM_TRACE` | The directory the exchange with the LLM server is written out to ([16.8](#168-inspecting-the-exchange-with-the-server)) |
 | `LC_ALL`, `LC_MESSAGES`, `LANG` | The language of the screen (when `[tui].language = "auto"`) |
+| `RUNEWIDTH_EASTASIAN` | Changes how the width of symbols such as box-drawing lines is counted (for adjusting when the display is misaligned) |
 
 ### What lagent passes to the commands it starts
 
@@ -3174,6 +3175,7 @@ These are passed to shell commands, MCP servers and hooks.
 | `LAGENT_SESSION_ID` | The session ID |
 | `LAGENT_PROJECT_DIR` | The project directory |
 | `LAGENT_WORK_DIR` | That session's work directory |
+| `TMPDIR`, `TMP`, `TEMP` | For `read` lane commands, the scratch directory dedicated to the session |
 | `GOCACHE` and so on | The cache locations written in `[sandbox.scratch_caches]` (passed to shell commands only) |
 
 The environment variables of your shell are passed on as they are. Only the
@@ -3218,6 +3220,7 @@ values, write them in that server's `env` in `mcp.json`.
 | `y` does not work in the dialog | Japanese input is ON. Select with ←→ and confirm with Enter |
 | A diagram is not drawn as a picture, or an image does not appear | Pictures can be displayed in iTerm2, kitty and Ghostty. With `[tui].images` at `auto`, they are not displayed inside tmux or screen. When the terminal has been detected wrongly, set `[tui].images` to `iterm` or `kitty` |
 | The colours are hard to read | Set `[tui].theme` to one of `dark`, `light` or `plain` |
+| The frame lines are misaligned | Try setting the environment variable `RUNEWIDTH_EASTASIAN` to `0` or `1` |
 | What you typed while it was working is not sent | Input typed while it is working is sent after the turn ends. If the turn ends with an error, it goes back to the input box |
 
 ### Commands and files
