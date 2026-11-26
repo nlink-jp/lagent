@@ -83,7 +83,8 @@ lagent
 
 - **ツール:** `list_files`、`list_tree`、`search_files`、`read_file`、
   `file_info`、`view_image`、`show_image`、`write_file`、`edit_file`、`shell_exec`、
-  `ask_user`、および
+  `ask_user`、`load_skill`、`save_memory`、`delete_memory`、
+  `request_directory`、および
   `.mcp.json` の MCP サーバが提供する全ツール — モデルには目録として見せ、
   サーバごとに `mcp_load` を呼んだ時点で広告する（ローカルモデルは毎ターン
   243 スキーマを読む余裕がない。`[mcp].preload` と `[mcp].advertise = "all"`
@@ -162,7 +163,7 @@ lagent
 - **インライン画像:** モデルは `show_image` であなたに絵を見せ、あなたは
   `/show <path>` で見たい画像を出す（PNG か JPEG、2 MiB まで。パスは空白を含んでも、
   引用符付きでも、ウィンドウへドラッグしたファイルでもよい）。端末が描けるときに、入力欄より上の画面に
-  収まる最大の大きさで、ただし画像そのものより大きくはせずに描く（iTerm2 と kitty。
+  収まる最大の大きさで、ただし画像そのものより大きくはせずに描く（iTerm2、kitty、Ghostty。
   `[tui].images`、既定は `auto`、tmux・screen の中では off）。`view_image` は
   逆向きで、**モデルが**画像を見るためのものである（ADR-0020/0021/0022/0037）。
 - **待っている対話は端末を鳴らす:** 承認や質問が 6 秒キー入力無しのままだと、TUI は端末のベルを

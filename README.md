@@ -89,7 +89,8 @@ run, so give third-party text to `-p`.
 
 - **Tools:** `list_files`, `list_tree`, `search_files`, `read_file`,
   `file_info`, `view_image`, `show_image`, `write_file`, `edit_file`, `shell_exec`,
-  `ask_user`, and
+  `ask_user`, `load_skill`, `save_memory`, `delete_memory`,
+  `request_directory`, and
   every tool of the MCP servers in `.mcp.json` — shown to the model as a
   catalog, and advertised per server once it calls `mcp_load` (a local
   model cannot afford 243 schemas on every turn; `[mcp].preload` and
@@ -179,7 +180,7 @@ run, so give third-party text to `-p`.
 - **Inline images:** the model shows you a picture with `show_image`, and
   you ask for one with `/show <path>` (PNG or JPEG, up to 2 MiB; the path may
   hold spaces, be quoted, or be a file dragged into the window) — drawn in the terminal when it can
-  draw (iTerm2 or kitty; `[tui].images`, `auto` by default, off inside tmux
+  draw (iTerm2, kitty or Ghostty; `[tui].images`, `auto` by default, off inside tmux
   and screen), as large as the screen above the input allows and never
   larger than the picture itself. `view_image` is the other direction: that
   is the model looking at an image, not you (ADR-0020/0021/0022/0037).
