@@ -3,6 +3,8 @@
 // existing project's MCP setup works without lagent-specific config.
 //
 // Ported from gem-agent internal/mcp at be7609980022e38314268c58ca94a6517e6f5d28 (v0.74.0), ADR-0001.
+// client.go and its tests were ported again from gem-agent at
+// bd33298e4faa2a29f96e979a14f8a42437c612fe (the move to nlink-jp/mcp), ADR-0056.
 package mcp
 
 import (

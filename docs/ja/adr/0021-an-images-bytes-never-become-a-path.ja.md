@@ -20,7 +20,7 @@ ADR-0020 はレーンを作り、供給源を開いたまま残し、反証さ�
 `[image saved at <path> … use view_image on that path]` を渡している
 （[mcpresult.go:304](../../../cmd/mcpresult.go)）。つまりパスはそこにある。しかし `write` は
 `os.Stat` で短絡し（[mcpresult.go:344](../../../cmd/mcpresult.go)）、毎回の呼び出しがサーバに
-work dir を `_meta[workdir.MetaKey]` で渡す（[client.go:639](../../../internal/mcp/client.go)）。
+work dir を `_meta[workdir.MetaKey]` で渡す（[client.go:498](../../../internal/mcp/client.go)）。
 ローカルのサーバ子は自分の名前・ツール名・返すバイト列・ディレクトリを知るので、応答の前に
 content-addressed の名前へ symlink を置ける。するとランタイムは何も書かず、パスはサーバが選んだ
 先を指す。`view_image` 経由でそこへ到達する道は封じ込められている。エージェントが強制者の判定
@@ -45,7 +45,7 @@ work dir の getter とバイト上限とプレビュー長だけで（[mcpresul
 バイト同一である）: デコード後の画像 1 MiB あたり約 **3.6 ms**。64 KiB の 0.35 ms から 8 MiB の
 29 ms まで線形で、payload の文字列は同時に 3 箇所に存在する — emit 経路、Bubble Tea のキュー、
 端末の scrollback。今日これを縛るものは JSON-RPC のフレーム上限だけで
-（`scannerMax = 10 MiB`、[client.go:29](../../../internal/mcp/client.go)）、ブロックあたりおよそ
+（`scannerMax = 10 MiB`、[client.go:26](../../../internal/mcp/client.go)）、ブロックあたりおよそ
 7.5 MiB のデコード後バイト列を許す。測定をここで繰り返さないのは、それが測っているのが共有
 コードであってランタイムではないからである。
 

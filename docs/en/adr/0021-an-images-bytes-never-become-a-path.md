@@ -25,7 +25,7 @@ into the session work directory and hands the model
 there — but `write` short-circuits on `os.Stat`
 ([mcpresult.go:344](../../../cmd/mcpresult.go)) while every call hands the
 server the work directory as `_meta[workdir.MetaKey]`
-([client.go:639](../../../internal/mcp/client.go)). A local server child
+([client.go:498](../../../internal/mcp/client.go)). A local server child
 knows its own name, its tool name, the bytes it will return and the
 directory, so it can plant a symlink at the content-addressed name before
 answering; the runtime then writes nothing and the path resolves where the
@@ -57,7 +57,7 @@ MiB** of decoded image, linear from 0.35 ms at 64 KiB to 29 ms at 8 MiB,
 and the payload string is held in three places at once — the emit path,
 Bubble Tea's queue, and the terminal's scrollback. Nothing bounds it today
 but the JSON-RPC frame cap (`scannerMax = 10 MiB`,
-[client.go:29](../../../internal/mcp/client.go)), which allows roughly
+[client.go:26](../../../internal/mcp/client.go)), which allows roughly
 7.5 MiB decoded per block. The measurement is not repeated here because it
 measures shared code, not a runtime.
 
