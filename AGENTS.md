@@ -121,6 +121,12 @@ An MCP time budget is stated once, by the work that owns it (`WithBudget` in
 `mcp.startup_timeout_sec`, an ordinary call under `mcp.call_timeout_sec`; each
 request takes the budget its context already states instead of layering
 `c.timeout` on top.
+Layered, a startup budget longer than the call budget was silently cut at the
+call's, and every timeout — the handshake's included — was reported as
+`c.timeout`, sending the operator to the wrong setting. Error text names
+`budgetOf(ctx)`. Listing servers at start-up runs in parallel into an
+index-addressed slice; attaching stays serial, in configured order, so the
+tool list is deterministic.
 
 The MCP protocol is nlink-jp/mcp's, the process is ours (ADR-0056,
 organization ADR-030 §6). `internal/mcp` handles neither `initialize` nor
@@ -130,12 +136,6 @@ closes `Done`). The hand-written handshakes in `internal/mcp/*_test.go` are
 stand-ins for misbehaving peers, exempt from ADR-030 §6 by name; they answer
 `server/discover` with -32601, or the probe waits out its 5-second default and
 eats the tests' start budget.
-Layered, a startup budget longer than the call budget was silently cut at the
-call's, and every timeout — the handshake's included — was reported as
-`c.timeout`, sending the operator to the wrong setting. Error text names
-`budgetOf(ctx)`. Listing servers at start-up runs in parallel into an
-index-addressed slice; attaching stays serial, in configured order, so the
-tool list is deterministic.
 
 A terminal query leaves no reader behind. Read the reply on the calling
 goroutine, every wait bounded by `select(2)` (`waitReadable` / `readReady` in
