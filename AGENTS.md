@@ -117,9 +117,19 @@ per-session state needs them to tie a call to its session. Their first
 consumer, agent-board, is archived; the contract is not.
 
 An MCP time budget is stated once, by the work that owns it (`WithBudget` in
-`internal/mcp/client.go`). The handshake runs under `mcp.startup_timeout_sec`,
-an ordinary call under `mcp.call_timeout_sec`; `rawCall` and `send` take the
-budget their context already states instead of layering `c.timeout` on top.
+`internal/mcp/client.go`). The start (spawn and the module's `Open`) runs under
+`mcp.startup_timeout_sec`, an ordinary call under `mcp.call_timeout_sec`; each
+request takes the budget its context already states instead of layering
+`c.timeout` on top.
+
+The MCP protocol is nlink-jp/mcp's, the process is ours (ADR-0056,
+organization ADR-030 §6). `internal/mcp` handles neither `initialize` nor
+`server/discover`: it spawns, opens one module `Client` per start, kills on a
+timeout, and reaps an ended start at once (the watcher — the module only
+closes `Done`). The hand-written handshakes in `internal/mcp/*_test.go` are
+stand-ins for misbehaving peers, exempt from ADR-030 §6 by name; they answer
+`server/discover` with -32601, or the probe waits out its 5-second default and
+eats the tests' start budget.
 Layered, a startup budget longer than the call budget was silently cut at the
 call's, and every timeout — the handshake's included — was reported as
 `c.timeout`, sending the operator to the wrong setting. Error text names
@@ -238,7 +248,7 @@ internal/bounded/  the one place a read, listing or process output is capped —
                    every primitive returns the `more` fact
 internal/archtest/ AST tests pinning confined opens, bounded reads and the
                    single decision point
-internal/mcp/      .mcp.json parsing + stdio JSON-RPC client (kill-and-respawn)
+internal/mcp/      .mcp.json parsing + stdio MCP client over nlink-jp/mcp (both eras; kill-and-respawn)
 internal/mcpfilter/ the one predicate behind `[mcp] exclude`
 internal/ignore/   ignore-aware enumeration: builtin dir list + full gitignore matcher
 internal/risk/     rule tier of the auto-approve ladder (pure, no model); exact for

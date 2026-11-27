@@ -93,7 +93,7 @@ LM Studio はネイティブの `/api/v0/models/<id>`、Ollama は `/api/show` �
 `mcp__<server>__<tool>` として登録する（`[mcp].exclude` で濾過）。モデルに
 何を見せるかは別に決める（ADR-0004、`cmd/mcpload.go`）: `[mcp].advertise =
 "deferred"` ではランタイム事実メッセージが目録 — サーバごとに 1 行、ツール名と
-initialize で公開した `instructions` の最初の一文 — を運び、組込の `mcp_load`
+開いたとき（`initialize`、新方式では `server/discover`）に公開した `instructions` の最初の一文 — を運び、組込の `mcp_load`
 がそのサーバのツールをセッションの残りの間広告する。モデルに見せていない
 登録済みツールへの呼び出しは、どのゲートにも達する前に経路を添えて拒否
 される。`[mcp].preload` と `--allow mcp__<server>__*` の許可は最初から

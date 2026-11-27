@@ -41,7 +41,7 @@ Homebrew（Apple Silicon）: `brew tap nlink-jp/tap` のあと
 | `[agent].compact_at_pct` | `80` | 送る直前の要求の見込みの大きさが窓のこの割合に達すると発動する。10〜99。`/settings` に表示される。変えるには再起動 |
 | `[mcp].enabled` | `true` | `false` で global とプロジェクトの全 MCP サーバを無効化。`--mcp on\|off` で実行ごとに上書き |
 | `[mcp].call_timeout_sec` | `60` | MCP ツール呼び出しごとのタイムアウト |
-| `[mcp].startup_timeout_sec` | `30` | サーバーが挨拶を返すまでの猶予（spawn + `initialize` + 最初の `tools/list`）。呼び出し用とは別枠。サーバーは並列に起動するので、これが縛るのは合計ではなく最も遅い 1 本 |
+| `[mcp].startup_timeout_sec` | `30` | サーバーが挨拶を返すまでの猶予（spawn + 開く処理 + 最初の `tools/list`）。呼び出し用とは別枠。サーバーは並列に起動するので、これが縛るのは合計ではなく最も遅い 1 本 |
 | `[mcp].exclude` | （未設定） | このセッションに無いサーバ、またはその一機能。プロジェクトの `.lagent.toml` は追加のみ可、削除は不可 |
 | `[mcp].advertise` | `deferred` | 接続したサーバのうちモデルに見せる範囲: `deferred` はランタイム事実に目録を出し、モデルがサーバ名で `mcp_load` を呼んだ時点でそのサーバのツールを広告する。`all` は最初から全ツールを広告（計測のベースライン） |
 | `[mcp].preload` | （未設定） | `deferred` でも最初から広告するサーバ。`--allow mcp__<server>__*` の許可はその実行でそのサーバをプリロードする |

@@ -107,8 +107,8 @@ and every tool registered as `mcp__<server>__<tool>`, filtered by
 `[mcp].exclude`. What the model is shown is decided separately
 (ADR-0004, `cmd/mcpload.go`): under `[mcp].advertise = "deferred"` the
 runtime-facts message carries a catalog — one line per server with its
-tool names and the first sentence of the `instructions` it published at
-initialize — and the built-in `mcp_load` advertises a server's tools
+tool names and the first sentence of the `instructions` it published when
+it was opened (`initialize`, or `server/discover` in the modern era) — and the built-in `mcp_load` advertises a server's tools
 for the rest of the session. A call to a registered tool the model was
 not shown is refused before any gate, with the route. `[mcp].preload`
 and a `--allow mcp__<server>__*` grant advertise from the start;

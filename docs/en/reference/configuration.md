@@ -41,7 +41,7 @@ Unknown keys are errors (strict decode).
 | `[agent].compact_at_pct` | `80` | the share of the window, projected for the request about to be sent, at which it fires; 10–99. Shown in `/settings`; restart to change |
 | `[mcp].enabled` | `true` | `false` disables every MCP server, global and project; `--mcp on\|off` overrides per run |
 | `[mcp].call_timeout_sec` | `60` | per-call timeout for an MCP tool |
-| `[mcp].startup_timeout_sec` | `30` | how long a server may take to say hello (spawn + `initialize` + the first `tools/list`). Separate from the call budget; servers are spawned in parallel, so this bounds the slowest one, not their sum |
+| `[mcp].startup_timeout_sec` | `30` | how long a server may take to say hello (spawn + opening it + the first `tools/list`). Separate from the call budget; servers are spawned in parallel, so this bounds the slowest one, not their sum |
 | `[mcp].exclude` | (unset) | servers or single functions this session does not have; a project's `.lagent.toml` may add to it, never remove |
 | `[mcp].advertise` | `deferred` | what the model is shown of the connected servers: `deferred` gives it a catalog in the runtime facts and advertises a server's tools once it calls `mcp_load` with the server name; `all` advertises every tool from the start (the measurement baseline) |
 | `[mcp].preload` | (unset) | servers advertised from the start under `deferred`; a `--allow mcp__<server>__*` grant preloads that server for the run |

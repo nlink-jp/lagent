@@ -94,7 +94,10 @@ run, so give third-party text to `-p`.
   every tool of the MCP servers in `.mcp.json` — shown to the model as a
   catalog, and advertised per server once it calls `mcp_load` (a local
   model cannot afford 243 schemas on every turn; `[mcp].preload` and
-  `[mcp].advertise = "all"` are the operator's levers).
+  `[mcp].advertise = "all"` are the operator's levers). A server is opened
+  in either era of the protocol — 2026-07-28 through `server/discover`, an
+  earlier server through `initialize` — by the shared module nlink-jp/mcp
+  (ADR-0056).
 - **Partial results are reachable:** `read_file` reads by line window or
   by byte `offset`/`length` (a negative offset counts from the end), so the
   tail of a long single-line file — a tool result saved to the work
