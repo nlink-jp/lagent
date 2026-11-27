@@ -25,7 +25,7 @@ into the session work directory and hands the model
 there — but `write` short-circuits on `os.Stat`
 ([mcpresult.go:344](../../../cmd/mcpresult.go)) while every call hands the
 server the work directory as `_meta[workdir.MetaKey]`
-([client.go:498](../../../internal/mcp/client.go)). A local server child
+([client.go:529](../../../internal/mcp/client.go)). A local server child
 knows its own name, its tool name, the bytes it will return and the
 directory, so it can plant a symlink at the content-addressed name before
 answering; the runtime then writes nothing and the path resolves where the
